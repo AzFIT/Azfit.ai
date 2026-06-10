@@ -635,21 +635,21 @@ const testimonials = [
     role: 'Powerlifter, 3 years',
     quote:
       'AzFIT transformed how I track my training. The spreadsheet mode is genius — I can log my entire workout in under 2 minutes, and the progress rings keep me honest about my sleep and steps.',
-    avatar: '/avatar-alex.jpg',
+    avatar:  './avatar-alex.jpg',
   },
   {
     name: 'Sarah Kim',
     role: 'CrossFit Athlete',
     quote:
       'My coach uses the coach view to program my workouts and track my progress remotely. The achievement badges are surprisingly motivating — I\'m chasing that 10,000 sets badge now!',
-    avatar: '/avatar-sarah.jpg',
+    avatar:  './avatar-sarah.jpg',
   },
   {
     name: 'Marcus Johnson',
     role: 'Bodybuilder, 5 years',
     quote:
       "I've tried dozens of fitness apps. AzFIT is the first one that actually understands how serious lifters track data. The RPE logging, rest timer, and volume charts are exactly what I needed.",
-    avatar: '/avatar-marcus.jpg',
+    avatar:  './avatar-marcus.jpg',
   },
 ];
 

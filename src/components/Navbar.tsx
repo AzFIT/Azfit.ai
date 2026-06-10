@@ -60,7 +60,7 @@ export default function Navbar({
       {/* AzFIT Logo (center) */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
         <img
-          src={isTransparent ? '/azfit-logo-text.png' : '/azfit-logo.png'}
+          src={isTransparent ?  './azfit-logo-text.png' :  './azfit-logo.png'}
           alt="AzFIT"
           className="h-7 object-contain"
           style={{

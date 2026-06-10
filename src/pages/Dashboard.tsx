@@ -124,11 +124,11 @@ const timeline = [
 ];
 
 const achievements = [
-  { label: '5000 Sets', icon: Layers, bg: 'purple', earned: true, img: '/badge-5000-sets.png' },
-  { label: '550 Kcal', icon: Flame, bg: 'teal', earned: true, img: '/badge-550-kcal.png' },
-  { label: '25 Poses', icon: PersonStanding, bg: 'purple', earned: true, img: '/badge-25-poses.png' },
-  { label: '135 Hours', icon: Clock, bg: 'aqua', earned: true, img: '/badge-135-hours.png' },
-  { label: '500 Reps', icon: Repeat, bg: 'aqua', earned: false, img: '/badge-500-reps.png' },
+  { label: '5000 Sets', icon: Layers, bg: 'purple', earned: true, img:  './badge-5000-sets.png' },
+  { label: '550 Kcal', icon: Flame, bg: 'teal', earned: true, img:  './badge-550-kcal.png' },
+  { label: '25 Poses', icon: PersonStanding, bg: 'purple', earned: true, img:  './badge-25-poses.png' },
+  { label: '135 Hours', icon: Clock, bg: 'aqua', earned: true, img:  './badge-135-hours.png' },
+  { label: '500 Reps', icon: Repeat, bg: 'aqua', earned: false, img:  './badge-500-reps.png' },
 ];
 
 const notifications = [
