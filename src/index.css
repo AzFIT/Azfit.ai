@@ -1,0 +1,422 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
+    --radius: 0.625rem;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* AzFIT Design Tokens - Light Mode */
+    --azfit-primary: #0D9488;
+    --azfit-primary-light: #14B8A6;
+    --azfit-secondary: #06B6D4;
+    --azfit-secondary-light: #22D3EE;
+    --azfit-accent: #8B5CF6;
+    --azfit-accent-light: #A78BFA;
+
+    --light-bg: #F8FAFC;
+    --light-surface: #FFFFFF;
+    --light-elevated: #F1F5F9;
+    --light-border: #E2E8F0;
+    --light-text-primary: #0F172A;
+    --light-text-secondary: #475569;
+    --light-text-muted: #94A3B8;
+
+    --dark-bg: #0F172A;
+    --dark-surface: #1E293B;
+    --dark-elevated: #334155;
+    --dark-border: #475569;
+    --dark-text-primary: #F8FAFC;
+    --dark-text-secondary: #CBD5E1;
+    --dark-text-muted: #64748B;
+
+    --success: #84CC16;
+    --success-bg: #ECFCCB;
+    --warning: #F59E0B;
+    --danger: #F87171;
+    --danger-bg: #FEF2F2;
+    --info: #06B6D4;
+
+    --glow-teal: rgba(13, 148, 136, 0.4);
+    --glow-cyan: rgba(6, 182, 212, 0.3);
+    --glow-purple: rgba(139, 92, 246, 0.3);
+    --backdrop: rgba(15, 23, 42, 0.6);
+
+    /* Text shadows */
+    --text-shadow-dark: 0 1px 2px rgba(255, 255, 255, 0.8);
+    --text-shadow-light: 0 1px 3px rgba(0, 0, 0, 0.5);
+    --text-shadow-hero: 0 2px 4px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 0, 0, 0.3);
+    --text-shadow-glow: 0 0 12px currentColor, 0 2px 4px rgba(0, 0, 0, 0.3);
+
+    /* Page background */
+    --page-bg: #F8FAFC;
+    --page-text: #0F172A;
+    --card-bg: #FFFFFF;
+    --card-border: #E2E8F0;
+  }
+
+  [data-theme="dark"] {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --success-bg: #1A2E05;
+    --danger-bg: #450A0A;
+
+    --text-shadow-dark: 0 1px 3px rgba(0, 0, 0, 0.5);
+    --text-shadow-light: 0 1px 2px rgba(255, 255, 255, 0.8);
+
+    --page-bg: #0F172A;
+    --page-text: #F8FAFC;
+    --card-bg: #1E293B;
+    --card-border: #475569;
+  }
+
+  /* Smooth theme transitions */
+  :root {
+    transition: background-color 300ms ease, color 200ms ease;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+    background-color: var(--page-bg);
+    color: var(--page-text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer utilities {
+  /* Text shadow utilities for readability */
+  .text-shadow-dark {
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+  }
+
+  .text-shadow-light {
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  }
+
+  .text-shadow-hero {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .text-shadow-glow {
+    text-shadow: 0 0 12px currentColor, 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Smooth scroll behavior */
+  .scroll-smooth {
+    scroll-behavior: smooth;
+  }
+
+  /* Snap scroll for mobile testimonials */
+  .snap-x {
+    scroll-snap-type: x mandatory;
+  }
+
+  .snap-start {
+    scroll-snap-align: start;
+  }
+
+  /* Glassmorphic backgrounds */
+  .glass {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  [data-theme="dark"] .glass {
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  /* Glow effects for progress rings */
+  .glow-teal {
+    filter: drop-shadow(0 0 8px rgba(13, 148, 136, 0.4));
+  }
+
+  .glow-cyan {
+    filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.4));
+  }
+
+  .glow-purple {
+    filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.4));
+  }
+
+  /* Dark mode image adjustments */
+  [data-theme="dark"] .dark-img-dim {
+    filter: brightness(0.6);
+  }
+
+  [data-theme="dark"] .dark-img-dim-more {
+    filter: brightness(0.5);
+  }
+}
+
+/* ═══════════════════════════════════════════
+   AI SHOWCASE COMPONENT STYLES
+   ═══════════════════════════════════════════ */
+
+.ai-showcase-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.ai-visual-inner {
+  position: relative;
+  width: 360px;
+  height: 360px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 640px) {
+  .ai-visual-inner {
+    width: 280px;
+    height: 280px;
+  }
+}
+
+/* ── Pedestal Shadow ── */
+.ai-pedestal {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translate(-50%, 40px);
+  width: 200px;
+  height: 30px;
+  background: radial-gradient(ellipse, rgba(0, 174, 239, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* ── Pulse Wave Ripples ── */
+.ai-pulse-waves {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.ai-pulse-wave {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 174, 239, 0.15);
+  width: 320px;
+  height: 320px;
+  animation: pulse-ring-anim 3s ease-out infinite;
+}
+
+.ai-pulse-wave:nth-child(2) {
+  border-color: rgba(0, 174, 239, 0.12);
+  animation-delay: 1s;
+}
+
+.ai-pulse-wave:nth-child(3) {
+  border-color: rgba(0, 174, 239, 0.08);
+  animation-delay: 2s;
+}
+
+@media (max-width: 640px) {
+  .ai-pulse-wave {
+    width: 260px;
+    height: 260px;
+  }
+}
+
+/* ── Outer Rotating Ring ── */
+.ai-outer-ring {
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 174, 239, 0.15);
+  animation: spin-slow 30s linear infinite;
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .ai-outer-ring {
+    width: 220px;
+    height: 220px;
+  }
+}
+
+/* ── Skill Icons positioned around the ring ── */
+.ai-skill-icon {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(0, 174, 239, 0.08);
+  border: 1px solid rgba(0, 174, 239, 0.12);
+  color: #00AEEF;
+  animation: spin-slow 30s linear infinite reverse;
+  transition: all 0.3s ease;
+}
+
+.ai-skill-icon:hover {
+  background: rgba(0, 174, 239, 0.2);
+  border-color: rgba(0, 174, 239, 0.35);
+  transform: scale(1.1);
+}
+
+.ai-skill-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+@media (max-width: 640px) {
+  .ai-skill-icon {
+    width: 34px;
+    height: 34px;
+  }
+  .ai-skill-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* ── Central Breathing Orb ── */
+.ai-central-orb {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 174, 239, 0.2) 0%, transparent 70%);
+  border: 2px solid rgba(0, 174, 239, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: orb-breathe 4s ease-in-out infinite;
+}
+
+.ai-central-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, rgba(0, 174, 239, 0.35) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+/* AzFIT logo inside the orb — 2x size */
+.ai-orb-logo {
+  position: relative;
+  z-index: 2;
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 16px rgba(0, 174, 239, 0.7));
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .ai-central-orb {
+    width: 140px;
+    height: 140px;
+  }
+  .ai-orb-logo {
+    width: 110px;
+    height: 110px;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   KEYFRAME ANIMATIONS
+   ═══════════════════════════════════════════ */
+
+@keyframes orb-breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 0.92;
+  }
+}
+
+@keyframes pulse-ring-anim {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
