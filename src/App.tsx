@@ -1,9 +1,13 @@
 import { Routes, Route } from 'react-router'
 import { Suspense, lazy } from 'react'
 import { ThemeProvider } from '@/hooks/useTheme'
+import { AuthProvider } from '@/hooks/useAuth'
+import ProtectedRoute from '@/components/ProtectedRoute'
 
 // Lazy-loaded pages for code splitting
 const Home = lazy(() => import('@/pages/Home'))
+const Login = lazy(() => import('@/pages/Login'))
+const Signup = lazy(() => import('@/pages/Signup'))
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
 const Analytics = lazy(() => import('@/pages/Analytics'))
 const Coach = lazy(() => import('@/pages/Coach'))
@@ -20,16 +24,36 @@ function PageLoader() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <Suspense fallback={<PageLoader />}>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/coach" element={<Coach />} />
-          <Route path="/settings" element={<Settings />} />
-        </Routes>
-      </Suspense>
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/analytics" element={
+              <ProtectedRoute>
+                <Analytics />
+              </ProtectedRoute>
+            } />
+            <Route path="/coach" element={
+              <ProtectedRoute requireTrainer>
+                <Coach />
+              </ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            } />
+          </Routes>
+        </Suspense>
+      </ThemeProvider>
+    </AuthProvider>
   )
 }
