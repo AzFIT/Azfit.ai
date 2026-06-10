@@ -59,7 +59,7 @@ export default function MessagesTab() {
   const handleSend = () => {
     if (!inputText.trim() || !activeConv) return;
     const newMsg: Message = {
-      id: Date.now(),
+      id: crypto.randomUUID(),
       sender: 'coach',
       text: inputText.trim(),
       timestamp: new Date().toLocaleTimeString([], {

@@ -324,7 +324,7 @@ export function setStoredUser(user: StoredUser | null): void {
 export function exportAllData(): string {
   const data = {
     clients: getClients(),
-    programs: getPrograms(),
+    programs: getProgramTemplates(),
     logs: getWorkoutLogs(),
     settings: getSettings(),
     exportedAt: new Date().toISOString(),

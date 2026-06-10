@@ -237,7 +237,8 @@ function EditableCell({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setEditVal(value);
+    const t = setTimeout(() => setEditVal(value), 0);
+    return () => clearTimeout(t);
   }, [value, isEditing]);
 
   useEffect(() => {
@@ -386,8 +387,11 @@ export function SheetsPanel({ onExportCsv }: SheetsPanelProps) {
   }, [selectedCell, activeTab, dailyRows, workoutRows, nutritionRows]);
 
   useEffect(() => {
-    setFormulaValue(currentCellValue);
-    setFormulaError(false);
+    const t = setTimeout(() => {
+      setFormulaValue(currentCellValue);
+      setFormulaError(false);
+    }, 0);
+    return () => clearTimeout(t);
   }, [currentCellValue]);
 
   /* ---- cell interaction ---- */

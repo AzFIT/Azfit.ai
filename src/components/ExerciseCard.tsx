@@ -1,6 +1,6 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Plus, Trash2, Check, TrendingUp } from 'lucide-react';
+import { ChevronDown, Plus, Trash2, Check } from 'lucide-react';
 import type { LoggedExercise, LoggedSet, SetType } from '@/lib/storage';
 import { SET_TYPE_COLORS } from '@/lib/storage';
 

@@ -1,18 +1,17 @@
 import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Save, Plus, Trash2, Copy, ChevronRight, Dumbbell,
-  Clock, RotateCcw, CheckCircle2, ArrowLeft, FileSpreadsheet
+  Save, Trash2, Dumbbell,
+  RotateCcw, CheckCircle2, ArrowLeft, FileSpreadsheet
 } from 'lucide-react';
 import { ExerciseSelector } from '@/components/ExerciseSelector';
 import {
-  getSlotCategory,
   getDefaultSlotExercise,
   getCategoryById,
   EXERCISE_CATEGORIES,
 } from '@/data/exerciseDatabase';
-import { MASTER_PROGRAMS } from '@/data/masterWorkouts';
-import { getProgramTemplates, saveProgramTemplate, type ProgramTemplate } from '@/lib/storage';
+import { masterPrograms } from '@/data/masterWorkouts';
+import { saveProgramTemplate, type ProgramTemplate } from '@/lib/storage';
 import { useNavigate } from 'react-router';
 
 // ═══════════════════════════════════════════════════════════════
@@ -122,20 +121,20 @@ export default function ProgramBuilderPage() {
   };
 
   const loadFromMaster = (programId: string) => {
-    const master = MASTER_PROGRAMS.find((p) => p.id === programId);
+    const master = masterPrograms.find((p) => p.id === programId);
     if (!master) return;
-    const days: ProgramTemplate['days'] = master.phases[0]?.workouts.map((w, i) => ({
+    const days: ProgramTemplate['days'] = master.phases[0]?.workouts.map((w, i: number) => ({
       id: `day-${i + 1}`,
       name: w.name,
-      dayNumber: w.dayNumber,
-      slots: w.exercises.map((ex) => ({
+      dayNumber: i + 1,
+      slots: w.exercises.map((ex: { order: string; name: string; category: string; sets: number; reps: string; tempo: string; restSeconds: number }) => ({
         order: ex.order,
         exercise: ex.name,
         categoryId: ex.category,
         sets: ex.sets,
         reps: ex.reps,
         tempo: ex.tempo,
-        restSeconds: ex.rest,
+        restSeconds: ex.restSeconds,
       })),
     })) || [];
     setProgram({
@@ -143,7 +142,7 @@ export default function ProgramBuilderPage() {
       name: master.name,
       category: master.category,
       description: master.description,
-      weeks: master.phases[0]?.weeks || 4,
+      weeks: master.phases[0]?.durationWeeks || 4,
       days,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -248,7 +247,7 @@ export default function ProgramBuilderPage() {
           >
             <h3 className="text-sm font-semibold text-slate-300 mb-3">Load from Master Templates</h3>
             <div className="flex gap-2 flex-wrap">
-              {MASTER_PROGRAMS.map((p) => (
+              {masterPrograms.map((p: { id: string; name: string }) => (
                 <button
                   key={p.id}
                   onClick={() => loadFromMaster(p.id)}

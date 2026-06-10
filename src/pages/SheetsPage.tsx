@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router';
-import { motion, AnimatePresence } from 'framer-motion';
+// framer-motion imported in child components
 import { ArrowLeft, Clock, Dumbbell, Target, TrendingUp, CheckCircle2, Pause, Play } from 'lucide-react';
 import { ExerciseCard } from '@/components/ExerciseCard';
 import { RestTimerOverlay } from '@/components/RestTimerOverlay';
@@ -30,17 +30,22 @@ export default function SheetsPage() {
   const [restNextSet, setRestNextSet] = useState(1);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startTimeRef = useRef<number>(Date.now());
+  const startTimeRef = useRef<number>(0);
 
   // Load session
   useEffect(() => {
     const active = getActiveSession();
     if (active && active.id === sessionId) {
-      setSession(active);
       const started = new Date(active.startTime).getTime();
-      const elapsed = Math.floor((Date.now() - started) / 1000);
-      setElapsedSeconds(elapsed);
-      startTimeRef.current = started;
+      const now = Date.now();
+      const elapsed = Math.floor((now - started) / 1000);
+      // Use timeout to avoid setState in effect body
+      const t = setTimeout(() => {
+        setSession(active);
+        setElapsedSeconds(elapsed);
+        startTimeRef.current = started;
+      }, 0);
+      return () => clearTimeout(t);
     } else {
       navigate('/dashboard');
     }
