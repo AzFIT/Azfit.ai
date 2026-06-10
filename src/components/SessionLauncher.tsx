@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Play, Dumbbell, Clock, ChevronRight, Flame } from 'lucide-react';
 import { findWorkoutById, type MasterWorkout } from '@/data/masterWorkouts';
 import { setActiveSession, type WorkoutLog, type LoggedExercise, type LoggedSet } from '@/lib/storage';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 interface SessionLauncherProps {
   isOpen: boolean;

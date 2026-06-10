@@ -13,7 +13,7 @@ import {
 } from '@/data/exerciseDatabase';
 import { MASTER_PROGRAMS } from '@/data/masterWorkouts';
 import { getProgramTemplates, saveProgramTemplate, type ProgramTemplate } from '@/lib/storage';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 // ═══════════════════════════════════════════════════════════════
 // TYPES
