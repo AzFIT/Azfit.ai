@@ -50,7 +50,7 @@ export const clients: Client[] = [
   {
     id: 1,
     name: 'Alex Chen',
-    avatar: '/avatar-alex.jpg',
+    avatar:  './avatar-alex.jpg',
     age: 28,
     status: 'active',
     fitnessScore: 82,
@@ -66,7 +66,7 @@ export const clients: Client[] = [
   {
     id: 2,
     name: 'Sarah Miller',
-    avatar: '/avatar-sarah.jpg',
+    avatar:  './avatar-sarah.jpg',
     age: 26,
     status: 'active',
     fitnessScore: 76,
@@ -82,7 +82,7 @@ export const clients: Client[] = [
   {
     id: 3,
     name: 'Marcus Johnson',
-    avatar: '/avatar-marcus.jpg',
+    avatar:  './avatar-marcus.jpg',
     age: 32,
     status: 'active',
     fitnessScore: 88,
@@ -98,7 +98,7 @@ export const clients: Client[] = [
   {
     id: 4,
     name: 'Emily Davis',
-    avatar: '/avatar-default-f.jpg',
+    avatar:  './avatar-default-f.jpg',
     age: 29,
     status: 'away',
     fitnessScore: 71,
@@ -114,7 +114,7 @@ export const clients: Client[] = [
   {
     id: 5,
     name: 'James Wilson',
-    avatar: '/avatar-default-m.jpg',
+    avatar:  './avatar-default-m.jpg',
     age: 35,
     status: 'active',
     fitnessScore: 79,
@@ -130,7 +130,7 @@ export const clients: Client[] = [
   {
     id: 6,
     name: 'Olivia Taylor',
-    avatar: '/avatar-default-f.jpg',
+    avatar:  './avatar-default-f.jpg',
     age: 24,
     status: 'new',
     fitnessScore: 68,
@@ -146,7 +146,7 @@ export const clients: Client[] = [
   {
     id: 7,
     name: 'Daniel Lee',
-    avatar: '/avatar-default-m.jpg',
+    avatar:  './avatar-default-m.jpg',
     age: 30,
     status: 'active',
     fitnessScore: 85,
@@ -162,7 +162,7 @@ export const clients: Client[] = [
   {
     id: 8,
     name: 'Sophia Garcia',
-    avatar: '/avatar-default-f.jpg',
+    avatar:  './avatar-default-f.jpg',
     age: 27,
     status: 'active',
     fitnessScore: 74,
@@ -228,7 +228,7 @@ export const conversations: Conversation[] = [
   {
     id: 1,
     clientName: 'Alex Chen',
-    clientAvatar: '/avatar-alex.jpg',
+    clientAvatar:  './avatar-alex.jpg',
     preview: 'Great squat session today! Hit 100kg for 5 reps clean.',
     time: '2m ago',
     unread: 1,
@@ -242,7 +242,7 @@ export const conversations: Conversation[] = [
   {
     id: 2,
     clientName: 'Sarah Miller',
-    clientAvatar: '/avatar-sarah.jpg',
+    clientAvatar:  './avatar-sarah.jpg',
     preview: 'Can we adjust my push day? My shoulder is feeling tight.',
     time: '1h ago',
     unread: 2,
@@ -254,7 +254,7 @@ export const conversations: Conversation[] = [
   {
     id: 3,
     clientName: 'Marcus Johnson',
-    clientAvatar: '/avatar-marcus.jpg',
+    clientAvatar:  './avatar-marcus.jpg',
     preview: 'Thanks for the new program. Starting hypertrophy phase Monday.',
     time: '3h ago',
     unread: 0,
@@ -266,7 +266,7 @@ export const conversations: Conversation[] = [
   {
     id: 4,
     clientName: 'Emily Davis',
-    clientAvatar: '/avatar-default-f.jpg',
+    clientAvatar:  './avatar-default-f.jpg',
     preview: 'Missed yesterday due to work. Back on track today!',
     time: '5h ago',
     unread: 1,
@@ -278,7 +278,7 @@ export const conversations: Conversation[] = [
   {
     id: 5,
     clientName: 'James Wilson',
-    clientAvatar: '/avatar-default-m.jpg',
+    clientAvatar:  './avatar-default-m.jpg',
     preview: 'Completed all sessions this week. Feeling great!',
     time: '1d ago',
     unread: 0,
