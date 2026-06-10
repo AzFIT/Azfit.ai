@@ -175,6 +175,21 @@ export function saveClientProgram(program: StoredProgram): void {
 
 // ─── Workout Sessions / Logs ───
 
+export type SetType = 'Normal' | 'Warm-up' | 'Drop Set' | 'To Failure' | 'AMRAP' | 'Superset' | 'Giant Set' | 'Cluster' | 'Back-off' | 'Eccentric';
+
+export const SET_TYPE_COLORS: Record<SetType, string> = {
+  'Normal': '#94A3B8',
+  'Warm-up': '#64748B',
+  'Drop Set': '#EF4444',
+  'To Failure': '#F59E0B',
+  'AMRAP': '#22C55E',
+  'Superset': '#00AEEF',
+  'Giant Set': '#EC4899',
+  'Cluster': '#8B5CF6',
+  'Back-off': '#06B6D4',
+  'Eccentric': '#F97316',
+};
+
 export interface LoggedSet {
   setNumber: number;
   load: number;
@@ -182,6 +197,7 @@ export interface LoggedSet {
   rpe: number;
   done: boolean;
   restSeconds: number;
+  type: SetType;
 }
 
 export interface LoggedExercise {
@@ -191,6 +207,7 @@ export interface LoggedExercise {
   targetSets: number;
   targetReps: string;
   targetLoad: number;
+  tempo: string;
   sets: LoggedSet[];
   notes?: string;
 }
@@ -203,10 +220,11 @@ export interface WorkoutLog {
   workoutName: string;
   phaseName: string;
   weekNumber: number;
+  dayNumber: number;
   exercises: LoggedExercise[];
   startTime: string;
   endTime?: string;
-  durationMinutes: number;
+  durationSeconds: number;
   totalVolume: number;
   totalSets: number;
   completedSets: number;

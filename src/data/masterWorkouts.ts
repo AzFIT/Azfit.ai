@@ -559,17 +559,292 @@ export const phase2Intensification: MasterPhase = {
 };
 
 // ═══════════════════════════════════════════════════════════════
+// PHASE 3: GBC REALIZATION (Weeks 9-12)
+// Heavy compounds, lower reps, explosive concentrics
+// 3-4 sets, 6-8 reps, tempo '5-0-X-0', rest 60-90s
+// ═══════════════════════════════════════════════════════════════
+
+export const phase3Realization: MasterPhase = {
+  id: 'gbc-phase-3',
+  name: 'Phase 3: GBC Realization',
+  block: 'Block 3',
+  durationWeeks: 4,
+  goal: 'Maximal strength expression, heavy compound lifts, reduced volume, longer rest',
+  workouts: [
+    {
+      id: 'p3-w9-fullbody-1',
+      name: 'FULL BODY 1',
+      exercises: [
+        {
+          order: 'A1',
+          name: 'Weighted Pull Up',
+          category: 'PULLING',
+          reps: '6',
+          sets: 4,
+          tempo: '5-0-X-0',
+          tut: 30,
+          restSeconds: 90,
+          link: 'Pull Up Tutorial',
+        },
+        {
+          order: 'A2',
+          name: 'BB Front Squat',
+          category: 'BILATERAL_QUAD',
+          reps: '6',
+          sets: 4,
+          tempo: '5-0-X-0',
+          tut: 30,
+          restSeconds: 90,
+          link: 'Front Squat Tutorial',
+        },
+        {
+          order: 'B1',
+          name: 'BB Bench Press',
+          category: 'PRESSING',
+          reps: '6',
+          sets: 4,
+          tempo: '5-0-X-0',
+          tut: 30,
+          restSeconds: 90,
+          link: 'Bench Press Tutorial',
+        },
+        {
+          order: 'B2',
+          name: 'BB RDL',
+          category: 'POSTERIOR',
+          reps: '6',
+          sets: 4,
+          tempo: '5-0-X-0',
+          tut: 30,
+          restSeconds: 90,
+          link: 'RDL Tutorial',
+        },
+        {
+          order: 'C1',
+          name: 'Standing BB Press',
+          category: 'PRESSING',
+          reps: '8',
+          sets: 3,
+          tempo: '3-0-1-0',
+          tut: 32,
+          restSeconds: 60,
+          link: 'Overhead Press Tutorial',
+        },
+        {
+          order: 'C2',
+          name: 'BB Curl',
+          category: 'BICEPS',
+          reps: '8',
+          sets: 3,
+          tempo: '3-0-1-0',
+          tut: 32,
+          restSeconds: 60,
+          link: 'Barbell Curl Tutorial',
+        },
+        {
+          order: 'C3',
+          name: 'Ab Wheel Rollout',
+          category: 'BRACING',
+          reps: '10',
+          sets: 3,
+          tempo: '3-0-1-0',
+          tut: 40,
+          restSeconds: 60,
+          link: 'Ab Wheel Tutorial',
+        },
+      ],
+    },
+    {
+      id: 'p3-w9-fullbody-2',
+      name: 'FULL BODY 2',
+      exercises: [
+        {
+          order: 'A1',
+          name: 'BB Incline Press',
+          category: 'PRESSING',
+          reps: '6',
+          sets: 4,
+          tempo: '5-0-X-0',
+          tut: 30,
+          restSeconds: 90,
+          link: 'Incline Press Tutorial',
+        },
+        {
+          order: 'A2',
+          name: 'Trap Bar Deadlift',
+          category: 'POSTERIOR',
+          reps: '6',
+          sets: 4,
+          tempo: '5-0-X-0',
+          tut: 30,
+          restSeconds: 90,
+          link: 'Trap Bar Deadlift Tutorial',
+        },
+        {
+          order: 'B1',
+          name: 'Chest Supported Row',
+          category: 'PULLING',
+          reps: '6',
+          sets: 4,
+          tempo: '5-0-X-0',
+          tut: 30,
+          restSeconds: 90,
+          link: 'Chest Supported Row Tutorial',
+        },
+        {
+          order: 'B2',
+          name: 'BB Back Squat',
+          category: 'BILATERAL_QUAD',
+          reps: '6',
+          sets: 4,
+          tempo: '5-0-X-0',
+          tut: 30,
+          restSeconds: 90,
+          link: 'Back Squat Tutorial',
+        },
+        {
+          order: 'C1',
+          name: 'Face Pull',
+          category: 'DELT_SCAP_CONTROL',
+          reps: '12',
+          sets: 3,
+          tempo: '2-1-2-1',
+          tut: 60,
+          restSeconds: 45,
+          link: 'Face Pull Tutorial',
+        },
+        {
+          order: 'C2',
+          name: 'Rope Pushdown',
+          category: 'TRICEPS',
+          reps: '10',
+          sets: 3,
+          tempo: '3-0-1-0',
+          tut: 40,
+          restSeconds: 45,
+          link: 'Tricep Pushdown Tutorial',
+        },
+        {
+          order: 'C3',
+          name: 'Side Plank',
+          category: 'BRACING',
+          reps: '30s',
+          sets: 3,
+          tempo: 'N/A',
+          tut: 30,
+          restSeconds: 45,
+          link: 'Side Plank Tutorial',
+        },
+      ],
+    },
+    {
+      id: 'p3-w9-upper-focus',
+      name: 'UPPER FOCUS',
+      exercises: [
+        {
+          order: 'A1',
+          name: 'Weighted Dips',
+          category: 'PRESSING',
+          reps: '6',
+          sets: 4,
+          tempo: '5-0-X-0',
+          tut: 30,
+          restSeconds: 90,
+          link: 'Weighted Dips Tutorial',
+        },
+        {
+          order: 'A2',
+          name: 'BB Bent Over Row',
+          category: 'PULLING',
+          reps: '6',
+          sets: 4,
+          tempo: '5-0-X-0',
+          tut: 30,
+          restSeconds: 90,
+          link: 'Bent Over Row Tutorial',
+        },
+        {
+          order: 'B1',
+          name: 'DB Shoulder Press',
+          category: 'PRESSING',
+          reps: '8',
+          sets: 3,
+          tempo: '3-0-1-0',
+          tut: 32,
+          restSeconds: 60,
+          link: 'DB Shoulder Press Tutorial',
+        },
+        {
+          order: 'B2',
+          name: 'Lat Pulldown - Wide',
+          category: 'PULLING',
+          reps: '8',
+          sets: 3,
+          tempo: '3-0-1-0',
+          tut: 32,
+          restSeconds: 60,
+          link: 'Lat Pulldown Tutorial',
+        },
+        {
+          order: 'C1',
+          name: 'Cable Lateral Raise',
+          category: 'DELT_SCAP_CONTROL',
+          reps: '12',
+          sets: 3,
+          tempo: '2-1-2-1',
+          tut: 60,
+          restSeconds: 45,
+          link: 'Lateral Raise Tutorial',
+        },
+        {
+          order: 'C2',
+          name: 'Incline DB Curl',
+          category: 'BICEPS',
+          reps: '10',
+          sets: 3,
+          tempo: '3-0-1-0',
+          tut: 40,
+          restSeconds: 45,
+          link: 'Incline Curl Tutorial',
+        },
+        {
+          order: 'C3',
+          name: 'Hanging Leg Raise',
+          category: 'BRACING',
+          reps: '10',
+          sets: 3,
+          tempo: '3-0-1-0',
+          tut: 40,
+          restSeconds: 45,
+          link: 'Hanging Leg Raise Tutorial',
+        },
+      ],
+    },
+    {
+      id: 'p3-w9-custom-1',
+      name: 'CUSTOM SESSION 1',
+      exercises: [],
+    },
+    {
+      id: 'p3-w9-custom-2',
+      name: 'CUSTOM SESSION 2',
+      exercises: [],
+    },
+  ],
+};
+
+// ═══════════════════════════════════════════════════════════════
 // MASTER PROGRAM
 // ═══════════════════════════════════════════════════════════════
 
 export const gbcProgram: MasterProgram = {
   id: 'gbc-standard',
   name: 'GBC Standard',
-  description: 'German Body Composition — 8-week protocol alternating accumulation and intensification blocks',
+  description: 'German Body Composition — 12-week protocol with accumulation, intensification, and realization blocks',
   category: 'GBC',
   level: 'Intermediate',
-  totalWeeks: 8,
-  phases: [phase1Accumulation, phase2Intensification],
+  totalWeeks: 12,
+  phases: [phase1Accumulation, phase2Intensification, phase3Realization],
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -594,6 +869,17 @@ export function getPhaseById(programId: string, phaseId: string): MasterPhase | 
 export function getWorkoutById(programId: string, phaseId: string, workoutId: string): MasterWorkout | undefined {
   const phase = getPhaseById(programId, phaseId);
   return phase?.workouts.find((w) => w.id === workoutId);
+}
+
+// Simplified: find workout by ID across all phases/programs
+export function findWorkoutById(workoutId: string): MasterWorkout | undefined {
+  for (const program of masterPrograms) {
+    for (const phase of program.phases) {
+      const workout = phase.workouts.find((w) => w.id === workoutId);
+      if (workout) return workout;
+    }
+  }
+  return undefined;
 }
 
 export function getAllExercises(): string[] {
