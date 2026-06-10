@@ -30,8 +30,8 @@ export default function Login() {
       await signIn(email, password);
       await refreshUser();
       navigate('/dashboard');
-    } catch (err: any) {
-      setError(err.message || 'Invalid email or password');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Invalid email or password');
     } finally {
       setLoading(false);
     }
@@ -42,8 +42,8 @@ export default function Login() {
     try {
       await loginAsAdmin();
       navigate('/coach');
-    } catch (err: any) {
-      setError(err.message || 'Admin login failed');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Admin login failed');
     } finally {
       setLoading(false);
     }

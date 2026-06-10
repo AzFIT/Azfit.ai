@@ -43,7 +43,7 @@ function workoutToSession(
     targetLoad: 0,
     tempo: ex.tempo,
     sets: Array.from({ length: ex.sets }, (_, i) =>
-      createEmptySet(i + 1, ex.rest)
+      createEmptySet(i + 1, ex.restSeconds)
     ),
     notes: '',
   }));

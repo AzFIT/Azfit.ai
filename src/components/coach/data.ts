@@ -40,7 +40,7 @@ export interface Conversation {
 }
 
 export interface Message {
-  id: number;
+  id: number | string;
   sender: 'coach' | 'client';
   text: string;
   timestamp: string;

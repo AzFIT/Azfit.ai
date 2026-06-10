@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Dumbbell, Search, X } from 'lucide-react';
-import { EXERCISE_CATEGORIES, getCategoryById, type ExerciseCategory } from '@/data/exerciseDatabase';
+import { EXERCISE_CATEGORIES, getCategoryById } from '@/data/exerciseDatabase';
 
 interface ExerciseSelectorProps {
   value: string;
