@@ -88,7 +88,7 @@ export default function Layout({
         <nav className="flex flex-1 flex-col gap-1 p-4">
           {/* Logo */}
           <div className="mb-4 flex items-center gap-3 px-3">
-            <img src="/azfit-logo.png" alt="AzFIT" className="h-8 object-contain" />
+            <img src="./azfit-logo.png" alt="AzFIT" className="h-8 object-contain" />
             <span className="text-lg font-bold" style={{ color: 'var(--page-text)' }}>
               AzFIT
             </span>
@@ -178,7 +178,7 @@ export default function Layout({
               {/* Close button */}
               <div className="flex h-14 items-center justify-between px-4">
                 <div className="flex items-center gap-2">
-                  <img src="/azfit-logo.png" alt="AzFIT" className="h-7 object-contain" />
+                  <img src="./azfit-logo.png" alt="AzFIT" className="h-7 object-contain" />
                   <span className="text-base font-bold" style={{ color: 'var(--page-text)' }}>
                     AzFIT
                   </span>

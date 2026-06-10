@@ -13,7 +13,7 @@ const Footer = memo(function Footer() {
         {/* Brand Column */}
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
-            <img src="/azfit-logo.png" alt="AzFIT" className="h-8 object-contain" />
+            <img src="./azfit-logo.png" alt="AzFIT" className="h-8 object-contain" />
             <span className="text-lg font-bold text-shadow-light" style={{ color: 'var(--dark-text-primary)' }}>
               AzFIT
             </span>

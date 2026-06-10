@@ -140,7 +140,7 @@ function HeroNav({
     >
       {/* Logo */}
       <div className="flex items-center gap-2">
-        <img src="/azfit-logo-text.png" alt="AzFIT" className="h-9 object-contain" />
+        <img src="./azfit-logo-text.png" alt="AzFIT" className="h-9 object-contain" />
       </div>
 
       {/* Desktop nav links */}
@@ -190,7 +190,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
         transition={{ duration: 20, ease: 'linear', repeat: Infinity, repeatType: 'reverse' }}
       >
         <img
-          src="/azfit-hero-bg.png"
+          src="./azfit-hero-bg.png"
           alt=""
           className="h-full w-full object-cover"
         />
@@ -752,7 +752,7 @@ function DownloadCTA({ onNavigate }: { onNavigate: (path: string) => void }) {
       {/* Background */}
       <div className="absolute inset-0">
         <img
-          src="/azfit-hero-bg.png"
+          src="./azfit-hero-bg.png"
           alt=""
           className="h-full w-full object-cover dark-img-dim"
           style={{ filter: 'brightness(0.4)' }}
@@ -877,7 +877,7 @@ function MobileDrawer({
             {/* Header */}
             <div className="flex h-16 items-center justify-between px-4">
               <div className="flex items-center gap-2">
-                <img src="/azfit-logo-text.png" alt="AzFIT" className="h-8 object-contain" />
+                <img src="./azfit-logo-text.png" alt="AzFIT" className="h-8 object-contain" />
               </div>
               <button onClick={onClose} className="text-white active:scale-[0.92]">
                 <X size={24} />

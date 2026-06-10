@@ -76,7 +76,7 @@ export default function AIShowcase() {
         <div className="ai-central-orb">
           <div className="ai-central-glow" />
           <img
-            src="/azfit-logo.png"
+            src="./azfit-logo.png"
             alt="AzFIT AI"
             className="ai-orb-logo"
             draggable={false}

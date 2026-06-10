@@ -340,7 +340,7 @@ export default function Settings() {
                 style={{ borderColor: 'var(--azfit-primary)' }}
               >
                 <img
-                  src="/avatar-alex.jpg"
+                  src="./avatar-alex.jpg"
                   alt="Alex Chen"
                   className="h-full w-full object-cover"
                   onError={(e) => {
