@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, Dumbbell, ArrowLeft } from 'lucide-react';
-import { signIn } from '@/services/auth';
+import { Eye, EyeOff, Dumbbell, ArrowLeft, Shield } from 'lucide-react';
+import { signIn, isAdminCredentials } from '@/services/auth';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { refreshUser } = useAuth();
+  const { refreshUser, loginAsAdmin } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -20,11 +20,30 @@ export default function Login() {
     setLoading(true);
 
     try {
+      // Check for admin credentials
+      if (isAdminCredentials(email, password)) {
+        await loginAsAdmin();
+        navigate('/coach');
+        return;
+      }
+
       await signIn(email, password);
       await refreshUser();
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Invalid email or password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAdminQuickLogin = async () => {
+    setLoading(true);
+    try {
+      await loginAsAdmin();
+      navigate('/coach');
+    } catch (err: any) {
+      setError(err.message || 'Admin login failed');
     } finally {
       setLoading(false);
     }
@@ -82,6 +101,30 @@ export default function Login() {
             <p className="mt-1 text-sm" style={{ color: '#94A3B8' }}>
               Sign in to your AzFIT account
             </p>
+          </div>
+
+          {/* Admin Quick Login Button */}
+          <button
+            onClick={handleAdminQuickLogin}
+            disabled={loading}
+            className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-semibold transition-all duration-200 hover:opacity-90 disabled:opacity-50"
+            style={{
+              borderColor: '#8B5CF6',
+              backgroundColor: 'rgba(139, 92, 246, 0.1)',
+              color: '#A78BFA',
+            }}
+          >
+            <Shield size={18} />
+            {loading ? 'Signing in...' : 'Admin Quick Login'}
+          </button>
+
+          {/* Divider */}
+          <div className="mb-4 flex items-center gap-3">
+            <div className="h-px flex-1" style={{ backgroundColor: '#475569' }} />
+            <span className="text-xs" style={{ color: '#64748B' }}>
+              or sign in with email
+            </span>
+            <div className="h-px flex-1" style={{ backgroundColor: '#475569' }} />
           </div>
 
           {/* Error */}

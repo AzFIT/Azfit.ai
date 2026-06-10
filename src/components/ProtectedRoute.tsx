@@ -6,12 +6,14 @@ interface ProtectedRouteProps {
   children: ReactNode;
   requireTrainer?: boolean;
   requireClient?: boolean;
+  requireAdmin?: boolean;
 }
 
 export default function ProtectedRoute({
   children,
   requireTrainer = false,
   requireClient = false,
+  requireAdmin = false,
 }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
 
@@ -30,11 +32,20 @@ export default function ProtectedRoute({
     return <Navigate to="/login" replace />;
   }
 
-  if (requireTrainer && user.role !== 'trainer') {
+  // Admin bypasses all restrictions
+  if (user.isAdmin) {
+    return <>{children}</>;
+  }
+
+  if (requireAdmin && !user.isAdmin) {
     return <Navigate to="/dashboard" replace />;
   }
 
-  if (requireClient && user.role !== 'client') {
+  if (requireTrainer && !user.isAdmin && user.role !== 'trainer') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (requireClient && !user.isAdmin && user.role !== 'client') {
     return <Navigate to="/coach" replace />;
   }
 

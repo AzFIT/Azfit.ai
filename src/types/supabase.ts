@@ -15,7 +15,7 @@ export type Database = {
           email: string;
           full_name: string | null;
           avatar_url: string | null;
-          role: 'trainer' | 'client';
+          role: 'admin' | 'trainer' | 'client';
           created_at: string;
           updated_at: string;
         };

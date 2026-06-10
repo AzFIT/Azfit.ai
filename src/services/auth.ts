@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/supabase';
 
-export type UserRole = 'trainer' | 'client';
+export type UserRole = 'admin' | 'trainer' | 'client';
 
 export interface AuthUser {
   id: string;
@@ -9,6 +9,16 @@ export interface AuthUser {
   full_name: string | null;
   avatar_url: string | null;
   role: UserRole;
+  isAdmin: boolean;
+}
+
+// Hardcoded admin credentials for development
+const ADMIN_EMAIL = 'admin@azfit.ai';
+const ADMIN_PASSWORD = 'AzFIT2024!';
+
+// Check if credentials match admin
+export function isAdminCredentials(email: string, password: string): boolean {
+  return email.toLowerCase() === ADMIN_EMAIL && password === ADMIN_PASSWORD;
 }
 
 // Sign up with email and password
@@ -26,6 +36,8 @@ export async function signUp(
         full_name: fullName,
         role: role,
       },
+      // Auto-confirm email for development
+      emailRedirectTo: undefined,
     },
   });
 
@@ -42,6 +54,40 @@ export async function signIn(email: string, password: string) {
 
   if (error) throw error;
   return data;
+}
+
+// Admin login - bypasses normal auth, creates a mock session
+export async function adminLogin(): Promise<AuthUser> {
+  // Try to sign in as admin first (if account exists in Supabase)
+  try {
+    const { data } = await supabase.auth.signInWithPassword({
+      email: ADMIN_EMAIL,
+      password: ADMIN_PASSWORD,
+    });
+
+    if (data.user) {
+      return {
+        id: data.user.id,
+        email: data.user.email || ADMIN_EMAIL,
+        full_name: 'AzFIT Admin',
+        avatar_url: null,
+        role: 'admin',
+        isAdmin: true,
+      };
+    }
+  } catch {
+    // Admin account doesn't exist yet in Supabase, use mock
+  }
+
+  // Return mock admin user for development
+  return {
+    id: '00000000-0000-0000-0000-000000000000',
+    email: ADMIN_EMAIL,
+    full_name: 'AzFIT Admin',
+    avatar_url: null,
+    role: 'admin',
+    isAdmin: true,
+  };
 }
 
 // Sign out
@@ -77,7 +123,8 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     email: profile.email,
     full_name: profile.full_name,
     avatar_url: profile.avatar_url,
-    role: profile.role,
+    role: (profile.role as UserRole) || 'client',
+    isAdmin: profile.role === 'admin',
   };
 }
 
