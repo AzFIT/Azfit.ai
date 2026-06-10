@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   UserCircle,
@@ -53,6 +54,7 @@ const tabContentVariants = {
 };
 
 export default function Coach() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabId>('clients');
 
   const renderTabContent = () => {
@@ -143,6 +145,24 @@ export default function Coach() {
               >
                 <Plus size={16} />
                 New Program
+              </button>
+              <button
+                className="flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-all duration-150 active:scale-[0.97]"
+                style={{
+                  borderColor: 'var(--card-border)',
+                  color: 'var(--page-text)',
+                  backgroundColor: 'var(--card-bg)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--light-elevated)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--card-bg)';
+                }}
+                onClick={() => navigate('/program-builder')}
+              >
+                <ClipboardList size={16} />
+                Program Builder
               </button>
               <button
                 className="flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-all duration-150 active:scale-[0.97]"

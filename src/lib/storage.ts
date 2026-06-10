@@ -9,6 +9,7 @@ const KEYS = {
   THEME: `${PREFIX}theme`,
   CLIENTS: `${PREFIX}clients`,
   PROGRAMS: `${PREFIX}programs`,
+  CLIENT_PROGRAMS: `${PREFIX}client_programs`,
   SESSIONS: `${PREFIX}sessions`,
   ACTIVE_SESSION: `${PREFIX}active_session`,
   SETTINGS: `${PREFIX}settings`,
@@ -92,6 +93,56 @@ export function deleteClient(clientId: string): void {
   set(KEYS.CLIENTS, clients);
 }
 
+// ─── Program Templates (builder) ───
+
+export interface ProgramTemplate {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  weeks: number;
+  days: ProgramTemplateDay[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProgramTemplateDay {
+  id: string;
+  name: string;
+  dayNumber: number;
+  slots: ProgramTemplateSlot[];
+}
+
+export interface ProgramTemplateSlot {
+  order: string;
+  exercise: string;
+  categoryId: string;
+  sets: number;
+  reps: string;
+  tempo: string;
+  restSeconds: number;
+}
+
+export function getProgramTemplates(): ProgramTemplate[] {
+  return get<ProgramTemplate[]>(KEYS.PROGRAMS, []);
+}
+
+export function saveProgramTemplate(template: ProgramTemplate): void {
+  const templates = getProgramTemplates();
+  const idx = templates.findIndex((p) => p.id === template.id);
+  if (idx >= 0) {
+    templates[idx] = template;
+  } else {
+    templates.push(template);
+  }
+  set(KEYS.PROGRAMS, templates);
+}
+
+export function deleteProgramTemplate(id: string): void {
+  const templates = getProgramTemplates().filter((p) => p.id !== id);
+  set(KEYS.PROGRAMS, templates);
+}
+
 // ─── Programs (assigned to clients) ───
 
 export interface StoredProgram {
@@ -107,19 +158,19 @@ export interface StoredProgram {
   createdAt: string;
 }
 
-export function getPrograms(): StoredProgram[] {
-  return get<StoredProgram[]>(KEYS.PROGRAMS, []);
+export function getClientPrograms(): StoredProgram[] {
+  return get<StoredProgram[]>(KEYS.CLIENT_PROGRAMS, []);
 }
 
-export function saveProgram(program: StoredProgram): void {
-  const programs = getPrograms();
+export function saveClientProgram(program: StoredProgram): void {
+  const programs = getClientPrograms();
   const idx = programs.findIndex((p) => p.id === program.id);
   if (idx >= 0) {
     programs[idx] = program;
   } else {
     programs.push(program);
   }
-  set(KEYS.PROGRAMS, programs);
+  set(KEYS.CLIENT_PROGRAMS, programs);
 }
 
 // ─── Workout Sessions / Logs ───
