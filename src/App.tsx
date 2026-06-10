@@ -11,6 +11,8 @@ const Signup = lazy(() => import('@/pages/Signup'))
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
 const Analytics = lazy(() => import('@/pages/Analytics'))
 const Coach = lazy(() => import('@/pages/Coach'))
+const ProgramBuilder = lazy(() => import('@/pages/ProgramBuilder'))
+const SheetsPage = lazy(() => import('@/pages/SheetsPage'))
 const Settings = lazy(() => import('@/pages/Settings'))
 
 // Loading fallback
@@ -44,6 +46,16 @@ export default function App() {
             <Route path="/coach" element={
               <ProtectedRoute requireTrainer>
                 <Coach />
+              </ProtectedRoute>
+            } />
+            <Route path="/program-builder" element={
+              <ProtectedRoute requireTrainer>
+                <ProgramBuilder />
+              </ProtectedRoute>
+            } />
+            <Route path="/sheets" element={
+              <ProtectedRoute>
+                <SheetsPage />
               </ProtectedRoute>
             } />
             <Route path="/settings" element={
