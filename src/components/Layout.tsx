@@ -13,6 +13,7 @@ import {
   Apple,
   Scale,
   Dumbbell,
+  Sparkles,
 } from 'lucide-react';
 import Navbar from './Navbar';
 import AzFitChat from './chat/AzFitChat';
@@ -29,6 +30,7 @@ interface LayoutProps {
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
   { icon: Dumbbell, label: 'Workouts', path: '/sheets' },
+  { icon: Sparkles, label: 'AI Builder', path: '/ai-program-builder' },
   { icon: Apple, label: 'Nutrition', path: '/nutrition' },
   { icon: Scale, label: 'Bio Print', path: '/bioprint' },
   { icon: BarChart3, label: 'Analytics', path: '/analytics' },

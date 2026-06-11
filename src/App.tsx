@@ -18,6 +18,7 @@ const Settings = lazy(() => import('@/pages/Settings'))
 const OnboardingPage = lazy(() => import('@/pages/OnboardingPage'))
 const BioPrintPage = lazy(() => import('@/pages/BioPrintPage'))
 const NutritionPage = lazy(() => import('@/pages/Nutrition'))
+const AIProgramBuilderPage = lazy(() => import('@/pages/AIProgramBuilder'))
 
 // Loading fallback
 function PageLoader() {
@@ -77,6 +78,11 @@ export default function App() {
             <Route path="/nutrition" element={
               <ProtectedRoute>
                 <NutritionPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/ai-program-builder" element={
+              <ProtectedRoute>
+                <AIProgramBuilderPage />
               </ProtectedRoute>
             } />
           </Routes>
