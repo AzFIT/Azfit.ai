@@ -15,6 +15,13 @@ import {
   Dumbbell,
   Sparkles,
   Calendar as CalendarIcon,
+  Camera,
+  Download,
+  Timer,
+  Bell,
+  Trophy,
+  Flame,
+  Brain,
 } from 'lucide-react';
 import Navbar from './Navbar';
 import AzFitChat from './chat/AzFitChat';
@@ -35,6 +42,13 @@ const navItems = [
   { icon: CalendarIcon, label: 'Schedule', path: '/schedule' },
   { icon: Apple, label: 'Nutrition', path: '/nutrition' },
   { icon: Scale, label: 'Bio Print', path: '/bioprint' },
+  { icon: Camera, label: 'Photos', path: '/progress-photos' },
+  { icon: Timer, label: 'Timer', path: '/timer' },
+  { icon: Download, label: 'Export', path: '/export' },
+  { icon: Bell, label: 'Alerts', path: '/notifications' },
+  { icon: Trophy, label: 'Leaderboard', path: '/leaderboard' },
+  { icon: Flame, label: 'Warm-up', path: '/warmup' },
+  { icon: Brain, label: 'Recovery', path: '/deload' },
   { icon: BarChart3, label: 'Analytics', path: '/analytics' },
   { icon: UserCircle, label: 'Coach', path: '/coach' },
   { icon: Settings, label: 'Settings', path: '/settings' },

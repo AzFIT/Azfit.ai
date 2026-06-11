@@ -20,6 +20,13 @@ const BioPrintPage = lazy(() => import('@/pages/BioPrintPage'))
 const NutritionPage = lazy(() => import('@/pages/Nutrition'))
 const AIProgramBuilderPage = lazy(() => import('@/pages/AIProgramBuilder'))
 const SchedulePage = lazy(() => import('@/pages/Schedule'))
+const ProgressPhotosPage = lazy(() => import('@/pages/ProgressPhotos'))
+const ExportSharePage = lazy(() => import('@/pages/ExportShare'))
+const TimerModesPage = lazy(() => import('@/pages/TimerModes'))
+const NotificationsPage = lazy(() => import('@/pages/Notifications'))
+const LeaderboardPage = lazy(() => import('@/pages/Leaderboard'))
+const WarmupGeneratorPage = lazy(() => import('@/pages/WarmupGenerator'))
+const DeloadDetectionPage = lazy(() => import('@/pages/DeloadDetection'))
 
 // Loading fallback
 function PageLoader() {
@@ -89,6 +96,41 @@ export default function App() {
             <Route path="/schedule" element={
               <ProtectedRoute>
                 <SchedulePage />
+              </ProtectedRoute>
+            } />
+            <Route path="/progress-photos" element={
+              <ProtectedRoute>
+                <ProgressPhotosPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/export" element={
+              <ProtectedRoute>
+                <ExportSharePage />
+              </ProtectedRoute>
+            } />
+            <Route path="/timer" element={
+              <ProtectedRoute>
+                <TimerModesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/notifications" element={
+              <ProtectedRoute>
+                <NotificationsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/leaderboard" element={
+              <ProtectedRoute>
+                <LeaderboardPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/warmup" element={
+              <ProtectedRoute>
+                <WarmupGeneratorPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/deload" element={
+              <ProtectedRoute>
+                <DeloadDetectionPage />
               </ProtectedRoute>
             } />
           </Routes>
