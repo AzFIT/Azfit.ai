@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router'
 import { Suspense, lazy } from 'react'
 import { ThemeProvider } from '@/hooks/useTheme'
 import { AuthProvider } from '@/hooks/useAuth'
+import { ChatProvider } from '@/components/chat/ChatContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
 
 // Lazy-loaded pages for code splitting
@@ -14,6 +15,9 @@ const Coach = lazy(() => import('@/pages/Coach'))
 const ProgramBuilder = lazy(() => import('@/pages/ProgramBuilder'))
 const SheetsPage = lazy(() => import('@/pages/SheetsPage'))
 const Settings = lazy(() => import('@/pages/Settings'))
+const OnboardingPage = lazy(() => import('@/pages/OnboardingPage'))
+const BioPrintPage = lazy(() => import('@/pages/BioPrintPage'))
+const NutritionPage = lazy(() => import('@/pages/Nutrition'))
 
 // Loading fallback
 function PageLoader() {
@@ -28,8 +32,9 @@ export default function App() {
   return (
     <AuthProvider>
       <ThemeProvider>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
+        <ChatProvider>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
@@ -63,8 +68,20 @@ export default function App() {
                 <Settings />
               </ProtectedRoute>
             } />
+            <Route path="/onboarding" element={<OnboardingPage />} />
+            <Route path="/bioprint" element={
+              <ProtectedRoute>
+                <BioPrintPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/nutrition" element={
+              <ProtectedRoute>
+                <NutritionPage />
+              </ProtectedRoute>
+            } />
           </Routes>
         </Suspense>
+        </ChatProvider>
       </ThemeProvider>
     </AuthProvider>
   )

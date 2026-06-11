@@ -6,13 +6,16 @@ import {
   BarChart3,
   UserCircle,
   Settings,
-  MessageSquare,
   LogOut,
   X,
   Moon,
   Sun,
+  Apple,
+  Scale,
+  Dumbbell,
 } from 'lucide-react';
 import Navbar from './Navbar';
+import AzFitChat from './chat/AzFitChat';
 import { useTheme } from '@/hooks/useTheme';
 
 interface LayoutProps {
@@ -25,16 +28,18 @@ interface LayoutProps {
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
+  { icon: Dumbbell, label: 'Workouts', path: '/sheets' },
+  { icon: Apple, label: 'Nutrition', path: '/nutrition' },
+  { icon: Scale, label: 'Bio Print', path: '/bioprint' },
   { icon: BarChart3, label: 'Analytics', path: '/analytics' },
   { icon: UserCircle, label: 'Coach', path: '/coach' },
-  { icon: MessageSquare, label: 'Messages', path: '#' },
   { icon: Settings, label: 'Settings', path: '/settings' },
 ];
 
 const tabItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-  { icon: BarChart3, label: 'Analytics', path: '/analytics' },
-  { icon: UserCircle, label: 'Coach', path: '/coach' },
+  { icon: Dumbbell, label: 'Workouts', path: '/sheets' },
+  { icon: Apple, label: 'Nutrition', path: '/nutrition' },
   { icon: Settings, label: 'Settings', path: '/settings' },
 ];
 
@@ -281,6 +286,9 @@ export default function Layout({
           ))}
         </div>
       </nav>
+
+      {/* AI Chat Bubble */}
+      <AzFitChat />
     </div>
   );
 }
