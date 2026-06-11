@@ -41,7 +41,7 @@ function createDummyClient(): ReturnType<typeof createClient<Database>> {
 export const supabase = new Proxy({} as ReturnType<typeof createClient<Database>>, {
   get(_, prop: string) {
     const c = getClient();
-    return (c as any)[prop];
+    return (c as unknown as Record<string, unknown>)[prop];
   },
 });
 

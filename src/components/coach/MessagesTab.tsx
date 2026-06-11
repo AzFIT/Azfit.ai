@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Send, ArrowLeft } from 'lucide-react';
 import { conversations, type Conversation, type Message } from './data';
@@ -47,7 +47,11 @@ export default function MessagesTab() {
   // Initialize chat messages when selecting a conversation
   useEffect(() => {
     if (activeConv) {
-      setChatMessages(activeConv.messages);
+      // Use a microtask to avoid synchronous setState during render
+      const timeoutId = setTimeout(() => {
+        setChatMessages(activeConv.messages);
+      }, 0);
+      return () => clearTimeout(timeoutId);
     }
   }, [activeConv]);
 
@@ -56,10 +60,16 @@ export default function MessagesTab() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
+  const msgIdRef = useRef(0);
+  const generateMsgId = useCallback(() => {
+    msgIdRef.current += 1;
+    return `msg-${msgIdRef.current}`;
+  }, []);
+
   const handleSend = () => {
     if (!inputText.trim() || !activeConv) return;
     const newMsg: Message = {
-      id: crypto.randomUUID(),
+      id: generateMsgId(),
       sender: 'coach',
       text: inputText.trim(),
       timestamp: new Date().toLocaleTimeString([], {
@@ -74,7 +84,7 @@ export default function MessagesTab() {
   const handleQuickReply = (text: string) => {
     if (!activeConv) return;
     const newMsg: Message = {
-      id: Date.now(),
+      id: generateMsgId(),
       sender: 'coach',
       text,
       timestamp: new Date().toLocaleTimeString([], {

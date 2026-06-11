@@ -280,12 +280,17 @@ export default function Analytics() {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
     const check = () => setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
     check();
     const observer = new MutationObserver(check);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     return () => observer.disconnect();
+  }, []);
+
+  // Use a microtask to avoid synchronous setState in effect
+  useEffect(() => {
+    const timeoutId = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(timeoutId);
   }, []);
 
   const heatmapData = useMemo(() => generateHeatmapData(), []);

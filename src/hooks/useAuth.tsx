@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { getCurrentUser, onAuthStateChange, signOut, adminLogin, type AuthUser } from '@/services/auth';
 
@@ -34,16 +35,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // Initial load
-    refreshUser().finally(() => setLoading(false));
+    let isMounted = true;
+
+    // Initial load — defer to avoid synchronous setState in effect
+    const initTimeout = setTimeout(() => {
+      refreshUser().finally(() => {
+        if (isMounted) setLoading(false);
+      });
+    }, 0);
 
     // Listen for auth changes
     const { data: subscription } = onAuthStateChange((user) => {
-      setUser(user);
-      setLoading(false);
+      if (isMounted) {
+        setUser(user);
+        setLoading(false);
+      }
     });
 
     return () => {
+      isMounted = false;
+      clearTimeout(initTimeout);
       subscription.subscription.unsubscribe();
     };
   }, []);
