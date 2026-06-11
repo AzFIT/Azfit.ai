@@ -14,11 +14,12 @@ import {
   MessageCircle,
   Target,
   ChevronRight,
-  Plus,
+  Play,
 } from 'lucide-react';
 import Layout from '@/components/Layout';
 import ProgressRing from '@/components/ProgressRing';
 import { SheetsPanel } from '@/components/SheetsPanel';
+import { WorkoutLauncher } from '@/components/WorkoutLauncher';
 
 /* ------------------------------------------------------------------ */
 /*  Animation variants                                                 */
@@ -173,6 +174,7 @@ function PulsingDot({ color = 'var(--success)' }: { color?: string }) {
 export default function Dashboard() {
   const [mode, setMode] = useState<'dashboard' | 'sheets'>('dashboard');
   const [mounted, setMounted] = useState(false);
+  const [showWorkoutLauncher, setShowWorkoutLauncher] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 0);
@@ -274,7 +276,88 @@ export default function Dashboard() {
         </motion.section>
 
         {/* ============================================================ */}
-        {/*  SECTION 3: Activity Timeline Feed                           */}
+        {/*  SECTION 3: Quick Actions                                     */}
+        {/* ============================================================ */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={mounted ? { opacity: 1, y: 0 } : {}}
+          transition={{ delay: 0.25, duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] }}
+          className="mt-6"
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <h3
+              className="text-xl font-bold"
+              style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}
+            >
+              Quick Actions
+            </h3>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setShowWorkoutLauncher(true)}
+              className="flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all hover:-translate-y-0.5"
+              style={{
+                backgroundColor: 'var(--card-bg)',
+                borderColor: 'var(--card-border)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}
+            >
+              <div className="w-10 h-10 rounded-xl bg-[#00AEEF]/10 flex items-center justify-center">
+                <Play className="w-5 h-5 text-[#00AEEF]" />
+              </div>
+              <span className="text-xs font-semibold" style={{ color: 'var(--page-text)' }}>Start Workout</span>
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => window.location.hash = '#/bioprint'}
+              className="flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all hover:-translate-y-0.5"
+              style={{
+                backgroundColor: 'var(--card-bg)',
+                borderColor: 'var(--card-border)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}
+            >
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                <Scale className="w-5 h-5 text-emerald-400" />
+              </div>
+              <span className="text-xs font-semibold" style={{ color: 'var(--page-text)' }}>Log Body</span>
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => window.location.hash = '#/nutrition'}
+              className="flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all hover:-translate-y-0.5"
+              style={{
+                backgroundColor: 'var(--card-bg)',
+                borderColor: 'var(--card-border)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}
+            >
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                <Utensils className="w-5 h-5 text-amber-400" />
+              </div>
+              <span className="text-xs font-semibold" style={{ color: 'var(--page-text)' }}>Log Meal</span>
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => window.location.hash = '#/onboarding'}
+              className="flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all hover:-translate-y-0.5"
+              style={{
+                backgroundColor: 'var(--card-bg)',
+                borderColor: 'var(--card-border)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}
+            >
+              <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center">
+                <PersonStanding className="w-5 h-5 text-violet-400" />
+              </div>
+              <span className="text-xs font-semibold" style={{ color: 'var(--page-text)' }}>Onboarding</span>
+            </motion.button>
+          </div>
+        </motion.section>
+
+        {/* ============================================================ */}
+        {/*  SECTION 4: Activity Timeline Feed                           */}
         {/* ============================================================ */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
@@ -542,6 +625,7 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={mounted ? { opacity: 1, y: 0 } : {}}
           transition={{ delay: 0.8, duration: 0.3 }}
+          onClick={() => setShowWorkoutLauncher(true)}
           className="fixed bottom-20 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg lg:hidden"
           style={{
             backgroundColor: 'var(--azfit-primary)',
@@ -549,10 +633,15 @@ export default function Dashboard() {
           }}
           whileTap={{ scale: 0.92 }}
         >
-          <Plus size={24} />
+          <Play size={24} className="fill-current" />
         </motion.button>
       </div>
       )}
+
+      <WorkoutLauncher
+        isOpen={showWorkoutLauncher}
+        onClose={() => setShowWorkoutLauncher(false)}
+      />
     </Layout>
   );
 }
