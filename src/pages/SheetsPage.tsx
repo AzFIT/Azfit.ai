@@ -5,6 +5,7 @@ import { ArrowLeft, Clock, Dumbbell, Target, TrendingUp, CheckCircle2, Pause, Pl
 import { ExerciseCard } from '@/components/ExerciseCard';
 import { RestTimerOverlay } from '@/components/RestTimerOverlay';
 import { WorkoutSummary } from '@/components/WorkoutSummary';
+import { formatElapsed } from '@/lib/utils';
 import {
   getActiveSession,
   setActiveSession,
@@ -72,12 +73,6 @@ export default function SheetsPage() {
     }, 10000);
     return () => clearInterval(interval);
   }, [session]);
-
-  const formatElapsed = (totalSeconds: number) => {
-    const m = Math.floor(totalSeconds / 60);
-    const s = totalSeconds % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
 
   const updateExercise = useCallback(
     (index: number, updated: LoggedExercise) => {

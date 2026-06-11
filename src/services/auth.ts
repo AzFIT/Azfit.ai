@@ -12,13 +12,14 @@ export interface AuthUser {
   isAdmin: boolean;
 }
 
-// Hardcoded admin credentials for development
-const ADMIN_EMAIL = 'admin@azfit.ai';
-const ADMIN_PASSWORD = 'AzFIT2024!';
+// Admin credentials from environment (fallback for development)
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'admin@azfit.ai';
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || '';
 
 // Check if credentials match admin
 export function isAdminCredentials(email: string, password: string): boolean {
-  return email.toLowerCase() === ADMIN_EMAIL && password === ADMIN_PASSWORD;
+  if (!ADMIN_PASSWORD) return false; // Disabled if no password configured
+  return email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && password === ADMIN_PASSWORD;
 }
 
 // Sign up with email and password
