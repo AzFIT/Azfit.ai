@@ -15,7 +15,7 @@ export type Database = {
           email: string;
           full_name: string | null;
           avatar_url: string | null;
-          role: 'admin' | 'trainer' | 'client';
+          role: "admin" | "trainer" | "client";
           created_at: string;
           updated_at: string;
         };
@@ -24,7 +24,7 @@ export type Database = {
           email: string;
           full_name?: string | null;
           avatar_url?: string | null;
-          role?: 'trainer' | 'client';
+          role?: "trainer" | "client";
           created_at?: string;
           updated_at?: string;
         };
@@ -33,7 +33,7 @@ export type Database = {
           email?: string;
           full_name?: string | null;
           avatar_url?: string | null;
-          role?: 'trainer' | 'client';
+          role?: "trainer" | "client";
           created_at?: string;
           updated_at?: string;
         };
@@ -47,13 +47,13 @@ export type Database = {
           email: string;
           phone: string | null;
           date_of_birth: string | null;
-          gender: 'male' | 'female' | 'other' | null;
+          gender: "male" | "female" | "other" | null;
           height_cm: number | null;
           weight_kg: number | null;
           body_fat_percentage: number | null;
           fitness_goal: string | null;
-          experience_level: 'beginner' | 'intermediate' | 'advanced' | null;
-          status: 'active' | 'inactive' | 'on_hold';
+          experience_level: "beginner" | "intermediate" | "advanced" | null;
+          status: "active" | "inactive" | "on_hold";
           notes: string | null;
           created_at: string;
           updated_at: string;
@@ -65,13 +65,13 @@ export type Database = {
           email: string;
           phone?: string | null;
           date_of_birth?: string | null;
-          gender?: 'male' | 'female' | 'other' | null;
+          gender?: "male" | "female" | "other" | null;
           height_cm?: number | null;
           weight_kg?: number | null;
           body_fat_percentage?: number | null;
           fitness_goal?: string | null;
-          experience_level?: 'beginner' | 'intermediate' | 'advanced' | null;
-          status?: 'active' | 'inactive' | 'on_hold';
+          experience_level?: "beginner" | "intermediate" | "advanced" | null;
+          status?: "active" | "inactive" | "on_hold";
           notes?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -83,13 +83,13 @@ export type Database = {
           email?: string;
           phone?: string | null;
           date_of_birth?: string | null;
-          gender?: 'male' | 'female' | 'other' | null;
+          gender?: "male" | "female" | "other" | null;
           height_cm?: number | null;
           weight_kg?: number | null;
           body_fat_percentage?: number | null;
           fitness_goal?: string | null;
-          experience_level?: 'beginner' | 'intermediate' | 'advanced' | null;
-          status?: 'active' | 'inactive' | 'on_hold';
+          experience_level?: "beginner" | "intermediate" | "advanced" | null;
+          status?: "active" | "inactive" | "on_hold";
           notes?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -105,7 +105,7 @@ export type Database = {
           description: string | null;
           duration_weeks: number;
           frequency_per_week: number;
-          status: 'draft' | 'active' | 'completed' | 'archived';
+          status: "draft" | "active" | "completed" | "archived";
           start_date: string | null;
           end_date: string | null;
           created_at: string;
@@ -119,7 +119,7 @@ export type Database = {
           description?: string | null;
           duration_weeks?: number;
           frequency_per_week?: number;
-          status?: 'draft' | 'active' | 'completed' | 'archived';
+          status?: "draft" | "active" | "completed" | "archived";
           start_date?: string | null;
           end_date?: string | null;
           created_at?: string;
@@ -133,7 +133,7 @@ export type Database = {
           description?: string | null;
           duration_weeks?: number;
           frequency_per_week?: number;
-          status?: 'draft' | 'active' | 'completed' | 'archived';
+          status?: "draft" | "active" | "completed" | "archived";
           start_date?: string | null;
           end_date?: string | null;
           created_at?: string;
@@ -242,6 +242,30 @@ export type Database = {
           completed_at?: string;
           duration_minutes?: number | null;
           notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: string;
+          read: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: string;
+          read?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: string;
+          read?: boolean;
           created_at?: string;
         };
         Relationships: [];
