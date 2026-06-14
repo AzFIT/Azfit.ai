@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import {
   LayoutDashboard,
   BarChart3,
+  Users,
   UserCircle,
   Settings,
   LogOut,
@@ -41,6 +42,7 @@ interface LayoutProps {
 // Primary navigation - always visible
 const primaryNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+  { icon: Users, label: "Clients", path: "/clients" },
   { icon: Dumbbell, label: "Workouts", path: "/sheets" },
   { icon: Apple, label: "Nutrition", path: "/nutrition" },
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
@@ -63,6 +65,7 @@ const secondaryNavItems = [
 // Mobile bottom tab - primary items only
 const tabItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+  { icon: Users, label: "Clients", path: "/clients" },
   { icon: Dumbbell, label: "Workouts", path: "/sheets" },
   { icon: Apple, label: "Nutrition", path: "/nutrition" },
   { icon: Settings, label: "Settings", path: "/settings" },

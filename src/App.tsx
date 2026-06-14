@@ -26,6 +26,7 @@ const TimerModesPage = lazy(() => import("@/pages/TimerModes"));
 const NotificationsPage = lazy(() => import("@/pages/Notifications"));
 const LeaderboardPage = lazy(() => import("@/pages/Leaderboard"));
 const ClientProfile = lazy(() => import("@/pages/ClientProfile"));
+const ClientsPage = lazy(() => import("@/pages/Clients"));
 const WarmupGeneratorPage = lazy(() => import("@/pages/WarmupGenerator"));
 const DeloadDetectionPage = lazy(() => import("@/pages/DeloadDetection"));
 
@@ -175,6 +176,14 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <ClientProfile />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/clients"
+                element={
+                  <ProtectedRoute>
+                    <ClientsPage />
                   </ProtectedRoute>
                 }
               />
