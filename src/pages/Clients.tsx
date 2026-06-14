@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -27,7 +27,7 @@ export default function ClientsPage() {
   const [filter, setFilter] = useState<
     "All" | "Active" | "Paused" | "Archived"
   >("All");
-  const [clients, setClients] = useState<StoredClient[]>([]);
+  const [clients, setClients] = useState<StoredClient[]>(() => getClients());
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<"add" | "edit">("add");
@@ -38,10 +38,6 @@ export default function ClientsPage() {
   const loadClients = () => {
     setClients(getClients());
   };
-
-  useEffect(() => {
-    loadClients();
-  }, []);
 
   const filteredClients = useMemo(() => {
     return clients.filter((client) => {
