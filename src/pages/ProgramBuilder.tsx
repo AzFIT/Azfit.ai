@@ -1,18 +1,28 @@
-import { useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router";
+import { motion } from "framer-motion";
 import {
-  Save, Trash2, Dumbbell,
-  RotateCcw, CheckCircle2, ArrowLeft, FileSpreadsheet
-} from 'lucide-react';
-import { ExerciseSelector } from '@/components/ExerciseSelector';
+  Save,
+  Trash2,
+  Dumbbell,
+  RotateCcw,
+  CheckCircle2,
+  ArrowLeft,
+  FileSpreadsheet,
+} from "lucide-react";
+import { ExerciseSelector } from "@/components/ExerciseSelector";
 import {
   getDefaultSlotExercise,
   getCategoryById,
   EXERCISE_CATEGORIES,
-} from '@/data/exerciseDatabase';
-import { masterPrograms } from '@/data/masterWorkouts';
-import { saveProgramTemplate, type ProgramTemplate } from '@/lib/storage';
-import { useNavigate } from 'react-router';
+} from "@/data/exerciseDatabase";
+import { masterPrograms } from "@/data/masterWorkouts";
+import {
+  saveProgramTemplate,
+  saveClientAssignedProgram,
+  type ProgramTemplate,
+} from "@/lib/storage";
+import { loadClientById } from "@/lib/client-demo";
 
 // ═══════════════════════════════════════════════════════════════
 // TYPES
@@ -35,29 +45,116 @@ interface WorkoutDay {
   slots: SlotExercise[];
 }
 
-
-
 // ═══════════════════════════════════════════════════════════════
 // DEFAULT GBC TEMPLATE (Phase 1 Accumulation)
 // ═══════════════════════════════════════════════════════════════
 
 const DEFAULT_SLOTS: SlotExercise[] = [
-  { order: 'A1', exercise: '', categoryId: 'pulling', sets: 2, reps: '10-12', tempo: '4010', restSeconds: 60 },
-  { order: 'A2', exercise: '', categoryId: 'unilateral_quad', sets: 2, reps: '10-12', tempo: '3110', restSeconds: 60 },
-  { order: 'B1', exercise: '', categoryId: 'pressing', sets: 2, reps: '10-12', tempo: '4010', restSeconds: 60 },
-  { order: 'B2', exercise: '', categoryId: 'posterior', sets: 2, reps: '10-12', tempo: '3110', restSeconds: 60 },
-  { order: 'C1', exercise: '', categoryId: 'delt_scap', sets: 2, reps: '12-15', tempo: '3010', restSeconds: 45 },
-  { order: 'C2', exercise: '', categoryId: 'biceps', sets: 2, reps: '10-12', tempo: '3011', restSeconds: 45 },
-  { order: 'C3', exercise: '', categoryId: 'bracing', sets: 2, reps: '45s', tempo: 'N/A', restSeconds: 45 },
-  { order: 'D', exercise: '', categoryId: 'metcon_bracing', sets: 1, reps: '10-15 min', tempo: 'N/A', restSeconds: 0 },
+  {
+    order: "A1",
+    exercise: "",
+    categoryId: "pulling",
+    sets: 2,
+    reps: "10-12",
+    tempo: "4010",
+    restSeconds: 60,
+  },
+  {
+    order: "A2",
+    exercise: "",
+    categoryId: "unilateral_quad",
+    sets: 2,
+    reps: "10-12",
+    tempo: "3110",
+    restSeconds: 60,
+  },
+  {
+    order: "B1",
+    exercise: "",
+    categoryId: "pressing",
+    sets: 2,
+    reps: "10-12",
+    tempo: "4010",
+    restSeconds: 60,
+  },
+  {
+    order: "B2",
+    exercise: "",
+    categoryId: "posterior",
+    sets: 2,
+    reps: "10-12",
+    tempo: "3110",
+    restSeconds: 60,
+  },
+  {
+    order: "C1",
+    exercise: "",
+    categoryId: "delt_scap",
+    sets: 2,
+    reps: "12-15",
+    tempo: "3010",
+    restSeconds: 45,
+  },
+  {
+    order: "C2",
+    exercise: "",
+    categoryId: "biceps",
+    sets: 2,
+    reps: "10-12",
+    tempo: "3011",
+    restSeconds: 45,
+  },
+  {
+    order: "C3",
+    exercise: "",
+    categoryId: "bracing",
+    sets: 2,
+    reps: "45s",
+    tempo: "N/A",
+    restSeconds: 45,
+  },
+  {
+    order: "D",
+    exercise: "",
+    categoryId: "metcon_bracing",
+    sets: 1,
+    reps: "10-15 min",
+    tempo: "N/A",
+    restSeconds: 0,
+  },
 ];
 
 const DEFAULT_DAYS: WorkoutDay[] = [
-  { id: 'day-1', name: 'Full Body 1', dayNumber: 1, slots: structuredClone(DEFAULT_SLOTS) },
-  { id: 'day-2', name: 'Full Body 2', dayNumber: 2, slots: structuredClone(DEFAULT_SLOTS) },
-  { id: 'day-3', name: 'Upper Focus', dayNumber: 3, slots: structuredClone(DEFAULT_SLOTS) },
-  { id: 'day-4', name: 'Custom 1', dayNumber: 4, slots: structuredClone(DEFAULT_SLOTS) },
-  { id: 'day-5', name: 'Custom 2', dayNumber: 5, slots: structuredClone(DEFAULT_SLOTS) },
+  {
+    id: "day-1",
+    name: "Full Body 1",
+    dayNumber: 1,
+    slots: structuredClone(DEFAULT_SLOTS),
+  },
+  {
+    id: "day-2",
+    name: "Full Body 2",
+    dayNumber: 2,
+    slots: structuredClone(DEFAULT_SLOTS),
+  },
+  {
+    id: "day-3",
+    name: "Upper Focus",
+    dayNumber: 3,
+    slots: structuredClone(DEFAULT_SLOTS),
+  },
+  {
+    id: "day-4",
+    name: "Custom 1",
+    dayNumber: 4,
+    slots: structuredClone(DEFAULT_SLOTS),
+  },
+  {
+    id: "day-5",
+    name: "Custom 2",
+    dayNumber: 5,
+    slots: structuredClone(DEFAULT_SLOTS),
+  },
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -66,11 +163,21 @@ const DEFAULT_DAYS: WorkoutDay[] = [
 
 export default function ProgramBuilderPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const clientId = useMemo(
+    () => new URLSearchParams(location.search).get("clientId"),
+    [location.search],
+  );
+  const client = useMemo(
+    () => (clientId ? loadClientById(clientId) : null),
+    [clientId],
+  );
+
   const [program, setProgram] = useState<ProgramTemplate>({
     id: crypto.randomUUID(),
-    name: 'New Program',
-    category: 'German Body Composition',
-    description: 'Custom GBC program',
+    name: "New Program",
+    category: "German Body Composition",
+    description: "Custom GBC program",
     weeks: 4,
     days: structuredClone(DEFAULT_DAYS),
     createdAt: new Date().toISOString(),
@@ -80,20 +187,49 @@ export default function ProgramBuilderPage() {
   const [saved, setSaved] = useState(false);
   const [showLoadTemplate, setShowLoadTemplate] = useState(false);
 
-  const updateSlot = useCallback((dayIndex: number, slotIndex: number, updates: Partial<SlotExercise>) => {
+  useEffect(() => {
+    if (!client) return;
     setProgram((prev) => {
-      const next = { ...prev };
-      next.days = next.days.map((d, di) => {
-        if (di !== dayIndex) return d;
-        return {
-          ...d,
-          slots: d.slots.map((s, si) => (si === slotIndex ? { ...s, ...updates } : s)),
-        };
-      });
-      return next;
+      if (
+        prev.name !== "New Program" &&
+        prev.category !== "German Body Composition"
+      ) {
+        return prev;
+      }
+      return {
+        ...prev,
+        name: `${client.name} Program`,
+        category: client.primaryGoal
+          ? client.primaryGoal
+              .replace(/_/g, " ")
+              .replace(/\b\w/g, (c) => c.toUpperCase())
+          : prev.category,
+        description: client.primaryGoal
+          ? `Custom ${client.primaryGoal.replace(/_/g, " ")} program for ${client.name}`
+          : prev.description,
+      };
     });
-    setSaved(false);
-  }, []);
+  }, [client]);
+
+  const updateSlot = useCallback(
+    (dayIndex: number, slotIndex: number, updates: Partial<SlotExercise>) => {
+      setProgram((prev) => {
+        const next = { ...prev };
+        next.days = next.days.map((d, di) => {
+          if (di !== dayIndex) return d;
+          return {
+            ...d,
+            slots: d.slots.map((s, si) =>
+              si === slotIndex ? { ...s, ...updates } : s,
+            ),
+          };
+        });
+        return next;
+      });
+      setSaved(false);
+    },
+    [],
+  );
 
   const autoFillDay = useCallback((dayIndex: number) => {
     setProgram((prev) => {
@@ -113,9 +249,61 @@ export default function ProgramBuilderPage() {
     setSaved(false);
   }, []);
 
+  const convertTemplateToAssignedProgram = (
+    template: ProgramTemplate,
+    clientId: string,
+    clientName: string,
+  ) => {
+    return {
+      id: template.id,
+      clientId,
+      clientName,
+      name: template.name,
+      description: template.description,
+      category: template.category,
+      level: "Custom",
+      totalWeeks: template.weeks,
+      goal: template.category,
+      frequency: template.days.length,
+      phases: [
+        {
+          id: `phase-${template.id}`,
+          name: "Custom Phase",
+          block: "Block 1",
+          durationWeeks: template.weeks,
+          goal: template.description,
+          workouts: template.days.map((day) => ({
+            id: day.id,
+            name: day.name,
+            dayNumber: day.dayNumber,
+            focus: day.name,
+            estimatedMinutes: Math.max(30, day.slots.length * 5),
+            exercises: day.slots.map((slot) => ({
+              order: slot.order,
+              name: slot.exercise || "TBD",
+              category: slot.categoryId,
+              sets: slot.sets,
+              reps: slot.reps,
+              tempo: slot.tempo,
+              restSeconds: slot.restSeconds,
+            })),
+          })),
+        },
+      ],
+    };
+  };
+
   const handleSave = () => {
     const toSave = { ...program, updatedAt: new Date().toISOString() };
     saveProgramTemplate(toSave);
+    if (clientId && client) {
+      const assigned = convertTemplateToAssignedProgram(
+        toSave,
+        clientId,
+        client.name,
+      );
+      saveClientAssignedProgram(assigned);
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -123,20 +311,31 @@ export default function ProgramBuilderPage() {
   const loadFromMaster = (programId: string) => {
     const master = masterPrograms.find((p) => p.id === programId);
     if (!master) return;
-    const days: ProgramTemplate['days'] = master.phases[0]?.workouts.map((w, i: number) => ({
-      id: `day-${i + 1}`,
-      name: w.name,
-      dayNumber: i + 1,
-      slots: w.exercises.map((ex: { order: string; name: string; category: string; sets: number; reps: string; tempo: string; restSeconds: number }) => ({
-        order: ex.order,
-        exercise: ex.name,
-        categoryId: ex.category,
-        sets: ex.sets,
-        reps: ex.reps,
-        tempo: ex.tempo,
-        restSeconds: ex.restSeconds,
-      })),
-    })) || [];
+    const days: ProgramTemplate["days"] =
+      master.phases[0]?.workouts.map((w, i: number) => ({
+        id: `day-${i + 1}`,
+        name: w.name,
+        dayNumber: i + 1,
+        slots: w.exercises.map(
+          (ex: {
+            order: string;
+            name: string;
+            category: string;
+            sets: number;
+            reps: string;
+            tempo: string;
+            restSeconds: number;
+          }) => ({
+            order: ex.order,
+            exercise: ex.name,
+            categoryId: ex.category,
+            sets: ex.sets,
+            reps: ex.reps,
+            tempo: ex.tempo,
+            restSeconds: ex.restSeconds,
+          }),
+        ),
+      })) || [];
     setProgram({
       id: crypto.randomUUID(),
       name: master.name,
@@ -160,14 +359,18 @@ export default function ProgramBuilderPage() {
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate('/coach')}
+              onClick={() => navigate("/coach")}
               className="p-2 rounded-lg hover:bg-slate-800 transition-colors"
             >
               <ArrowLeft className="w-5 h-5 text-slate-400" />
             </button>
             <div>
               <h1 className="text-lg font-bold text-white">Program Builder</h1>
-              <p className="text-xs text-slate-400">Design workouts with exercise database</p>
+              <p className="text-xs text-slate-400">
+                {client
+                  ? `Design workouts for ${client.name}`
+                  : "Design workouts with exercise database"}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -182,13 +385,18 @@ export default function ProgramBuilderPage() {
             <button
               onClick={handleSave}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all
-                ${saved
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-teal-500 hover:bg-teal-400 text-slate-950'
+                ${
+                  saved
+                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                    : "bg-teal-500 hover:bg-teal-400 text-slate-950"
                 }`}
             >
-              {saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-              {saved ? 'Saved!' : 'Save Program'}
+              {saved ? (
+                <CheckCircle2 className="w-4 h-4" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              {saved ? "Saved!" : "Save Program"}
             </button>
           </div>
         </div>
@@ -203,33 +411,48 @@ export default function ProgramBuilderPage() {
         >
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Program Name</label>
+              <label className="block text-xs font-medium text-slate-400 mb-1.5">
+                Program Name
+              </label>
               <input
                 type="text"
                 value={program.name}
-                onChange={(e) => setProgram({ ...program, name: e.target.value })}
+                onChange={(e) =>
+                  setProgram({ ...program, name: e.target.value })
+                }
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg
                   text-white text-sm focus:outline-none focus:border-teal-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Category</label>
+              <label className="block text-xs font-medium text-slate-400 mb-1.5">
+                Category
+              </label>
               <input
                 type="text"
                 value={program.category}
-                onChange={(e) => setProgram({ ...program, category: e.target.value })}
+                onChange={(e) =>
+                  setProgram({ ...program, category: e.target.value })
+                }
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg
                   text-white text-sm focus:outline-none focus:border-teal-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Weeks</label>
+              <label className="block text-xs font-medium text-slate-400 mb-1.5">
+                Weeks
+              </label>
               <input
                 type="number"
                 min={1}
                 max={12}
                 value={program.weeks}
-                onChange={(e) => setProgram({ ...program, weeks: parseInt(e.target.value) || 4 })}
+                onChange={(e) =>
+                  setProgram({
+                    ...program,
+                    weeks: parseInt(e.target.value) || 4,
+                  })
+                }
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg
                   text-white text-sm focus:outline-none focus:border-teal-500"
               />
@@ -241,11 +464,13 @@ export default function ProgramBuilderPage() {
         {showLoadTemplate && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
+            animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             className="mb-6 bg-slate-900/50 border border-slate-800 rounded-2xl p-4"
           >
-            <h3 className="text-sm font-semibold text-slate-300 mb-3">Load from Master Templates</h3>
+            <h3 className="text-sm font-semibold text-slate-300 mb-3">
+              Load from Master Templates
+            </h3>
             <div className="flex gap-2 flex-wrap">
               {masterPrograms.map((p: { id: string; name: string }) => (
                 <button
@@ -269,9 +494,10 @@ export default function ProgramBuilderPage() {
               onClick={() => setActiveDay(i)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium
                 whitespace-nowrap transition-all
-                ${activeDay === i
-                  ? 'bg-teal-500/15 text-teal-300 border border-teal-500/30'
-                  : 'bg-slate-800/50 text-slate-400 border border-slate-800 hover:border-slate-700'
+                ${
+                  activeDay === i
+                    ? "bg-teal-500/15 text-teal-300 border border-teal-500/30"
+                    : "bg-slate-800/50 text-slate-400 border border-slate-800 hover:border-slate-700"
                 }`}
             >
               <span className="w-6 h-6 rounded-md bg-slate-900 flex items-center justify-center text-xs font-bold">
@@ -300,7 +526,7 @@ export default function ProgramBuilderPage() {
                 onChange={(e) => {
                   const next = { ...program };
                   next.days = next.days.map((d, i) =>
-                    i === activeDay ? { ...d, name: e.target.value } : d
+                    i === activeDay ? { ...d, name: e.target.value } : d,
                   );
                   setProgram(next);
                 }}
@@ -308,7 +534,8 @@ export default function ProgramBuilderPage() {
                   border-b border-transparent focus:border-teal-500/50 pb-1"
               />
               <span className="text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded-md">
-                {currentDay.slots.filter((s) => s.exercise).length} / {currentDay.slots.length} exercises
+                {currentDay.slots.filter((s) => s.exercise).length} /{" "}
+                {currentDay.slots.length} exercises
               </span>
             </div>
             <button
@@ -323,8 +550,10 @@ export default function ProgramBuilderPage() {
 
           {/* Slots Table */}
           <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden">
-            <div className="grid grid-cols-[60px_1fr_100px_80px_80px_80px_60px] gap-2 px-4 py-3
-              bg-slate-800/50 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            <div
+              className="grid grid-cols-[60px_1fr_100px_80px_80px_80px_60px] gap-2 px-4 py-3
+              bg-slate-800/50 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider"
+            >
               <span>Order</span>
               <span>Exercise</span>
               <span>Sets</span>
@@ -343,17 +572,22 @@ export default function ProgramBuilderPage() {
                     border-b border-slate-800/50 items-center hover:bg-slate-800/20 transition-colors"
                 >
                   {/* Order */}
-                  <span className="text-sm font-bold text-teal-400">{slot.order}</span>
+                  <span className="text-sm font-bold text-teal-400">
+                    {slot.order}
+                  </span>
 
                   {/* Exercise Selector */}
                   <div className="min-w-0">
                     <ExerciseSelector
                       value={slot.exercise}
                       onChange={(exercise, catId) =>
-                        updateSlot(activeDay, slotIndex, { exercise, categoryId: catId })
+                        updateSlot(activeDay, slotIndex, {
+                          exercise,
+                          categoryId: catId,
+                        })
                       }
                       categoryFilter={slot.categoryId}
-                      placeholder={`Select ${category?.label.toLowerCase() || 'exercise'}...`}
+                      placeholder={`Select ${category?.label.toLowerCase() || "exercise"}...`}
                     />
                   </div>
 
@@ -364,7 +598,9 @@ export default function ProgramBuilderPage() {
                     max={10}
                     value={slot.sets}
                     onChange={(e) =>
-                      updateSlot(activeDay, slotIndex, { sets: parseInt(e.target.value) || 1 })
+                      updateSlot(activeDay, slotIndex, {
+                        sets: parseInt(e.target.value) || 1,
+                      })
                     }
                     className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg
                       text-sm text-white text-center focus:outline-none focus:border-teal-500"
@@ -386,7 +622,9 @@ export default function ProgramBuilderPage() {
                     type="text"
                     value={slot.tempo}
                     onChange={(e) =>
-                      updateSlot(activeDay, slotIndex, { tempo: e.target.value })
+                      updateSlot(activeDay, slotIndex, {
+                        tempo: e.target.value,
+                      })
                     }
                     className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg
                       text-sm text-white text-center focus:outline-none focus:border-teal-500"
@@ -401,7 +639,9 @@ export default function ProgramBuilderPage() {
                       step={5}
                       value={slot.restSeconds}
                       onChange={(e) =>
-                        updateSlot(activeDay, slotIndex, { restSeconds: parseInt(e.target.value) || 0 })
+                        updateSlot(activeDay, slotIndex, {
+                          restSeconds: parseInt(e.target.value) || 0,
+                        })
                       }
                       className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg
                         text-sm text-white text-center focus:outline-none focus:border-teal-500"
@@ -411,7 +651,9 @@ export default function ProgramBuilderPage() {
 
                   {/* Actions */}
                   <button
-                    onClick={() => updateSlot(activeDay, slotIndex, { exercise: '' })}
+                    onClick={() =>
+                      updateSlot(activeDay, slotIndex, { exercise: "" })
+                    }
                     className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />

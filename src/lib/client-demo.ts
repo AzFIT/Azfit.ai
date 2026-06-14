@@ -8,6 +8,7 @@ import type {
   ClientScheduleEvent,
   ClientGeneratedProgram,
 } from "@/types/client";
+import { getClientAssignedPrograms } from "@/lib/storage";
 
 const DEMO_CLIENT_ID = "demo-client-001";
 
@@ -344,11 +345,5 @@ export function getClientScheduleEvents(
 
 export function getClientPrograms(clientId: string): ClientGeneratedProgram[] {
   if (clientId === DEMO_CLIENT_ID) return [demoGeneratedProgram];
-  try {
-    const raw = localStorage.getItem("azfit_generated_programs");
-    if (raw) return JSON.parse(raw) as ClientGeneratedProgram[];
-  } catch {
-    // ignore
-  }
-  return [];
+  return getClientAssignedPrograms(clientId);
 }

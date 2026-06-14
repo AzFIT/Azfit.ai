@@ -150,6 +150,8 @@ export interface ClientScheduleEvent {
 
 export interface ClientGeneratedProgram {
   id: string;
+  clientId?: string;
+  clientName?: string;
   name: string;
   description: string;
   category: string;

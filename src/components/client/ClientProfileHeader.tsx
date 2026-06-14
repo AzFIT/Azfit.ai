@@ -8,6 +8,7 @@ import {
   Calendar,
   Edit3,
   MoreHorizontal,
+  Dumbbell,
 } from "lucide-react";
 import type { Client } from "@/types/client";
 import { Button } from "@/components/ui/button";
@@ -20,10 +21,12 @@ import {
 
 interface ClientProfileHeaderProps {
   client: Client;
+  onBuildProgram?: () => void;
 }
 
 export default function ClientProfileHeader({
   client,
+  onBuildProgram,
 }: ClientProfileHeaderProps) {
   const navigate = useNavigate();
 
@@ -170,6 +173,16 @@ export default function ClientProfileHeader({
 
         {/* Actions */}
         <div className="flex items-center gap-2 shrink-0">
+          <Button
+            size="sm"
+            className="gap-1.5 rounded-xl hidden sm:flex"
+            style={{ backgroundColor: "var(--azfit-primary)", color: "#fff" }}
+            onClick={onBuildProgram}
+            disabled={!onBuildProgram}
+          >
+            <Dumbbell size={13} />
+            Build Program
+          </Button>
           <Button
             size="sm"
             className="gap-1.5 rounded-xl hidden sm:flex"

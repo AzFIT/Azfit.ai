@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useParams } from "react-router";
+import { useParams, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User,
@@ -51,6 +51,7 @@ export default function ClientProfile() {
   const [client, setClient] = useState<Client | null>(null);
   const [notes, setNotes] = useState<ClientNote[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!clientId) return;
@@ -93,6 +94,11 @@ export default function ClientProfile() {
     },
     [clientId, notes],
   );
+
+  const handleBuildProgram = useCallback(() => {
+    if (!client) return;
+    navigate(`/program-builder?clientId=${client.id}`);
+  }, [client, navigate]);
 
   if (loading) {
     return (
@@ -156,7 +162,10 @@ export default function ClientProfile() {
     >
       <div className="max-w-5xl mx-auto px-4 pt-4 space-y-4">
         {/* Header */}
-        <ClientProfileHeader client={client} />
+        <ClientProfileHeader
+          client={client}
+          onBuildProgram={handleBuildProgram}
+        />
 
         {/* Tabs */}
         <div
