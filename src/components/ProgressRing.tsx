@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
 interface ProgressRingProps {
   size?: number;
@@ -17,19 +17,17 @@ export default function ProgressRing({
   color,
   label,
   value,
-  glowClass = 'glow-teal',
+  glowClass = "glow-teal",
 }: ProgressRingProps) {
-  const [animatedPercentage, setAnimatedPercentage] = useState(0);
+  const [animatedPercentage, setAnimatedPercentage] = useState(percentage);
 
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (animatedPercentage / 100) * circumference;
+  const strokeDashoffset =
+    circumference - (animatedPercentage / 100) * circumference;
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setAnimatedPercentage(percentage);
-    }, 100);
-    return () => clearTimeout(timer);
+    setAnimatedPercentage(percentage);
   }, [percentage]);
 
   return (
@@ -50,7 +48,7 @@ export default function ProgressRing({
             stroke="currentColor"
             strokeWidth={strokeWidth}
             className="opacity-30"
-            style={{ color: 'var(--light-border)' }}
+            style={{ color: "var(--light-border)" }}
           />
           {/* Fill */}
           <circle
@@ -65,7 +63,7 @@ export default function ProgressRing({
             strokeDashoffset={strokeDashoffset}
             className={glowClass}
             style={{
-              transition: 'stroke-dashoffset 1000ms ease-out',
+              transition: "stroke-dashoffset 1000ms ease-out",
             }}
           />
         </svg>
@@ -79,7 +77,7 @@ export default function ProgressRing({
           </span>
           <span
             className="mt-0.5 text-[11px] font-medium leading-tight tracking-wide lg:text-xs"
-            style={{ color: 'var(--light-text-muted)' }}
+            style={{ color: "var(--light-text-muted)" }}
           >
             {label}
           </span>
