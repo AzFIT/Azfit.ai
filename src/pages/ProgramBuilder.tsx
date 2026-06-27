@@ -189,26 +189,29 @@ export default function ProgramBuilderPage() {
 
   useEffect(() => {
     if (!client) return;
-    setProgram((prev) => {
-      if (
-        prev.name !== "New Program" &&
-        prev.category !== "German Body Composition"
-      ) {
-        return prev;
-      }
-      return {
-        ...prev,
-        name: `${client.name} Program`,
-        category: client.primaryGoal
-          ? client.primaryGoal
-              .replace(/_/g, " ")
-              .replace(/\b\w/g, (c) => c.toUpperCase())
-          : prev.category,
-        description: client.primaryGoal
-          ? `Custom ${client.primaryGoal.replace(/_/g, " ")} program for ${client.name}`
-          : prev.description,
-      };
-    });
+    const timer = setTimeout(() => {
+      setProgram((prev) => {
+        if (
+          prev.name !== "New Program" &&
+          prev.category !== "German Body Composition"
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          name: `${client.name} Program`,
+          category: client.primaryGoal
+            ? client.primaryGoal
+                .replace(/_/g, " ")
+                .replace(/\b\w/g, (c) => c.toUpperCase())
+            : prev.category,
+          description: client.primaryGoal
+            ? `Custom ${client.primaryGoal.replace(/_/g, " ")} program for ${client.name}`
+            : prev.description,
+        };
+      });
+    }, 0);
+    return () => clearTimeout(timer);
   }, [client]);
 
   const updateSlot = useCallback(
