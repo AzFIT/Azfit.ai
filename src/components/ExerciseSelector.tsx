@@ -3,14 +3,62 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Dumbbell, Search, X } from 'lucide-react';
 import { EXERCISE_CATEGORIES, getCategoryById } from '@/data/exerciseDatabase';
 
+// ─── Types ───
+
+export interface ExerciseOption {
+  name: string;
+  categoryId: string;
+  categoryLabel: string;
+  isAlternative?: boolean;
+}
+
+export interface ExerciseCategoryGroup {
+  id: string;
+  label: string;
+  description?: string;
+  exercises: string[];
+  alternatives: string[];
+}
+
 interface ExerciseSelectorProps {
   value: string;
   onChange: (exercise: string, categoryId: string) => void;
-  categoryFilter?: string; // optional: restrict to specific category
+  categoryFilter?: string;
   placeholder?: string;
   label?: string;
   className?: string;
+  /** If provided, uses these exercises instead of the static database */
+  exercises?: ExerciseOption[];
+  /** If provided, uses these categories instead of the static database */
+  categories?: ExerciseCategoryGroup[];
 }
+
+// ─── Helpers ───
+
+function buildCategoriesFromOptions(
+  exercises: ExerciseOption[]
+): ExerciseCategoryGroup[] {
+  const map = new Map<string, ExerciseCategoryGroup>();
+  for (const ex of exercises) {
+    if (!map.has(ex.categoryId)) {
+      map.set(ex.categoryId, {
+        id: ex.categoryId,
+        label: ex.categoryLabel || ex.categoryId,
+        exercises: [],
+        alternatives: [],
+      });
+    }
+    const cat = map.get(ex.categoryId)!;
+    if (ex.isAlternative) {
+      cat.alternatives.push(ex.name);
+    } else {
+      cat.exercises.push(ex.name);
+    }
+  }
+  return Array.from(map.values());
+}
+
+// ─── Component ───
 
 export function ExerciseSelector({
   value,
@@ -19,18 +67,37 @@ export function ExerciseSelector({
   placeholder = 'Select exercise...',
   label,
   className = '',
+  exercises: propExercises,
+  categories: propCategories,
 }: ExerciseSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
+  // Determine which data source to use
+  const useStatic = !propExercises && !propCategories;
+
   const categories = useMemo(() => {
-    if (categoryFilter) {
-      const cat = getCategoryById(categoryFilter);
-      return cat ? [cat] : EXERCISE_CATEGORIES;
+    if (useStatic) {
+      if (categoryFilter) {
+        const cat = getCategoryById(categoryFilter);
+        return cat ? [cat] : EXERCISE_CATEGORIES;
+      }
+      return EXERCISE_CATEGORIES;
     }
-    return EXERCISE_CATEGORIES;
-  }, [categoryFilter]);
+    if (propCategories) {
+      if (categoryFilter) {
+        return propCategories.filter((c) => c.id === categoryFilter);
+      }
+      return propCategories;
+    }
+    // Build from propExercises
+    const built = buildCategoriesFromOptions(propExercises!);
+    if (categoryFilter) {
+      return built.filter((c) => c.id === categoryFilter);
+    }
+    return built;
+  }, [useStatic, categoryFilter, propExercises, propCategories]);
 
   const filteredCategories = useMemo(() => {
     if (!searchQuery.trim()) return categories;
@@ -133,7 +200,7 @@ export function ExerciseSelector({
                 >
                   All
                 </button>
-                {EXERCISE_CATEGORIES.map((cat) => (
+                {categories.map((cat) => (
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.id)}

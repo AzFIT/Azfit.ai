@@ -9,8 +9,12 @@ import {
   CheckCircle2,
   ArrowLeft,
   FileSpreadsheet,
+  Target,
+  Zap,
+  LayoutTemplate,
+  Loader2,
 } from "lucide-react";
-import { ExerciseSelector } from "@/components/ExerciseSelector";
+import { ExerciseSelector, type ExerciseCategoryGroup } from "@/components/ExerciseSelector";
 import {
   getDefaultSlotExercise,
   getCategoryById,
@@ -23,6 +27,13 @@ import {
   type ProgramTemplate,
 } from "@/lib/storage";
 import { loadClientById } from "@/lib/client-demo";
+import {
+  useExercises,
+  useGoalCategories,
+  useGoalMethods,
+  useMethodPrograms,
+  useWeeklyStructuresByGoal,
+} from "@/hooks/useSupabaseData";
 
 // ═══════════════════════════════════════════════════════════════
 // TYPES
@@ -172,6 +183,52 @@ export default function ProgramBuilderPage() {
     () => (clientId ? loadClientById(clientId) : null),
     [clientId],
   );
+
+  // ─── Supabase Data ───
+  const { data: exerciseLibrary } = useExercises();
+  const { data: goalCategories, loading: goalsLoading } = useGoalCategories();
+
+  // ─── Pipeline State ───
+  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
+  const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [showPipeline, setShowPipeline] = useState(false);
+
+  const { data: goalMethods, loading: methodsLoading } = useGoalMethods(selectedGoalId, 5);
+  const { data: methodPrograms, loading: templatesLoading } = useMethodPrograms(selectedMethodId, 5);
+
+  // Find selected goal name for weekly structures lookup
+  const selectedGoalName = useMemo(() => {
+    if (!selectedGoalId || !goalCategories) return null;
+    for (const cat of goalCategories) {
+      const goal = cat.goals?.find((g) => g.id === selectedGoalId);
+      if (goal) return goal.name;
+    }
+    return null;
+  }, [selectedGoalId, goalCategories]);
+
+  const { data: weeklyStructures, loading: structuresLoading } = useWeeklyStructuresByGoal(selectedGoalName);
+
+  // Convert Supabase exercises to ExerciseSelector format
+  const supabaseExerciseCategories = useMemo<ExerciseCategoryGroup[]>(() => {
+    if (!exerciseLibrary) return [];
+    const map = new Map<string, ExerciseCategoryGroup>();
+    for (const ex of exerciseLibrary) {
+      const catId = ex.primary_muscle?.toLowerCase().replace(/\s+/g, '_') || 'general';
+      const catLabel = ex.primary_muscle || 'General';
+      if (!map.has(catId)) {
+        map.set(catId, {
+          id: catId,
+          label: catLabel,
+          description: ex.equipment || '',
+          exercises: [],
+          alternatives: [],
+        });
+      }
+      map.get(catId)!.exercises.push(ex.name);
+    }
+    return Array.from(map.values());
+  }, [exerciseLibrary]);
 
   const [program, setProgram] = useState<ProgramTemplate>({
     id: crypto.randomUUID(),
@@ -406,6 +463,206 @@ export default function ProgramBuilderPage() {
       </header>
 
       <div className="max-w-6xl mx-auto px-4 py-6">
+        {/* Goal → Method → Program Pipeline */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 mb-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-bold text-white flex items-center gap-2">
+              <Target className="w-4 h-4 text-teal-400" />
+              Goal → Method → Program Pipeline
+            </h2>
+            <button
+              onClick={() => setShowPipeline(!showPipeline)}
+              className="text-xs text-slate-400 hover:text-white transition-colors"
+            >
+              {showPipeline ? 'Hide' : 'Show'}
+            </button>
+          </div>
+
+          {showPipeline && (
+            <div className="space-y-4">
+              {/* Step 1: Goal Selection */}
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-2">
+                  1. Select Goal
+                </label>
+                {goalsLoading && (
+                  <div className="flex items-center gap-2 text-sm text-slate-400">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Loading goals...
+                  </div>
+                )}
+                {!goalsLoading && goalCategories && (
+                  <div className="space-y-3">
+                    {goalCategories.map((cat) => (
+                      <div key={cat.id}>
+                        <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                          {cat.name}
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {cat.goals?.map((goal) => (
+                            <button
+                              key={goal.id}
+                              onClick={() => {
+                                setSelectedGoalId(goal.id);
+                                setSelectedMethodId(null);
+                                setSelectedTemplateId(null);
+                              }}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all
+                                ${selectedGoalId === goal.id
+                                  ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
+                                  : 'bg-slate-800 text-slate-300 border border-slate-700 hover:border-slate-600'
+                                }`}
+                            >
+                              {goal.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Step 2: Method Selection */}
+              {selectedGoalId && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="overflow-hidden"
+                >
+                  <label className="block text-xs font-medium text-slate-400 mb-2">
+                    2. Select Method
+                  </label>
+                  {methodsLoading && (
+                    <div className="flex items-center gap-2 text-sm text-slate-400">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Loading methods...
+                    </div>
+                  )}
+                  {!methodsLoading && goalMethods && (
+                    <div className="flex flex-wrap gap-2">
+                      {goalMethods.map((method) => (
+                        <button
+                          key={method.method_id}
+                          onClick={() => {
+                            setSelectedMethodId(method.method_id);
+                            setSelectedTemplateId(null);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all
+                            ${selectedMethodId === method.method_id
+                              ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+                              : 'bg-slate-800 text-slate-300 border border-slate-700 hover:border-slate-600'
+                            }`}
+                        >
+                          <Zap className="w-3 h-3 inline mr-1" />
+                          {method.method_name}
+                          <span className="ml-1 text-[10px] opacity-60">
+                            {Math.round(method.score * 100)}%
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {/* Step 3: Program Template Selection */}
+              {selectedMethodId && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="overflow-hidden"
+                >
+                  <label className="block text-xs font-medium text-slate-400 mb-2">
+                    3. Select Program Template
+                  </label>
+                  {templatesLoading && (
+                    <div className="flex items-center gap-2 text-sm text-slate-400">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Loading templates...
+                    </div>
+                  )}
+                  {!templatesLoading && methodPrograms && (
+                    <div className="flex flex-wrap gap-2">
+                      {methodPrograms.map((prog) => (
+                        <button
+                          key={prog.program_template_id}
+                          onClick={() => setSelectedTemplateId(prog.program_template_id)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all
+                            ${selectedTemplateId === prog.program_template_id
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              : 'bg-slate-800 text-slate-300 border border-slate-700 hover:border-slate-600'
+                            }`}
+                        >
+                          <LayoutTemplate className="w-3 h-3 inline mr-1" />
+                          {prog.program_name}
+                          <span className="ml-1 text-[10px] opacity-60">
+                            {Math.round(prog.score * 100)}%
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {/* Step 4: Weekly Structure Preview */}
+              {selectedTemplateId && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="overflow-hidden"
+                >
+                  <label className="block text-xs font-medium text-slate-400 mb-2">
+                    4. Weekly Structure Preview
+                  </label>
+                  {structuresLoading && (
+                    <div className="flex items-center gap-2 text-sm text-slate-400">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Loading weekly structure...
+                    </div>
+                  )}
+                  {!structuresLoading && weeklyStructures && weeklyStructures.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">
+                        {weeklyStructures[0].days_per_week} days/week • {weeklyStructures[0].goal_category}
+                      </div>
+                      {weeklyStructures.map((ws) => (
+                        <div
+                          key={ws.id}
+                          className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/50 border border-slate-700/50"
+                        >
+                          <span className="text-xs font-bold text-teal-400 w-12 shrink-0">
+                            {ws.day_label}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-medium text-slate-200 truncate">
+                              {ws.split_name}
+                            </div>
+                            <div className="text-[10px] text-slate-500 truncate">
+                              {ws.sets_range} sets • {ws.reps_range} reps
+                            </div>
+                          </div>
+                          <div className="text-[10px] text-slate-400 max-w-[200px] truncate hidden sm:block">
+                            {ws.programming_notes}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {!structuresLoading && weeklyStructures && weeklyStructures.length === 0 && (
+                    <p className="text-xs text-slate-500">No weekly structure found for this goal.</p>
+                  )}
+                </motion.div>
+              )}
+            </div>
+          )}
+        </motion.div>
+
         {/* Program Info */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -591,6 +848,7 @@ export default function ProgramBuilderPage() {
                       }
                       categoryFilter={slot.categoryId}
                       placeholder={`Select ${category?.label.toLowerCase() || "exercise"}...`}
+                      categories={supabaseExerciseCategories.length > 0 ? supabaseExerciseCategories : undefined}
                     />
                   </div>
 
@@ -668,7 +926,7 @@ export default function ProgramBuilderPage() {
 
           {/* Category Legend */}
           <div className="mt-4 flex flex-wrap gap-2">
-            {EXERCISE_CATEGORIES.map((cat) => (
+            {(supabaseExerciseCategories.length > 0 ? supabaseExerciseCategories : EXERCISE_CATEGORIES).map((cat) => (
               <div
                 key={cat.id}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800/50 border border-slate-800
