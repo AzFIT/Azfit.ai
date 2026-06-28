@@ -44,6 +44,7 @@ function createDummyClient(): ReturnType<typeof createClient<Database>> {
       update: () => ({ data: null, error: null }),
       delete: () => ({ data: null, error: null }),
     }),
+    rpc: () => Promise.resolve({ data: [], error: null }),
     storage: {
       from: () => ({
         upload: () => Promise.resolve({ data: null, error: { message: 'Supabase not configured' } }),

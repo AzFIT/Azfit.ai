@@ -240,7 +240,7 @@ export default function OnboardingPage() {
             transition={{ duration: 0.2 }}
           >
             {step === 1 && <Step1Personal data={data} updateData={updateData} />}
-            {step === 2 && <Step2Body data={data} updateData={updateData} age={age} />}
+            {step === 2 && <Step2Body data={data} updateData={updateData} />}
             {step === 3 && <Step3Fitness data={data} updateData={updateData} />}
             {step === 4 && <Step4TDEE data={data} updateData={updateData} age={age} bmi={bmi} bmr={bmr} tdee={tdee} calorieGoal={calorieGoal} macros={macros} waterGoal={waterGoal} />}
             {step === 5 && <Step5Review data={data} age={age} bmi={bmi} tdee={tdee} calorieGoal={calorieGoal} macros={macros} waterGoal={waterGoal} />}
@@ -329,7 +329,7 @@ function Step1Personal({ data, updateData }: { data: OnboardingData; updateData:
 
 /* ── Step 2: Body Composition ──────────────────────────── */
 
-function Step2Body({ data, updateData }: { data: OnboardingData; updateData: (u: Partial<OnboardingData>) => void; age: number }) {
+function Step2Body({ data, updateData }: { data: OnboardingData; updateData: (u: Partial<OnboardingData>) => void }) {
   const calculateNavyBF = () => {
     if (!data.gender || !data.height || !data.navyWaist || !data.navyNeck) return;
     const h = data.height;

@@ -222,7 +222,6 @@ export function useGoalMethods(
       p_goal_id: goalId,
       p_limit: topN,
     });
-    console.log("[useGoalMethods] RPC response:", { goalId, topN, data, error });
     return { data: data as GoalMethodResult[] | null, error };
   });
 }
@@ -244,7 +243,6 @@ export function useMethodPrograms(
       p_method_id: methodId,
       p_limit: topN,
     });
-    console.log("[useMethodPrograms] RPC response:", { methodId, topN, data, error });
     return { data: data as MethodProgramResult[] | null, error };
   });
 }

@@ -561,7 +561,7 @@ export default function ProgramBuilderPage() {
                           <Zap className="w-3 h-3 inline mr-1" />
                           {method.method_name}
                           <span className="ml-1 text-[10px] opacity-60">
-                            {Math.round(method.score * 100)}%
+                            {Math.round(method.score)}%
                           </span>
                         </button>
                       ))}
@@ -601,7 +601,7 @@ export default function ProgramBuilderPage() {
                           <LayoutTemplate className="w-3 h-3 inline mr-1" />
                           {prog.program_name}
                           <span className="ml-1 text-[10px] opacity-60">
-                            {Math.round(prog.score * 100)}%
+                            {Math.round(prog.score)}%
                           </span>
                         </button>
                       ))}
