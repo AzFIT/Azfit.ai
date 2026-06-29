@@ -5,6 +5,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ChatProvider } from "@/components/chat/ChatContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Toaster } from "@/components/ui/sonner";
+import OfflineBanner from "@/components/OfflineBanner";
 
 // Lazy-loaded pages for code splitting
 const Home = lazy(() => import("@/pages/Home"));
@@ -55,6 +56,7 @@ export default function App() {
       <ThemeProvider>
         <ChatProvider>
           <Toaster />
+          <OfflineBanner />
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<Home />} />

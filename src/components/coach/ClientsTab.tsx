@@ -6,8 +6,10 @@ import {
   UserCircle,
   ClipboardList,
   Filter,
+  Plus,
 } from 'lucide-react';
 import { clients, type Client } from './data';
+import QuickAddClientModal from '@/components/QuickAddClientModal';
 
 const filterOptions = ['All', 'Active', 'Away', 'New'] as const;
 
@@ -64,6 +66,7 @@ const cardVariants = {
 export default function ClientsTab() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<(typeof filterOptions)[number]>('All');
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
 
   const filtered = useMemo(() => {
     return clients.filter((c) => {
@@ -101,6 +104,13 @@ export default function ClientsTab() {
           />
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsQuickAddOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-full bg-[#0D9488] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-[#0B7A75]"
+          >
+            <Plus size={14} />
+            Add Client
+          </button>
           <Filter
             size={16}
             style={{ color: 'var(--light-text-muted)' }}
@@ -305,6 +315,12 @@ export default function ClientsTab() {
           </p>
         </div>
       )}
+
+      {/* Quick Add Client Modal */}
+      <QuickAddClientModal
+        open={isQuickAddOpen}
+        onClose={() => setIsQuickAddOpen(false)}
+      />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useParams, useNavigate, useSearchParams } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User,
@@ -47,7 +47,11 @@ type TabId = (typeof tabs)[number]["id"];
 
 export default function ClientProfile() {
   const { clientId } = useParams<{ clientId: string }>();
-  const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<TabId>(
+    (tabs.find((t) => t.id === urlTab)?.id as TabId) || "overview"
+  );
   const [client, setClient] = useState<Client | null>(null);
   const [notes, setNotes] = useState<ClientNote[]>([]);
   const [loading, setLoading] = useState(true);
@@ -182,7 +186,10 @@ export default function ClientProfile() {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    setSearchParams({ tab: tab.id });
+                  }}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
                   style={{
                     backgroundColor: isActive

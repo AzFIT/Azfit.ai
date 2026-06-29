@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { calculateBMI, calculateBMR, calculateTDEE } from '@/lib/utils';
 
+import { useGoalCategories } from '@/hooks/useSupabaseData';
+
 /* ── Types ─────────────────────────────────────────────── */
 
 interface OnboardingData {
@@ -35,6 +37,7 @@ interface OnboardingData {
   trainingFrequency: string;
   activityLevel: string;
   primaryGoal: string;
+  primaryGoalId: string;
   injuries: string;
   preferredStyle: string[];
   availableEquipment: string[];
@@ -49,7 +52,7 @@ const INITIAL_DATA: OnboardingData = {
   measurements: {},
   parqAnswers: [false, false, false, false, false, false, false],
   trainingExperience: '', trainingFrequency: '', activityLevel: '',
-  primaryGoal: '', injuries: '', preferredStyle: [], availableEquipment: [],
+  primaryGoal: '', primaryGoalId: '', injuries: '', preferredStyle: [], availableEquipment: [],
   macroSplit: 'balanced', mealCount: '4',
 };
 
@@ -76,15 +79,6 @@ const ACTIVITY_OPTIONS = [
   { value: 'moderate', label: 'Moderately Active', sub: 'Moderate exercise 3-5 days/week' },
   { value: 'very', label: 'Very Active', sub: 'Hard exercise 6-7 days/week' },
   { value: 'extreme', label: 'Extremely Active', sub: 'Very hard exercise + physical job' },
-];
-
-const GOAL_OPTIONS = [
-  { value: 'lose_fat', label: 'Lose Fat', emoji: '🔥' },
-  { value: 'build_muscle', label: 'Build Muscle', emoji: '💪' },
-  { value: 'strength', label: 'Strength', emoji: '🏋️' },
-  { value: 'recomposition', label: 'Recomposition', emoji: '⚖️' },
-  { value: 'performance', label: 'Athletic Performance', emoji: '🏃' },
-  { value: 'general_health', label: 'General Health', emoji: '❤️' },
 ];
 
 const EQUIPMENT_OPTIONS = ['Full Gym', 'Dumbbells Only', 'Home Gym (limited)', 'Bodyweight Only'];
@@ -176,6 +170,7 @@ export default function OnboardingPage() {
       trainingFrequency: Number(data.trainingFrequency),
       activityLevel: data.activityLevel,
       primaryGoal: data.primaryGoal,
+      primaryGoalId: data.primaryGoalId,
       injuries: data.injuries,
       preferredStyle: data.preferredStyle,
       availableEquipment: data.availableEquipment,
@@ -245,7 +240,7 @@ export default function OnboardingPage() {
             transition={{ duration: 0.2 }}
           >
             {step === 1 && <Step1Personal data={data} updateData={updateData} />}
-            {step === 2 && <Step2Body data={data} updateData={updateData} age={age} />}
+            {step === 2 && <Step2Body data={data} updateData={updateData} />}
             {step === 3 && <Step3Fitness data={data} updateData={updateData} />}
             {step === 4 && <Step4TDEE data={data} updateData={updateData} age={age} bmi={bmi} bmr={bmr} tdee={tdee} calorieGoal={calorieGoal} macros={macros} waterGoal={waterGoal} />}
             {step === 5 && <Step5Review data={data} age={age} bmi={bmi} tdee={tdee} calorieGoal={calorieGoal} macros={macros} waterGoal={waterGoal} />}
@@ -334,7 +329,7 @@ function Step1Personal({ data, updateData }: { data: OnboardingData; updateData:
 
 /* ── Step 2: Body Composition ──────────────────────────── */
 
-function Step2Body({ data, updateData }: { data: OnboardingData; updateData: (u: Partial<OnboardingData>) => void; age: number }) {
+function Step2Body({ data, updateData }: { data: OnboardingData; updateData: (u: Partial<OnboardingData>) => void }) {
   const calculateNavyBF = () => {
     if (!data.gender || !data.height || !data.navyWaist || !data.navyNeck) return;
     const h = data.height;
@@ -411,6 +406,12 @@ function Step2Body({ data, updateData }: { data: OnboardingData; updateData: (u:
 /* ── Step 3: Fitness Background ────────────────────────── */
 
 function Step3Fitness({ data, updateData }: { data: OnboardingData; updateData: (u: Partial<OnboardingData>) => void }) {
+  const { data: goalCategories, loading: goalsLoading, error: goalsError } = useGoalCategories();
+
+  const handleGoalSelect = (goalName: string, goalId: string) => {
+    updateData({ primaryGoal: goalName, primaryGoalId: goalId });
+  };
+
   return (
     <div className="space-y-5">
       {/* PAR-Q */}
@@ -507,25 +508,45 @@ function Step3Fitness({ data, updateData }: { data: OnboardingData; updateData: 
         </div>
       </div>
 
-      {/* Primary Goal */}
+      {/* Primary Goal — Dynamic from Supabase */}
       <div>
         <Label>Primary Goal *</Label>
-        <div className="grid grid-cols-2 gap-2">
-          {GOAL_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => updateData({ primaryGoal: opt.value })}
-              className="rounded-xl border-2 py-3 text-center text-sm font-medium transition-all"
-              style={{
-                borderColor: data.primaryGoal === opt.value ? '#00AEEF' : 'var(--card-border)',
-                backgroundColor: data.primaryGoal === opt.value ? 'rgba(0,174,239,0.1)' : 'transparent',
-                color: data.primaryGoal === opt.value ? '#00AEEF' : 'var(--text-primary)',
-              }}
-            >
-              <span className="mr-1">{opt.emoji}</span>{opt.label}
-            </button>
-          ))}
-        </div>
+        {goalsLoading && (
+          <div className="flex items-center gap-2 py-4 text-sm" style={{ color: 'var(--text-muted)' }}>
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#00AEEF] border-t-transparent" />
+            Loading goals...
+          </div>
+        )}
+        {goalsError && (
+          <p className="py-2 text-xs text-red-500">Failed to load goals: {goalsError}</p>
+        )}
+        {!goalsLoading && goalCategories && (
+          <div className="space-y-4">
+            {goalCategories.map((category) => (
+              <div key={category.id}>
+                <h4 className="mb-2 text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                  {category.name}
+                </h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {category.goals?.map((goal) => (
+                    <button
+                      key={goal.id}
+                      onClick={() => handleGoalSelect(goal.name, goal.id)}
+                      className="rounded-xl border-2 py-3 text-center text-sm font-medium transition-all"
+                      style={{
+                        borderColor: data.primaryGoalId === goal.id ? '#00AEEF' : 'var(--card-border)',
+                        backgroundColor: data.primaryGoalId === goal.id ? 'rgba(0,174,239,0.1)' : 'transparent',
+                        color: data.primaryGoalId === goal.id ? '#00AEEF' : 'var(--text-primary)',
+                      }}
+                    >
+                      {goal.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Injuries */}
@@ -577,11 +598,7 @@ function Step4TDEE({ data, updateData, age, bmi, bmr, tdee, calorieGoal, macros,
   macros: { protein: number; fats: number; carbs: number }; waterGoal: number;
 }) {
   const goalLabel = useMemo(() => {
-    const map: Record<string, string> = {
-      lose_fat: 'Fat Loss', build_muscle: 'Muscle Gain', strength: 'Strength',
-      recomposition: 'Recomp', performance: 'Performance', general_health: 'Maintenance',
-    };
-    return map[data.primaryGoal] || 'Maintenance';
+    return data.primaryGoal || 'Maintenance';
   }, [data.primaryGoal]);
 
   return (
@@ -707,7 +724,7 @@ function Step5Review({ data, age, bmi, tdee, calorieGoal, macros, waterGoal }: {
         )}
         <ReviewItem label="Experience" value={data.trainingExperience} />
         <ReviewItem label="Frequency" value={`${data.trainingFrequency} days/week`} />
-        <ReviewItem label="Goal" value={GOAL_OPTIONS.find((g) => g.value === data.primaryGoal)?.label || data.primaryGoal} />
+        <ReviewItem label="Goal" value={data.primaryGoal || 'Not selected'} />
       </div>
 
       {/* Nutrition Summary */}

@@ -9,6 +9,7 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      // ─── Existing Tables (Phase 1) ───
       profiles: {
         Row: {
           id: string;
@@ -348,12 +349,544 @@ export type Database = {
         };
         Relationships: [];
       };
+
+      // ─── Blueprint Tables (Phase 2) ───
+      goal_categories: {
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          description?: string | null;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      goals: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          description: string | null;
+          category_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          description?: string | null;
+          category_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          slug?: string;
+          description?: string | null;
+          category_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "goals_category_id_fkey";
+            columns: ["category_id"];
+            isOneToOne: false;
+            referencedRelation: "goal_categories";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      method_categories: {
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          description?: string | null;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      methods: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          description: string | null;
+          category_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          description?: string | null;
+          category_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          slug?: string;
+          description?: string | null;
+          category_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "methods_category_id_fkey";
+            columns: ["category_id"];
+            isOneToOne: false;
+            referencedRelation: "method_categories";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      program_categories: {
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          description?: string | null;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      program_templates: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          description: string | null;
+          category_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          description?: string | null;
+          category_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          slug?: string;
+          description?: string | null;
+          category_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "program_templates_category_id_fkey";
+            columns: ["category_id"];
+            isOneToOne: false;
+            referencedRelation: "program_categories";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      tags: {
+        Row: {
+          id: string;
+          name: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      goal_tags: {
+        Row: {
+          goal_id: string;
+          tag_id: string;
+        };
+        Insert: {
+          goal_id: string;
+          tag_id: string;
+        };
+        Update: {
+          goal_id?: string;
+          tag_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "goal_tags_goal_id_fkey";
+            columns: ["goal_id"];
+            isOneToOne: false;
+            referencedRelation: "goals";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "goal_tags_tag_id_fkey";
+            columns: ["tag_id"];
+            isOneToOne: false;
+            referencedRelation: "tags";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      method_tags: {
+        Row: {
+          method_id: string;
+          tag_id: string;
+        };
+        Insert: {
+          method_id: string;
+          tag_id: string;
+        };
+        Update: {
+          method_id?: string;
+          tag_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "method_tags_method_id_fkey";
+            columns: ["method_id"];
+            isOneToOne: false;
+            referencedRelation: "methods";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "method_tags_tag_id_fkey";
+            columns: ["tag_id"];
+            isOneToOne: false;
+            referencedRelation: "tags";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      program_template_tags: {
+        Row: {
+          program_template_id: string;
+          tag_id: string;
+        };
+        Insert: {
+          program_template_id: string;
+          tag_id: string;
+        };
+        Update: {
+          program_template_id?: string;
+          tag_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "program_template_tags_program_template_id_fkey";
+            columns: ["program_template_id"];
+            isOneToOne: false;
+            referencedRelation: "program_templates";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "program_template_tags_tag_id_fkey";
+            columns: ["tag_id"];
+            isOneToOne: false;
+            referencedRelation: "tags";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      exercise_library: {
+        Row: {
+          id: string;
+          exercise_id: string;
+          name: string;
+          primary_muscle: string | null;
+          secondary_muscle: string | null;
+          equipment: string | null;
+          difficulty: string | null;
+          exercise_type: string | null;
+          met_value: string | null;
+          description: string | null;
+          safety_notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          exercise_id: string;
+          name: string;
+          primary_muscle?: string | null;
+          secondary_muscle?: string | null;
+          equipment?: string | null;
+          difficulty?: string | null;
+          exercise_type?: string | null;
+          met_value?: string | null;
+          description?: string | null;
+          safety_notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          exercise_id?: string;
+          name?: string;
+          primary_muscle?: string | null;
+          secondary_muscle?: string | null;
+          equipment?: string | null;
+          difficulty?: string | null;
+          exercise_type?: string | null;
+          met_value?: string | null;
+          description?: string | null;
+          safety_notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      weekly_structures: {
+        Row: {
+          id: string;
+          goal_category: string;
+          goal_name: string;
+          days_per_week: string;
+          day_label: string;
+          split_name: string;
+          sets_range: string | null;
+          reps_range: string | null;
+          programming_notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          goal_category: string;
+          goal_name: string;
+          days_per_week: string;
+          day_label: string;
+          split_name: string;
+          sets_range?: string | null;
+          reps_range?: string | null;
+          programming_notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          goal_category?: string;
+          goal_name?: string;
+          days_per_week?: string;
+          day_label?: string;
+          split_name?: string;
+          sets_range?: string | null;
+          reps_range?: string | null;
+          programming_notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      goal_method_scores: {
+        Row: {
+          goal_id: string;
+          method_id: string;
+          score: number;
+          updated_at: string;
+        };
+        Insert: {
+          goal_id: string;
+          method_id: string;
+          score?: number;
+          updated_at?: string;
+        };
+        Update: {
+          goal_id?: string;
+          method_id?: string;
+          score?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "goal_method_scores_goal_id_fkey";
+            columns: ["goal_id"];
+            isOneToOne: false;
+            referencedRelation: "goals";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "goal_method_scores_method_id_fkey";
+            columns: ["method_id"];
+            isOneToOne: false;
+            referencedRelation: "methods";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      method_program_scores: {
+        Row: {
+          method_id: string;
+          program_template_id: string;
+          score: number;
+          updated_at: string;
+        };
+        Insert: {
+          method_id: string;
+          program_template_id: string;
+          score?: number;
+          updated_at?: string;
+        };
+        Update: {
+          method_id?: string;
+          program_template_id?: string;
+          score?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "method_program_scores_method_id_fkey";
+            columns: ["method_id"];
+            isOneToOne: false;
+            referencedRelation: "methods";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "method_program_scores_program_template_id_fkey";
+            columns: ["program_template_id"];
+            isOneToOne: false;
+            referencedRelation: "program_templates";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      pipeline_scores: {
+        Row: {
+          goal_id: string;
+          method_id: string;
+          program_template_id: string;
+          score: number;
+          updated_at: string;
+        };
+        Insert: {
+          goal_id: string;
+          method_id: string;
+          program_template_id: string;
+          score?: number;
+          updated_at?: string;
+        };
+        Update: {
+          goal_id?: string;
+          method_id?: string;
+          program_template_id?: string;
+          score?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_scores_goal_id_fkey";
+            columns: ["goal_id"];
+            isOneToOne: false;
+            referencedRelation: "goals";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pipeline_scores_method_id_fkey";
+            columns: ["method_id"];
+            isOneToOne: false;
+            referencedRelation: "methods";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pipeline_scores_program_template_id_fkey";
+            columns: ["program_template_id"];
+            isOneToOne: false;
+            referencedRelation: "program_templates";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      settings_config: {
+        Row: {
+          id: string;
+          key: string;
+          value: string;
+          description: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          key: string;
+          value: string;
+          description?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          key?: string;
+          value?: string;
+          description?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      compute_jaccard: {
+        Args: { tags_a: string[]; tags_b: string[] };
+        Returns: number;
+      };
+      get_goal_methods: {
+        Args: { p_goal_id: string; p_limit?: number };
+        Returns: { method_id: string; method_name: string; score: number }[];
+      };
+      get_method_program_templates: {
+        Args: { p_method_id: string; p_limit?: number };
+        Returns: { program_template_id: string; program_name: string; score: number }[];
+      };
+      get_top_pipelines: {
+        Args: { p_goal_id: string; p_limit?: number };
+        Returns: { goal_id: string; method_id: string; program_template_id: string; score: number }[];
+      };
+      refresh_all_scores: {
+        Args: Record<PropertyKey, never>;
+        Returns: void;
+      };
     };
     Enums: {
       [_ in never]: never;

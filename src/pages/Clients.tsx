@@ -1,25 +1,12 @@
 import { useState, useMemo } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
-import { Search, Plus, Edit3, X } from "lucide-react";
+import { Search, Plus, Edit3 } from "lucide-react";
 import Layout from "@/components/Layout";
-import { deleteClient, getClients, saveClient } from "@/lib/storage";
+import QuickAddClientModal from "@/components/QuickAddClientModal";
+import { deleteClient, getClients } from "@/lib/storage";
 import type { StoredClient } from "@/lib/storage";
-
-const initialFormState: Partial<StoredClient> = {
-  fullName: "",
-  email: "",
-  phone: "",
-  dateOfBirth: "",
-  gender: "other",
-  heightCm: undefined,
-  weightKg: undefined,
-  bodyFatPercent: undefined,
-  fitnessGoal: "",
-  experienceLevel: "beginner",
-  status: "active",
-};
 
 export default function ClientsPage() {
   const [mode, setMode] = useState<"dashboard" | "sheets">("dashboard");
@@ -29,10 +16,7 @@ export default function ClientsPage() {
   >("All");
   const [clients, setClients] = useState<StoredClient[]>(() => getClients());
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [formMode, setFormMode] = useState<"add" | "edit">("add");
-  const [formValues, setFormValues] =
-    useState<Partial<StoredClient>>(initialFormState);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const navigate = useNavigate();
 
   const loadClients = () => {
@@ -59,72 +43,13 @@ export default function ClientsPage() {
     : null;
 
   const openAddClient = () => {
-    setFormMode("add");
-    setFormValues(initialFormState);
-    setIsFormOpen(true);
+    setIsQuickAddOpen(true);
   };
 
   const openEditClient = (client?: StoredClient) => {
     const target = client || selectedClient;
     if (!target) return;
-    setFormMode("edit");
-    setFormValues(target);
-    setSelectedClientId(target.id);
-    setIsFormOpen(true);
-  };
-
-  const closeForm = () => {
-    setIsFormOpen(false);
-    setFormValues(initialFormState);
-  };
-
-  const handleFormChange = (key: keyof StoredClient, value: string) => {
-    setFormValues((current) => ({ ...current, [key]: value }));
-  };
-
-  const handleSaveClient = () => {
-    if (!formValues.fullName?.trim() || !formValues.email?.trim()) {
-      toast.error("Full name and email are required.");
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const client: StoredClient = {
-      id:
-        formMode === "edit" && formValues.id
-          ? formValues.id
-          : `client-${Date.now()}`,
-      fullName: formValues.fullName?.trim() ?? "",
-      email: formValues.email?.trim() ?? "",
-      phone: formValues.phone?.trim() ?? "",
-      dateOfBirth: formValues.dateOfBirth ?? "",
-      gender: (formValues.gender as StoredClient["gender"]) || "other",
-      heightCm: formValues.heightCm ? Number(formValues.heightCm) : undefined,
-      weightKg: formValues.weightKg ? Number(formValues.weightKg) : undefined,
-      bodyFatPercent: formValues.bodyFatPercent
-        ? Number(formValues.bodyFatPercent)
-        : undefined,
-      fitnessGoal: formValues.fitnessGoal ?? "",
-      experienceLevel:
-        (formValues.experienceLevel as StoredClient["experienceLevel"]) ||
-        "beginner",
-      status: (formValues.status as StoredClient["status"]) || "active",
-      createdAt:
-        formMode === "edit" && formValues.createdAt
-          ? formValues.createdAt
-          : now,
-      updatedAt: now,
-    };
-
-    saveClient(client);
-    loadClients();
-    setSelectedClientId(client.id);
-    closeForm();
-    toast.success(
-      formMode === "add"
-        ? "Client added successfully."
-        : "Client updated successfully.",
-    );
+    navigate(`/client/${target.id}`);
   };
 
   const handleDeleteClient = (clientId: string) => {
@@ -138,6 +63,11 @@ export default function ClientsPage() {
       setSelectedClientId(null);
     }
     toast.success("Client deleted successfully.");
+  };
+
+  const handleQuickAddSuccess = (client: StoredClient) => {
+    loadClients();
+    setSelectedClientId(client.id);
   };
 
   return (
@@ -323,255 +253,12 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      <AnimatePresence>
-        {isFormOpen && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            onClick={closeForm}
-          >
-            <motion.div
-              className="w-full max-w-2xl overflow-hidden rounded-3xl border bg-[var(--card-bg)] p-6 shadow-2xl"
-              style={{ borderColor: "var(--card-border)" }}
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 12 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="mb-6 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-[var(--light-text-muted)]">
-                    {formMode === "add" ? "New client" : "Edit client"}
-                  </p>
-                  <h2 className="mt-2 text-2xl font-semibold text-[var(--page-text)]">
-                    {formMode === "add" ? "Add New Client" : "Update Client"}
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeForm}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--card-border)] transition hover:bg-[var(--light-elevated)]"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2 text-sm">
-                  <span className="block text-[var(--light-text-muted)]">
-                    Full name
-                  </span>
-                  <input
-                    type="text"
-                    value={formValues.fullName ?? ""}
-                    onChange={(e) =>
-                      handleFormChange("fullName", e.target.value)
-                    }
-                    className="w-full rounded-xl border bg-[var(--page-bg)] px-4 py-3 text-sm outline-none"
-                    style={{
-                      borderColor: "var(--card-border)",
-                      color: "var(--page-text)",
-                    }}
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span className="block text-[var(--light-text-muted)]">
-                    Email
-                  </span>
-                  <input
-                    type="email"
-                    value={formValues.email ?? ""}
-                    onChange={(e) => handleFormChange("email", e.target.value)}
-                    className="w-full rounded-xl border bg-[var(--page-bg)] px-4 py-3 text-sm outline-none"
-                    style={{
-                      borderColor: "var(--card-border)",
-                      color: "var(--page-text)",
-                    }}
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span className="block text-[var(--light-text-muted)]">
-                    Phone
-                  </span>
-                  <input
-                    type="tel"
-                    value={formValues.phone ?? ""}
-                    onChange={(e) => handleFormChange("phone", e.target.value)}
-                    className="w-full rounded-xl border bg-[var(--page-bg)] px-4 py-3 text-sm outline-none"
-                    style={{
-                      borderColor: "var(--card-border)",
-                      color: "var(--page-text)",
-                    }}
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span className="block text-[var(--light-text-muted)]">
-                    Date of birth
-                  </span>
-                  <input
-                    type="date"
-                    value={formValues.dateOfBirth ?? ""}
-                    onChange={(e) =>
-                      handleFormChange("dateOfBirth", e.target.value)
-                    }
-                    className="w-full rounded-xl border bg-[var(--page-bg)] px-4 py-3 text-sm outline-none"
-                    style={{
-                      borderColor: "var(--card-border)",
-                      color: "var(--page-text)",
-                    }}
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span className="block text-[var(--light-text-muted)]">
-                    Goal
-                  </span>
-                  <input
-                    type="text"
-                    value={formValues.fitnessGoal ?? ""}
-                    onChange={(e) =>
-                      handleFormChange("fitnessGoal", e.target.value)
-                    }
-                    className="w-full rounded-xl border bg-[var(--page-bg)] px-4 py-3 text-sm outline-none"
-                    style={{
-                      borderColor: "var(--card-border)",
-                      color: "var(--page-text)",
-                    }}
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span className="block text-[var(--light-text-muted)]">
-                    Gender
-                  </span>
-                  <select
-                    value={formValues.gender ?? "other"}
-                    onChange={(e) => handleFormChange("gender", e.target.value)}
-                    className="w-full rounded-xl border bg-[var(--page-bg)] px-4 py-3 text-sm outline-none"
-                    style={{
-                      borderColor: "var(--card-border)",
-                      color: "var(--page-text)",
-                    }}
-                  >
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                  </select>
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span className="block text-[var(--light-text-muted)]">
-                    Experience
-                  </span>
-                  <select
-                    value={formValues.experienceLevel ?? "beginner"}
-                    onChange={(e) =>
-                      handleFormChange("experienceLevel", e.target.value)
-                    }
-                    className="w-full rounded-xl border bg-[var(--page-bg)] px-4 py-3 text-sm outline-none"
-                    style={{
-                      borderColor: "var(--card-border)",
-                      color: "var(--page-text)",
-                    }}
-                  >
-                    <option value="beginner">Beginner</option>
-                    <option value="intermediate">Intermediate</option>
-                    <option value="advanced">Advanced</option>
-                  </select>
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span className="block text-[var(--light-text-muted)]">
-                    Height (cm)
-                  </span>
-                  <input
-                    type="number"
-                    value={formValues.heightCm ?? ""}
-                    onChange={(e) =>
-                      handleFormChange("heightCm", e.target.value)
-                    }
-                    className="w-full rounded-xl border bg-[var(--page-bg)] px-4 py-3 text-sm outline-none"
-                    style={{
-                      borderColor: "var(--card-border)",
-                      color: "var(--page-text)",
-                    }}
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span className="block text-[var(--light-text-muted)]">
-                    Weight (kg)
-                  </span>
-                  <input
-                    type="number"
-                    value={formValues.weightKg ?? ""}
-                    onChange={(e) =>
-                      handleFormChange("weightKg", e.target.value)
-                    }
-                    className="w-full rounded-xl border bg-[var(--page-bg)] px-4 py-3 text-sm outline-none"
-                    style={{
-                      borderColor: "var(--card-border)",
-                      color: "var(--page-text)",
-                    }}
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span className="block text-[var(--light-text-muted)]">
-                    Body fat %
-                  </span>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={formValues.bodyFatPercent ?? ""}
-                    onChange={(e) =>
-                      handleFormChange("bodyFatPercent", e.target.value)
-                    }
-                    className="w-full rounded-xl border bg-[var(--page-bg)] px-4 py-3 text-sm outline-none"
-                    style={{
-                      borderColor: "var(--card-border)",
-                      color: "var(--page-text)",
-                    }}
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span className="block text-[var(--light-text-muted)]">
-                    Status
-                  </span>
-                  <select
-                    value={formValues.status ?? "active"}
-                    onChange={(e) => handleFormChange("status", e.target.value)}
-                    className="w-full rounded-xl border bg-[var(--page-bg)] px-4 py-3 text-sm outline-none"
-                    style={{
-                      borderColor: "var(--card-border)",
-                      color: "var(--page-text)",
-                    }}
-                  >
-                    <option value="active">Active</option>
-                    <option value="paused">Paused</option>
-                    <option value="archived">Archived</option>
-                  </select>
-                </label>
-              </div>
-
-              <div className="mt-6 flex flex-wrap justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={closeForm}
-                  className="rounded-full border border-[var(--card-border)] bg-[var(--card-bg)] px-5 py-3 text-sm font-semibold transition hover:bg-[var(--light-elevated)]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveClient}
-                  className="rounded-full bg-[var(--azfit-primary)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#0b776d]"
-                >
-                  Save Client
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Quick Add Client Modal */}
+      <QuickAddClientModal
+        open={isQuickAddOpen}
+        onClose={() => setIsQuickAddOpen(false)}
+        onSuccess={handleQuickAddSuccess}
+      />
     </Layout>
   );
 }

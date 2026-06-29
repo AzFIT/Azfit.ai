@@ -18,6 +18,9 @@ const KEYS = {
   NOTES: (clientId: string) => `${PREFIX}notes_${clientId}`,
   WORKOUT_LOGS: `${PREFIX}workout_logs`,
   CURRENT_USER: `${PREFIX}current_user`,
+  WORKOUT_DRAFT: (userId: string, workoutLogId: string, exerciseId: string) =>
+    `${PREFIX}workout_draft:${userId}:${workoutLogId}:ex_${exerciseId}`,
+  OFFLINE_QUEUE: (userId: string) => `${PREFIX}offline_queue:${userId}`,
 } as const;
 
 // ─── Generic helpers ───
@@ -353,6 +356,69 @@ export function setStoredUser(user: StoredUser | null): void {
   } else {
     remove(KEYS.CURRENT_USER);
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Phase 2: Workout Draft Helpers — Resilient State Management
+// ═══════════════════════════════════════════════════════════════
+
+export interface WorkoutDraftData {
+  sets: { reps: string; weight: string; rpe: string; done: boolean }[];
+  notes: string;
+  timestamp: number;
+  synced: boolean;
+}
+
+export function getWorkoutDraft(userId: string, workoutLogId: string, exerciseId: string): WorkoutDraftData | null {
+  return get<WorkoutDraftData | null>(KEYS.WORKOUT_DRAFT(userId, workoutLogId, exerciseId), null);
+}
+
+export function setWorkoutDraft(userId: string, workoutLogId: string, exerciseId: string, data: Omit<WorkoutDraftData, 'timestamp' | 'synced'>): void {
+  set(KEYS.WORKOUT_DRAFT(userId, workoutLogId, exerciseId), {
+    ...data,
+    timestamp: Date.now(),
+    synced: false,
+  });
+}
+
+export function clearWorkoutDraft(userId: string, workoutLogId: string, exerciseId: string): void {
+  remove(KEYS.WORKOUT_DRAFT(userId, workoutLogId, exerciseId));
+}
+
+export function clearAllWorkoutDrafts(userId: string, workoutLogId: string): void {
+  const prefix = `${PREFIX}workout_draft:${userId}:${workoutLogId}:`;
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(prefix)) {
+      remove(key);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Phase 2: Offline Queue Helpers
+// ═══════════════════════════════════════════════════════════════
+
+export interface OfflineQueueItem {
+  id: string;
+  table: string;
+  operation: 'insert' | 'update';
+  payload: Record<string, unknown>;
+  attempts: number;
+  createdAt: string;
+  error?: string;
+}
+
+export function getOfflineQueue(userId: string): OfflineQueueItem[] {
+  return get<OfflineQueueItem[]>(KEYS.OFFLINE_QUEUE(userId), []);
+}
+
+export function setOfflineQueue(userId: string, queue: OfflineQueueItem[]): void {
+  set(KEYS.OFFLINE_QUEUE(userId), queue);
+}
+
+export function clearOfflineQueue(userId: string): void {
+  remove(KEYS.OFFLINE_QUEUE(userId));
 }
 
 // ─── Export / Import ───

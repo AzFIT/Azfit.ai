@@ -5,6 +5,9 @@ import {
   ArrowLeft, Play, Pause, RotateCcw, SkipForward, Volume2, VolumeX,
   Timer, Zap, Activity, Watch,
 } from 'lucide-react';
+import { useWorkoutSession } from '@/hooks/useWorkoutSession';
+import OfflineBanner from '@/components/OfflineBanner';
+import { useAuth } from '@/hooks/useAuth';
 
 type TimerMode = 'tabata' | 'emom' | 'circuit' | 'stopwatch';
 
@@ -22,10 +25,11 @@ const DEFAULT_CONFIG: TimerConfig = {
   stopwatch: {},
 };
 
-/* ── Main Component ────────────────────────────────────── */
+
 
 export default function TimerModesPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [mode, setMode] = useState<TimerMode>('tabata');
   const [config, setConfig] = useState<TimerConfig>(DEFAULT_CONFIG);
   const [isRunning, setIsRunning] = useState(false);
@@ -36,6 +40,34 @@ export default function TimerModesPage() {
   const [totalElapsed, setTotalElapsed] = useState(0);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  const [showWorkoutLog, setShowWorkoutLog] = useState(false);
+
+  // Phase 2: Resilient workout logging
+  const userId = user?.id || 'anonymous';
+  const workoutLogId = `timer_${mode}_${new Date().toISOString().split('T')[0]}`;
+
+  const {
+    getExerciseData,
+    updateSet,
+    toggleSetDone,
+    addSet,
+    submitAll,
+    isSubmitting,
+    pendingCount,
+    retryAll,
+    lastSaved,
+  } = useWorkoutSession({
+    workoutLogId,
+    clientId: userId,
+    exercises: mode === 'circuit' && 'exercises' in config.circuit
+      ? config.circuit.exercises.map((name, i) => ({
+          id: `circuit_ex_${i}`,
+          name,
+          targetSets: 1,
+          targetReps: '10',
+        }))
+      : [{ id: mode, name: mode.toUpperCase(), targetSets: 1, targetReps: '10' }],
+  });
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -396,7 +428,153 @@ export default function TimerModesPage() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Phase 2: Workout Log Panel */}
+        <AnimatePresence>
+          {showWorkoutLog && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-300">Workout Log</h3>
+                  {lastSaved && (
+                    <span className="text-[10px] text-emerald-400">
+                      Last saved: {lastSaved.toLocaleTimeString()}
+                    </span>
+                  )}
+                </div>
+
+                {mode === 'circuit' && 'exercises' in currentConfig ? (
+                  currentConfig.exercises.map((exName, exIdx) => {
+                    const exId = `circuit_ex_${exIdx}`;
+                    const data = getExerciseData(exId);
+                    return (
+                      <div key={exId} className="space-y-2">
+                        <p className="text-xs font-medium text-slate-300">{exName}</p>
+                        {data.sets.map((set, sIdx) => (
+                          <div key={sIdx} className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              placeholder="Reps"
+                              value={set.reps}
+                              onChange={(e) => updateSet(exId, sIdx, 'reps', e.target.value)}
+                              className="w-16 px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs text-white text-center focus:outline-none focus:border-[#00AEEF]"
+                            />
+                            <input
+                              type="text"
+                              placeholder="Weight"
+                              value={set.weight}
+                              onChange={(e) => updateSet(exId, sIdx, 'weight', e.target.value)}
+                              className="w-16 px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs text-white text-center focus:outline-none focus:border-[#00AEEF]"
+                            />
+                            <input
+                              type="text"
+                              placeholder="RPE"
+                              value={set.rpe}
+                              onChange={(e) => updateSet(exId, sIdx, 'rpe', e.target.value)}
+                              className="w-12 px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs text-white text-center focus:outline-none focus:border-[#00AEEF]"
+                            />
+                            <button
+                              onClick={() => toggleSetDone(exId, sIdx)}
+                              className={`px-2 py-1 rounded text-[10px] font-bold transition-colors ${
+                                set.done ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'
+                              }`}
+                            >
+                              {set.done ? 'Done' : 'Log'}
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          onClick={() => addSet(exId)}
+                          className="text-[10px] text-[#00AEEF] hover:text-[#0098D1] transition-colors"
+                        >
+                          + Add Set
+                        </button>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-slate-300">{mode.toUpperCase()}</p>
+                    {getExerciseData(mode).sets.map((set, sIdx) => (
+                      <div key={sIdx} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="Reps"
+                          value={set.reps}
+                          onChange={(e) => updateSet(mode, sIdx, 'reps', e.target.value)}
+                          className="w-16 px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs text-white text-center focus:outline-none focus:border-[#00AEEF]"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Weight"
+                          value={set.weight}
+                          onChange={(e) => updateSet(mode, sIdx, 'weight', e.target.value)}
+                          className="w-16 px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs text-white text-center focus:outline-none focus:border-[#00AEEF]"
+                        />
+                        <input
+                          type="text"
+                          placeholder="RPE"
+                          value={set.rpe}
+                          onChange={(e) => updateSet(mode, sIdx, 'rpe', e.target.value)}
+                          className="w-12 px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs text-white text-center focus:outline-none focus:border-[#00AEEF]"
+                        />
+                        <button
+                          onClick={() => toggleSetDone(mode, sIdx)}
+                          className={`px-2 py-1 rounded text-[10px] font-bold transition-colors ${
+                            set.done ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'
+                          }`}
+                        >
+                          {set.done ? 'Done' : 'Log'}
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => addSet(mode)}
+                      className="text-[10px] text-[#00AEEF] hover:text-[#0098D1] transition-colors"
+                    >
+                      + Add Set
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 pt-2">
+                  <button
+                    onClick={() => submitAll()}
+                    disabled={isSubmitting}
+                    className="flex-1 py-2 rounded-xl bg-[#00AEEF] hover:bg-[#0098D1] disabled:opacity-50 text-[#0B1120] font-bold text-sm transition-colors"
+                  >
+                    {isSubmitting ? 'Saving...' : 'Save Workout'}
+                  </button>
+                  {pendingCount > 0 && (
+                    <button
+                      onClick={retryAll}
+                      className="px-3 py-2 rounded-xl bg-amber-500/20 text-amber-400 text-xs font-bold hover:bg-amber-500/30 transition-colors"
+                    >
+                      Retry ({pendingCount})
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Toggle Workout Log */}
+        <button
+          onClick={() => setShowWorkoutLog(!showWorkoutLog)}
+          className="w-full text-center text-xs text-slate-500 hover:text-slate-300 transition-colors py-2"
+        >
+          {showWorkoutLog ? 'Hide' : 'Show'} Workout Log
+        </button>
       </div>
+
+      {/* Phase 2: Offline Banner */}
+      <OfflineBanner pendingCount={pendingCount} onRetry={retryAll} />
     </div>
   );
 }
