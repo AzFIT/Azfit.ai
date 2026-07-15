@@ -78,15 +78,15 @@ export default function WorkoutLogsTab({ logs }: WorkoutLogsTabProps) {
                 className="overflow-hidden"
               >
                 <div className="px-4 pb-4 space-y-2">
-                  {log.exercises.map((exercise, idx) => (
-                    <div key={idx} className="rounded-xl p-3" style={{ backgroundColor: 'var(--light-elevated)' }}>
+                  {log.exercises.map((exercise) => (
+                    <div key={exercise.name} className="rounded-xl p-3" style={{ backgroundColor: 'var(--light-elevated)' }}>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-medium" style={{ color: 'var(--page-text)' }}>{exercise.name}</span>
                         <span className="text-[10px] px-1.5 py-0.5 rounded-md" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--light-text-muted)' }}>{exercise.muscleGroup}</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
-                        {exercise.sets.map((set, sIdx) => (
-                          <div key={sIdx} className="text-[10px] px-2 py-1 rounded-md border" style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)', color: 'var(--light-text-secondary)' }}>
+                        {exercise.sets.map((set) => (
+                          <div key={`${set.reps}-${set.weight}`} className="text-[10px] px-2 py-1 rounded-md border" style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)', color: 'var(--light-text-secondary)' }}>
                             {set.reps} reps × {set.weight} kg
                           </div>
                         ))}

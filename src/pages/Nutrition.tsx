@@ -468,7 +468,7 @@ export default function NutritionPage() {
                         style={{ borderColor: "var(--card-border)" }}
                       >
                         {/* Food List */}
-                        {meal?.foods.map((entry, idx) => {
+                        {meal?.foods.map((entry) => {
                           const food = FOOD_DB.find(
                             (f) => f.id === entry.foodId,
                           );
@@ -476,7 +476,7 @@ export default function NutritionPage() {
                           const ratio = entry.quantity / food.servingSize;
                           return (
                             <div
-                              key={idx}
+                              key={entry.foodId}
                               className="flex items-center justify-between py-2"
                             >
                               <div>
