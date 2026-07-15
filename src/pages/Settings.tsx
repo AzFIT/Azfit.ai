@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useTheme } from '@/hooks/useTheme';
+import { useAuth } from '@/hooks/useAuth';
 
 /* ------------------------------------------------------------------ */
 /*  Animation helpers                                                  */
@@ -213,6 +214,7 @@ function DeviceRow({ device }: { device: DeviceItem }) {
 
 export default function Settings() {
   const { theme, toggleTheme } = useTheme();
+  const { logout } = useAuth();
   const isDark = theme === 'dark';
 
   /* ---- units state ---- */
@@ -795,6 +797,7 @@ export default function Settings() {
           className="mt-6 space-y-3 px-1 pb-8"
         >
           <button
+            onClick={() => alert('Password change not yet implemented')}
             className="flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-3 font-mono text-sm font-semibold transition-all duration-200 active:scale-[0.97]"
             style={{
               borderColor: 'var(--azfit-primary)',
@@ -808,6 +811,11 @@ export default function Settings() {
           </button>
 
           <button
+            onClick={() => {
+              if (confirm('Are you sure you want to delete your account? This cannot be undone.')) {
+                alert('Account deletion not yet implemented');
+              }
+            }}
             className="flex w-full items-center justify-center gap-2 rounded-lg border border-transparent px-4 py-3 font-mono text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 active:scale-[0.97]"
             style={{
               backgroundColor: 'var(--danger)',
@@ -820,6 +828,10 @@ export default function Settings() {
           </button>
 
           <button
+            onClick={async () => {
+              await logout();
+              window.location.href = '/';
+            }}
             className="flex w-full items-center justify-center gap-2 rounded-lg border border-transparent px-4 py-3 font-mono text-sm font-semibold transition-all duration-200 active:scale-[0.97]"
             style={{
               color: 'var(--danger)',
