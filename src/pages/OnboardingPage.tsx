@@ -1,10 +1,12 @@
- 
 import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronRight, ChevronLeft, User, Scale, Dumbbell,
-  Apple, Check, Droplets,
+  Apple, Check, Droplets, Briefcase, PersonStanding,
+  Building2, Home, Trees, Dumbbell as DumbbellIcon,
+  Watch, PartyPopper,
+  type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,94 +14,57 @@ import { Label } from '@/components/ui/label';
 import { calculateBMI, calculateBMR, calculateTDEE } from '@/lib/utils';
 
 import { useGoalCategories } from '@/hooks/useSupabaseData';
+import { createClientProfile, getSession } from '@/services/auth';
+import { setOnboardingData, clearOnboardingData } from '@/lib/storage';
 
-/* ── Types ─────────────────────────────────────────────── */
+import {
+  type OnboardingData,
+  INITIAL_ONBOARDING_DATA,
+  PARQ_QUESTIONS,
+  EXPERIENCE_OPTIONS,
+  FREQUENCY_OPTIONS,
+  ACTIVITY_OPTIONS,
+  EQUIPMENT_OPTIONS,
+  GYM_TYPE_OPTIONS,
+  SESSION_LENGTH_OPTIONS,
+  DEVICE_OPTIONS,
+  MACRO_PRESETS,
+  BODY_MEASUREMENTS,
+  type ConnectableDevice,
+} from '@/types/onboarding';
 
-interface OnboardingData {
-  fullName: string;
-  email: string;
-  phone: string;
-  dateOfBirth: string;
-  gender: 'male' | 'female' | '';
-  photo?: string;
-  weight: number;
-  goalWeight: number;
-  height: number;
-  bodyFatPercentage?: number;
-  useNavyMethod: boolean;
-  navyNeck: number;
-  navyWaist: number;
-  navyHip: number;
-  measurements: Record<string, number>;
-  progressPhoto?: string;
-  parqAnswers: boolean[];
-  trainingExperience: string;
-  trainingFrequency: string;
-  activityLevel: string;
-  primaryGoal: string;
-  primaryGoalId: string;
-  injuries: string;
-  preferredStyle: string[];
-  availableEquipment: string[];
-  macroSplit: 'balanced' | 'high_protein' | 'high_carb';
-  mealCount: string;
-}
+/* ── Step titles & icons ─────────────────────────────── */
 
-const INITIAL_DATA: OnboardingData = {
-  fullName: '', email: '', phone: '', dateOfBirth: '', gender: '',
-  weight: 0, goalWeight: 0, height: 0, useNavyMethod: false,
-  navyNeck: 0, navyWaist: 0, navyHip: 0,
-  measurements: {},
-  parqAnswers: [false, false, false, false, false, false, false],
-  trainingExperience: '', trainingFrequency: '', activityLevel: '',
-  primaryGoal: '', primaryGoalId: '', injuries: '', preferredStyle: [], availableEquipment: [],
-  macroSplit: 'balanced', mealCount: '4',
-};
+const STEP_TITLES = [
+  'Your Role',
+  'Personal Info',
+  'Body Composition',
+  'Fitness Background',
+  'Training Setup',
+  'TDEE & Nutrition',
+  'Device Connect',
+  'Review',
+  'All Set!',
+] as const;
 
-const PARQ_QUESTIONS = [
-  'Has your doctor ever said that you have a heart condition and that you should only do physical activity recommended by a doctor?',
-  'Do you feel pain in your chest when you do physical activity?',
-  'In the past month, have you had chest pain when you were not doing physical activity?',
-  'Do you lose your balance because of dizziness or do you ever lose consciousness?',
-  'Do you have a bone or joint problem that could be made worse by a change in your physical activity?',
-  'Is your doctor currently prescribing drugs for your blood pressure or heart condition?',
-  'Do you know of any other reason why you should not do physical activity?',
+const STEP_ICONS: LucideIcon[] = [
+  Briefcase, User, Scale, Dumbbell, DumbbellIcon, Apple, Watch, Check, PartyPopper,
 ];
-
-const EXPERIENCE_OPTIONS = [
-  { value: 'beginner', label: 'Beginner', sub: '0-1 years' },
-  { value: 'intermediate', label: 'Intermediate', sub: '1-3 years' },
-  { value: 'advanced', label: 'Advanced', sub: '3+ years' },
-];
-
-const FREQUENCY_OPTIONS = ['2', '3', '4', '5', '6'];
-const ACTIVITY_OPTIONS = [
-  { value: 'sedentary', label: 'Sedentary', sub: 'Little to no exercise' },
-  { value: 'light', label: 'Lightly Active', sub: 'Light exercise 1-3 days/week' },
-  { value: 'moderate', label: 'Moderately Active', sub: 'Moderate exercise 3-5 days/week' },
-  { value: 'very', label: 'Very Active', sub: 'Hard exercise 6-7 days/week' },
-  { value: 'extreme', label: 'Extremely Active', sub: 'Very hard exercise + physical job' },
-];
-
-const EQUIPMENT_OPTIONS = ['Full Gym', 'Dumbbells Only', 'Home Gym (limited)', 'Bodyweight Only'];
-
-const MACRO_PRESETS = {
-  balanced: { protein: 0.30, fats: 0.35, carbs: 0.35, label: 'Balanced Diet', desc: 'General health & sustainability' },
-  high_protein: { protein: 0.40, fats: 0.40, carbs: 0.20, label: 'High Protein', desc: 'Muscle building & strength' },
-  high_carb: { protein: 0.30, fats: 0.20, carbs: 0.50, label: 'High Carb', desc: 'Endurance & performance' },
-};
 
 /* ── Main Component ────────────────────────────────────── */
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
-  const [data, setData] = useState<OnboardingData>(INITIAL_DATA);
+  const [data, setData] = useState<OnboardingData>(INITIAL_ONBOARDING_DATA);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const updateData = useCallback((updates: Partial<OnboardingData>) => {
     setData((prev) => ({ ...prev, ...updates }));
   }, []);
 
+  /* ── Derived values ── */
   const age = useMemo(() => {
     if (!data.dateOfBirth) return 0;
     const birth = new Date(data.dateOfBirth);
@@ -138,18 +103,100 @@ export default function OnboardingPage() {
 
   const waterGoal = useMemo(() => Math.round(data.weight * 35), [data.weight]);
 
+  /* ── Progress gate ── */
   const canProceed = useMemo(() => {
     switch (step) {
-      case 1: return data.fullName && data.email && data.dateOfBirth && data.gender;
-      case 2: return data.weight > 0 && data.goalWeight > 0 && data.height > 0;
-      case 3: return data.trainingExperience && data.trainingFrequency && data.activityLevel && data.primaryGoal;
-      case 4: return true;
-      case 5: return true;
+      case 1: return data.role !== '';
+      case 2: return data.fullName && data.email && data.dateOfBirth && data.gender;
+      case 3: return data.weight > 0 && data.goalWeight > 0 && data.height > 0;
+      case 4: return data.trainingExperience && data.trainingFrequency && data.activityLevel && data.primaryGoal;
+      case 5: return data.gymType !== '' && data.sessionLength > 0;
+      case 6: return true;
+      case 7: return true;
+      case 8: return true;
+      case 9: return true;
       default: return false;
     }
   }, [step, data]);
 
-  const handleComplete = () => {
+  /* ── Completion handler ── */
+  const handleComplete = async () => {
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    // Build the profile data object
+    const profileData = {
+      fullName: data.fullName,
+      email: data.email,
+      phone: data.phone,
+      dateOfBirth: data.dateOfBirth,
+      gender: data.gender || undefined,
+      heightCm: data.height || undefined,
+      weightKg: data.weight || undefined,
+      bodyFatPercentage: data.bodyFatPercentage,
+      fitnessGoal: data.primaryGoal,
+      experienceLevel: data.trainingExperience as 'beginner' | 'intermediate' | 'advanced' | undefined,
+      trainingFrequency: data.trainingFrequency,
+      activityLevel: data.activityLevel,
+      injuries: data.injuries,
+      availableEquipment: data.availableEquipment,
+      gymType: data.gymType,
+      sessionLength: data.sessionLength,
+      hasCoach: data.hasCoach,
+      coachCode: data.coachCode,
+      macroSplit: data.macroSplit,
+      mealCount: data.mealCount,
+      connectedDevices: data.connectedDevices,
+    };
+
+    // Try Supabase first
+    const session = await getSession();
+    if (session) {
+      const { clientId, error } = await createClientProfile(profileData);
+      if (!error && clientId) {
+        // Success — clear localStorage draft and go to celebration
+        clearOnboardingData();
+        setStep(9);
+        setIsSubmitting(false);
+        return;
+      }
+      // Supabase failed — fall back to localStorage
+      console.warn('Supabase profile creation failed, falling back to localStorage:', error?.message);
+    }
+
+    // Fallback: save to localStorage
+    setOnboardingData({
+      ...data,
+      weight: data.weight,
+      goalWeight: data.goalWeight,
+      height: data.height,
+      bodyFatPercentage: data.bodyFatPercentage,
+      primaryGoal: data.primaryGoal,
+      primaryGoalId: data.primaryGoalId,
+      trainingExperience: data.trainingExperience,
+      trainingFrequency: data.trainingFrequency,
+      activityLevel: data.activityLevel,
+      gymType: data.gymType,
+      sessionLength: data.sessionLength,
+      hasCoach: data.hasCoach,
+      coachCode: data.coachCode,
+      macroSplit: data.macroSplit,
+      mealCount: data.mealCount,
+      connectedDevices: data.connectedDevices,
+      injuries: data.injuries,
+      availableEquipment: data.availableEquipment,
+      parqAnswers: data.parqAnswers,
+      useNavyMethod: data.useNavyMethod,
+      navyNeck: data.navyNeck,
+      navyWaist: data.navyWaist,
+      navyHip: data.navyHip,
+      measurements: data.measurements,
+      progressPhoto: data.progressPhoto,
+      photo: data.photo,
+      preferredStyle: data.preferredStyle,
+    });
+
+    // Also save legacy profile for backward compatibility
     const profile = {
       id: crypto.randomUUID(),
       name: data.fullName,
@@ -174,6 +221,11 @@ export default function OnboardingPage() {
       injuries: data.injuries,
       preferredStyle: data.preferredStyle,
       availableEquipment: data.availableEquipment,
+      gymType: data.gymType,
+      sessionLength: data.sessionLength,
+      hasCoach: data.hasCoach,
+      coachCode: data.coachCode,
+      connectedDevices: data.connectedDevices,
       tdee,
       calorieGoal,
       macroSplit: data.macroSplit,
@@ -182,6 +234,7 @@ export default function OnboardingPage() {
       carbsGrams: macros.carbs,
       waterGoal,
       mealCount: Number(data.mealCount),
+      role: data.role,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -191,11 +244,13 @@ export default function OnboardingPage() {
       proteinGrams: macros.protein, fatsGrams: macros.fats, carbsGrams: macros.carbs,
       waterGoal, mealCount: Number(data.mealCount), createdAt: Date.now(),
     }));
-    navigate('/dashboard');
+
+    setStep(9);
+    setIsSubmitting(false);
   };
 
-  const stepIcons = [User, Scale, Dumbbell, Apple, Check];
-  const StepIcon = stepIcons[step - 1] || User;
+  const StepIcon = STEP_ICONS[step - 1] || User;
+  const totalSteps = 9;
 
   return (
     <div className="min-h-[100dvh] pb-20" style={{ backgroundColor: 'var(--page-bg)' }}>
@@ -209,13 +264,13 @@ export default function OnboardingPage() {
               </div>
               <div>
                 <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-                  {['Personal Info', 'Body Composition', 'Fitness Background', 'TDEE & Nutrition', 'Review'][step - 1]}
+                  {STEP_TITLES[step - 1]}
                 </h1>
-                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Step {step} of 5</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Step {step} of {totalSteps}</p>
               </div>
             </div>
             <div className="flex gap-1">
-              {[1, 2, 3, 4, 5].map((s) => (
+              {Array.from({ length: totalSteps }, (_, i) => i + 1).map((s) => (
                 <div
                   key={s}
                   className="h-2 w-2 rounded-full"
@@ -229,6 +284,15 @@ export default function OnboardingPage() {
         </div>
       </div>
 
+      {/* Error banner */}
+      {submitError && (
+        <div className="mx-auto max-w-2xl px-4 pt-4">
+          <div className="rounded-lg bg-red-500/10 p-3 text-xs text-red-500">
+            {submitError}
+          </div>
+        </div>
+      )}
+
       {/* Content */}
       <div className="mx-auto max-w-2xl px-4 py-6">
         <AnimatePresence mode="wait">
@@ -239,53 +303,155 @@ export default function OnboardingPage() {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.2 }}
           >
-            {step === 1 && <Step1Personal data={data} updateData={updateData} />}
-            {step === 2 && <Step2Body data={data} updateData={updateData} />}
-            {step === 3 && <Step3Fitness data={data} updateData={updateData} />}
-            {step === 4 && <Step4TDEE data={data} updateData={updateData} age={age} bmi={bmi} bmr={bmr} tdee={tdee} calorieGoal={calorieGoal} macros={macros} waterGoal={waterGoal} />}
-            {step === 5 && <Step5Review data={data} age={age} bmi={bmi} tdee={tdee} calorieGoal={calorieGoal} macros={macros} waterGoal={waterGoal} />}
+            {step === 1 && <Step1Role data={data} updateData={updateData} />}
+            {step === 2 && <Step2Personal data={data} updateData={updateData} />}
+            {step === 3 && <Step3Body data={data} updateData={updateData} />}
+            {step === 4 && <Step4Fitness data={data} updateData={updateData} />}
+            {step === 5 && <Step5TrainingSetup data={data} updateData={updateData} />}
+            {step === 6 && <Step6TDEE data={data} updateData={updateData} age={age} bmi={bmi} bmr={bmr} tdee={tdee} calorieGoal={calorieGoal} macros={macros} waterGoal={waterGoal} />}
+            {step === 7 && <Step7Devices data={data} updateData={updateData} />}
+            {step === 8 && <Step8Review data={data} age={age} bmi={bmi} tdee={tdee} calorieGoal={calorieGoal} macros={macros} waterGoal={waterGoal} />}
+            {step === 9 && <Step9Complete data={data} navigate={navigate} />}
           </motion.div>
         </AnimatePresence>
       </div>
 
       {/* Footer Buttons */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white/90 backdrop-blur-xl dark:bg-slate-950/90 lg:left-[280px]">
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
-          <button
-            onClick={() => setStep((s) => Math.max(1, s - 1))}
-            disabled={step === 1}
-            className="flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-30"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            <ChevronLeft className="h-4 w-4" /> Back
-          </button>
-          {step < 5 ? (
+      {step < 9 && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white/90 backdrop-blur-xl dark:bg-slate-950/90 lg:left-[280px]">
+          <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
             <button
-              onClick={() => setStep((s) => s + 1)}
-              disabled={!canProceed}
-              className="flex items-center gap-1 rounded-xl px-6 py-2.5 text-sm font-bold text-white transition-all disabled:opacity-40"
-              style={{ background: 'linear-gradient(135deg, #00AEEF, #8B5CF6)' }}
+              onClick={() => setStep((s) => Math.max(1, s - 1))}
+              disabled={step === 1}
+              className="flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-30"
+              style={{ color: 'var(--text-muted)' }}
             >
-              Next <ChevronRight className="h-4 w-4" />
+              <ChevronLeft className="h-4 w-4" /> Back
             </button>
-          ) : (
-            <button
-              onClick={handleComplete}
-              className="flex items-center gap-1 rounded-xl px-6 py-2.5 text-sm font-bold text-white"
-              style={{ background: 'linear-gradient(135deg, #00AEEF, #8B5CF6)' }}
-            >
-              <Check className="h-4 w-4" /> Complete Setup
-            </button>
-          )}
+            {step < 8 ? (
+              <button
+                onClick={() => setStep((s) => s + 1)}
+                disabled={!canProceed}
+                className="flex items-center gap-1 rounded-xl px-6 py-2.5 text-sm font-bold text-white transition-all disabled:opacity-40"
+                style={{ background: 'linear-gradient(135deg, #00AEEF, #8B5CF6)' }}
+              >
+                Next <ChevronRight className="h-4 w-4" />
+              </button>
+            ) : (
+              <button
+                onClick={handleComplete}
+                disabled={isSubmitting}
+                className="flex items-center gap-1 rounded-xl px-6 py-2.5 text-sm font-bold text-white transition-all disabled:opacity-40"
+                style={{ background: 'linear-gradient(135deg, #00AEEF, #8B5CF6)' }}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4" /> Complete Setup
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
-/* ── Step 1: Personal Info ─────────────────────────────── */
+/* ── Step 1: Role Selection ─────────────────────────────── */
 
-function Step1Personal({ data, updateData }: { data: OnboardingData; updateData: (u: Partial<OnboardingData>) => void }) {
+function Step1Role({ data, updateData }: { data: OnboardingData; updateData: (u: Partial<OnboardingData>) => void }) {
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+          Welcome to AzFIT
+        </h2>
+        <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+          Let&apos;s get you set up. Which best describes you?
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        {/* Coach option */}
+        <button
+          onClick={() => updateData({ role: 'trainer' })}
+          className="flex flex-col items-center gap-3 rounded-2xl border-2 p-6 text-center transition-all"
+          style={{
+            borderColor: data.role === 'trainer' ? '#00AEEF' : 'var(--card-border)',
+            backgroundColor: data.role === 'trainer' ? 'rgba(0,174,239,0.1)' : 'transparent',
+          }}
+        >
+          <div
+            className="flex h-14 w-14 items-center justify-center rounded-full"
+            style={{ backgroundColor: data.role === 'trainer' ? '#00AEEF' : 'var(--card-border)' }}
+          >
+            <Briefcase className="h-7 w-7 text-white" />
+          </div>
+          <div>
+            <p
+              className="font-bold"
+              style={{ color: data.role === 'trainer' ? '#00AEEF' : 'var(--text-primary)' }}
+            >
+              I&apos;m a Coach / Trainer
+            </p>
+            <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+              I want to manage clients and build programs
+            </p>
+          </div>
+        </button>
+
+        {/* Client option */}
+        <button
+          onClick={() => updateData({ role: 'client' })}
+          className="flex flex-col items-center gap-3 rounded-2xl border-2 p-6 text-center transition-all"
+          style={{
+            borderColor: data.role === 'client' ? '#00AEEF' : 'var(--card-border)',
+            backgroundColor: data.role === 'client' ? 'rgba(0,174,239,0.1)' : 'transparent',
+          }}
+        >
+          <div
+            className="flex h-14 w-14 items-center justify-center rounded-full"
+            style={{ backgroundColor: data.role === 'client' ? '#00AEEF' : 'var(--card-border)' }}
+          >
+            <PersonStanding className="h-7 w-7 text-white" />
+          </div>
+          <div>
+            <p
+              className="font-bold"
+              style={{ color: data.role === 'client' ? '#00AEEF' : 'var(--text-primary)' }}
+            >
+              I&apos;m Training for Myself
+            </p>
+            <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+              I want to track workouts, nutrition, and progress
+            </p>
+          </div>
+        </button>
+      </div>
+
+      <p className="text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+        Already have an account?{' '}
+        <button
+          onClick={() => window.location.href = '/login'}
+          className="font-medium underline"
+          style={{ color: '#00AEEF' }}
+        >
+          Log In
+        </button>
+      </p>
+    </div>
+  );
+}
+
+/* ── Step 2: Personal Info ─────────────────────────────── */
+
+function Step2Personal({ data, updateData }: { data: OnboardingData; updateData: (u: Partial<OnboardingData>) => void }) {
   return (
     <div className="space-y-4">
       <div>
@@ -327,9 +493,9 @@ function Step1Personal({ data, updateData }: { data: OnboardingData; updateData:
   );
 }
 
-/* ── Step 2: Body Composition ──────────────────────────── */
+/* ── Step 3: Body Composition ──────────────────────────── */
 
-function Step2Body({ data, updateData }: { data: OnboardingData; updateData: (u: Partial<OnboardingData>) => void }) {
+function Step3Body({ data, updateData }: { data: OnboardingData; updateData: (u: Partial<OnboardingData>) => void }) {
   const calculateNavyBF = () => {
     if (!data.gender || !data.height || !data.navyWaist || !data.navyNeck) return;
     const h = data.height;
@@ -392,7 +558,7 @@ function Step2Body({ data, updateData }: { data: OnboardingData; updateData: (u:
       )}
 
       <div className="grid grid-cols-2 gap-2">
-        {['Chest', 'Waist', 'Hips', 'Left Arm', 'Right Arm', 'Left Thigh', 'Right Thigh', 'Left Calf', 'Right Calf'].map((m) => (
+        {BODY_MEASUREMENTS.map((m) => (
           <div key={m}>
             <Label className="text-xs">{m} (cm)</Label>
             <Input type="number" placeholder="0" value={data.measurements[m] || ''} onChange={(e) => updateData({ measurements: { ...data.measurements, [m]: Number(e.target.value) } })} />
@@ -403,9 +569,9 @@ function Step2Body({ data, updateData }: { data: OnboardingData; updateData: (u:
   );
 }
 
-/* ── Step 3: Fitness Background ────────────────────────── */
+/* ── Step 4: Fitness Background ────────────────────────── */
 
-function Step3Fitness({ data, updateData }: { data: OnboardingData; updateData: (u: Partial<OnboardingData>) => void }) {
+function Step4Fitness({ data, updateData }: { data: OnboardingData; updateData: (u: Partial<OnboardingData>) => void }) {
   const { data: goalCategories, loading: goalsLoading, error: goalsError } = useGoalCategories();
 
   const handleGoalSelect = (goalName: string, goalId: string) => {
@@ -590,9 +756,122 @@ function Step3Fitness({ data, updateData }: { data: OnboardingData; updateData: 
   );
 }
 
-/* ── Step 4: TDEE & Nutrition ──────────────────────────── */
+/* ── Step 5: Training Setup (NEW) ──────────────────────── */
 
-function Step4TDEE({ data, updateData, age, bmi, bmr, tdee, calorieGoal, macros, waterGoal }: {
+function Step5TrainingSetup({ data, updateData }: { data: OnboardingData; updateData: (u: Partial<OnboardingData>) => void }) {
+  return (
+    <div className="space-y-6">
+      {/* Gym Type */}
+      <div>
+        <Label>Where do you train? *</Label>
+        <div className="mt-2 grid grid-cols-2 gap-3">
+          {GYM_TYPE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => updateData({ gymType: opt.value })}
+              className="flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-center transition-all"
+              style={{
+                borderColor: data.gymType === opt.value ? '#00AEEF' : 'var(--card-border)',
+                backgroundColor: data.gymType === opt.value ? 'rgba(0,174,239,0.1)' : 'transparent',
+              }}
+            >
+              <div
+                className="flex h-10 w-10 items-center justify-center rounded-full"
+                style={{ backgroundColor: data.gymType === opt.value ? '#00AEEF' : 'var(--card-border)' }}
+              >
+                {opt.value === 'commercial' && <Building2 className="h-5 w-5 text-white" />}
+                {opt.value === 'home' && <Home className="h-5 w-5 text-white" />}
+                {opt.value === 'outdoor' && <Trees className="h-5 w-5 text-white" />}
+                {opt.value === 'mixed' && <DumbbellIcon className="h-5 w-5 text-white" />}
+              </div>
+              <div>
+                <p
+                  className="text-sm font-bold"
+                  style={{ color: data.gymType === opt.value ? '#00AEEF' : 'var(--text-primary)' }}
+                >
+                  {opt.label}
+                </p>
+                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{opt.sub}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Training Frequency */}
+      <div>
+        <Label>How many days per week? *</Label>
+        <div className="mt-2 flex gap-2">
+          {['2', '3', '4', '5', '6', '7'].map((f) => (
+            <button
+              key={f}
+              onClick={() => updateData({ trainingFrequency: f })}
+              className="flex-1 rounded-xl border-2 py-2.5 text-sm font-bold transition-all"
+              style={{
+                borderColor: data.trainingFrequency === f ? '#00AEEF' : 'var(--card-border)',
+                backgroundColor: data.trainingFrequency === f ? 'rgba(0,174,239,0.1)' : 'transparent',
+                color: data.trainingFrequency === f ? '#00AEEF' : 'var(--text-primary)',
+              }}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Session Length */}
+      <div>
+        <Label>Typical session length? *</Label>
+        <div className="mt-2 flex gap-2">
+          {SESSION_LENGTH_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => updateData({ sessionLength: opt.value })}
+              className="flex-1 rounded-xl border-2 py-2.5 text-xs font-bold transition-all"
+              style={{
+                borderColor: data.sessionLength === opt.value ? '#00AEEF' : 'var(--card-border)',
+                backgroundColor: data.sessionLength === opt.value ? 'rgba(0,174,239,0.1)' : 'transparent',
+                color: data.sessionLength === opt.value ? '#00AEEF' : 'var(--text-primary)',
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Coach Code */}
+      <div className="rounded-xl border p-4" style={{ borderColor: 'var(--card-border)' }}>
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={data.hasCoach}
+            onChange={(e) => updateData({ hasCoach: e.target.checked })}
+            className="h-4 w-4 accent-[#00AEEF]"
+          />
+          <Label className="mb-0">I have a coach who invited me</Label>
+        </div>
+        {data.hasCoach && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="mt-3">
+            <Label className="text-xs">Coach Code (optional)</Label>
+            <Input
+              value={data.coachCode}
+              onChange={(e) => updateData({ coachCode: e.target.value })}
+              placeholder="Enter your coach's referral code"
+            />
+            <p className="mt-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+              Your coach will be able to see your progress and assign programs.
+            </p>
+          </motion.div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Step 6: TDEE & Nutrition ──────────────────────────── */
+
+function Step6TDEE({ data, updateData, age, bmi, bmr, tdee, calorieGoal, macros, waterGoal }: {
   data: OnboardingData; updateData: (u: Partial<OnboardingData>) => void;
   age: number; bmi: number; bmr: number; tdee: number; calorieGoal: number;
   macros: { protein: number; fats: number; carbs: number }; waterGoal: number;
@@ -682,9 +961,74 @@ function Step4TDEE({ data, updateData, age, bmi, bmr, tdee, calorieGoal, macros,
   );
 }
 
-/* ── Step 5: Review ────────────────────────────────────── */
+/* ── Step 7: Device Connect (NEW) ──────────────────────── */
 
-function Step5Review({ data, age, bmi, tdee, calorieGoal, macros, waterGoal }: {
+function Step7Devices({ data, updateData }: { data: OnboardingData; updateData: (u: Partial<OnboardingData>) => void }) {
+  const toggleDevice = (device: ConnectableDevice) => {
+    const next = data.connectedDevices.includes(device)
+      ? data.connectedDevices.filter((d) => d !== device)
+      : [...data.connectedDevices, device];
+    updateData({ connectedDevices: next });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+          Connect Your Devices
+        </h2>
+        <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+          Sync data automatically for smarter coaching (optional)
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {DEVICE_OPTIONS.map((device) => (
+          <button
+            key={device.value}
+            onClick={() => toggleDevice(device.value)}
+            className="flex items-center gap-3 rounded-xl border-2 p-4 text-left transition-all"
+            style={{
+              borderColor: data.connectedDevices.includes(device.value) ? '#00AEEF' : 'var(--card-border)',
+              backgroundColor: data.connectedDevices.includes(device.value) ? 'rgba(0,174,239,0.1)' : 'transparent',
+            }}
+          >
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+              style={{ backgroundColor: data.connectedDevices.includes(device.value) ? '#00AEEF' : 'var(--card-border)' }}
+            >
+              <Watch className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p
+                className="text-sm font-bold"
+                style={{ color: data.connectedDevices.includes(device.value) ? '#00AEEF' : 'var(--text-primary)' }}
+              >
+                {device.label}
+              </p>
+              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                {data.connectedDevices.includes(device.value) ? 'Will connect' : 'Tap to select'}
+              </p>
+            </div>
+            {data.connectedDevices.includes(device.value) && (
+              <Check className="ml-auto h-5 w-5 shrink-0" style={{ color: '#00AEEF' }} />
+            )}
+          </button>
+        ))}
+      </div>
+
+      <div className="rounded-xl border p-4 text-center" style={{ borderColor: 'var(--card-border)' }}>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          You can skip this step and connect devices later from Settings.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ── Step 8: Review ────────────────────────────────────── */
+
+function Step8Review({ data, age, bmi, tdee, calorieGoal, macros, waterGoal }: {
   data: OnboardingData; age: number; bmi: number; tdee: number; calorieGoal: number;
   macros: { protein: number; fats: number; carbs: number }; waterGoal: number;
 }) {
@@ -710,6 +1054,9 @@ function Step5Review({ data, age, bmi, tdee, calorieGoal, macros, waterGoal }: {
             <p className="font-bold" style={{ color: 'var(--text-primary)' }}>{data.fullName}</p>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{data.email} • {age} years • {data.gender}</p>
           </div>
+          <div className="ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: 'rgba(0,174,239,0.1)', color: '#00AEEF' }}>
+            {data.role}
+          </div>
         </div>
       </div>
 
@@ -725,6 +1072,8 @@ function Step5Review({ data, age, bmi, tdee, calorieGoal, macros, waterGoal }: {
         <ReviewItem label="Experience" value={data.trainingExperience} />
         <ReviewItem label="Frequency" value={`${data.trainingFrequency} days/week`} />
         <ReviewItem label="Goal" value={data.primaryGoal || 'Not selected'} />
+        <ReviewItem label="Gym" value={data.gymType || 'Not selected'} />
+        <ReviewItem label="Session" value={`${data.sessionLength} min`} />
       </div>
 
       {/* Nutrition Summary */}
@@ -743,11 +1092,102 @@ function Step5Review({ data, age, bmi, tdee, calorieGoal, macros, waterGoal }: {
           <span className="font-bold" style={{ color: '#00AEEF' }}>{(waterGoal / 1000).toFixed(1)}L</span>
         </div>
       </div>
+
+      {/* Devices */}
+      {data.connectedDevices.length > 0 && (
+        <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--card-border)' }}>
+          <p className="mb-2 text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Connected Devices</p>
+          <div className="flex flex-wrap gap-2">
+            {data.connectedDevices.map((d) => (
+              <span key={d} className="rounded-full px-2 py-1 text-[10px] font-medium" style={{ backgroundColor: 'rgba(0,174,239,0.1)', color: '#00AEEF' }}>
+                {d.replace('_', ' ')}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-/* ── Helpers ───────────────────────────────────────────── */
+/* ── Step 9: Setup Complete (NEW) ──────────────────────── */
+
+function Step9Complete({ data, navigate }: { data: OnboardingData; navigate: (path: string) => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center space-y-6 py-8 text-center">
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+        className="flex h-20 w-20 items-center justify-center rounded-full"
+        style={{ background: 'linear-gradient(135deg, #00AEEF, #8B5CF6)' }}
+      >
+        <Check className="h-10 w-10 text-white" />
+      </motion.div>
+
+      <div>
+        <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+          Setup Complete!
+        </h2>
+        <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+          Your personalized dashboard is ready.
+        </p>
+      </div>
+
+      <div className="w-full rounded-2xl border p-4 text-left" style={{ borderColor: 'var(--card-border)' }}>
+        <p className="mb-3 text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Based on your profile:</p>
+        <div className="space-y-2 text-xs">
+          <div className="flex justify-between">
+            <span style={{ color: 'var(--text-muted)' }}>Role:</span>
+            <span className="font-medium capitalize" style={{ color: 'var(--text-primary)' }}>{data.role}</span>
+          </div>
+          <div className="flex justify-between">
+            <span style={{ color: 'var(--text-muted)' }}>Goal:</span>
+            <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{data.primaryGoal || 'Not selected'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span style={{ color: 'var(--text-muted)' }}>Experience:</span>
+            <span className="font-medium capitalize" style={{ color: 'var(--text-primary)' }}>{data.trainingExperience}</span>
+          </div>
+          <div className="flex justify-between">
+            <span style={{ color: 'var(--text-muted)' }}>Training:</span>
+            <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{data.trainingFrequency} days/week at {data.gymType}</span>
+          </div>
+          <div className="flex justify-between">
+            <span style={{ color: 'var(--text-muted)' }}>Session:</span>
+            <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{data.sessionLength} min</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex w-full flex-col gap-3">
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="w-full rounded-xl py-3 text-sm font-bold text-white transition-all"
+          style={{ background: 'linear-gradient(135deg, #00AEEF, #8B5CF6)' }}
+        >
+          Explore Dashboard
+        </button>
+        <button
+          onClick={() => navigate('/program-builder')}
+          className="w-full rounded-xl border-2 py-3 text-sm font-bold transition-all"
+          style={{ borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
+        >
+          View My Program
+        </button>
+        <button
+          onClick={() => navigate('/bioprint')}
+          className="w-full rounded-xl py-3 text-sm font-medium transition-all"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          Take a Tour
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Helpers ─────────────────────────────────────────── */
 
 function StatCard({ label, value, unit }: { label: string; value: string; unit?: string }) {
   return (

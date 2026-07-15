@@ -421,6 +421,56 @@ export function clearOfflineQueue(userId: string): void {
   remove(KEYS.OFFLINE_QUEUE(userId));
 }
 
+// ─── Onboarding Data ───
+
+export interface OnboardingState {
+  role: 'trainer' | 'client' | '';
+  fullName: string;
+  email: string;
+  phone: string;
+  dateOfBirth: string;
+  gender: 'male' | 'female' | 'other' | '';
+  weight: number;
+  goalWeight: number;
+  height: number;
+  bodyFatPercentage?: number;
+  primaryGoal: string;
+  primaryGoalId: string;
+  trainingExperience: string;
+  trainingFrequency: string;
+  activityLevel: string;
+  gymType: string;
+  sessionLength: number;
+  hasCoach: boolean;
+  coachCode: string;
+  macroSplit: string;
+  mealCount: string;
+  connectedDevices: string[];
+  injuries: string;
+  availableEquipment: string[];
+  parqAnswers: boolean[];
+  useNavyMethod: boolean;
+  navyNeck: number;
+  navyWaist: number;
+  navyHip: number;
+  measurements: Record<string, number>;
+  progressPhoto?: string;
+  photo?: string;
+  preferredStyle: string[];
+}
+
+export function getOnboardingData(): OnboardingState | null {
+  return get<OnboardingState | null>(`${PREFIX}onboarding_data`, null);
+}
+
+export function setOnboardingData(data: OnboardingState): void {
+  set(`${PREFIX}onboarding_data`, data);
+}
+
+export function clearOnboardingData(): void {
+  remove(`${PREFIX}onboarding_data`);
+}
+
 // ─── Export / Import ───
 
 export function exportAllData(): string {

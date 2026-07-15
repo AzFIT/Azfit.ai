@@ -318,12 +318,12 @@ export default function NutritionPage() {
     setShowFoodSearch(null);
   };
 
-  const removeFood = (mealType: string, index: number) => {
+  const removeFood = (mealType: string, foodId: string) => {
     const newLog = {
       ...log,
       meals: log.meals.map((m) =>
         m.type === mealType
-          ? { ...m, foods: m.foods.filter((_, i) => i !== index) }
+          ? { ...m, foods: m.foods.filter((f) => f.foodId !== foodId) }
           : m,
       ),
     };
@@ -495,7 +495,7 @@ export default function NutritionPage() {
                                 </p>
                               </div>
                               <button
-                                onClick={() => removeFood(mealType.type, idx)}
+                                onClick={() => removeFood(mealType.type, entry.foodId)}
                                 className="rounded-lg p-1 hover:bg-red-500/10"
                               >
                                 <Trash2 className="h-3.5 w-3.5 text-red-400" />

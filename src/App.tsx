@@ -110,7 +110,14 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route path="/onboarding" element={<OnboardingPage />} />
+              <Route
+                path="/onboarding"
+                element={
+                  <ProtectedRoute>
+                    <OnboardingPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/bioprint"
                 element={

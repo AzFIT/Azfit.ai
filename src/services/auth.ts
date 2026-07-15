@@ -12,6 +12,30 @@ export interface AuthUser {
   isAdmin: boolean;
 }
 
+export interface ClientProfileData {
+  fullName: string;
+  email: string;
+  phone?: string;
+  dateOfBirth?: string;
+  gender?: 'male' | 'female' | 'other';
+  heightCm?: number;
+  weightKg?: number;
+  bodyFatPercentage?: number;
+  fitnessGoal?: string;
+  experienceLevel?: 'beginner' | 'intermediate' | 'advanced';
+  trainingFrequency?: string;
+  activityLevel?: string;
+  injuries?: string;
+  availableEquipment?: string[];
+  gymType?: string;
+  sessionLength?: number;
+  hasCoach?: boolean;
+  coachCode?: string;
+  macroSplit?: string;
+  mealCount?: string;
+  connectedDevices?: string[];
+}
+
 // Admin credentials from environment (fallback for development)
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'admin@azfit.ai';
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || '';
@@ -159,4 +183,81 @@ export async function updateProfile(updates: {
     .eq('id', session.user.id);
 
   if (error) throw error;
+}
+
+// Create or update full client profile after onboarding
+export async function createClientProfile(
+  data: ClientProfileData
+): Promise<{ clientId: string; error: Error | null }> {
+  const session = await getSession();
+  if (!session) {
+    return { clientId: '', error: new Error('Not authenticated') };
+  }
+
+  const userId = session.user.id;
+
+  // 1. Update profiles row with latest info
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .update({
+      full_name: data.fullName,
+      email: data.email,
+    } as Database['public']['Tables']['profiles']['Update'])
+    .eq('id', userId);
+
+  if (profileError) {
+    console.warn('Profile update warning:', profileError.message);
+    // Non-fatal: profile may already exist via auth trigger
+  }
+
+  // 2. Create clients row
+  // For self-coached users, we use their own user ID as trainer_id
+  // This allows them to see themselves in their own client list
+  const trainerId = data.hasCoach && data.coachCode
+    ? data.coachCode
+    : userId;
+
+  const { data: clientRow, error: clientError } = await supabase
+    .from('clients')
+    .insert({
+      trainer_id: trainerId,
+      full_name: data.fullName,
+      email: data.email,
+      phone: data.phone || null,
+      date_of_birth: data.dateOfBirth || null,
+      gender: data.gender || null,
+      height_cm: data.heightCm || null,
+      weight_kg: data.weightKg || null,
+      body_fat_percentage: data.bodyFatPercentage || null,
+      fitness_goal: data.fitnessGoal || null,
+      experience_level: data.experienceLevel || null,
+      status: 'active',
+      notes: data.injuries || null,
+    } as Database['public']['Tables']['clients']['Insert'])
+    .select('id')
+    .single();
+
+  if (clientError || !clientRow) {
+    return { clientId: '', error: clientError || new Error('Failed to create client profile') };
+  }
+
+  const clientId = clientRow.id;
+
+  // 3. Create initial body composition record if we have measurements
+  if (data.weightKg || data.bodyFatPercentage) {
+    const { error: bodyError } = await supabase
+      .from('body_composition')
+      .insert({
+        client_id: clientId,
+        weight_kg: data.weightKg || null,
+        body_fat_percentage: data.bodyFatPercentage || null,
+      } as Database['public']['Tables']['body_composition']['Insert']);
+
+    if (bodyError) {
+      console.warn('Body composition insert warning:', bodyError.message);
+      // Non-fatal: client was created successfully
+    }
+  }
+
+  return { clientId, error: null };
 }
