@@ -71,7 +71,11 @@ function removeStorageItem(key: string): void {
 /* ─── Untyped Supabase helper ─── */
 
 function getTableRef(supabase: SupabaseClient, table: string) {
-  return (supabase as unknown as { from: (t: string) => { insert: (p: unknown) => Promise<{ error: { message: string } | null }>; update: (p: unknown) => Promise<{ error: { message: string } | null }> } }).from(table);
+  return (supabase as unknown as { from: (t: string) => {
+    insert: (p: unknown) => Promise<{ error: { message: string } | null }>;
+    update: (p: unknown) => Promise<{ error: { message: string } | null }>;
+    select: (cols: string) => { order: (col: string, opts: unknown) => { limit: (n: number) => Promise<{ data: unknown[] | null; error: { message: string } | null }> } };
+  } }).from(table);
 }
 
 /* ─── Hook ─── */
@@ -184,7 +188,10 @@ export function useResilientForm<T>(options: ResilientFormOptions<T>): Resilient
         if (!cached || cached.synced) return;
 
         const tableRef = getTableRef(supabase, supabaseTable);
-        const { data: serverData } = await tableRef.insert({}).then(() => ({ data: [] as unknown[] })).catch(() => ({ data: [] as unknown[] }));
+        const { data: serverData } = await tableRef
+          .select('created_at')
+          .order('created_at', { ascending: false })
+          .limit(1);
         if (serverData && serverData.length > 0) {
           const serverTimestamp = new Date((serverData[0] as { created_at?: string }).created_at || 0).getTime();
           if (serverTimestamp > cached.timestamp) {

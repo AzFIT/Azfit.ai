@@ -558,8 +558,8 @@ export default function Analytics() {
                         animationDuration={1000}
                         animationBegin={200}
                       >
-                        {macroData.map((entry, i) => (
-                          <Cell key={i} fill={entry.color} />
+                        {macroData.map((entry) => (
+                          <Cell key={`macro-${entry.name}`} fill={entry.color} />
                         ))}
                       </Pie>
                       <Tooltip content={<MacroTooltip />} />
