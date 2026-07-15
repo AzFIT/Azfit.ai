@@ -20,16 +20,23 @@ import { useNavigate } from "react-router";
 import { GlassCard } from "./shared/GlassCard";
 import { ProgressRing } from "./shared/ProgressRing";
 import { CollapsibleSection } from "./shared/CollapsibleSection";
+import { ClientHealthGrid } from "./ClientHealthGrid";
+import { AIInsightsPanel } from "./AIInsightsPanel";
+import { RevenueSnapshot } from "./RevenueSnapshot";
+import type { ClientHealthItem, AIInsight, RevenueSnapshotData } from "./types";
 
 /* ═══════════════════════════════════════════════════════════════════
-   Trainer Dashboard — Phase A3
+   Trainer Dashboard — Phase A3 + Enhanced Sections
    ═══════════════════════════════════════════════════════════════════
    Core trainer overview with:
    • Revenue Ring ($6,500 / 65% goal)
    • Client Compliance bar (85% | 17/20)
    • Weekly Summary metrics (Volume, RPE, Time)
+   • AI Insights Panel (NEW)
+   • Client Health Grid (NEW)
+   • Revenue Snapshot (NEW)
    • Today's Sessions list
-   • Client Insights placeholder
+   • Client Insights
    • Glassmorphic dark-mode aesthetic with neon accents
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -170,6 +177,63 @@ const MOCK_INSIGHTS: ClientInsight[] = [
     nextSession: "Today 4:00 PM",
   },
 ];
+
+/* ── Enhanced Mock Data for New Sections ───────────────────────── */
+
+const MOCK_HEALTH_GRID: ClientHealthItem[] = [
+  { id: "h1", name: "Sarah Chen", initials: "SC", status: "on_track" },
+  { id: "h2", name: "Marcus Johnson", initials: "MJ", status: "on_track" },
+  { id: "h3", name: "Alex Rivera", initials: "AR", status: "at_risk", missedSessions: 2, lastActiveDays: 4 },
+  { id: "h4", name: "Emma Wilson", initials: "EW", status: "on_track" },
+  { id: "h5", name: "David Kim", initials: "DK", status: "needs_attention", weightStalledWeeks: 3, lastActiveDays: 1 },
+  { id: "h6", name: "Lisa Lau", initials: "LL", status: "on_track" },
+  { id: "h7", name: "Jason Chan", initials: "JC", status: "deload" },
+  { id: "h8", name: "Tom Wong", initials: "TW", status: "on_track" },
+  { id: "h9", name: "Jenny Lee", initials: "JL", status: "on_track" },
+  { id: "h10", name: "Kevin Ho", initials: "KH", status: "needs_attention", hrvChange: -8, lastActiveDays: 2 },
+];
+
+const MOCK_AI_INSIGHTS: AIInsight[] = [
+  {
+    id: "ai1",
+    severity: "danger",
+    clientName: "Alex Rivera",
+    clientId: "c3",
+    title: "Missed 2 sessions — recommend check-in",
+    description: "Alex hasn't logged a workout in 4 days. His HRV is down 12% according to his Apple Health sync.",
+    suggestedAction: "Send Check-in",
+    timestamp: "2h ago",
+  },
+  {
+    id: "ai2",
+    severity: "warning",
+    clientName: "David Kim",
+    clientId: "c5",
+    title: "Weight stalled for 3 weeks",
+    description: "David's weight has been flat at 78.2kg for 3 consecutive weeks. Consider adjusting his calorie target.",
+    suggestedAction: "Adjust Plan",
+    timestamp: "5h ago",
+  },
+  {
+    id: "ai3",
+    severity: "info",
+    clientName: "Emma Wilson",
+    clientId: "c4",
+    title: "New PR on bench press",
+    description: "Emma hit 62.5kg x 5 on bench press yesterday. Should we auto-progress her program?",
+    suggestedAction: "Progress Program",
+    timestamp: "1d ago",
+  },
+];
+
+const MOCK_REVENUE: RevenueSnapshotData = {
+  thisMonth: 24500,
+  lastMonth: 22800,
+  currency: "HK$",
+  activeClients: 24,
+  clientLimit: 30,
+  avgPerClient: 1021,
+};
 
 const WEEKLY_METRICS = [
   { label: "Total Volume", value: "142,500 kg", change: "+12%", positive: true, icon: BarChart3 },
@@ -520,6 +584,51 @@ export default function TrainerDashboard() {
             </GlassCard>
           </motion.div>
         ))}
+      </motion.section>
+
+      {/* ═══════════════════════════════════════════════════════════
+          NEW SECTION: AI Insights + Revenue Snapshot (3-col grid)
+          ═══════════════════════════════════════════════════════════ */}
+      <motion.section
+        variants={staggerContainer}
+        initial="hidden"
+        animate={mounted ? "visible" : "hidden"}
+        className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3"
+      >
+        {/* AI Insights Panel */}
+        <motion.div variants={fadeInUp} className="lg:col-span-2">
+          <AIInsightsPanel
+            insights={MOCK_AI_INSIGHTS}
+            onViewAll={() => navigate("/coach")}
+            onActionClick={(id, action) => {
+              console.log(`AI action: ${action} for insight ${id}`);
+            }}
+          />
+        </motion.div>
+
+        {/* Revenue Snapshot */}
+        <motion.div variants={fadeInUp}>
+          <RevenueSnapshot
+            data={MOCK_REVENUE}
+            onViewDetails={() => navigate("/analytics")}
+          />
+        </motion.div>
+      </motion.section>
+
+      {/* ═══════════════════════════════════════════════════════════
+          NEW SECTION: Client Health Grid
+          ═══════════════════════════════════════════════════════════ */}
+      <motion.section
+        variants={fadeInUp}
+        initial="hidden"
+        animate={mounted ? "visible" : "hidden"}
+        className="mt-6"
+      >
+        <ClientHealthGrid
+          clients={MOCK_HEALTH_GRID}
+          onClientClick={(clientId) => navigate(`/client/${clientId}`)}
+          onSendMessage={(clientId) => navigate(`/client/${clientId}`)}
+        />
       </motion.section>
 
       {/* ═══════════════════════════════════════════════════════════

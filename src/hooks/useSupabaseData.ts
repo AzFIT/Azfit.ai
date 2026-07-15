@@ -310,3 +310,22 @@ export function useProgramTemplateWithTags(
     return { data: data as ProgramTemplateWithTags | null, error };
   });
 }
+
+// ─── useTrainerClients: Fetch clients managed by the current trainer ───
+type ClientRow = Database["public"]["Tables"]["clients"]["Row"];
+
+export function useTrainerClients(): UseSupabaseQueryResult<ClientRow[]> {
+  return useSupabaseQuery(async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    const trainerId = userData.user?.id;
+    if (!trainerId) return { data: [], error: null };
+
+    const { data, error } = await supabase
+      .from("clients")
+      .select("*")
+      .eq("trainer_id", trainerId)
+      .order("created_at", { ascending: false });
+
+    return { data: data as ClientRow[] | null, error };
+  });
+}
