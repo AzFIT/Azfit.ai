@@ -31,6 +31,7 @@ const ClientProfile = lazy(() => import("@/pages/ClientProfile"));
 const ClientsPage = lazy(() => import("@/pages/Clients"));
 const WarmupGeneratorPage = lazy(() => import("@/pages/WarmupGenerator"));
 const DeloadDetectionPage = lazy(() => import("@/pages/DeloadDetection"));
+const CoachAIPage = lazy(() => import("@/pages/CoachAIPage"));
 
 // Loading fallback
 function PageLoader() {
@@ -83,6 +84,14 @@ export default function App() {
                 element={
                   <ProtectedRoute requireTrainer>
                     <Coach />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/coach-ai"
+                element={
+                  <ProtectedRoute requireTrainer>
+                    <CoachAIPage />
                   </ProtectedRoute>
                 }
               />

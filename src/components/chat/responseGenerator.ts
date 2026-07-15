@@ -1,5 +1,6 @@
- 
-import type { IntentResult, ChatMessage, ChatAction, PageContext } from './types';
+
+
+import type { IntentResult, ChatMessage, ChatAction, PageContext, MessageContent } from './types';
 
 interface ResponseContext {
   intentResult: IntentResult;
@@ -8,7 +9,7 @@ interface ResponseContext {
   messageHistory: ChatMessage[];
 }
 
-export function generateResponse(input: string, ctx: ResponseContext): { text: string; actions?: ChatAction[] } {
+export function generateResponse(input: string, ctx: ResponseContext): { text: string; actions?: ChatAction[]; content?: MessageContent } {
   const { intentResult, currentPage, userRole } = ctx;
   const { intent, confidence } = intentResult;
 
@@ -66,6 +67,18 @@ export function generateResponse(input: string, ctx: ResponseContext): { text: s
     case 'navigation':
       return handleNavigationIntent(input, currentPage);
 
+    case 'generate_program':
+      return handleGenerateProgram(input);
+
+    case 'exercise_substitute':
+      return handleExerciseSubstitute(input);
+
+    case 'deload':
+      return handleDeload(input);
+
+    case 'analyze':
+      return handleAnalyze(input);
+
     default:
       return {
         text: "I can help with workouts, nutrition, progress tracking, or navigating the app. What do you need?",
@@ -73,6 +86,181 @@ export function generateResponse(input: string, ctx: ResponseContext): { text: s
       };
   }
 }
+
+/* ── Enhanced Intent Handlers ─────────────────────────── */
+
+function handleGenerateProgram(input: string): { text: string; actions?: ChatAction[]; content?: MessageContent } {
+  const lower = input.toLowerCase();
+
+  // Parse basic constraints from input
+  const daysMatch = lower.match(/(\d+)\s*day/);
+  const daysPerWeek = daysMatch ? parseInt(daysMatch[1]) : 4;
+  const weeks = lower.includes('6 week') ? 6 : lower.includes('8 week') ? 8 : 4;
+  const goal = lower.includes('strength') ? 'strength' : lower.includes('fat loss') ? 'fat_loss' : 'hypertrophy';
+  const upperFocus = lower.includes('upper') || lower.includes('push') || lower.includes('pull');
+
+  const programContent: MessageContent = {
+    type: 'program',
+    days: [
+      {
+        dayNumber: 1,
+        name: upperFocus ? 'Push (Chest emphasis)' : 'Day 1: Upper Body',
+        exercises: [
+          { name: 'Bench Press', sets: '4', reps: '6-8', rpe: '8', notes: 'Progressive overload focus' },
+          { name: 'Incline DB Press', sets: '3', reps: '8-10', rpe: '8' },
+          { name: 'Cable Fly', sets: '3', reps: '12-15', rpe: '9' },
+          { name: 'OHP', sets: '3', reps: '8-10', rpe: '8' },
+          { name: 'Lateral Raise', sets: '3', reps: '15-20', rpe: '9' },
+          { name: 'Tricep Pushdown', sets: '3', reps: '12-15', rpe: '9' },
+        ],
+      },
+      {
+        dayNumber: 2,
+        name: upperFocus ? 'Pull (Back emphasis)' : 'Day 2: Lower Body',
+        exercises: [
+          { name: 'Deadlift', sets: '3', reps: '5', rpe: '7', notes: 'Reset each rep' },
+          { name: 'Barbell Row', sets: '4', reps: '8-10', rpe: '8' },
+          { name: 'Pull-up', sets: '3', reps: '8-10', rpe: '8' },
+          { name: 'Face Pull', sets: '3', reps: '15-20', rpe: '9' },
+          { name: 'Barbell Curl', sets: '3', reps: '10-12', rpe: '8' },
+          { name: 'Hammer Curl', sets: '3', reps: '12-15', rpe: '9' },
+        ],
+      },
+      {
+        dayNumber: 3,
+        name: 'Legs & Core',
+        exercises: [
+          { name: 'Squat', sets: '4', reps: '6-8', rpe: '8', notes: 'Depth focus' },
+          { name: 'Romanian Deadlift', sets: '3', reps: '8-10', rpe: '8' },
+          { name: 'Leg Press', sets: '3', reps: '10-12', rpe: '8' },
+          { name: 'Leg Curl', sets: '3', reps: '12-15', rpe: '9' },
+          { name: 'Calf Raise', sets: '4', reps: '15-20', rpe: '9' },
+          { name: 'Plank', sets: '3', reps: '45-60s', rpe: '7' },
+        ],
+      },
+    ],
+    periodization: 'Linear',
+    weeks,
+    daysPerWeek,
+  };
+
+  return {
+    text: `Here's a customized ${weeks}-week ${daysPerWeek}-day ${goal} program. I've designed it with progressive overload and appropriate volume for your goals.`,
+    actions: [
+      { label: 'Apply Full Program', type: 'apply', payload: 'apply_program' },
+      { label: 'Modify', type: 'customize', payload: 'modify_program' },
+      { label: 'Export as PDF', type: 'link', payload: '/export' },
+    ],
+    content: programContent,
+  };
+}
+
+function handleExerciseSubstitute(input: string): { text: string; actions?: ChatAction[]; content?: MessageContent } {
+  const lower = input.toLowerCase();
+
+  // Common substitution pairs
+  const substitutions: Record<string, { replacement: string; reasoning: string; sets: string; reps: string; rpe: string }> = {
+    deadlift: { replacement: 'Rack Pull (below knee)', reasoning: 'Reduces lower back stress while maintaining posterior chain development', sets: '3', reps: '6-8', rpe: '8' },
+    squat: { replacement: 'Belt Squat', reasoning: 'Eliminates spinal loading while maintaining quad development', sets: '3', reps: '10-12', rpe: '9' },
+    'bench press': { replacement: 'Floor Press', reasoning: 'Reduces shoulder strain by limiting range of motion', sets: '3', reps: '6-8', rpe: '8' },
+    'overhead press': { replacement: 'Landmine Press', reasoning: 'More shoulder-friendly pressing angle', sets: '3', reps: '8-10', rpe: '8' },
+    'barbell row': { replacement: 'Chest-Supported Row', reasoning: 'Eliminates lower back fatigue and isolates lats', sets: '3', reps: '10-12', rpe: '8' },
+  };
+
+  let matchedExercise = '';
+  for (const [exercise] of Object.entries(substitutions)) {
+    if (lower.includes(exercise)) {
+      matchedExercise = exercise;
+      break;
+    }
+  }
+
+  if (!matchedExercise) {
+    return {
+      text: "I can suggest exercise substitutions based on injuries or equipment limitations. Which exercise would you like to replace, and what's the reason?",
+      actions: [
+        { label: 'Back Pain', type: 'suggest', payload: 'swap deadlift for back pain' },
+        { label: 'Shoulder Issues', type: 'suggest', payload: 'swap bench press for shoulder pain' },
+        { label: 'Knee Pain', type: 'suggest', payload: 'swap squat for knee pain' },
+      ],
+    };
+  }
+
+  const sub = substitutions[matchedExercise];
+  const reason = lower.includes('back') ? 'lower back stress' : lower.includes('shoulder') ? 'shoulder strain' : lower.includes('knee') ? 'knee stress' : 'joint-friendly alternative';
+
+  const swapContent: MessageContent = {
+    type: 'exercise_swap',
+    original: { name: matchedExercise.charAt(0).toUpperCase() + matchedExercise.slice(1), reason },
+    replacement: {
+      name: sub.replacement,
+      sets: sub.sets,
+      reps: sub.reps,
+      rpe: sub.rpe,
+      reasoning: sub.reasoning,
+    },
+  };
+
+  return {
+    text: `Got it! Replaced ${matchedExercise} with ${sub.replacement} to reduce ${reason}.`,
+    actions: [
+      { label: 'Apply Changes', type: 'apply', payload: 'apply_swap' },
+      { label: 'Undo', type: 'dismiss', payload: 'undo_swap' },
+      { label: 'Explain Choice', type: 'suggest', payload: 'why this substitution?' },
+    ],
+    content: swapContent,
+  };
+}
+
+function handleDeload(input: string): { text: string; actions?: ChatAction[]; content?: MessageContent } {
+  const lower = input.toLowerCase();
+  const clientName = lower.includes('mike') ? 'Mike' : lower.includes('alex') ? 'Alex' : 'your client';
+
+  const insightContent: MessageContent = {
+    type: 'insight',
+    severity: 'warning',
+    clientName,
+    title: `Recommend deload for ${clientName}`,
+    description: `${clientName} hasn't logged a workout in 4 days. HRV is down 12% according to Apple Health sync. Training volume has been high for 6 consecutive weeks.`,
+    suggestedAction: 'Apply 60% volume deload',
+  };
+
+  return {
+    text: `Based on ${clientName}'s recovery data and training history, I recommend:\n\n1. Deload to 60% volume this week\n2. Prioritize sleep (avg 6.2h → target 7.5h)\n3. Substitute heavy squats with mobility work\n4. Re-test next Monday`,
+    actions: [
+      { label: 'Apply Recommendations', type: 'apply', payload: 'apply_deload' },
+      { label: 'Customize', type: 'customize', payload: 'customize_deload' },
+      { label: 'Dismiss', type: 'dismiss', payload: 'dismiss' },
+    ],
+    content: insightContent,
+  };
+}
+
+function handleAnalyze(input: string): { text: string; actions?: ChatAction[]; content?: MessageContent } {
+  const lower = input.toLowerCase();
+  const clientName = lower.includes('mike') ? 'Mike Wong' : lower.includes('lisa') ? 'Lisa Lau' : lower.includes('alex') ? 'Alex Rivera' : 'your client';
+
+  const insightContent: MessageContent = {
+    type: 'insight',
+    severity: 'info',
+    clientName,
+    title: `${clientName} hit a new PR`,
+    description: `${clientName} bench pressed 62.5kg x 5 yesterday — a 7.5kg improvement from 8 weeks ago. Compliance is at 92%, and volume has been consistently increasing.`,
+    suggestedAction: 'Auto-progress program',
+  };
+
+  return {
+    text: `${clientName} is performing well! Here's what stands out:\n\n• New PR on bench: 62.5kg x 5 (+7.5kg from 8 weeks ago)\n• Compliance: 92% (excellent)\n• Weekly volume trending up 8%\n• Sleep average: 7.1h (good)\n\nShould I auto-progress their program for the next mesocycle?`,
+    actions: [
+      { label: 'Progress Program', type: 'apply', payload: 'progress_program' },
+      { label: 'Review First', type: 'navigate', payload: '/analytics' },
+      { label: 'Dismiss', type: 'dismiss', payload: 'dismiss' },
+    ],
+    content: insightContent,
+  };
+}
+
+/* ── Existing Intent Handlers ──────────────────────────── */
 
 function handleWorkoutIntent(input: string, _currentPage?: PageContext, userRole?: string): { text: string; actions?: ChatAction[] } {
   const lower = input.toLowerCase();
@@ -201,6 +389,7 @@ function handleNavigationIntent(input: string, _currentPage?: PageContext): { te
     { name: 'nutrition', path: '/nutrition' },
     { name: 'bioprint', path: '/bioprint' },
     { name: 'program', path: '/program-builder' },
+    { name: 'ai coach', path: '/coach-ai' },
   ]) {
     if (lower.includes(page.name)) {
       return {

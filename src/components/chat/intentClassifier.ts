@@ -43,6 +43,28 @@ const INTENT_KEYWORDS: Record<IntentType, string[]> = {
     'go to', 'open', 'show me', 'take me', 'navigate', 'where is',
     'find', 'page', 'screen', 'dashboard', 'analytics', 'coach',
   ],
+  generate_program: [
+    'generate program', 'create program', 'build program', 'make program',
+    'program for', 'workout plan', 'training plan', 'routine for',
+    '4 week', '6 week', '8 week', 'hypertrophy program', 'strength program',
+    'fat loss program', 'muscle building', 'upper body program', 'lower body',
+    'push pull', 'full body', 'split routine', 'periodization',
+  ],
+  exercise_substitute: [
+    'swap', 'replace', 'substitute', 'alternative', 'instead of',
+    'change exercise', 'different exercise', 'variation',
+    'back hurts', 'wrist pain', 'shoulder pain', 'knee pain',
+    'lower back', 'spinal loading', 'joint friendly',
+  ],
+  deload: [
+    'deload', 'reduce volume', 'take it easy', 'light week', 'recovery week',
+    'tired', 'fatigue', 'burned out', 'overreaching', 'overtraining',
+    'hrv down', 'sleep bad', 'stressed', 'need rest',
+  ],
+  analyze: [
+    'analyze', 'review', 'check', 'how is', 'status of', 'look at',
+    'concerned about', 'worried about', 'what about', 'tell me about',
+  ],
   unknown: [],
 };
 
@@ -108,6 +130,10 @@ export function getNavigationSuggestion(intent: IntentType, currentPath: string)
     help: ['/dashboard'],
     greeting: [],
     navigation: [],
+    generate_program: ['/program-builder'],
+    exercise_substitute: ['/program-builder'],
+    deload: ['/deload'],
+    analyze: ['/analytics'],
     unknown: [],
   };
 

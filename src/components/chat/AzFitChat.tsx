@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Send, X, User, Bot, ChevronRight } from "lucide-react";
+import { Sparkles, Send, X, User, Bot, ChevronRight, Maximize2 } from "lucide-react";
 import { useChatContext } from "./ChatContext";
 import { classifyIntent, getPageContext } from "./intentClassifier";
 import { generateResponse } from "./responseGenerator";
@@ -170,15 +170,27 @@ export default function AzFitChat() {
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={closeChat}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-slate-800"
-                >
-                  <X
-                    className="h-4 w-4"
-                    style={{ color: "var(--text-muted)" }}
-                  />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => navigate('/coach-ai')}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-slate-800"
+                    title="Open full chat"
+                  >
+                    <Maximize2
+                      className="h-4 w-4"
+                      style={{ color: "var(--text-muted)" }}
+                    />
+                  </button>
+                  <button
+                    onClick={closeChat}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-slate-800"
+                  >
+                    <X
+                      className="h-4 w-4"
+                      style={{ color: "var(--text-muted)" }}
+                    />
+                  </button>
+                </div>
               </div>
 
               {/* Messages */}
