@@ -80,7 +80,11 @@ export async function adminLogin(): Promise<AuthUser> {
     // Admin account doesn't exist yet in Supabase, use mock
   }
 
-  // Return mock admin user for development
+  // Return mock admin user ONLY in development when no password is configured
+  if (!ADMIN_PASSWORD) {
+    throw new Error('Admin password not configured. Set VITE_ADMIN_PASSWORD in .env');
+  }
+
   return {
     id: '00000000-0000-0000-0000-000000000000',
     email: ADMIN_EMAIL,

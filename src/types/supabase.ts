@@ -247,6 +247,51 @@ export type Database = {
         };
         Relationships: [];
       };
+      workout_log_entries: {
+        Row: {
+          id: string;
+          workout_log_id: string;
+          client_id: string;
+          exercise_id: string;
+          exercise_name: string;
+          sets_completed: number;
+          total_sets: number;
+          reps_per_set: number[];
+          weight_per_set: number[];
+          rpe_per_set: number[];
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workout_log_id: string;
+          client_id: string;
+          exercise_id: string;
+          exercise_name: string;
+          sets_completed?: number;
+          total_sets?: number;
+          reps_per_set?: number[];
+          weight_per_set?: number[];
+          rpe_per_set?: number[];
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          workout_log_id?: string;
+          client_id?: string;
+          exercise_id?: string;
+          exercise_name?: string;
+          sets_completed?: number;
+          total_sets?: number;
+          reps_per_set?: number[];
+          weight_per_set?: number[];
+          rpe_per_set?: number[];
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       notifications: {
         Row: {
           id: string;

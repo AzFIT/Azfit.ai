@@ -385,6 +385,10 @@ export default function Layout({
             </span>
           </button>
           <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              window.location.href = '/';
+            }}
             className="flex h-12 w-full items-center gap-4 rounded-lg px-3 text-left transition-all duration-150 hover:bg-[var(--light-elevated)] active:scale-[0.98]"
             style={{ color: "var(--light-text-muted)" }}
           >

@@ -560,8 +560,13 @@ export function SheetsPanel({ onExportCsv }: SheetsPanelProps) {
             if (e.target.value.startsWith('=') && e.target.value.length > 1) {
               try {
                 const expr = e.target.value.slice(1);
-                Function('"use strict"; return (' + expr + ')')();
-                setFormulaError(false);
+                // Safe math evaluation: only allow numbers, operators, parentheses, and cell refs
+                if (!/^[\d\s+\-*/().,A-Z]+$/.test(expr)) {
+                  setFormulaError(true);
+                } else {
+                  Function('"use strict"; return (' + expr + ')')();
+                  setFormulaError(false);
+                }
               } catch {
                 setFormulaError(true);
               }
