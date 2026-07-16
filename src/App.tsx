@@ -33,6 +33,7 @@ const ClientProfile = lazy(() => import("@/pages/ClientProfile"));
 const ClientsPage = lazy(() => import("@/pages/Clients"));
 const WarmupGeneratorPage = lazy(() => import("@/pages/WarmupGenerator"));
 const DeloadDetectionPage = lazy(() => import("@/pages/DeloadDetection"));
+const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const CoachAIPage = lazy(() => import("@/pages/CoachAIPage"));
 
 // Loading fallback
@@ -63,6 +64,7 @@ export default function App() {
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/demo" element={<DemoDashboard />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
