@@ -16,6 +16,28 @@ export default function Signup() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState(0);
+
+  const checkPasswordStrength = (pwd: string) => {
+    let score = 0;
+    if (pwd.length >= 8) score++;
+    if (pwd.length >= 12) score++;
+    if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) score++;
+    if (/\d/.test(pwd)) score++;
+    if (/[^a-zA-Z0-9]/.test(pwd)) score++;
+    return Math.min(score, 4);
+  };
+
+  const getStrengthLabel = (strength: number) => {
+    switch (strength) {
+      case 0: return { label: 'Very Weak', color: '#EF4444' };
+      case 1: return { label: 'Weak', color: '#F97316' };
+      case 2: return { label: 'Fair', color: '#EAB308' };
+      case 3: return { label: 'Good', color: '#22C55E' };
+      case 4: return { label: 'Strong', color: '#10B981' };
+      default: return { label: 'Very Weak', color: '#EF4444' };
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,7 +229,10 @@ export default function Signup() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setPasswordStrength(checkPasswordStrength(e.target.value));
+                  }}
                   required
                   minLength={6}
                   className="w-full rounded-lg border px-4 py-3 pr-12 text-sm text-white outline-none transition-all focus:border-[#0D9488] focus:ring-1 focus:ring-[#0D9488]"
@@ -222,6 +247,35 @@ export default function Signup() {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+              {/* Password Strength Indicator */}
+              {password.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 flex gap-1">
+                      {[0, 1, 2, 3].map((i) => (
+                        <div
+                          key={i}
+                          className="h-1.5 flex-1 rounded-full transition-all duration-300"
+                          style={{
+                            backgroundColor: i < passwordStrength 
+                              ? getStrengthLabel(passwordStrength).color 
+                              : '#334155',
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-xs font-medium" style={{ color: getStrengthLabel(passwordStrength).color }}>
+                      {getStrengthLabel(passwordStrength).label}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs" style={{ color: '#64748B' }}>
+                    <span className={password.length >= 8 ? 'text-emerald-400' : ''}>8+ chars</span>
+                    <span className={/[a-z]/.test(password) && /[A-Z]/.test(password) ? 'text-emerald-400' : ''}>Mixed case</span>
+                    <span className={/\d/.test(password) ? 'text-emerald-400' : ''}>Number</span>
+                    <span className={/[^a-zA-Z0-9]/.test(password) ? 'text-emerald-400' : ''}>Symbol</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>

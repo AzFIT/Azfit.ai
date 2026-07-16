@@ -40,6 +40,11 @@ export interface ClientProfileData {
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'admin@azfit.ai';
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || '';
 
+// Check if admin quick login is available (password configured)
+export function isAdminQuickLoginAvailable(): boolean {
+  return !!ADMIN_PASSWORD;
+}
+
 // Check if credentials match admin
 export function isAdminCredentials(email: string, password: string): boolean {
   if (!ADMIN_PASSWORD) return false; // Disabled if no password configured

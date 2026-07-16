@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, Dumbbell, ArrowLeft, Shield } from 'lucide-react';
-import { signIn, isAdminCredentials } from '@/services/auth';
+import { signIn, isAdminCredentials, isAdminQuickLoginAvailable } from '@/services/auth';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Login() {
@@ -12,6 +12,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -103,29 +104,33 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Admin Quick Login Button */}
-          <button
-            onClick={handleAdminQuickLogin}
-            disabled={loading}
-            className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-semibold transition-all duration-200 hover:opacity-90 disabled:opacity-50"
-            style={{
-              borderColor: '#8B5CF6',
-              backgroundColor: 'rgba(139, 92, 246, 0.1)',
-              color: '#A78BFA',
-            }}
-          >
-            <Shield size={18} />
-            {loading ? 'Signing in...' : 'Admin Quick Login'}
-          </button>
+          {/* Admin Quick Login Button - Only show if configured */}
+          {isAdminQuickLoginAvailable() && (
+            <button
+              onClick={handleAdminQuickLogin}
+              disabled={loading}
+              className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-semibold transition-all duration-200 hover:opacity-90 disabled:opacity-50"
+              style={{
+                borderColor: '#8B5CF6',
+                backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                color: '#A78BFA',
+              }}
+            >
+              <Shield size={18} />
+              {loading ? 'Signing in...' : 'Admin Quick Login'}
+            </button>
+          )}
 
-          {/* Divider */}
-          <div className="mb-4 flex items-center gap-3">
-            <div className="h-px flex-1" style={{ backgroundColor: '#475569' }} />
-            <span className="text-xs" style={{ color: '#64748B' }}>
-              or sign in with email
-            </span>
-            <div className="h-px flex-1" style={{ backgroundColor: '#475569' }} />
-          </div>
+          {/* Divider - Only show if admin quick login is available */}
+          {isAdminQuickLoginAvailable() && (
+            <div className="mb-4 flex items-center gap-3">
+              <div className="h-px flex-1" style={{ backgroundColor: '#475569' }} />
+              <span className="text-xs" style={{ color: '#64748B' }}>
+                or sign in with email
+              </span>
+              <div className="h-px flex-1" style={{ backgroundColor: '#475569' }} />
+            </div>
+          )}
 
           {/* Error */}
           {error && (
@@ -160,9 +165,19 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium" style={{ color: '#CBD5E1' }}>
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium" style={{ color: '#CBD5E1' }}>
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={() => navigate('/forgot-password')}
+                  className="text-xs transition-colors hover:underline"
+                  style={{ color: '#0D9488' }}
+                >
+                  Forgot password?
+                </button>
+              </div>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -184,6 +199,25 @@ export default function Login() {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+            </div>
+
+            {/* Remember Me */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="remember-me"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border accent-[#0D9488]"
+                style={{ borderColor: '#475569', backgroundColor: '#0F172A' }}
+              />
+              <label
+                htmlFor="remember-me"
+                className="text-sm cursor-pointer"
+                style={{ color: '#94A3B8' }}
+              >
+                Remember me for 30 days
+              </label>
             </div>
 
             <button

@@ -27,6 +27,8 @@ const ExportSharePage = lazy(() => import("@/pages/ExportShare"));
 const TimerModesPage = lazy(() => import("@/pages/TimerModes"));
 const NotificationsPage = lazy(() => import("@/pages/Notifications"));
 const LeaderboardPage = lazy(() => import("@/pages/Leaderboard"));
+const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
+const DemoDashboard = lazy(() => import("@/pages/DemoDashboard"));
 const ClientProfile = lazy(() => import("@/pages/ClientProfile"));
 const ClientsPage = lazy(() => import("@/pages/Clients"));
 const WarmupGeneratorPage = lazy(() => import("@/pages/WarmupGenerator"));
@@ -60,6 +62,8 @@ export default function App() {
           <OfflineBanner />
           <Suspense fallback={<PageLoader />}>
             <Routes>
+              <Route path="/demo" element={<DemoDashboard />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
