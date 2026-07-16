@@ -96,7 +96,7 @@ export default function Layout({
   );
 
   const handleNav = (path: string) => {
-    if (path !== "#") {
+    if (path !== "#" && path !== location.pathname) {
       navigate(path);
     }
     setSidebarOpen(false);
