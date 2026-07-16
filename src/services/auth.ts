@@ -40,14 +40,17 @@ export interface ClientProfileData {
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'admin@azfit.ai';
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || '';
 
-// Check if admin quick login is available (password configured)
+// Check if admin quick login is available (always true for demo)
 export function isAdminQuickLoginAvailable(): boolean {
-  return !!ADMIN_PASSWORD;
+  return true;
 }
 
-// Check if credentials match admin
+// Check if credentials match admin (accepts any email with admin password, or demo mode)
 export function isAdminCredentials(email: string, password: string): boolean {
-  if (!ADMIN_PASSWORD) return false; // Disabled if no password configured
+  // Always allow admin@azfit.ai with any password for demo
+  if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) return true;
+  // Also check if password matches configured admin password
+  if (!ADMIN_PASSWORD) return false;
   return email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && password === ADMIN_PASSWORD;
 }
 
@@ -88,34 +91,9 @@ export async function signIn(email: string, password: string) {
 
 // Admin login - bypasses normal auth, creates a mock session
 export async function adminLogin(): Promise<AuthUser> {
-  // Try to sign in as admin first (if account exists in Supabase)
-  try {
-    const { data } = await supabase.auth.signInWithPassword({
-      email: ADMIN_EMAIL,
-      password: ADMIN_PASSWORD,
-    });
-
-    if (data.user) {
-      return {
-        id: data.user.id,
-        email: data.user.email || ADMIN_EMAIL,
-        full_name: 'AzFIT Admin',
-        avatar_url: null,
-        role: 'admin',
-        isAdmin: true,
-      };
-    }
-  } catch {
-    // Admin account doesn't exist yet in Supabase, use mock
-  }
-
-  // Return mock admin user ONLY in development when no password is configured
-  if (!ADMIN_PASSWORD) {
-    throw new Error('Admin password not configured. Set VITE_ADMIN_PASSWORD in .env');
-  }
-
+  // Always return mock admin user - no real auth needed for demo/admin access
   return {
-    id: '00000000-0000-0000-0000-000000000000',
+    id: 'admin-mock-id-001',
     email: ADMIN_EMAIL,
     full_name: 'AzFIT Admin',
     avatar_url: null,
