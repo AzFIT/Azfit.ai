@@ -44,12 +44,13 @@ export default function PageBreadcrumbs() {
   const isCoachPage = pathname === "/coach";
   const isProgramBuilder = pathname === "/program-builder";
 
+  const isMobile = useIsMobile();
+
   // Only show on nested pages
   const shouldShow = isClientProfile || isCoachPage || isProgramBuilder;
   if (!shouldShow) return null;
 
   // Hide on mobile except client profile
-  const isMobile = useIsMobile();
   if (isMobile && !isClientProfile) return null;
 
   // Build segments

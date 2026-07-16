@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   Footprints,
   Moon,
@@ -7,31 +7,26 @@ import {
   ChevronRight,
   Check,
   Circle,
-  Pencil,
-  Save,
   Utensils,
-  GlassWater,
   TrendingUp,
   Dumbbell,
-  Lock,
+  Bell,
+  MessageSquare,
+  CalendarDays,
+  Play,
+  Plus,
+  BedDouble,
+  Scale,
 } from "lucide-react";
 import { useNavigate } from "react-router";
+import { useAuth } from "@/hooks/useAuth";
 import { GlassCard } from "./shared/GlassCard";
 import { ProgressRing } from "./shared/ProgressRing";
 import { CollapsibleSection } from "./shared/CollapsibleSection";
 
 /* ═══════════════════════════════════════════════════════════════════
-   Client Dashboard — Phase A4
-   ═══════════════════════════════════════════════════════════════════
-   Habit-execution focused client view with:
-   • Steps Ring (dynamic target)
-   • Macros Ring (Protein/Carbs/Fats — dynamic targets)
-   • Recovery Ring (Sleep/Quality — dynamic targets)
-   • Today's Workout (interactive checklist)
-   • Nutrition Summary (calories + hydration tracker)
-   • Weekly Compliance chart
-   • Editable targets shell (trainer-only future flag)
-   • Deep dark-mode glassmorphic aesthetic
+   Client Dashboard — Restructured (Phase 1)
+   Answers: "What do I need to do today?"
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── Animation Variants ──────────────────────────────────────────── */
@@ -79,6 +74,7 @@ interface HydrationLog {
 }
 
 /* ── Mock Data ───────────────────────────────────────────────────── */
+// TODO: wire to Supabase
 const MOCK_WORKOUT: WorkoutExercise[] = [
   { id: "e1", order: "A1", name: "Back Squat", sets: 4, reps: "6", load: "120kg", completed: true },
   { id: "e2", order: "A2", name: "Romanian Deadlift", sets: 3, reps: "8", load: "100kg", completed: true },
@@ -98,6 +94,20 @@ const WEEKLY_COMPLIANCE = [
   { day: "Sun", value: 60 },
 ];
 
+// TODO: wire to Supabase — coach assignment
+const MOCK_COACH = {
+  name: "Coach Marcus",
+  avatar: "/avatar-coach.jpg",
+  isOnline: true,
+  nextSession: { day: "Wed", time: "6:00 PM", workout: "Lower Body" },
+};
+
+// TODO: wire to Supabase — check-in schedule
+const isCheckinDue = true;
+
+// TODO: wire to Supabase — unread notifications
+const unreadNotifications = 3;
+
 /* ── Helper: Percentage Calculator ───────────────────────────────── */
 function calcPct(current: number, target: number): number {
   if (target <= 0) return 0;
@@ -108,25 +118,27 @@ function formatNumber(n: number): string {
   return n.toLocaleString();
 }
 
+function greeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 /* ── Main Component ──────────────────────────────────────────────── */
 export default function ClientDashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
 
-  /* ═══════════════════════════════════════════════════════════════
-     EDITABLE TARGETS STATE — Future-proof architecture
-     All targets are dynamic state variables, not hardcoded.
-     isTrainerEditOnly flag gates the edit UI for future client portal.
-     ═══════════════════════════════════════════════════════════════ */
-  const [isTrainerEditOnly] = useState(true); // Future: read from useAuth().isTrainer
-  const [isEditingTargets, setIsEditingTargets] = useState(false);
+  const firstName = user?.full_name?.split(" ")[0] || "Alex";
 
   // Steps
-  const [stepsTarget, setStepsTarget] = useState(10000);
-  const [stepsCurrent, setStepsCurrent] = useState(9245);
+  const [stepsTarget] = useState(10000);
+  const [stepsCurrent] = useState(9245);
 
   // Macros
-  const [macros, setMacros] = useState<MacroTarget>({
+  const [macros] = useState<MacroTarget>({
     protein: { current: 145, target: 180 },
     carbs: { current: 210, target: 250 },
     fats: { current: 55, target: 70 },
@@ -134,7 +146,7 @@ export default function ClientDashboard() {
   });
 
   // Recovery
-  const [recovery, setRecovery] = useState<RecoveryMetrics>({
+  const [recovery] = useState<RecoveryMetrics>({
     sleep: { current: 7.5, target: 8, unit: "h" },
     quality: { current: 8, target: 10, unit: "/10" },
     hrv: { current: 62, target: 65, unit: "ms" },
@@ -146,7 +158,7 @@ export default function ClientDashboard() {
   // Workout checklist
   const [exercises, setExercises] = useState<WorkoutExercise[]>(MOCK_WORKOUT);
 
-  // Weekly compliance (editable for demo)
+  // Weekly compliance
   const [complianceData] = useState(WEEKLY_COMPLIANCE);
 
   /* ── Derived Values ────────────────────────────────────────────── */
@@ -158,7 +170,6 @@ export default function ClientDashboard() {
   const sleepPct = calcPct(recovery.sleep.current, recovery.sleep.target);
   const qualityPct = calcPct(recovery.quality.current, recovery.quality.target);
   const hrvPct = calcPct(recovery.hrv.current, recovery.hrv.target);
-  const hydrationPct = calcPct(hydration.current, hydration.target);
 
   const completedExercises = exercises.filter((e) => e.completed).length;
   const workoutProgress = calcPct(completedExercises, exercises.length);
@@ -170,25 +181,10 @@ export default function ClientDashboard() {
     );
   }, []);
 
-  const updateMacro = useCallback((
-    key: keyof MacroTarget,
-    field: "current" | "target",
-    value: number
-  ) => {
-    setMacros((prev) => ({
+  const addWater = useCallback((amount: number) => {
+    setHydration((prev) => ({
       ...prev,
-      [key]: { ...prev[key], [field]: value },
-    }));
-  }, []);
-
-  const updateRecovery = useCallback((
-    key: keyof RecoveryMetrics,
-    field: "current" | "target",
-    value: number
-  ) => {
-    setRecovery((prev) => ({
-      ...prev,
-      [key]: { ...prev[key], [field]: value },
+      current: Math.min(prev.current + amount, prev.target + 1),
     }));
   }, []);
 
@@ -201,7 +197,7 @@ export default function ClientDashboard() {
   return (
     <div className="mx-auto max-w-[1400px] px-4 pt-4 pb-20 lg:px-6 lg:pb-8">
       {/* ═══════════════════════════════════════════════════════════
-          HEADER
+          HEADER: Greeting + Streak + Notification Bell
           ═══════════════════════════════════════════════════════════ */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -215,45 +211,35 @@ export default function ClientDashboard() {
               className="text-2xl font-bold tracking-tight lg:text-3xl"
               style={{ color: "var(--page-text)" }}
             >
-              My Dashboard
+              {greeting()}, {firstName}
             </h1>
             <p className="mt-1 text-sm" style={{ color: "var(--light-text-muted)" }}>
-              Track your daily habits and progress
+              Here&apos;s what you need to do today
             </p>
           </div>
           <div className="mt-3 flex items-center gap-3 sm:mt-0">
-            {/* Edit Targets Toggle — trainer-only shell */}
-            {isTrainerEditOnly && (
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setIsEditingTargets((p) => !p)}
-                className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-all"
-                style={{
-                  backgroundColor: isEditingTargets
-                    ? "rgba(13,148,136,0.15)"
-                    : "var(--card-bg)",
-                  borderColor: isEditingTargets
-                    ? "var(--azfit-primary)"
-                    : "var(--card-border)",
-                  color: isEditingTargets
-                    ? "var(--azfit-primary)"
-                    : "var(--page-text)",
-                }}
-              >
-                {isEditingTargets ? (
-                  <>
-                    <Save className="h-4 w-4" />
-                    Done Editing
-                  </>
-                ) : (
-                  <>
-                    <Pencil className="h-4 w-4" />
-                    Edit Targets
-                    <Lock className="h-3 w-3 opacity-50" />
-                  </>
-                )}
-              </motion.button>
-            )}
+            {/* Notification Bell */}
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate("/notifications")}
+              className="relative flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-all"
+              style={{
+                backgroundColor: "var(--card-bg)",
+                borderColor: "var(--card-border)",
+                color: "var(--page-text)",
+              }}
+            >
+              <Bell className="h-4 w-4" />
+              {unreadNotifications > 0 && (
+                <span
+                  className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                  style={{ backgroundColor: "#F87171" }}
+                >
+                  {unreadNotifications}
+                </span>
+              )}
+            </motion.button>
+            {/* Streak */}
             <div
               className="flex items-center gap-2 rounded-lg border px-3 py-2"
               style={{
@@ -271,13 +257,282 @@ export default function ClientDashboard() {
       </motion.div>
 
       {/* ═══════════════════════════════════════════════════════════
-          TOP ROW: Activity Rings (Steps + Macros + Recovery)
+          YOUR COACH CARD
+          ═══════════════════════════════════════════════════════════ */}
+      <motion.div
+        variants={fadeInUp}
+        initial="hidden"
+        animate={mounted ? "visible" : "hidden"}
+        className="mb-6"
+      >
+        <GlassCard
+          glass
+          hover
+          accentColor="#0D9488"
+          className="!p-5"
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            {/* Coach Info */}
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <img
+                  src={MOCK_COACH.avatar}
+                  alt={MOCK_COACH.name}
+                  className="h-14 w-14 rounded-full object-cover"
+                  style={{ border: "2px solid var(--card-border)" }}
+                />
+                {MOCK_COACH.isOnline && (
+                  <span
+                    className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2"
+                    style={{
+                      backgroundColor: "#84CC16",
+                      borderColor: "var(--card-bg)",
+                    }}
+                  />
+                )}
+              </div>
+              <div>
+                <p className="text-sm font-medium" style={{ color: "var(--light-text-muted)" }}>
+                  Your Coach
+                </p>
+                <p className="text-lg font-bold" style={{ color: "var(--page-text)" }}>
+                  {MOCK_COACH.name}
+                </p>
+              </div>
+            </div>
+
+            {/* Next Session */}
+            <button
+              onClick={() => navigate("/schedule")}
+              className="flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all hover:-translate-y-0.5"
+              style={{
+                backgroundColor: "rgba(13,148,136,0.06)",
+                borderColor: "rgba(13,148,136,0.2)",
+              }}
+            >
+              <CalendarDays className="h-4 w-4 shrink-0" style={{ color: "var(--azfit-primary)" }} />
+              <div>
+                <p className="text-[11px] font-medium" style={{ color: "var(--light-text-muted)" }}>
+                  Next session
+                </p>
+                <p className="text-sm font-semibold" style={{ color: "var(--azfit-primary)" }}>
+                  {MOCK_COACH.nextSession.day} {MOCK_COACH.nextSession.time} — {MOCK_COACH.nextSession.workout}
+                </p>
+              </div>
+            </button>
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => navigate("/coach")}
+                className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white"
+                style={{ backgroundColor: "var(--azfit-primary)" }}
+              >
+                <MessageSquare className="h-4 w-4" />
+                Message
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => navigate("/schedule")}
+                className="flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium transition-all"
+                style={{
+                  backgroundColor: "var(--card-bg)",
+                  borderColor: "var(--card-border)",
+                  color: "var(--page-text)",
+                }}
+              >
+                <CalendarDays className="h-4 w-4" />
+                Book Session
+              </motion.button>
+            </div>
+          </div>
+        </GlassCard>
+      </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          TODAY'S WORKOUT CARD
+          ═══════════════════════════════════════════════════════════ */}
+      <motion.div
+        variants={fadeInUp}
+        initial="hidden"
+        animate={mounted ? "visible" : "hidden"}
+        className="mb-6"
+      >
+        <CollapsibleSection
+          title="Today's Workout"
+          icon={<Dumbbell className="h-4 w-4" />}
+          defaultExpanded
+          accentColor="#0D9488"
+          badge={
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+              style={{ backgroundColor: workoutProgress === 100 ? "#84CC16" : "#0D9488" }}
+            >
+              {completedExercises}/{exercises.length}
+            </span>
+          }
+          headerAction={
+            <button
+              onClick={() => navigate("/sheets")}
+              className="flex items-center gap-0.5 text-[11px] font-medium transition-opacity hover:opacity-70"
+              style={{ color: "var(--azfit-primary)" }}
+            >
+              Full Program
+              <ChevronRight className="h-3 w-3" />
+            </button>
+          }
+        >
+          {/* Start Workout Button */}
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={() => navigate("/sheets")}
+            className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold text-white transition-all"
+            style={{ backgroundColor: "var(--azfit-primary)" }}
+          >
+            <Play className="h-4 w-4" />
+            Start Workout
+          </motion.button>
+
+          {/* Workout progress bar */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] font-medium" style={{ color: "var(--light-text-muted)" }}>
+                Progress
+              </span>
+              <span className="text-[11px] font-bold font-mono" style={{ color: "var(--azfit-primary)" }}>
+                {workoutProgress}%
+              </span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-700">
+              <motion.div
+                className="h-full rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${workoutProgress}%` }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+                style={{
+                  background: "linear-gradient(90deg, #0D9488, #14B8A6)",
+                  boxShadow: workoutProgress > 0 ? "0 0 8px rgba(13,148,136,0.4)" : "none",
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Exercise List */}
+          <div className="space-y-2">
+            {exercises.map((exercise, i) => (
+              <motion.div
+                key={exercise.id}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.05, duration: 0.3 }}
+                className={`group flex items-center gap-3 rounded-xl border p-3 transition-all cursor-pointer ${
+                  exercise.completed ? "opacity-60" : "hover:-translate-y-0.5"
+                }`}
+                style={{
+                  backgroundColor: exercise.completed
+                    ? "rgba(13,148,136,0.05)"
+                    : "var(--card-bg)",
+                  borderColor: exercise.completed
+                    ? "rgba(13,148,136,0.3)"
+                    : "var(--card-border)",
+                }}
+                onClick={() => toggleExercise(exercise.id)}
+              >
+                {/* Checkbox */}
+                <div
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
+                    exercise.completed
+                      ? "border-teal-500 bg-teal-500"
+                      : "border-slate-500 hover:border-teal-400"
+                  }`}
+                >
+                  {exercise.completed && <Check className="h-3.5 w-3.5 text-white" />}
+                </div>
+
+                {/* Exercise Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-[10px] font-bold font-mono"
+                      style={{ color: "var(--azfit-primary)" }}
+                    >
+                      {exercise.order}
+                    </span>
+                    <p
+                      className={`text-sm font-semibold truncate ${
+                        exercise.completed ? "line-through" : ""
+                      }`}
+                      style={{ color: "var(--page-text)" }}
+                    >
+                      {exercise.name}
+                    </p>
+                  </div>
+                  <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>
+                    {exercise.sets} sets × {exercise.reps} @ {exercise.load}
+                  </p>
+                </div>
+
+                {/* Status */}
+                {exercise.completed ? (
+                  <span className="text-[10px] font-semibold" style={{ color: "#84CC16" }}>
+                    Done
+                  </span>
+                ) : (
+                  <Circle className="h-4 w-4 opacity-30" style={{ color: "var(--light-text-muted)" }} />
+                )}
+              </motion.div>
+            ))}
+          </div>
+        </CollapsibleSection>
+      </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          CHECK-IN DUE CARD (conditional)
+          ═══════════════════════════════════════════════════════════ */}
+      {isCheckinDue && (
+        <motion.div
+          variants={fadeInUp}
+          initial="hidden"
+          animate={mounted ? "visible" : "hidden"}
+          className="mb-6"
+        >
+          <GlassCard
+            glass
+            hover
+            accentColor="#F87171"
+            className="!p-5"
+          >
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: "#F87171" }}>
+                  Check-in Due
+                </p>
+                <p className="text-sm" style={{ color: "var(--light-text-muted)" }}>
+                  Your weekly progress check-in is ready. Keep your coach in the loop!
+                </p>
+              </div>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => navigate("/bioprint")}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-white shrink-0"
+                style={{ backgroundColor: "#F87171" }}
+              >
+                Complete Now
+              </motion.button>
+            </div>
+          </GlassCard>
+        </motion.div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════
+          ACTIVITY RINGS ROW (Steps + Macros + Recovery)
           ═══════════════════════════════════════════════════════════ */}
       <motion.section
         variants={staggerContainer}
         initial="hidden"
         animate={mounted ? "visible" : "hidden"}
-        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-6"
       >
         {/* Steps Ring */}
         <motion.div variants={fadeInUp}>
@@ -288,6 +543,7 @@ export default function ClientDashboard() {
             glow
             accentColor="#0D9488"
             hover
+            onClick={() => navigate("/analytics")}
           >
             <div className="flex items-center justify-center py-4">
               <ProgressRing
@@ -303,47 +559,6 @@ export default function ClientDashboard() {
                 showPulse={stepsPct >= 100}
               />
             </div>
-
-            {/* Edit Target Shell */}
-            <AnimatePresence>
-              {isEditingTargets && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.25 }}
-                  className="overflow-hidden border-t pt-3"
-                  style={{ borderColor: "var(--card-border)" }}
-                >
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[10px] font-medium uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>
-                        Current
-                      </label>
-                      <input
-                        type="number"
-                        value={stepsCurrent}
-                        onChange={(e) => setStepsCurrent(Number(e.target.value))}
-                        className="mt-1 w-full rounded-lg border bg-transparent px-2 py-1 text-sm font-mono outline-none focus:border-teal-500"
-                        style={{ borderColor: "var(--card-border)", color: "var(--page-text)" }}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-medium uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>
-                        Target
-                      </label>
-                      <input
-                        type="number"
-                        value={stepsTarget}
-                        onChange={(e) => setStepsTarget(Number(e.target.value))}
-                        className="mt-1 w-full rounded-lg border bg-transparent px-2 py-1 text-sm font-mono outline-none focus:border-teal-500"
-                        style={{ borderColor: "var(--card-border)", color: "var(--page-text)" }}
-                      />
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
 
             {/* Stats */}
             <div className="grid grid-cols-2 gap-3 border-t pt-4" style={{ borderColor: "var(--card-border)" }}>
@@ -376,6 +591,7 @@ export default function ClientDashboard() {
             glow
             accentColor="#06B6D4"
             hover
+            onClick={() => navigate("/nutrition")}
           >
             <div className="flex items-center justify-center py-4">
               <ProgressRing
@@ -421,45 +637,6 @@ export default function ClientDashboard() {
                 </div>
               ))}
             </div>
-
-            {/* Edit Targets Shell */}
-            <AnimatePresence>
-              {isEditingTargets && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.25 }}
-                  className="overflow-hidden border-t pt-3 mt-3"
-                  style={{ borderColor: "var(--card-border)" }}
-                >
-                  <p className="mb-2 text-[10px] font-medium uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>
-                    Edit Macro Targets
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {([
-                      ["protein", "Protein"] as const,
-                      ["carbs", "Carbs"] as const,
-                      ["fats", "Fats"] as const,
-                      ["calories", "Calories"] as const,
-                    ]).map(([key, label]) => (
-                      <div key={key}>
-                        <label className="text-[9px] font-medium uppercase" style={{ color: "var(--light-text-muted)" }}>
-                          {label} Target
-                        </label>
-                        <input
-                          type="number"
-                          value={macros[key].target}
-                          onChange={(e) => updateMacro(key, "target", Number(e.target.value))}
-                          className="mt-0.5 w-full rounded-lg border bg-transparent px-2 py-1 text-xs font-mono outline-none focus:border-cyan-500"
-                          style={{ borderColor: "var(--card-border)", color: "var(--page-text)" }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </GlassCard>
         </motion.div>
 
@@ -472,6 +649,7 @@ export default function ClientDashboard() {
             glow
             accentColor="#8B5CF6"
             hover
+            onClick={() => navigate("/deload")}
           >
             <div className="flex items-center justify-center py-4">
               <ProgressRing
@@ -511,334 +689,96 @@ export default function ClientDashboard() {
                 </div>
               ))}
             </div>
-
-            {/* Edit Targets Shell */}
-            <AnimatePresence>
-              {isEditingTargets && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.25 }}
-                  className="overflow-hidden border-t pt-3 mt-3"
-                  style={{ borderColor: "var(--card-border)" }}
-                >
-                  <p className="mb-2 text-[10px] font-medium uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>
-                    Edit Recovery Targets
-                  </p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {([
-                      ["sleep", "Sleep (h)"] as const,
-                      ["quality", "Quality (/10)"] as const,
-                      ["hrv", "HRV (ms)"] as const,
-                    ]).map(([key, label]) => (
-                      <div key={key}>
-                        <label className="text-[9px] font-medium uppercase" style={{ color: "var(--light-text-muted)" }}>
-                          {label}
-                        </label>
-                        <input
-                          type="number"
-                          step={key === "sleep" ? 0.5 : 1}
-                          value={recovery[key].target}
-                          onChange={(e) => updateRecovery(key, "target", Number(e.target.value))}
-                          className="mt-0.5 w-full rounded-lg border bg-transparent px-2 py-1 text-xs font-mono outline-none focus:border-purple-500"
-                          style={{ borderColor: "var(--card-border)", color: "var(--page-text)" }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </GlassCard>
         </motion.div>
       </motion.section>
 
       {/* ═══════════════════════════════════════════════════════════
-          MIDDLE ROW: Today's Workout + Nutrition Summary
+          QUICK LOG ROW
           ═══════════════════════════════════════════════════════════ */}
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Today's Workout */}
-        <motion.div
-          variants={fadeInUp}
-          initial="hidden"
-          animate={mounted ? "visible" : "hidden"}
-        >
-          <CollapsibleSection
-            title="Today's Workout"
-            icon={<Dumbbell className="h-4 w-4" />}
-            defaultExpanded
-            accentColor="#0D9488"
-            badge={
-              <span
-                className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
-                style={{ backgroundColor: workoutProgress === 100 ? "#84CC16" : "#0D9488" }}
-              >
-                {completedExercises}/{exercises.length}
-              </span>
-            }
-            headerAction={
-              <button
-                onClick={() => navigate("/sheets")}
-                className="flex items-center gap-0.5 text-[11px] font-medium transition-opacity hover:opacity-70"
-                style={{ color: "var(--azfit-primary)" }}
-              >
-                Full Program
-                <ChevronRight className="h-3 w-3" />
-              </button>
-            }
-          >
-            {/* Workout progress bar */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] font-medium" style={{ color: "var(--light-text-muted)" }}>
-                  Progress
-                </span>
-                <span className="text-[11px] font-bold font-mono" style={{ color: "var(--azfit-primary)" }}>
-                  {workoutProgress}%
-                </span>
-              </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-700">
-                <motion.div
-                  className="h-full rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${workoutProgress}%` }}
-                  transition={{ duration: 0.8, ease: "easeOut" }}
-                  style={{
-                    background: "linear-gradient(90deg, #0D9488, #14B8A6)",
-                    boxShadow: workoutProgress > 0 ? "0 0 8px rgba(13,148,136,0.4)" : "none",
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Exercise List */}
+      <motion.div
+        variants={fadeInUp}
+        initial="hidden"
+        animate={mounted ? "visible" : "hidden"}
+        className="mb-6"
+      >
+        <GlassCard glass hover accentColor="#84CC16" className="!p-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {/* Water */}
             <div className="space-y-2">
-              {exercises.map((exercise, i) => (
-                <motion.div
-                  key={exercise.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05, duration: 0.3 }}
-                  className={`group flex items-center gap-3 rounded-xl border p-3 transition-all cursor-pointer ${
-                    exercise.completed ? "opacity-60" : "hover:-translate-y-0.5"
-                  }`}
-                  style={{
-                    backgroundColor: exercise.completed
-                      ? "rgba(13,148,136,0.05)"
-                      : "var(--card-bg)",
-                    borderColor: exercise.completed
-                      ? "rgba(13,148,136,0.3)"
-                      : "var(--card-border)",
-                  }}
-                  onClick={() => toggleExercise(exercise.id)}
-                >
-                  {/* Checkbox */}
-                  <div
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
-                      exercise.completed
-                        ? "border-teal-500 bg-teal-500"
-                        : "border-slate-500 hover:border-teal-400"
-                    }`}
-                  >
-                    {exercise.completed && <Check className="h-3.5 w-3.5 text-white" />}
-                  </div>
-
-                  {/* Exercise Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="text-[10px] font-bold font-mono"
-                        style={{ color: "var(--azfit-primary)" }}
-                      >
-                        {exercise.order}
-                      </span>
-                      <p
-                        className={`text-sm font-semibold truncate ${
-                          exercise.completed ? "line-through" : ""
-                        }`}
-                        style={{ color: "var(--page-text)" }}
-                      >
-                        {exercise.name}
-                      </p>
-                    </div>
-                    <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>
-                      {exercise.sets} sets × {exercise.reps} @ {exercise.load}
-                    </p>
-                  </div>
-
-                  {/* Status */}
-                  {exercise.completed ? (
-                    <span className="text-[10px] font-semibold" style={{ color: "#84CC16" }}>
-                      Done
-                    </span>
-                  ) : (
-                    <Circle className="h-4 w-4 opacity-30" style={{ color: "var(--light-text-muted)" }} />
-                  )}
-                </motion.div>
-              ))}
-            </div>
-          </CollapsibleSection>
-        </motion.div>
-
-        {/* Nutrition Summary + Hydration */}
-        <motion.div
-          variants={fadeInUp}
-          initial="hidden"
-          animate={mounted ? "visible" : "hidden"}
-          transition={{ delay: 0.1 }}
-          className="space-y-6"
-        >
-          {/* Nutrition Summary */}
-          <CollapsibleSection
-            title="Nutrition Summary"
-            icon={<Utensils className="h-4 w-4" />}
-            defaultExpanded
-            accentColor="#06B6D4"
-            headerAction={
-              <button
-                onClick={() => navigate("/nutrition")}
-                className="flex items-center gap-0.5 text-[11px] font-medium transition-opacity hover:opacity-70"
-                style={{ color: "var(--azfit-secondary)" }}
-              >
-                Log Meal
-                <ChevronRight className="h-3 w-3" />
-              </button>
-            }
-          >
-            <div className="space-y-4">
-              {/* Calorie progress */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium" style={{ color: "var(--page-text)" }}>
-                    Calories
-                  </span>
-                  <span className="text-sm font-bold font-mono" style={{ color: "var(--azfit-secondary)" }}>
-                    {formatNumber(macros.calories.current)} / {formatNumber(macros.calories.target)}
-                  </span>
-                </div>
-                <div className="h-3 w-full overflow-hidden rounded-full bg-slate-700">
-                  <motion.div
-                    className="h-full rounded-full"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${caloriesPct}%` }}
-                    transition={{ duration: 1, ease: "easeOut" }}
+              <p className="text-[10px] font-medium uppercase tracking-wide text-center" style={{ color: "var(--light-text-muted)" }}>
+                Water
+              </p>
+              <div className="flex gap-1">
+                {[0.25, 0.5, 1.0].map((amount) => (
+                  <button
+                    key={amount}
+                    onClick={() => addWater(amount)}
+                    className="flex-1 rounded-lg border py-2 text-[10px] font-medium transition-all hover:-translate-y-0.5 active:scale-95"
                     style={{
-                      background: "linear-gradient(90deg, #06B6D4, #22D3EE)",
-                      boxShadow: "0 0 8px rgba(6,182,212,0.3)",
+                      backgroundColor: "rgba(34,211,238,0.08)",
+                      borderColor: "rgba(34,211,238,0.2)",
+                      color: "#22D3EE",
                     }}
-                  />
-                </div>
-                <div className="mt-1 flex justify-between">
-                  <span className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
-                    {caloriesPct}% of daily target
-                  </span>
-                  <span className="text-[10px] font-mono" style={{ color: "var(--light-text-muted)" }}>
-                    {formatNumber(macros.calories.target - macros.calories.current)} left
-                  </span>
-                </div>
-              </div>
-
-              {/* Macro bars */}
-              <div className="space-y-3">
-                {[
-                  { label: "Protein", current: macros.protein.current, target: macros.protein.target, color: "#0D9488", pct: proteinPct },
-                  { label: "Carbs", current: macros.carbs.current, target: macros.carbs.target, color: "#8B5CF6", pct: carbsPct },
-                  { label: "Fats", current: macros.fats.current, target: macros.fats.target, color: "#F59E0B", pct: fatsPct },
-                ].map((m) => (
-                  <div key={m.label}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] font-medium" style={{ color: "var(--page-text)" }}>
-                        {m.label}
-                      </span>
-                      <span className="text-[11px] font-mono" style={{ color: "var(--light-text-muted)" }}>
-                        {m.current}g / {m.target}g
-                      </span>
-                    </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-700">
-                      <motion.div
-                        className="h-full rounded-full"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${m.pct}%` }}
-                        transition={{ duration: 0.8, delay: 0.2 }}
-                        style={{ backgroundColor: m.color }}
-                      />
-                    </div>
-                  </div>
+                  >
+                    +{amount}L
+                  </button>
                 ))}
               </div>
+              <p className="text-center text-[10px] font-mono" style={{ color: "var(--light-text-muted)" }}>
+                {hydration.current.toFixed(1)} / {hydration.target}L
+              </p>
             </div>
-          </CollapsibleSection>
 
-          {/* Hydration Tracker */}
-          <GlassCard
-            title="Hydration"
-            titleIcon={<GlassWater className="h-4 w-4" />}
-            glass
-            hover
-            accentColor="#22D3EE"
-          >
-            <div className="flex items-center gap-4">
-              {/* Water ring */}
-              <div className="shrink-0">
-                <ProgressRing
-                  size={80}
-                  strokeWidth={8}
-                  percentage={hydrationPct}
-                  color="#22D3EE"
-                  label=""
-                  value={`${hydration.current}L`}
-                  subtitle={`/ ${hydration.target}L`}
-                  animate={false}
-                  glowClass="glow-cyan"
-                />
-              </div>
+            {/* Meal */}
+            <button
+              onClick={() => navigate("/nutrition")}
+              className="flex flex-col items-center justify-center gap-1 rounded-lg border py-3 transition-all hover:-translate-y-0.5 active:scale-95"
+              style={{
+                backgroundColor: "var(--card-bg)",
+                borderColor: "var(--card-border)",
+              }}
+            >
+              <Plus className="h-4 w-4" style={{ color: "var(--azfit-primary)" }} />
+              <span className="text-[11px] font-medium" style={{ color: "var(--page-text)" }}>Meal</span>
+            </button>
 
-              {/* Quick add buttons */}
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium" style={{ color: "var(--page-text)" }}>
-                    Water Intake
-                  </span>
-                  <span className="text-[11px] font-mono" style={{ color: "var(--light-text-muted)" }}>
-                    {hydrationPct}%
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  {[0.25, 0.5, 1.0].map((amount) => (
-                    <button
-                      key={amount}
-                      onClick={() =>
-                        setHydration((prev) => ({
-                          ...prev,
-                          current: Math.min(prev.current + amount, prev.target + 1),
-                        }))
-                      }
-                      className="flex-1 rounded-lg border py-2 text-xs font-medium transition-all hover:-translate-y-0.5 active:scale-95"
-                      style={{
-                        backgroundColor: "rgba(34,211,238,0.08)",
-                        borderColor: "rgba(34,211,238,0.2)",
-                        color: "#22D3EE",
-                      }}
-                    >
-                      +{amount}L
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </GlassCard>
-        </motion.div>
-      </div>
+            {/* Sleep */}
+            <button
+              onClick={() => navigate("/sheets")}
+              className="flex flex-col items-center justify-center gap-1 rounded-lg border py-3 transition-all hover:-translate-y-0.5 active:scale-95"
+              style={{
+                backgroundColor: "var(--card-bg)",
+                borderColor: "var(--card-border)",
+              }}
+            >
+              <BedDouble className="h-4 w-4" style={{ color: "#8B5CF6" }} />
+              <span className="text-[11px] font-medium" style={{ color: "var(--page-text)" }}>Sleep</span>
+            </button>
+
+            {/* Weight */}
+            <button
+              onClick={() => navigate("/sheets")}
+              className="flex flex-col items-center justify-center gap-1 rounded-lg border py-3 transition-all hover:-translate-y-0.5 active:scale-95"
+              style={{
+                backgroundColor: "var(--card-bg)",
+                borderColor: "var(--card-border)",
+              }}
+            >
+              <Scale className="h-4 w-4" style={{ color: "#F59E0B" }} />
+              <span className="text-[11px] font-medium" style={{ color: "var(--page-text)" }}>Weight</span>
+            </button>
+          </div>
+        </GlassCard>
+      </motion.div>
 
       {/* ═══════════════════════════════════════════════════════════
-          BOTTOM ROW: Weekly Compliance Chart
+          WEEKLY COMPLIANCE CHART
           ═══════════════════════════════════════════════════════════ */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={mounted ? { opacity: 1, y: 0 } : {}}
         transition={{ delay: 0.3, duration: 0.5 }}
-        className="mt-6"
       >
         <GlassCard
           title="Weekly Compliance"
