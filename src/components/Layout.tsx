@@ -25,6 +25,7 @@ import {
   Trophy,
   Flame,
   Brain,
+  MessageSquare,
   ChevronDown,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -53,6 +54,9 @@ const baseSecondaryNavItems = [
   { icon: Trophy, label: "Leaderboard", path: "/leaderboard" },
 ];
 
+// Messages nav item (both roles)
+const messagesNavItem = { icon: MessageSquare, label: "Messages", path: "/messages" };
+
 export default function Layout({
   children,
   showNav = true,
@@ -77,10 +81,10 @@ export default function Layout({
     { icon: BarChart3, label: "Analytics", path: "/analytics" },
   ];
 
-  // Secondary nav: add Coach only for trainers/admins
+  // Secondary nav: add Coach only for trainers/admins, Messages for both
   const secondaryNavItems = isTrainer
-    ? [...baseSecondaryNavItems, { icon: UserCircle, label: "Coach", path: "/coach" }]
-    : baseSecondaryNavItems;
+    ? [...baseSecondaryNavItems, messagesNavItem, { icon: UserCircle, label: "Coach", path: "/coach" }]
+    : [...baseSecondaryNavItems, messagesNavItem];
 
   // Mobile tabs: clients see Schedule instead of Clients, no Coach
   const tabItems = isTrainer
@@ -88,14 +92,14 @@ export default function Layout({
         { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
         { icon: Users, label: "Clients", path: "/clients" },
         { icon: Dumbbell, label: "Workouts", path: "/sheets" },
-        { icon: Apple, label: "Nutrition", path: "/nutrition" },
+        { icon: MessageSquare, label: "Messages", path: "/messages" },
         { icon: Settings, label: "Settings", path: "/settings" },
       ]
     : [
         { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
         { icon: Dumbbell, label: "Workouts", path: "/sheets" },
         { icon: Apple, label: "Nutrition", path: "/nutrition" },
-        { icon: CalendarIcon, label: "Schedule", path: "/schedule" },
+        { icon: MessageSquare, label: "Messages", path: "/messages" },
         { icon: Settings, label: "Settings", path: "/settings" },
       ];
 
@@ -163,12 +167,21 @@ export default function Layout({
           counts[t] = (counts[t] || 0) + 1;
         });
 
-        // Map types to nav labels
+        // Map types to nav labels + unread messages
+        const { data: msgData, error: msgError } = await supabase
+          .from("messages")
+          .select("id", { count: "exact", head: true })
+          .eq("receiver_id", userId)
+          .is("read_at", null);
+
+        const unreadMessages = msgError ? 0 : (msgData?.length ?? 0);
+
         const mapped = {
           Nutrition: counts["meal"] || 0,
           Coach: counts["coach_message"] || 0,
           Leaderboard: counts["leaderboard"] || 0,
           Alerts: counts["alert"] || 0,
+          Messages: unreadMessages,
         } as Record<string, number>;
 
         if (mounted) setNavBadges(mapped);

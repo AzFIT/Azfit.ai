@@ -325,7 +325,7 @@ export default function ClientDashboard() {
             <div className="flex gap-2">
               <motion.button
                 whileTap={{ scale: 0.95 }}
-                onClick={() => navigate("/coach")}
+                onClick={() => navigate("/messages")}
                 className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white"
                 style={{ backgroundColor: "var(--azfit-primary)" }}
               >

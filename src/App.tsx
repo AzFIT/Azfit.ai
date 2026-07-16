@@ -35,6 +35,7 @@ const WarmupGeneratorPage = lazy(() => import("@/pages/WarmupGenerator"));
 const DeloadDetectionPage = lazy(() => import("@/pages/DeloadDetection"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const CoachAIPage = lazy(() => import("@/pages/CoachAIPage"));
+const Messages = lazy(() => import("@/pages/Messages"));
 
 // Loading fallback
 function PageLoader() {
@@ -234,6 +235,14 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <DeloadDetectionPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/messages"
+                element={
+                  <ProtectedRoute>
+                    <Messages />
                   </ProtectedRoute>
                 }
               />

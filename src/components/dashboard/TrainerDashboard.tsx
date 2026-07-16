@@ -356,7 +356,7 @@ export default function TrainerDashboard() {
           {MOCK_ATTENTION.unreadMessages > 0 && (
             <motion.div variants={fadeInUp}>
               <button
-                onClick={() => navigate("/coach?tab=messages")}
+                onClick={() => navigate("/messages")}
                 className="flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-all hover:-translate-y-0.5"
                 style={{
                   backgroundColor: "rgba(6,182,212,0.06)",
@@ -807,7 +807,7 @@ export default function TrainerDashboard() {
               label: "Broadcast",
               icon: Megaphone,
               color: "#F87171",
-              onClick: () => navigate("/coach?tab=messages"),
+              onClick: () => navigate("/messages"),
             },
           ].map((action) => (
             <motion.button
