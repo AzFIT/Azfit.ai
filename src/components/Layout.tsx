@@ -39,17 +39,8 @@ interface LayoutProps {
   onModeToggle?: (mode: "dashboard" | "sheets") => void;
 }
 
-// Primary navigation - always visible
-const primaryNavItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-  { icon: Users, label: "Clients", path: "/clients" },
-  { icon: Dumbbell, label: "Workouts", path: "/sheets" },
-  { icon: Apple, label: "Nutrition", path: "/nutrition" },
-  { icon: BarChart3, label: "Analytics", path: "/analytics" },
-];
-
-// Secondary navigation - in collapsible "More" section
-const secondaryNavItems = [
+// Base secondary navigation (without Coach - added conditionally)
+const baseSecondaryNavItems = [
   { icon: Sparkles, label: "AI Builder", path: "/ai-program-builder" },
   { icon: CalendarIcon, label: "Schedule", path: "/schedule" },
   { icon: Scale, label: "Bio Print", path: "/bioprint" },
@@ -59,16 +50,6 @@ const secondaryNavItems = [
   { icon: Brain, label: "Recovery", path: "/deload" },
   { icon: Download, label: "Export", path: "/export" },
   { icon: Trophy, label: "Leaderboard", path: "/leaderboard" },
-  { icon: UserCircle, label: "Coach", path: "/coach" },
-];
-
-// Mobile bottom tab - primary items only
-const tabItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-  { icon: Users, label: "Clients", path: "/clients" },
-  { icon: Dumbbell, label: "Workouts", path: "/sheets" },
-  { icon: Apple, label: "Nutrition", path: "/nutrition" },
-  { icon: Settings, label: "Settings", path: "/settings" },
 ];
 
 export default function Layout({
@@ -84,7 +65,38 @@ export default function Layout({
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { user } = useAuth();
+  const { user, isTrainer } = useAuth();
+
+  // Dynamic navigation based on user role
+  const primaryNavItems = [
+    { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+    { icon: Users, label: "Clients", path: "/clients" },
+    { icon: Dumbbell, label: "Workouts", path: "/sheets" },
+    { icon: Apple, label: "Nutrition", path: "/nutrition" },
+    { icon: BarChart3, label: "Analytics", path: "/analytics" },
+  ];
+
+  // Secondary nav: add Coach only for trainers/admins
+  const secondaryNavItems = isTrainer
+    ? [...baseSecondaryNavItems, { icon: UserCircle, label: "Coach", path: "/coach" }]
+    : baseSecondaryNavItems;
+
+  // Mobile tabs: clients see Schedule instead of Clients, no Coach
+  const tabItems = isTrainer
+    ? [
+        { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+        { icon: Users, label: "Clients", path: "/clients" },
+        { icon: Dumbbell, label: "Workouts", path: "/sheets" },
+        { icon: Apple, label: "Nutrition", path: "/nutrition" },
+        { icon: Settings, label: "Settings", path: "/settings" },
+      ]
+    : [
+        { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+        { icon: Dumbbell, label: "Workouts", path: "/sheets" },
+        { icon: Apple, label: "Nutrition", path: "/nutrition" },
+        { icon: CalendarIcon, label: "Schedule", path: "/schedule" },
+        { icon: Settings, label: "Settings", path: "/settings" },
+      ];
 
   const isActive = useCallback(
     (path: string) => {
