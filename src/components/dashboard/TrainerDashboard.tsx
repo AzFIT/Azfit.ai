@@ -10,34 +10,34 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Activity,
-  Target,
-  Flame,
   Zap,
   BarChart3,
   MoreHorizontal,
+  Bell,
+  UserPlus,
+  AlertTriangle,
+  ClipboardCheck,
+  Mail,
+  FileSpreadsheet,
+  Megaphone,
+  Wand2,
+  Dumbbell,
+  Scale,
 } from "lucide-react";
 import { useNavigate } from "react-router";
+import { useAuth } from "@/hooks/useAuth";
 import { GlassCard } from "./shared/GlassCard";
 import { ProgressRing } from "./shared/ProgressRing";
 import { CollapsibleSection } from "./shared/CollapsibleSection";
 import { ClientHealthGrid } from "./ClientHealthGrid";
 import { AIInsightsPanel } from "./AIInsightsPanel";
 import { RevenueSnapshot } from "./RevenueSnapshot";
+import QuickAddClientModal from "@/components/QuickAddClientModal";
 import type { ClientHealthItem, AIInsight, RevenueSnapshotData } from "./types";
 
 /* ═══════════════════════════════════════════════════════════════════
-   Trainer Dashboard — Phase A3 + Enhanced Sections
-   ═══════════════════════════════════════════════════════════════════
-   Core trainer overview with:
-   • Revenue Ring ($6,500 / 65% goal)
-   • Client Compliance bar (85% | 17/20)
-   • Weekly Summary metrics (Volume, RPE, Time)
-   • AI Insights Panel (NEW)
-   • Client Health Grid (NEW)
-   • Revenue Snapshot (NEW)
-   • Today's Sessions list
-   • Client Insights
-   • Glassmorphic dark-mode aesthetic with neon accents
+   Trainer Dashboard — Restructured (Phase 2)
+   Answers: "Who needs my attention right now?"
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── Animation Variants ──────────────────────────────────────────── */
@@ -75,110 +75,29 @@ interface SessionItem {
   status: "completed" | "in-progress" | "upcoming" | "cancelled";
 }
 
-interface ClientInsight {
-  id: string;
-  name: string;
-  avatar?: string;
-  compliance: number;
-  trend: "up" | "down" | "stable";
-  trendValue: number;
-  lastActive: string;
-  nextSession: string;
-}
-
 /* ── Mock Data ───────────────────────────────────────────────────── */
+// TODO: wire to Supabase
 const MOCK_SESSIONS: SessionItem[] = [
-  {
-    id: "s1",
-    clientName: "Sarah Chen",
-    time: "7:00 AM",
-    duration: "60 min",
-    type: "strength",
-    status: "completed",
-  },
-  {
-    id: "s2",
-    clientName: "Marcus Johnson",
-    time: "9:00 AM",
-    duration: "45 min",
-    type: "cardio",
-    status: "in-progress",
-  },
-  {
-    id: "s3",
-    clientName: "Alex Rivera",
-    time: "11:00 AM",
-    duration: "75 min",
-    type: "strength",
-    status: "upcoming",
-  },
-  {
-    id: "s4",
-    clientName: "Emma Wilson",
-    time: "2:00 PM",
-    duration: "30 min",
-    type: "assessment",
-    status: "upcoming",
-  },
-  {
-    id: "s5",
-    clientName: "David Kim",
-    time: "4:00 PM",
-    duration: "60 min",
-    type: "recovery",
-    status: "upcoming",
-  },
+  { id: "s1", clientName: "Sarah Chen", time: "7:00 AM", duration: "60 min", type: "strength", status: "completed" },
+  { id: "s2", clientName: "Marcus Johnson", time: "9:00 AM", duration: "45 min", type: "cardio", status: "in-progress" },
+  { id: "s3", clientName: "Alex Rivera", time: "11:00 AM", duration: "75 min", type: "strength", status: "upcoming" },
+  { id: "s4", clientName: "Emma Wilson", time: "2:00 PM", duration: "30 min", type: "assessment", status: "upcoming" },
+  { id: "s5", clientName: "David Kim", time: "4:00 PM", duration: "60 min", type: "recovery", status: "upcoming" },
 ];
 
-const MOCK_INSIGHTS: ClientInsight[] = [
-  {
-    id: "c1",
-    name: "Sarah Chen",
-    compliance: 94,
-    trend: "up",
-    trendValue: 3,
-    lastActive: "Today",
-    nextSession: "Tomorrow 7:00 AM",
-  },
-  {
-    id: "c2",
-    name: "Marcus Johnson",
-    compliance: 87,
-    trend: "stable",
-    trendValue: 0,
-    lastActive: "Today",
-    nextSession: "Today 9:00 AM",
-  },
-  {
-    id: "c3",
-    name: "Alex Rivera",
-    compliance: 72,
-    trend: "down",
-    trendValue: 5,
-    lastActive: "2 days ago",
-    nextSession: "Today 11:00 AM",
-  },
-  {
-    id: "c4",
-    name: "Emma Wilson",
-    compliance: 91,
-    trend: "up",
-    trendValue: 2,
-    lastActive: "Yesterday",
-    nextSession: "Today 2:00 PM",
-  },
-  {
-    id: "c5",
-    name: "David Kim",
-    compliance: 68,
-    trend: "down",
-    trendValue: 8,
-    lastActive: "3 days ago",
-    nextSession: "Today 4:00 PM",
-  },
-];
+// TODO: wire to Supabase — attention counts
+const MOCK_ATTENTION = {
+  missedWorkouts: 3,
+  checkinsPending: 5,
+  unreadMessages: 8,
+};
 
-/* ── Enhanced Mock Data for New Sections ───────────────────────── */
+// TODO: wire to Supabase — active clients count
+const MOCK_ACTIVE_CLIENTS = {
+  count: 24,
+  trend: "+2" as string,
+  trendPositive: true,
+};
 
 const MOCK_HEALTH_GRID: ClientHealthItem[] = [
   { id: "h1", name: "Sarah Chen", initials: "SC", status: "on_track" },
@@ -280,44 +199,36 @@ function SessionTypeBadge({ type }: { type: SessionItem["type"] }) {
   );
 }
 
-function TrendIndicator({ trend, value }: { trend: ClientInsight["trend"]; value: number }) {
-  if (trend === "stable") {
-    return (
-      <span className="flex items-center gap-1 text-[11px] font-medium" style={{ color: "#64748B" }}>
-        <span className="h-1 w-3 rounded-full bg-slate-500" />
-        Stable
-      </span>
-    );
-  }
-  const isUp = trend === "up";
-  const Icon = isUp ? ArrowUpRight : ArrowDownRight;
-  const color = isUp ? "#84CC16" : "#F87171";
-  return (
-    <span className="flex items-center gap-0.5 text-[11px] font-medium" style={{ color }}>
-      <Icon className="h-3 w-3" />
-      {value}%
-    </span>
-  );
+function greeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
 }
 
 /* ── Main Component ──────────────────────────────────────────────── */
 export default function TrainerDashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
+  const [showAddClientModal, setShowAddClientModal] = useState(false);
+
+  const firstName = user?.full_name?.split(" ")[0] || "Marcus";
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
     return () => clearTimeout(t);
   }, []);
 
-  const completedSessions = MOCK_SESSIONS.filter((s) => s.status === "completed").length;
-  const totalSessions = MOCK_SESSIONS.length;
-  const sessionProgress = Math.round((completedSessions / totalSessions) * 100);
+  const hasAttention =
+    MOCK_ATTENTION.missedWorkouts > 0 ||
+    MOCK_ATTENTION.checkinsPending > 0 ||
+    MOCK_ATTENTION.unreadMessages > 0;
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 pt-4 pb-20 lg:px-6 lg:pb-8">
       {/* ═══════════════════════════════════════════════════════════
-          HEADER
+          HEADER: Greeting + Notification Bell + Add Client
           ═══════════════════════════════════════════════════════════ */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -331,41 +242,253 @@ export default function TrainerDashboard() {
               className="text-2xl font-bold tracking-tight lg:text-3xl"
               style={{ color: "var(--page-text)" }}
             >
-              Trainer Overview
+              {greeting()}, Coach {firstName}
             </h1>
             <p className="mt-1 text-sm" style={{ color: "var(--light-text-muted)" }}>
-              Welcome back — here's what's happening today
+              Here&apos;s who needs your attention today
             </p>
           </div>
           <div className="mt-3 flex items-center gap-3 sm:mt-0">
-            <div
-              className="flex items-center gap-2 rounded-lg border px-3 py-2"
+            {/* Notification Bell */}
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate("/notifications")}
+              className="relative flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-all"
               style={{
                 backgroundColor: "var(--card-bg)",
                 borderColor: "var(--card-border)",
+                color: "var(--page-text)",
               }}
             >
-              <Calendar className="h-4 w-4" style={{ color: "var(--azfit-primary)" }} />
-              <span className="text-sm font-medium" style={{ color: "var(--page-text)" }}>
-                {new Date().toLocaleDateString("en-US", {
-                  weekday: "long",
-                  month: "short",
-                  day: "numeric",
-                })}
-              </span>
-            </div>
+              <Bell className="h-4 w-4" />
+              {MOCK_ATTENTION.unreadMessages > 0 && (
+                <span
+                  className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                  style={{ backgroundColor: "#F87171" }}
+                >
+                  {MOCK_ATTENTION.unreadMessages}
+                </span>
+              )}
+            </motion.button>
+            {/* Add Client — primary action */}
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowAddClientModal(true)}
+              className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
+              style={{ backgroundColor: "var(--azfit-primary)" }}
+            >
+              <UserPlus className="h-4 w-4" />
+              Add Client
+            </motion.button>
           </div>
         </div>
       </motion.div>
 
       {/* ═══════════════════════════════════════════════════════════
-          TOP ROW: Progress Rings (Revenue + Compliance + Sessions)
+          NEEDS ATTENTION STRIP (conditional)
+          ═══════════════════════════════════════════════════════════ */}
+      {hasAttention && (
+        <motion.section
+          variants={staggerContainer}
+          initial="hidden"
+          animate={mounted ? "visible" : "hidden"}
+          className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3"
+        >
+          {/* Missed Workouts */}
+          {MOCK_ATTENTION.missedWorkouts > 0 && (
+            <motion.div variants={fadeInUp}>
+              <button
+                onClick={() => navigate("/clients")}
+                className="flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-all hover:-translate-y-0.5"
+                style={{
+                  backgroundColor: "rgba(248,113,113,0.06)",
+                  borderColor: "rgba(248,113,113,0.25)",
+                }}
+              >
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+                  style={{ backgroundColor: "rgba(248,113,113,0.12)" }}
+                >
+                  <AlertTriangle className="h-5 w-5" style={{ color: "#F87171" }} />
+                </div>
+                <div>
+                  <p className="text-lg font-bold" style={{ color: "#F87171" }}>
+                    {MOCK_ATTENTION.missedWorkouts}
+                  </p>
+                  <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>
+                    clients missed workouts this week
+                  </p>
+                </div>
+              </button>
+            </motion.div>
+          )}
+
+          {/* Check-ins Pending */}
+          {MOCK_ATTENTION.checkinsPending > 0 && (
+            <motion.div variants={fadeInUp}>
+              <button
+                onClick={() => navigate("/coach")}
+                className="flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-all hover:-translate-y-0.5"
+                style={{
+                  backgroundColor: "rgba(245,158,11,0.06)",
+                  borderColor: "rgba(245,158,11,0.25)",
+                }}
+              >
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+                  style={{ backgroundColor: "rgba(245,158,11,0.12)" }}
+                >
+                  <ClipboardCheck className="h-5 w-5" style={{ color: "#F59E0B" }} />
+                </div>
+                <div>
+                  <p className="text-lg font-bold" style={{ color: "#F59E0B" }}>
+                    {MOCK_ATTENTION.checkinsPending}
+                  </p>
+                  <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>
+                    check-ins awaiting review
+                  </p>
+                </div>
+              </button>
+            </motion.div>
+          )}
+
+          {/* Unread Messages */}
+          {MOCK_ATTENTION.unreadMessages > 0 && (
+            <motion.div variants={fadeInUp}>
+              <button
+                onClick={() => navigate("/coach?tab=messages")}
+                className="flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-all hover:-translate-y-0.5"
+                style={{
+                  backgroundColor: "rgba(6,182,212,0.06)",
+                  borderColor: "rgba(6,182,212,0.25)",
+                }}
+              >
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+                  style={{ backgroundColor: "rgba(6,182,212,0.12)" }}
+                >
+                  <Mail className="h-5 w-5" style={{ color: "#06B6D4" }} />
+                </div>
+                <div>
+                  <p className="text-lg font-bold" style={{ color: "#06B6D4" }}>
+                    {MOCK_ATTENTION.unreadMessages}
+                  </p>
+                  <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>
+                    unread messages
+                  </p>
+                </div>
+              </button>
+            </motion.div>
+          )}
+        </motion.section>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════
+          TODAY'S SESSIONS
+          ═══════════════════════════════════════════════════════════ */}
+      <motion.div
+        variants={fadeInUp}
+        initial="hidden"
+        animate={mounted ? "visible" : "hidden"}
+        className="mb-6"
+      >
+        <CollapsibleSection
+          title="Today's Sessions"
+          icon={<Calendar className="h-4 w-4" />}
+          defaultExpanded
+          accentColor="#0D9488"
+          badge={
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+              style={{ backgroundColor: "#0D9488" }}
+            >
+              {MOCK_SESSIONS.length}
+            </span>
+          }
+          headerAction={
+            <button
+              onClick={() => navigate("/schedule")}
+              className="flex items-center gap-0.5 text-[11px] font-medium transition-opacity hover:opacity-70"
+              style={{ color: "var(--azfit-primary)" }}
+            >
+              Full Schedule
+              <ChevronRight className="h-3 w-3" />
+            </button>
+          }
+        >
+          <div className="space-y-3">
+            {MOCK_SESSIONS.map((session, i) => (
+              <motion.div
+                key={session.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.08, duration: 0.3 }}
+                className="group flex items-center gap-3 rounded-xl border p-3 transition-all hover:-translate-y-0.5"
+                style={{
+                  backgroundColor: "var(--card-bg)",
+                  borderColor: "var(--card-border)",
+                }}
+              >
+                {/* Status + Time */}
+                <div className="flex flex-col items-center gap-1">
+                  <StatusDot status={session.status} />
+                  <span
+                    className="text-[10px] font-mono font-medium"
+                    style={{ color: "var(--light-text-muted)" }}
+                  >
+                    {session.time}
+                  </span>
+                </div>
+
+                {/* Client Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p
+                      className="text-sm font-semibold truncate"
+                      style={{ color: "var(--page-text)" }}
+                    >
+                      {session.clientName}
+                    </p>
+                    <SessionTypeBadge type={session.type} />
+                  </div>
+                  <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>
+                    {session.duration} • {session.type.charAt(0).toUpperCase() + session.type.slice(1)}
+                  </p>
+                </div>
+
+                {/* Status label */}
+                <span
+                  className="text-[10px] font-semibold uppercase tracking-wide"
+                  style={{
+                    color:
+                      session.status === "completed"
+                        ? "#84CC16"
+                        : session.status === "in-progress"
+                          ? "#0D9488"
+                          : "#64748B",
+                  }}
+                >
+                  {session.status === "in-progress" ? "Now" : session.status}
+                </span>
+
+                <ChevronRight
+                  className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100"
+                  style={{ color: "var(--light-text-muted)" }}
+                />
+              </motion.div>
+            ))}
+          </div>
+        </CollapsibleSection>
+      </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          BUSINESS AT A GLANCE (Revenue + Compliance + Active Clients)
           ═══════════════════════════════════════════════════════════ */}
       <motion.section
         variants={staggerContainer}
         initial="hidden"
         animate={mounted ? "visible" : "hidden"}
-        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-6"
       >
         {/* Revenue Ring */}
         <motion.div variants={fadeInUp}>
@@ -373,7 +496,7 @@ export default function TrainerDashboard() {
             title="Revenue"
             titleIcon={<DollarSign className="h-4 w-4" />}
             headerAction={
-              <span className="text-[11px] font-medium" style={{ color: "var(--success)" }}>
+              <span className="text-[11px] font-medium" style={{ color: "#84CC16" }}>
                 +8% vs last month
               </span>
             }
@@ -381,6 +504,7 @@ export default function TrainerDashboard() {
             glow
             accentColor="#0D9488"
             hover
+            onClick={() => navigate("/coach")}
           >
             <div className="flex items-center justify-center py-4">
               <ProgressRing
@@ -423,7 +547,7 @@ export default function TrainerDashboard() {
             title="Client Compliance"
             titleIcon={<Users className="h-4 w-4" />}
             headerAction={
-              <span className="text-[11px] font-medium" style={{ color: "var(--success)" }}>
+              <span className="text-[11px] font-medium" style={{ color: "#84CC16" }}>
                 17/20 active
               </span>
             }
@@ -431,6 +555,7 @@ export default function TrainerDashboard() {
             glow
             accentColor="#06B6D4"
             hover
+            onClick={() => navigate("/analytics")}
           >
             <div className="flex items-center justify-center py-4">
               <ProgressRing
@@ -468,49 +593,52 @@ export default function TrainerDashboard() {
           </GlassCard>
         </motion.div>
 
-        {/* Today's Sessions Progress */}
+        {/* Active Clients (replaced Sessions ring) */}
         <motion.div variants={fadeInUp}>
           <GlassCard
-            title="Today's Sessions"
-            titleIcon={<Calendar className="h-4 w-4" />}
+            title="Active Clients"
+            titleIcon={<Users className="h-4 w-4" />}
             headerAction={
-              <span className="text-[11px] font-medium" style={{ color: "var(--light-text-muted)" }}>
-                {completedSessions}/{totalSessions} done
+              <span
+                className="flex items-center gap-0.5 text-[11px] font-medium"
+                style={{ color: MOCK_ACTIVE_CLIENTS.trendPositive ? "#84CC16" : "#F87171" }}
+              >
+                {MOCK_ACTIVE_CLIENTS.trendPositive ? (
+                  <ArrowUpRight className="h-3 w-3" />
+                ) : (
+                  <ArrowDownRight className="h-3 w-3" />
+                )}
+                {MOCK_ACTIVE_CLIENTS.trend}
               </span>
             }
             glass
-            glow
-            accentColor="#8B5CF6"
             hover
+            accentColor="#8B5CF6"
+            onClick={() => navigate("/clients")}
           >
-            <div className="flex items-center justify-center py-4">
-              <ProgressRing
-                size={160}
-                strokeWidth={12}
-                percentage={sessionProgress}
-                color="#8B5CF6"
-                gradientEndColor="#A78BFA"
-                label="completed"
-                value={`${sessionProgress}%`}
-                subtitle={`${completedSessions} of ${totalSessions}`}
-                glowClass="glow-purple"
-              />
+            <div className="flex flex-col items-center justify-center py-6">
+              <p className="text-5xl font-bold font-mono" style={{ color: "var(--page-text)" }}>
+                {MOCK_ACTIVE_CLIENTS.count}
+              </p>
+              <p className="mt-1 text-[11px]" style={{ color: "var(--light-text-muted)" }}>
+                clients this month
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-3 border-t pt-4" style={{ borderColor: "var(--card-border)" }}>
               <div className="text-center">
                 <p className="text-lg font-semibold font-mono" style={{ color: "var(--page-text)" }}>
-                  4h 30m
+                  6
                 </p>
                 <p className="text-[10px] uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>
-                  Remaining
+                  New this week
                 </p>
               </div>
               <div className="text-center">
                 <p className="text-lg font-semibold font-mono" style={{ color: "var(--page-text)" }}>
-                  5
+                  2
                 </p>
                 <p className="text-[10px] uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>
-                  Clients
+                  At risk of churn
                 </p>
               </div>
             </div>
@@ -525,17 +653,16 @@ export default function TrainerDashboard() {
         variants={staggerContainer}
         initial="hidden"
         animate={mounted ? "visible" : "hidden"}
-        className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4"
+        className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-6"
       >
-        {WEEKLY_METRICS.map((metric, i) => (
-          <motion.div key={metric.label} variants={fadeInUp} custom={i}>
+        {WEEKLY_METRICS.map((metric) => (
+          <motion.div key={metric.label} variants={fadeInUp}>
             <GlassCard
               glass
               hover
               padding="p-4"
               className="relative overflow-hidden"
             >
-              {/* Subtle accent glow in corner */}
               <div
                 className="absolute -right-4 -top-4 h-16 w-16 rounded-full opacity-20 blur-2xl"
                 style={{ backgroundColor: metric.positive ? "#0D9488" : "#F87171" }}
@@ -587,15 +714,30 @@ export default function TrainerDashboard() {
       </motion.section>
 
       {/* ═══════════════════════════════════════════════════════════
-          NEW SECTION: AI Insights + Revenue Snapshot (3-col grid)
+          CLIENT HEALTH GRID
+          ═══════════════════════════════════════════════════════════ */}
+      <motion.section
+        variants={fadeInUp}
+        initial="hidden"
+        animate={mounted ? "visible" : "hidden"}
+        className="mb-6"
+      >
+        <ClientHealthGrid
+          clients={MOCK_HEALTH_GRID}
+          onClientClick={(clientId) => navigate(`/client/${clientId}`)}
+          onSendMessage={(clientId) => navigate(`/client/${clientId}`)}
+        />
+      </motion.section>
+
+      {/* ═══════════════════════════════════════════════════════════
+          AI INSIGHTS + REVENUE SNAPSHOT
           ═══════════════════════════════════════════════════════════ */}
       <motion.section
         variants={staggerContainer}
         initial="hidden"
         animate={mounted ? "visible" : "hidden"}
-        className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3"
+        className="grid grid-cols-1 gap-4 lg:grid-cols-3 mb-6"
       >
-        {/* AI Insights Panel */}
         <motion.div variants={fadeInUp} className="lg:col-span-2">
           <AIInsightsPanel
             insights={MOCK_AI_INSIGHTS}
@@ -606,7 +748,6 @@ export default function TrainerDashboard() {
           />
         </motion.div>
 
-        {/* Revenue Snapshot */}
         <motion.div variants={fadeInUp}>
           <RevenueSnapshot
             data={MOCK_REVENUE}
@@ -616,282 +757,91 @@ export default function TrainerDashboard() {
       </motion.section>
 
       {/* ═══════════════════════════════════════════════════════════
-          NEW SECTION: Client Health Grid
-          ═══════════════════════════════════════════════════════════ */}
-      <motion.section
-        variants={fadeInUp}
-        initial="hidden"
-        animate={mounted ? "visible" : "hidden"}
-        className="mt-6"
-      >
-        <ClientHealthGrid
-          clients={MOCK_HEALTH_GRID}
-          onClientClick={(clientId) => navigate(`/client/${clientId}`)}
-          onSendMessage={(clientId) => navigate(`/client/${clientId}`)}
-        />
-      </motion.section>
-
-      {/* ═══════════════════════════════════════════════════════════
-          MIDDLE ROW: Sessions List + Client Insights
-          ═══════════════════════════════════════════════════════════ */}
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Today's Sessions */}
-        <motion.div
-          variants={fadeInUp}
-          initial="hidden"
-          animate={mounted ? "visible" : "hidden"}
-        >
-          <CollapsibleSection
-            title="Today's Sessions"
-            icon={<Calendar className="h-4 w-4" />}
-            defaultExpanded
-            accentColor="#0D9488"
-            badge={
-              <span
-                className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
-                style={{ backgroundColor: "#0D9488" }}
-              >
-                {MOCK_SESSIONS.length}
-              </span>
-            }
-            headerAction={
-              <button
-                onClick={() => navigate("/schedule")}
-                className="flex items-center gap-0.5 text-[11px] font-medium transition-opacity hover:opacity-70"
-                style={{ color: "var(--azfit-primary)" }}
-              >
-                View All
-                <ChevronRight className="h-3 w-3" />
-              </button>
-            }
-          >
-            <div className="space-y-3">
-              {MOCK_SESSIONS.map((session, i) => (
-                <motion.div
-                  key={session.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.08, duration: 0.3 }}
-                  className="group flex items-center gap-3 rounded-xl border p-3 transition-all hover:-translate-y-0.5"
-                  style={{
-                    backgroundColor: "var(--card-bg)",
-                    borderColor: "var(--card-border)",
-                  }}
-                >
-                  {/* Status + Time */}
-                  <div className="flex flex-col items-center gap-1">
-                    <StatusDot status={session.status} />
-                    <span
-                      className="text-[10px] font-mono font-medium"
-                      style={{ color: "var(--light-text-muted)" }}
-                    >
-                      {session.time}
-                    </span>
-                  </div>
-
-                  {/* Client Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p
-                        className="text-sm font-semibold truncate"
-                        style={{ color: "var(--page-text)" }}
-                      >
-                        {session.clientName}
-                      </p>
-                      <SessionTypeBadge type={session.type} />
-                    </div>
-                    <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>
-                      {session.duration} • {session.type.charAt(0).toUpperCase() + session.type.slice(1)}
-                    </p>
-                  </div>
-
-                  {/* Status label */}
-                  <span
-                    className="text-[10px] font-semibold uppercase tracking-wide"
-                    style={{
-                      color:
-                        session.status === "completed"
-                          ? "#84CC16"
-                          : session.status === "in-progress"
-                            ? "#0D9488"
-                            : "#64748B",
-                    }}
-                  >
-                    {session.status === "in-progress" ? "Now" : session.status}
-                  </span>
-
-                  {/* Arrow on hover */}
-                  <ChevronRight
-                    className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100"
-                    style={{ color: "var(--light-text-muted)" }}
-                  />
-                </motion.div>
-              ))}
-            </div>
-          </CollapsibleSection>
-        </motion.div>
-
-        {/* Client Insights */}
-        <motion.div
-          variants={fadeInUp}
-          initial="hidden"
-          animate={mounted ? "visible" : "hidden"}
-          transition={{ delay: 0.1 }}
-        >
-          <CollapsibleSection
-            title="Client Insights"
-            icon={<Target className="h-4 w-4" />}
-            defaultExpanded
-            accentColor="#8B5CF6"
-            headerAction={
-              <button
-                onClick={() => navigate("/clients")}
-                className="flex items-center gap-0.5 text-[11px] font-medium transition-opacity hover:opacity-70"
-                style={{ color: "var(--azfit-accent)" }}
-              >
-                All Clients
-                <ChevronRight className="h-3 w-3" />
-              </button>
-            }
-          >
-            <div className="space-y-3">
-              {MOCK_INSIGHTS.map((client, i) => (
-                <motion.div
-                  key={client.id}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.08, duration: 0.3 }}
-                  className="group flex items-center gap-3 rounded-xl border p-3 transition-all hover:-translate-y-0.5 cursor-pointer"
-                  style={{
-                    backgroundColor: "var(--card-bg)",
-                    borderColor: "var(--card-border)",
-                  }}
-                  onClick={() => navigate(`/client/${client.id}`)}
-                >
-                  {/* Avatar placeholder */}
-                  <div
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold"
-                    style={{
-                      backgroundColor: "rgba(13,148,136,0.15)",
-                      color: "#0D9488",
-                    }}
-                  >
-                    {client.name.split(" ").map((n) => n[0]).join("")}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className="text-sm font-semibold truncate"
-                      style={{ color: "var(--page-text)" }}
-                    >
-                      {client.name}
-                    </p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <TrendIndicator trend={client.trend} value={client.trendValue} />
-                      <span className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
-                        • {client.lastActive}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Compliance mini-ring */}
-                  <div className="flex flex-col items-center">
-                    <ProgressRing
-                      size={48}
-                      strokeWidth={4}
-                      percentage={client.compliance}
-                      color={client.compliance >= 80 ? "#84CC16" : client.compliance >= 60 ? "#F59E0B" : "#F87171"}
-                      label=""
-                      value={`${client.compliance}`}
-                      animate={false}
-                      className="scale-75"
-                    />
-                    <span
-                      className="text-[9px] font-medium uppercase tracking-wide"
-                      style={{ color: "var(--light-text-muted)" }}
-                    >
-                      Compliance
-                    </span>
-                  </div>
-
-                  <ChevronRight
-                    className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100"
-                    style={{ color: "var(--light-text-muted)" }}
-                  />
-                </motion.div>
-              ))}
-            </div>
-          </CollapsibleSection>
-        </motion.div>
-      </div>
-
-      {/* ═══════════════════════════════════════════════════════════
-          BOTTOM ROW: Quick Actions + Placeholder Cards
+          QUICK ACTIONS — 6 compact buttons
           ═══════════════════════════════════════════════════════════ */}
       <motion.section
         variants={staggerContainer}
         initial="hidden"
         animate={mounted ? "visible" : "hidden"}
-        className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4"
+        className="mb-6"
       >
-        {[
-          {
-            label: "Start Session",
-            icon: Flame,
-            color: "#0D9488",
-            path: "/sheets",
-          },
-          {
-            label: "New Program",
-            icon: Zap,
-            color: "#8B5CF6",
-            path: "/program-builder",
-          },
-          {
-            label: "Add Client",
-            icon: Users,
-            color: "#06B6D4",
-            path: "/clients",
-          },
-          {
-            label: "Analytics",
-            icon: BarChart3,
-            color: "#F59E0B",
-            path: "/analytics",
-          },
-        ].map((action, i) => (
-          <motion.div key={action.label} variants={scaleIn} custom={i}>
-            <GlassCard
-              glass
-              hover
-              glow
-              padding="p-4"
-              className="cursor-pointer text-center"
-              onClick={() => navigate(action.path)}
+        <h3
+          className="mb-3 text-sm font-semibold uppercase tracking-wide"
+          style={{ color: "var(--light-text-muted)" }}
+        >
+          Quick Actions
+        </h3>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {[
+            {
+              label: "Add Client",
+              icon: UserPlus,
+              color: "#0D9488",
+              onClick: () => setShowAddClientModal(true),
+            },
+            {
+              label: "Build Program",
+              icon: Dumbbell,
+              color: "#8B5CF6",
+              onClick: () => navigate("/program-builder"),
+            },
+            {
+              label: "AI Builder",
+              icon: Wand2,
+              color: "#06B6D4",
+              onClick: () => navigate("/ai-program-builder"),
+            },
+            {
+              label: "Log Assessment",
+              icon: Scale,
+              color: "#F59E0B",
+              onClick: () => navigate("/bioprint"),
+            },
+            {
+              label: "Export",
+              icon: FileSpreadsheet,
+              color: "#84CC16",
+              onClick: () => navigate("/export"),
+            },
+            {
+              label: "Broadcast",
+              icon: Megaphone,
+              color: "#F87171",
+              onClick: () => navigate("/coach?tab=messages"),
+            },
+          ].map((action) => (
+            <motion.button
+              key={action.label}
+              variants={scaleIn}
+              whileTap={{ scale: 0.95 }}
+              onClick={action.onClick}
+              className="flex flex-col items-center gap-2 rounded-xl border p-4 transition-all hover:-translate-y-0.5"
+              style={{
+                backgroundColor: "var(--card-bg)",
+                borderColor: "var(--card-border)",
+              }}
             >
               <div
-                className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl"
+                className="flex h-10 w-10 items-center justify-center rounded-lg"
                 style={{ backgroundColor: `${action.color}15` }}
               >
-                <action.icon className="h-6 w-6" style={{ color: action.color }} />
+                <action.icon className="h-5 w-5" style={{ color: action.color }} />
               </div>
-              <p className="text-sm font-semibold" style={{ color: "var(--page-text)" }}>
+              <span className="text-[11px] font-medium" style={{ color: "var(--page-text)" }}>
                 {action.label}
-              </p>
-            </GlassCard>
-          </motion.div>
-        ))}
+              </span>
+            </motion.button>
+          ))}
+        </div>
       </motion.section>
 
       {/* ═══════════════════════════════════════════════════════════
-          PLACEHOLDER: Schedule Timeline (for future expansion)
+          WEEKLY SCHEDULE OVERVIEW
           ═══════════════════════════════════════════════════════════ */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={mounted ? { opacity: 1, y: 0 } : {}}
         transition={{ delay: 0.4, duration: 0.5 }}
-        className="mt-6"
       >
         <GlassCard
           title="Weekly Schedule Overview"
@@ -917,6 +867,14 @@ export default function TrainerDashboard() {
           </div>
         </GlassCard>
       </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          QUICK ADD CLIENT MODAL
+          ═══════════════════════════════════════════════════════════ */}
+      <QuickAddClientModal
+        open={showAddClientModal}
+        onClose={() => setShowAddClientModal(false)}
+      />
     </div>
   );
 }
