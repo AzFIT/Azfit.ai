@@ -5,6 +5,8 @@ import {
   ChevronLeft, ChevronRight, Calendar as CalendarIcon,
   Users, Timer, Dumbbell,
 } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useSessions } from '@/hooks/useSessions';
 import type { CalendarEvent } from '@/types';
 import { CellContextMenu } from '@/components/schedule/CellContextMenu';
 import { BookSessionDialog } from '@/components/schedule/BookSessionDialog';
@@ -48,41 +50,47 @@ function timeToMinutes(time: string): number {
   return h * 60 + m;
 }
 
-function getEventColor(type: CalendarEvent['type']): string {
+function getEventColor(type: string): string {
   switch (type) {
-    case 'session': return 'bg-[#00AEEF]';
+    case '1-on-1': return 'bg-[#00AEEF]';
     case 'assessment': return 'bg-violet-500';
     case 'blocked': return 'bg-slate-600 border-dashed border-slate-500';
     case 'check-in': return 'bg-emerald-500';
-    case 'reminder': return 'bg-amber-500';
+    case 'group': return 'bg-amber-500';
     default: return 'bg-slate-500';
   }
 }
 
+/* ── Convert Session → CalendarEvent for grid display ─── */
 
+function sessionToEvent(session: ReturnType<typeof useSessions>['sessions'][number]): CalendarEvent {
+  const start = new Date(session.startsAt);
+  const end = new Date(session.endsAt);
+  const dateKey = formatDateKey(start);
+  const startTime = start.toTimeString().slice(0, 5);
+  const endTime = end.toTimeString().slice(0, 5);
 
-/* ── Storage ───────────────────────────────────────────── */
-
-const STORAGE_KEY = 'azfit_schedule_events';
-
-function loadEvents(): CalendarEvent[] {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-  } catch {
-    return [];
-  }
-}
-
-function saveEvents(events: CalendarEvent[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+  return {
+    id: session.id,
+    title: session.title,
+    date: dateKey,
+    startTime,
+    endTime,
+    type: session.type === 'blocked' ? 'blocked' : session.status === 'requested' ? 'reminder' : 'session',
+    clientId: session.clientId,
+    clientName: session.clientName,
+    description: session.notes || undefined,
+  };
 }
 
 /* ── Main Component ────────────────────────────────────── */
 
 export default function SchedulePage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { loading, saving, isTrainer, createSession, updateSession, cancelSession, weekSessions } = useSessions();
+
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [events, setEvents] = useState<CalendarEvent[]>(loadEvents);
   const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
   const [selectedDay, setSelectedDay] = useState(0); // 0-6 for day view
 
@@ -116,10 +124,11 @@ export default function SchedulePage() {
     }
   }, []);
 
-  // Save events when changed
-  useEffect(() => {
-    saveEvents(events);
-  }, [events]);
+  // Convert sessions to events for the grid
+  const events = useMemo(() => {
+    const weekEvts = weekSessions(weekStart);
+    return weekEvts.map(sessionToEvent);
+  }, [weekSessions, weekStart]);
 
   const weekEvents = useMemo(() => {
     const weekDates = weekDays.map(formatDateKey);
@@ -161,7 +170,6 @@ export default function SchedulePage() {
   }, []);
 
   const handleCellClick = useCallback((date: string, time: string) => {
-    // Check if there's an event at this time
     const dateEvents = events.filter((ev) => ev.date === date);
     const timeMin = timeToMinutes(time);
     const clickedEvent = dateEvents.find((ev) => {
@@ -175,44 +183,90 @@ export default function SchedulePage() {
     }
   }, [events]);
 
-  const handleBook = (event: CalendarEvent) => {
-    setEvents((prev) => [...prev, event]);
-    setBookOpen(false);
+  const handleBook = async (event: CalendarEvent) => {
+    const startDate = new Date(`${event.date}T${event.startTime}`);
+    const endDate = new Date(`${event.date}T${event.endTime}`);
+
+    const success = await createSession({
+      trainerId: user?.id || '',
+      clientId: event.clientId || '',
+      title: event.title,
+      type: event.type === 'blocked' ? 'blocked' : '1-on-1',
+      status: isTrainer ? 'scheduled' : 'requested',
+      startsAt: startDate.toISOString(),
+      endsAt: endDate.toISOString(),
+      location: null,
+      notes: event.description || null,
+    });
+
+    if (success) {
+      setBookOpen(false);
+    }
   };
 
-  const handleBlock = (event: CalendarEvent) => {
-    setEvents((prev) => [...prev, event]);
-    setBlockOpen(false);
+  const handleBlock = async (event: CalendarEvent) => {
+    const startDate = new Date(`${event.date}T${event.startTime}`);
+    const endDate = new Date(`${event.date}T${event.endTime}`);
+
+    const success = await createSession({
+      trainerId: user?.id || '',
+      clientId: user?.id || '', // self-block
+      title: event.title,
+      type: 'blocked',
+      status: 'scheduled',
+      startsAt: startDate.toISOString(),
+      endsAt: endDate.toISOString(),
+      location: null,
+      notes: event.description || null,
+    });
+
+    if (success) {
+      setBlockOpen(false);
+    }
   };
 
-  const handleSaveEdit = (id: string, updates: Partial<CalendarEvent>) => {
-    setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, ...updates } : e)));
+  const handleSaveEdit = async (id: string, updates: Partial<CalendarEvent>) => {
+    const sessionUpdates: Parameters<typeof updateSession>[1] = {};
+    if (updates.title !== undefined) sessionUpdates.title = updates.title;
+    if (updates.type !== undefined) sessionUpdates.type = updates.type;
+    if (updates.date && updates.startTime) {
+      sessionUpdates.startsAt = new Date(`${updates.date}T${updates.startTime}`).toISOString();
+    }
+    if (updates.date && updates.endTime) {
+      sessionUpdates.endsAt = new Date(`${updates.date}T${updates.endTime}`).toISOString();
+    }
+    if (updates.description !== undefined) sessionUpdates.notes = updates.description;
+
+    await updateSession(id, sessionUpdates);
     setEditOpen(false);
   };
 
-  const handleCancelSession = (id: string) => {
-    setEvents((prev) => prev.filter((e) => e.id !== id));
+  const handleCancelSession = async (id: string) => {
+    await cancelSession(id);
     setEditOpen(false);
     setCancelOpen(false);
   };
 
   const handleRepeatWeekly = () => {
     const { date, time } = contextMenu;
-    // Create a blocked recurring slot for the same time every week
     for (let i = 1; i <= 4; i++) {
       const nextDate = addDays(new Date(date), i * 7);
-      const event: CalendarEvent = {
-        id: `evt-repeat-${Date.now()}-${i}`,
+      createSession({
+        trainerId: user?.id || '',
+        clientId: user?.id || '',
         title: 'Recurring Block',
-        date: formatDateKey(nextDate),
-        startTime: time,
-        endTime: `${parseInt(time.split(':')[0]) + 1}:${time.split(':')[1]}`,
         type: 'blocked',
-        description: 'Auto-blocked by repeat weekly',
-      };
-      setEvents((prev) => [...prev, event]);
+        status: 'scheduled',
+        startsAt: new Date(`${formatDateKey(nextDate)}T${time}`).toISOString(),
+        endsAt: new Date(`${formatDateKey(nextDate)}T${parseInt(time.split(':')[0]) + 1}:${time.split(':')[1]}`).toISOString(),
+        location: null,
+        notes: 'Auto-blocked by repeat weekly',
+      });
     }
   };
+
+  /* ── Loading overlay ─────────────────────────────────── */
+  const isLoading = loading || saving;
 
   /* ── Render ──────────────────────────────────────────── */
 
@@ -314,7 +368,13 @@ export default function SchedulePage() {
       </header>
 
       {/* Time Grid */}
-      <div className="max-w-7xl mx-auto px-4 py-4">
+      <div className="max-w-7xl mx-auto px-4 py-4 relative">
+        {isLoading && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/50">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#00AEEF] border-t-transparent" />
+          </div>
+        )}
+
         {/* Day Headers (week view) */}
         {viewMode === 'week' && (
           <div className="grid grid-cols-[60px_repeat(7,1fr)] gap-1 mb-2">

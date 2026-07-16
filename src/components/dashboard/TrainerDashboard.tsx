@@ -32,6 +32,7 @@ import { CollapsibleSection } from "./shared/CollapsibleSection";
 import { ClientHealthGrid } from "./ClientHealthGrid";
 import { AIInsightsPanel } from "./AIInsightsPanel";
 import { RevenueSnapshot } from "./RevenueSnapshot";
+import { useSessions } from "@/hooks/useSessions";
 import QuickAddClientModal from "@/components/QuickAddClientModal";
 import type { ClientHealthItem, AIInsight, RevenueSnapshotData } from "./types";
 
@@ -65,25 +66,11 @@ const scaleIn = {
 };
 
 /* ── Types ───────────────────────────────────────────────────────── */
-interface SessionItem {
-  id: string;
-  clientName: string;
-  clientAvatar?: string;
-  time: string;
-  duration: string;
-  type: "strength" | "cardio" | "recovery" | "assessment";
-  status: "completed" | "in-progress" | "upcoming" | "cancelled";
-}
+// SessionItem type replaced by useSessions Session type
 
 /* ── Mock Data ───────────────────────────────────────────────────── */
 // TODO: wire to Supabase
-const MOCK_SESSIONS: SessionItem[] = [
-  { id: "s1", clientName: "Sarah Chen", time: "7:00 AM", duration: "60 min", type: "strength", status: "completed" },
-  { id: "s2", clientName: "Marcus Johnson", time: "9:00 AM", duration: "45 min", type: "cardio", status: "in-progress" },
-  { id: "s3", clientName: "Alex Rivera", time: "11:00 AM", duration: "75 min", type: "strength", status: "upcoming" },
-  { id: "s4", clientName: "Emma Wilson", time: "2:00 PM", duration: "30 min", type: "assessment", status: "upcoming" },
-  { id: "s5", clientName: "David Kim", time: "4:00 PM", duration: "60 min", type: "recovery", status: "upcoming" },
-];
+// Session data replaced by useSessions hook
 
 // TODO: wire to Supabase — attention counts
 const MOCK_ATTENTION = {
@@ -163,41 +150,7 @@ const WEEKLY_METRICS = [
 
 /* ── Helper Components ─────────────────────────────────────────── */
 
-function StatusDot({ status }: { status: SessionItem["status"] }) {
-  const colors = {
-    completed: "#84CC16",
-    "in-progress": "#0D9488",
-    upcoming: "#64748B",
-    cancelled: "#F87171",
-  };
-  return (
-    <span
-      className="inline-block h-2.5 w-2.5 rounded-full"
-      style={{
-        backgroundColor: colors[status],
-        boxShadow: status === "in-progress" ? `0 0 8px ${colors[status]}` : "none",
-      }}
-    />
-  );
-}
-
-function SessionTypeBadge({ type }: { type: SessionItem["type"] }) {
-  const config = {
-    strength: { color: "#0D9488", bg: "rgba(13,148,136,0.15)", label: "Strength" },
-    cardio: { color: "#06B6D4", bg: "rgba(6,182,212,0.15)", label: "Cardio" },
-    recovery: { color: "#8B5CF6", bg: "rgba(139,92,246,0.15)", label: "Recovery" },
-    assessment: { color: "#F59E0B", bg: "rgba(245,158,11,0.15)", label: "Assessment" },
-  };
-  const c = config[type];
-  return (
-    <span
-      className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-      style={{ backgroundColor: c.bg, color: c.color }}
-    >
-      {c.label}
-    </span>
-  );
-}
+// SessionTypeBadge removed — session type is displayed inline now
 
 function greeting(): string {
   const hour = new Date().getHours();
@@ -210,6 +163,7 @@ function greeting(): string {
 export default function TrainerDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { todaySessions, loading: sessionsLoading } = useSessions();
   const [mounted, setMounted] = useState(false);
   const [showAddClientModal, setShowAddClientModal] = useState(false);
 
@@ -224,6 +178,9 @@ export default function TrainerDashboard() {
     MOCK_ATTENTION.missedWorkouts > 0 ||
     MOCK_ATTENTION.checkinsPending > 0 ||
     MOCK_ATTENTION.unreadMessages > 0;
+
+  // Real today's sessions from useSessions
+  const todaysSessionList = todaySessions();
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 pt-4 pb-20 lg:px-6 lg:pb-8">
@@ -402,7 +359,7 @@ export default function TrainerDashboard() {
               className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
               style={{ backgroundColor: "#0D9488" }}
             >
-              {MOCK_SESSIONS.length}
+              {todaysSessionList.length}
             </span>
           }
           headerAction={
@@ -417,66 +374,125 @@ export default function TrainerDashboard() {
           }
         >
           <div className="space-y-3">
-            {MOCK_SESSIONS.map((session, i) => (
-              <motion.div
-                key={session.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.08, duration: 0.3 }}
-                className="group flex items-center gap-3 rounded-xl border p-3 transition-all hover:-translate-y-0.5"
-                style={{
-                  backgroundColor: "var(--card-bg)",
-                  borderColor: "var(--card-border)",
-                }}
-              >
-                {/* Status + Time */}
-                <div className="flex flex-col items-center gap-1">
-                  <StatusDot status={session.status} />
-                  <span
-                    className="text-[10px] font-mono font-medium"
-                    style={{ color: "var(--light-text-muted)" }}
+            {sessionsLoading && todaysSessionList.length === 0 ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 rounded-xl border p-3 animate-pulse"
+                    style={{
+                      backgroundColor: "var(--card-bg)",
+                      borderColor: "var(--card-border)",
+                    }}
                   >
-                    {session.time}
-                  </span>
-                </div>
-
-                {/* Client Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p
-                      className="text-sm font-semibold truncate"
-                      style={{ color: "var(--page-text)" }}
-                    >
-                      {session.clientName}
-                    </p>
-                    <SessionTypeBadge type={session.type} />
+                    <div className="h-2.5 w-2.5 rounded-full bg-slate-700" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 w-32 rounded bg-slate-700" />
+                      <div className="h-3 w-24 rounded bg-slate-700" />
+                    </div>
                   </div>
-                  <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>
-                    {session.duration} • {session.type.charAt(0).toUpperCase() + session.type.slice(1)}
-                  </p>
-                </div>
-
-                {/* Status label */}
-                <span
-                  className="text-[10px] font-semibold uppercase tracking-wide"
-                  style={{
-                    color:
-                      session.status === "completed"
-                        ? "#84CC16"
-                        : session.status === "in-progress"
-                          ? "#0D9488"
-                          : "#64748B",
-                  }}
+                ))}
+              </div>
+            ) : todaysSessionList.length === 0 ? (
+              <div className="py-6 text-center">
+                <p className="text-sm" style={{ color: "var(--light-text-muted)" }}>
+                  No sessions scheduled today
+                </p>
+                <button
+                  onClick={() => navigate("/schedule")}
+                  className="mt-2 text-[11px] font-medium"
+                  style={{ color: "var(--azfit-primary)" }}
                 >
-                  {session.status === "in-progress" ? "Now" : session.status}
-                </span>
+                  Go to Schedule →
+                </button>
+              </div>
+            ) : (
+              todaysSessionList.map((session, i) => {
+                const start = new Date(session.startsAt);
+                const end = new Date(session.endsAt);
+                const timeStr = start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+                const durationMin = (end.getTime() - start.getTime()) / 60000;
+                const durationStr = durationMin >= 60
+                  ? `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`
+                  : `${durationMin}m`;
+                const statusColor =
+                  session.status === "completed"
+                    ? "#84CC16"
+                    : session.status === "scheduled"
+                      ? "#0D9488"
+                      : session.status === "cancelled"
+                        ? "#F87171"
+                        : "#64748B";
 
-                <ChevronRight
-                  className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100"
-                  style={{ color: "var(--light-text-muted)" }}
-                />
-              </motion.div>
-            ))}
+                return (
+                  <motion.div
+                    key={session.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.08, duration: 0.3 }}
+                    className="group flex items-center gap-3 rounded-xl border p-3 transition-all hover:-translate-y-0.5"
+                    style={{
+                      backgroundColor: "var(--card-bg)",
+                      borderColor: "var(--card-border)",
+                    }}
+                  >
+                    {/* Status + Time */}
+                    <div className="flex flex-col items-center gap-1">
+                      <span
+                        className="inline-block h-2.5 w-2.5 rounded-full"
+                        style={{
+                          backgroundColor: statusColor,
+                          boxShadow: session.status === "scheduled" ? `0 0 8px ${statusColor}` : "none",
+                        }}
+                      />
+                      <span
+                        className="text-[10px] font-mono font-medium"
+                        style={{ color: "var(--light-text-muted)" }}
+                      >
+                        {timeStr}
+                      </span>
+                    </div>
+
+                    {/* Client Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p
+                          className="text-sm font-semibold truncate"
+                          style={{ color: "var(--page-text)" }}
+                        >
+                          {session.clientName || "Unknown"}
+                        </p>
+                        <span
+                          className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                          style={{
+                            backgroundColor: "rgba(13,148,136,0.15)",
+                            color: "#0D9488",
+                          }}
+                        >
+                          {session.type}
+                        </span>
+                      </div>
+                      <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>
+                        {durationStr} • {session.title}
+                      </p>
+                    </div>
+
+                    {/* Status label */}
+                    <span
+                      className="text-[10px] font-semibold uppercase tracking-wide"
+                      style={{ color: statusColor }}
+                    >
+                      {session.status}
+                    </span>
+
+                    <ChevronRight
+                      className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100"
+                      style={{ color: "var(--light-text-muted)" }}
+                    />
+                  </motion.div>
+                );
+              })
+            )}
           </div>
         </CollapsibleSection>
       </motion.div>

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
+import { useSessions } from "@/hooks/useSessions";
 import { GlassCard } from "./shared/GlassCard";
 import { ProgressRing } from "./shared/ProgressRing";
 import { CollapsibleSection } from "./shared/CollapsibleSection";
@@ -129,9 +130,13 @@ function greeting(): string {
 export default function ClientDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { nextUpcomingSession, loading: sessionsLoading } = useSessions();
   const [mounted, setMounted] = useState(false);
 
   const firstName = user?.full_name?.split(" ")[0] || "Alex";
+
+  // Real next session
+  const nextSession = nextUpcomingSession();
 
   // Steps
   const [stepsTarget] = useState(10000);
@@ -302,24 +307,59 @@ export default function ClientDashboard() {
             </div>
 
             {/* Next Session */}
-            <button
-              onClick={() => navigate("/schedule")}
-              className="flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all hover:-translate-y-0.5"
-              style={{
-                backgroundColor: "rgba(13,148,136,0.06)",
-                borderColor: "rgba(13,148,136,0.2)",
-              }}
-            >
-              <CalendarDays className="h-4 w-4 shrink-0" style={{ color: "var(--azfit-primary)" }} />
-              <div>
-                <p className="text-[11px] font-medium" style={{ color: "var(--light-text-muted)" }}>
-                  Next session
-                </p>
-                <p className="text-sm font-semibold" style={{ color: "var(--azfit-primary)" }}>
-                  {MOCK_COACH.nextSession.day} {MOCK_COACH.nextSession.time} — {MOCK_COACH.nextSession.workout}
-                </p>
+            {sessionsLoading ? (
+              <div className="flex items-center gap-2 rounded-lg border px-3 py-2 animate-pulse"
+                style={{
+                  backgroundColor: "rgba(13,148,136,0.06)",
+                  borderColor: "rgba(13,148,136,0.2)",
+                }}
+              >
+                <div className="h-4 w-4 rounded-full bg-slate-700" />
+                <div className="space-y-1">
+                  <div className="h-3 w-16 rounded bg-slate-700" />
+                  <div className="h-4 w-40 rounded bg-slate-700" />
+                </div>
               </div>
-            </button>
+            ) : nextSession ? (
+              <button
+                onClick={() => navigate("/schedule")}
+                className="flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all hover:-translate-y-0.5"
+                style={{
+                  backgroundColor: "rgba(13,148,136,0.06)",
+                  borderColor: "rgba(13,148,136,0.2)",
+                }}
+              >
+                <CalendarDays className="h-4 w-4 shrink-0" style={{ color: "var(--azfit-primary)" }} />
+                <div>
+                  <p className="text-[11px] font-medium" style={{ color: "var(--light-text-muted)" }}>
+                    Next session
+                  </p>
+                  <p className="text-sm font-semibold" style={{ color: "var(--azfit-primary)" }}>
+                    {new Date(nextSession.startsAt).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })} {" "}
+                    {new Date(nextSession.startsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} — {nextSession.title}
+                  </p>
+                </div>
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate("/schedule")}
+                className="flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all hover:-translate-y-0.5"
+                style={{
+                  backgroundColor: "rgba(13,148,136,0.06)",
+                  borderColor: "rgba(13,148,136,0.2)",
+                }}
+              >
+                <CalendarDays className="h-4 w-4 shrink-0" style={{ color: "var(--azfit-primary)" }} />
+                <div>
+                  <p className="text-[11px] font-medium" style={{ color: "var(--light-text-muted)" }}>
+                    Next session
+                  </p>
+                  <p className="text-sm font-semibold" style={{ color: "var(--azfit-primary)" }}>
+                    No upcoming session — book one
+                  </p>
+                </div>
+              </button>
+            )}
 
             {/* Actions */}
             <div className="flex gap-2">

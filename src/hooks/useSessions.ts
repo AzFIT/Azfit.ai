@@ -1,0 +1,275 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
+
+/* ═══════════════════════════════════════════════════════════════════
+   useSessions — Real-time session scheduling hook
+   ═══════════════════════════════════════════════════════════════════ */
+
+export interface Session {
+  id: string;
+  trainerId: string;
+  clientId: string;
+  title: string;
+  type: string;
+  status: "requested" | "scheduled" | "completed" | "cancelled";
+  startsAt: string;
+  endsAt: string;
+  location: string | null;
+  notes: string | null;
+  createdAt: string;
+  // Joined fields
+  clientName?: string;
+  clientAvatar?: string | null;
+  trainerName?: string;
+}
+
+function toSession(raw: Record<string, unknown>): Session {
+  return {
+    id: raw.id as string,
+    trainerId: raw.trainer_id as string,
+    clientId: raw.client_id as string,
+    title: raw.title as string,
+    type: raw.type as string,
+    status: raw.status as Session["status"],
+    startsAt: raw.starts_at as string,
+    endsAt: raw.ends_at as string,
+    location: raw.location as string | null,
+    notes: raw.notes as string | null,
+    createdAt: raw.created_at as string,
+    clientName: (raw as Record<string, unknown>).client_name as string | undefined,
+    clientAvatar: (raw as Record<string, unknown>).client_avatar as string | null | undefined,
+    trainerName: (raw as Record<string, unknown>).trainer_name as string | undefined,
+  };
+}
+
+function getDateKey(d: Date): string {
+  return d.toISOString().split("T")[0];
+}
+
+export function useSessions() {
+  const { user } = useAuth();
+  const myId = user?.id;
+  const isTrainer = user?.role === "admin" || user?.role === "trainer";
+
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  /* ── Fetch sessions ────────────────────────────────────────────── */
+  const fetchSessions = useCallback(async () => {
+    if (!myId) return;
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("sessions")
+        .select(`
+          *,
+          client:profiles!sessions_client_id_fkey(full_name, avatar_url),
+          trainer:profiles!sessions_trainer_id_fkey(full_name)
+        `)
+        .or(isTrainer ? `trainer_id.eq.${myId}` : `client_id.eq.${myId}`)
+        .order("starts_at", { ascending: true });
+
+      if (error) throw error;
+
+      const mapped: Session[] = (data || []).map((raw: Record<string, unknown>) => {
+        const s = toSession(raw);
+        const clientData = raw.client as Record<string, unknown> | undefined;
+        const trainerData = raw.trainer as Record<string, unknown> | undefined;
+        return {
+          ...s,
+          clientName: clientData?.full_name as string | undefined,
+          clientAvatar: clientData?.avatar_url as string | null | undefined,
+          trainerName: trainerData?.full_name as string | undefined,
+        };
+      });
+
+      setSessions(mapped);
+    } catch (err) {
+      console.error("Failed to fetch sessions:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [myId, isTrainer]);
+
+  /* ── Create session ────────────────────────────────────────────── */
+  const createSession = useCallback(
+    async (session: Omit<Session, "id" | "createdAt">) => {
+      if (!myId) return false;
+      setSaving(true);
+
+      try {
+        const payload = {
+          trainer_id: isTrainer ? myId : session.trainerId,
+          client_id: isTrainer ? session.clientId : myId,
+          title: session.title,
+          type: session.type,
+          status: isTrainer ? "scheduled" : "requested",
+          starts_at: session.startsAt,
+          ends_at: session.endsAt,
+          location: session.location,
+          notes: session.notes,
+        };
+
+        const { error } = await supabase.from("sessions").insert(payload);
+        if (error) throw error;
+
+        if (!isTrainer) {
+          toast.success("Request sent to your coach");
+        } else {
+          toast.success("Session scheduled");
+        }
+
+        await fetchSessions();
+        return true;
+      } catch (err) {
+        console.error("Failed to create session:", err);
+        toast.error("Failed to schedule session");
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [myId, isTrainer, fetchSessions]
+  );
+
+  /* ── Update session ────────────────────────────────────────────── */
+  const updateSession = useCallback(
+    async (id: string, updates: Partial<Session>) => {
+      if (!myId) return false;
+      setSaving(true);
+
+      try {
+        const payload: { [key: string]: string | null } = {};
+        if (updates.title !== undefined) payload.title = updates.title;
+        if (updates.type !== undefined) payload.type = updates.type;
+        if (updates.status !== undefined) payload.status = updates.status;
+        if (updates.startsAt !== undefined) payload.starts_at = updates.startsAt;
+        if (updates.endsAt !== undefined) payload.ends_at = updates.endsAt;
+        if (updates.location !== undefined) payload.location = updates.location;
+        if (updates.notes !== undefined) payload.notes = updates.notes;
+
+        // Cast to any to bypass strict generated-type checking
+        const { error } = await (supabase.from("sessions").update(payload as never) as unknown as { eq: (field: string, value: string) => Promise<{ error: { message: string } | null }> }).eq("id", id);
+        if (error) throw error;
+
+        toast.success("Session updated");
+        await fetchSessions();
+        return true;
+      } catch (err) {
+        console.error("Failed to update session:", err);
+        toast.error("Failed to update session");
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [myId, fetchSessions]
+  );
+
+  /* ── Cancel session ───────────────────────────────────────────── */
+  const cancelSession = useCallback(
+    async (id: string) => {
+      if (!myId) return false;
+      setSaving(true);
+
+      try {
+        const { error } = await supabase
+          .from("sessions")
+          .update({ status: "cancelled" })
+          .eq("id", id);
+        if (error) throw error;
+
+        toast.success("Session cancelled");
+        await fetchSessions();
+        return true;
+      } catch (err) {
+        console.error("Failed to cancel session:", err);
+        toast.error("Failed to cancel session");
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [myId, fetchSessions]
+  );
+
+  /* ── Realtime subscription ─────────────────────────────────────── */
+  useEffect(() => {
+    if (!myId) return;
+
+    fetchSessions();
+
+    const channel = supabase
+      .channel(`sessions:${myId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "sessions",
+        },
+        () => {
+          fetchSessions();
+        }
+      )
+      .subscribe();
+
+    channelRef.current = channel;
+
+    return () => {
+      channel.unsubscribe();
+      channelRef.current = null;
+    };
+  }, [myId, fetchSessions]);
+
+  /* ── Derived: today's sessions ─────────────────────────────────── */
+  const todaySessions = useCallback(() => {
+    const todayKey = getDateKey(new Date());
+    return sessions
+      .filter((s) => {
+        const sKey = getDateKey(new Date(s.startsAt));
+        return sKey === todayKey && s.status !== "cancelled";
+      })
+      .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+  }, [sessions]);
+
+  /* ── Derived: next upcoming session for client ─────────────────── */
+  const nextUpcomingSession = useCallback(() => {
+    const now = new Date().toISOString();
+    return sessions
+      .filter((s) => s.startsAt > now && s.status === "scheduled")
+      .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())[0] || null;
+  }, [sessions]);
+
+  /* ── Derived: week sessions for a given week start ───────────── */
+  const weekSessions = useCallback(
+    (weekStart: Date) => {
+      const startKey = getDateKey(weekStart);
+      const endKey = getDateKey(new Date(weekStart.getTime() + 6 * 86400000));
+      return sessions.filter((s) => {
+        const sKey = getDateKey(new Date(s.startsAt));
+        return sKey >= startKey && sKey <= endKey && s.status !== "cancelled";
+      });
+    },
+    [sessions]
+  );
+
+  return {
+    sessions,
+    loading,
+    saving,
+    isTrainer,
+    fetchSessions,
+    createSession,
+    updateSession,
+    cancelSession,
+    todaySessions,
+    nextUpcomingSession,
+    weekSessions,
+  };
+}

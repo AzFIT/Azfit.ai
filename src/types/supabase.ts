@@ -394,6 +394,48 @@ export type Database = {
         };
         Relationships: [];
       };
+      sessions: {
+        Row: {
+          id: string;
+          trainer_id: string;
+          client_id: string;
+          title: string;
+          type: string;
+          status: string;
+          starts_at: string;
+          ends_at: string;
+          location: string | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          trainer_id: string;
+          client_id: string;
+          title: string;
+          type?: string;
+          status?: string;
+          starts_at: string;
+          ends_at: string;
+          location?: string | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          trainer_id?: string;
+          client_id?: string;
+          title?: string;
+          type?: string;
+          status?: string;
+          starts_at?: string;
+          ends_at?: string;
+          location?: string | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
 
       // ─── Blueprint Tables (Phase 2) ───
       goal_categories: {
