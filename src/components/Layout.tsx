@@ -30,6 +30,7 @@ import {
 import Navbar from "@/components/Navbar";
 import Badge from "@/components/Badge";
 import AzFitChat from "@/components/chat/AzFitChat";
+import PageBreadcrumbs from "@/components/PageBreadcrumbs";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -606,6 +607,7 @@ export default function Layout({
         className={`min-h-[100dvh] pb-16 lg:ml-[280px] lg:pb-0 ${showNav ? "pt-14" : ""}`}
         style={{ backgroundColor: "var(--page-bg)" }}
       >
+        <PageBreadcrumbs />
         {children}
       </main>
 
