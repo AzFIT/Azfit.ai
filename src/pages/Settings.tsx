@@ -25,6 +25,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 
 /* ------------------------------------------------------------------ */
 /*  Animation helpers                                                  */
@@ -393,6 +394,7 @@ export default function Settings() {
                     textShadow: 'var(--text-shadow-dark)',
                   }}
                   type="button"
+                  onClick={() => toast.info('Profile editing coming soon')}
                 >
                   <Edit3 size={12} />
                   Edit
@@ -447,6 +449,7 @@ export default function Settings() {
               className="flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors duration-150 hover:bg-[var(--light-elevated)]"
               style={{ color: 'var(--light-text-muted)' }}
               type="button"
+              onClick={() => toast.info('Goal setting coming soon')}
             >
               + Add Goal
             </button>
@@ -716,6 +719,7 @@ export default function Settings() {
                 textShadow: 'var(--text-shadow-dark)',
               }}
               type="button"
+              onClick={() => toast.info('Device connection coming soon')}
             >
               + Connect Device
             </button>
@@ -797,7 +801,7 @@ export default function Settings() {
           className="mt-6 space-y-3 px-1 pb-8"
         >
           <button
-            onClick={() => alert('Password change not yet implemented')}
+            onClick={() => toast.info('Password change coming soon')}
             className="flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-3 font-mono text-sm font-semibold transition-all duration-200 active:scale-[0.97]"
             style={{
               borderColor: 'var(--azfit-primary)',
@@ -813,7 +817,7 @@ export default function Settings() {
           <button
             onClick={() => {
               if (confirm('Are you sure you want to delete your account? This cannot be undone.')) {
-                alert('Account deletion not yet implemented');
+                toast.info('Account deletion coming soon');
               }
             }}
             className="flex w-full items-center justify-center gap-2 rounded-lg border border-transparent px-4 py-3 font-mono text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 active:scale-[0.97]"

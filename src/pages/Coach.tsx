@@ -142,6 +142,7 @@ export default function Coach() {
                   e.currentTarget.style.backgroundColor = '#0D9488';
                   e.currentTarget.style.boxShadow = 'none';
                 }}
+                onClick={() => navigate('/program-builder')}
               >
                 <Plus size={16} />
                 New Program
@@ -177,6 +178,7 @@ export default function Coach() {
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'var(--card-bg)';
                 }}
+                onClick={() => setActiveTab('messages')}
               >
                 <Mail size={16} />
                 Message All
