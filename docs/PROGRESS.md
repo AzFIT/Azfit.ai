@@ -5,6 +5,7 @@
 - Real-time messaging via Supabase Realtime (30d7ead)
 - Sessions table + booking requests + realtime (dfa953f)
 - DB reconciliation: RLS fixes on category tables, program-library schema dump, notifications table
+- Body Composition Assessments: skinfold_assessments table, JP3/JP7/Poliquin math, Katch-McArdle TDEE, BioPrint rebuild, trainer ClientProfile card (7398f5f)
 ## Next
 - Check-in forms + habit tracking (Phase 5)
 - Voice notes + push notifications
