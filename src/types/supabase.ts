@@ -367,6 +367,59 @@ export type Database = {
         };
         Relationships: [];
       };
+      skinfold_assessments: {
+        Row: {
+          id: string;
+          client_id: string;
+          assessed_by: string | null;
+          recorded_at: string;
+          protocol: "jp3" | "jp7" | "poliquin12";
+          sites: Json;
+          sum_mm: number | null;
+          body_fat_pct: number | null;
+          weight_kg: number | null;
+          age_years: number | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          assessed_by?: string | null;
+          recorded_at?: string;
+          protocol: "jp3" | "jp7" | "poliquin12";
+          sites?: Json;
+          sum_mm?: number | null;
+          body_fat_pct?: number | null;
+          weight_kg?: number | null;
+          age_years?: number | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          client_id?: string;
+          assessed_by?: string | null;
+          recorded_at?: string;
+          protocol?: "jp3" | "jp7" | "poliquin12";
+          sites?: Json;
+          sum_mm?: number | null;
+          body_fat_pct?: number | null;
+          weight_kg?: number | null;
+          age_years?: number | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "skinfold_assessments_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       messages: {
         Row: {
           id: string;
