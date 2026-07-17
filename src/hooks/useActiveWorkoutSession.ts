@@ -58,6 +58,7 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [historyPbs, setHistoryPbs] = useState<Record<string, { volume: number; oneRepMax: number }>>({});
+  const [lastLoadPerExercise, setLastLoadPerExercise] = useState<Record<string, number>>({});
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(Date.now());
@@ -173,6 +174,8 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
         }
       }
 
+      setLastLoadPerExercise(lastLoad);
+
       const sessionExercises = exerciseRows.map((ex) =>
         buildSessionExercise(ex as ExerciseRow, findCategoryForExercise(ex.name) || "Other", lastLoad)
       );
@@ -209,8 +212,14 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
     };
   }, [workoutLog, isPaused]);
 
-  const updateExercise = useCallback((exerciseId: string, updater: (ex: SessionExercise) => SessionExercise) => {
-    setExercises((prev) => prev.map((ex) => (ex.id === exerciseId ? updater(ex) : ex)));
+  const updateExercise = useCallback((exerciseId: string, updater: Partial<SessionExercise> | ((ex: SessionExercise) => SessionExercise)) => {
+    setExercises((prev) =>
+      prev.map((ex) => {
+        if (ex.id !== exerciseId) return ex;
+        if (typeof updater === 'function') return updater(ex);
+        return { ...ex, ...updater };
+      })
+    );
   }, []);
 
   const updateSet = useCallback(
@@ -494,5 +503,6 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
     finishSession,
     setPaused,
     historyPbs,
+    lastLoadPerExercise,
   };
 }

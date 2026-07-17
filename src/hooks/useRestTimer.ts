@@ -79,6 +79,8 @@ export function useRestTimer() {
 
   useEffect(() => {
     return () => {
+      // We intentionally read the latest ref here so all active intervals are cleared on unmount.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       Object.values(intervals.current).forEach(clearInterval);
     };
   }, []);

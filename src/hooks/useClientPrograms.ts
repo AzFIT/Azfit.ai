@@ -16,17 +16,15 @@ function useResolvedClientId() {
   const { user, loading: authLoading } = useAuth();
   const email = user?.email;
   const [clientId, setClientId] = useState<string | null>(null);
-  const [resolving, setResolving] = useState(true);
+  const [resolving, setResolving] = useState(false);
 
   useEffect(() => {
-    if (!email) {
-      setResolving(false);
-      return;
-    }
+    if (!email) return;
 
     let cancelled = false;
 
     const resolve = async () => {
+      setResolving(true);
       const { data, error } = await supabase
         .from("clients")
         .select("id")
