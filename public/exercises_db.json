@@ -1,0 +1,2002 @@
+[
+  {
+    "ExerciseID": "EX001",
+    "Name": "Barbell Back Squat",
+    "MuscleGroup": "Quads/Glutes",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=gcNh17Ckjgg",
+    "Description": "High-bar squat, full depth, brace core. Drive through mid-foot, knees track over toes, chest up."
+  },
+  {
+    "ExerciseID": "EX002",
+    "Name": "Romanian Deadlift",
+    "MuscleGroup": "Hamstrings/Glutes",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/shorts/KhjNjzrm93c",
+    "Description": "Hip hinge pattern, slight knee bend, neutral spine. Lower until hamstring stretch, squeeze glutes at lockout."
+  },
+  {
+    "ExerciseID": "EX003",
+    "Name": "Bench Press",
+    "MuscleGroup": "Chest/Triceps",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=vthMCtgVtFw",
+    "Description": "Retract scapula, controlled touch to chest. Bar path over mid-foot, elbows tuck ~75\u00b0, feet planted."
+  },
+  {
+    "ExerciseID": "EX004",
+    "Name": "Overhead Press",
+    "MuscleGroup": "Shoulders",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=Gu1t7X2yq4M",
+    "Description": "Strict press, no leg drive, bar path over mid-foot. Brace abs, head through at lockout, glutes tight."
+  },
+  {
+    "ExerciseID": "EX005",
+    "Name": "Pull-Up",
+    "MuscleGroup": "Back/Biceps",
+    "Equipment": "Pull-Up Bar",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=MhokcbRLP5w",
+    "Description": "Full dead hang at bottom, chin over bar at top. Depress scapula first, elbows drive down, core braced."
+  },
+  {
+    "ExerciseID": "EX006",
+    "Name": "Barbell Row",
+    "MuscleGroup": "Back",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=7PhvyukQ4Sw",
+    "Description": "Pendlay style, flat back, pull to lower chest. Hips hinge, bar close to shins, squeeze shoulder blades."
+  },
+  {
+    "ExerciseID": "EX007",
+    "Name": "Front Squat",
+    "MuscleGroup": "Quads/Core",
+    "Equipment": "Barbell",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=uQeCK1vfj4E",
+    "Description": "Elbows high, upright torso, ATG depth. Knees out, core tight, breathe into belly, drive elbows up."
+  },
+  {
+    "ExerciseID": "EX008",
+    "Name": "Incline Dumbbell Press",
+    "MuscleGroup": "Upper Chest",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=bf93PZWLeF8",
+    "Description": "30-45 degree incline, controlled eccentric. Dumbbells to upper chest, press up and slightly inward."
+  },
+  {
+    "ExerciseID": "EX009",
+    "Name": "Dumbbell Lunge",
+    "MuscleGroup": "Quads/Glutes",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Beginner",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=L8fvyBHUPew",
+    "Description": "Step forward, back knee near floor, push through heel. Torso upright, front knee tracks over toe."
+  },
+  {
+    "ExerciseID": "EX010",
+    "Name": "Leg Press",
+    "MuscleGroup": "Quads/Glutes",
+    "Equipment": "Leg Press",
+    "Difficulty": "Beginner",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=IZxyjW7MPJQ",
+    "Description": "Full range of motion, do not lock knees. Feet shoulder-width, lower until thighs break 90\u00b0, press through heels."
+  },
+  {
+    "ExerciseID": "EX011",
+    "Name": "Leg Curl",
+    "MuscleGroup": "Hamstrings",
+    "Equipment": "Leg Curl",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=hRZ5MM6gmlE",
+    "Description": "Control the negative, avoid momentum. Heels against pad, squeeze hamstrings, slow eccentric."
+  },
+  {
+    "ExerciseID": "EX012",
+    "Name": "Leg Extension",
+    "MuscleGroup": "Quads",
+    "Equipment": "Leg Extension",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=ljO4jkwv8wQ",
+    "Description": "Squeeze at top, controlled lowering. Adjust pad above ankle, extend fully without locking knees."
+  },
+  {
+    "ExerciseID": "EX013",
+    "Name": "Cable Fly",
+    "MuscleGroup": "Chest",
+    "Equipment": "Cable",
+    "Difficulty": "Intermediate",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/shorts/XDgttD692Uc",
+    "Description": "Slight elbow bend, squeeze at midline. Step forward, stretch at bottom, cross slightly at top."
+  },
+  {
+    "ExerciseID": "EX014",
+    "Name": "Lateral Raise",
+    "MuscleGroup": "Shoulders",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=ENsp0DEryrM",
+    "Description": "Lead with elbows, control negative, slight forward lean. Thumbs up, raise to shoulder height, no swinging."
+  },
+  {
+    "ExerciseID": "EX015",
+    "Name": "Face Pull",
+    "MuscleGroup": "Rear Delts/Upper Back",
+    "Equipment": "Cable",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=eIq5CB9JfKE",
+    "Description": "Pull to face level, external rotation at end. Rope attachment, elbows high, squeeze rear delts."
+  },
+  {
+    "ExerciseID": "EX016",
+    "Name": "Tricep Pushdown",
+    "MuscleGroup": "Triceps",
+    "Equipment": "Cable",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=vPeQu_L-1n0",
+    "Description": "Elbows fixed at sides, full extension. Rope or bar, hinge slightly forward, lock out at bottom."
+  },
+  {
+    "ExerciseID": "EX017",
+    "Name": "Barbell Curl",
+    "MuscleGroup": "Biceps",
+    "Equipment": "Barbell",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=kwG2ipFRgFo",
+    "Description": "No swing, full stretch at bottom. Shoulders back, curl to chin level, squeeze biceps, slow lower."
+  },
+  {
+    "ExerciseID": "EX018",
+    "Name": "Hammer Curl",
+    "MuscleGroup": "Biceps/Forearms",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=0IAM4YtfgJw",
+    "Description": "Neutral grip, brachialis emphasis. Elbows pinned, curl toward opposite shoulder, controlled negative."
+  },
+  {
+    "ExerciseID": "EX019",
+    "Name": "Plank",
+    "MuscleGroup": "Core",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Beginner",
+    "Type": "Isometric",
+    "VideoURL": "https://www.youtube.com/watch?v=pSHjTRCQwNY",
+    "Description": "Neutral spine, squeeze glutes, hold. Forearms under shoulders, brace abs, breathe steady, no sagging."
+  },
+  {
+    "ExerciseID": "EX020",
+    "Name": "Dead Bug",
+    "MuscleGroup": "Core",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Beginner",
+    "Type": "Isometric",
+    "VideoURL": "https://www.youtube.com/watch?v=gBYB7IUE-9U",
+    "Description": "Lower back pressed to floor, slow limb movement. Exhale as limb extends, maintain hollow body."
+  },
+  {
+    "ExerciseID": "EX021",
+    "Name": "Hip Thrust",
+    "MuscleGroup": "Glutes",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=LM8XH1aNPNM",
+    "Description": "Chin tucked, eyes forward, full hip extension. Shoulders on bench, squeeze glutes at top, no arching back."
+  },
+  {
+    "ExerciseID": "EX022",
+    "Name": "Bulgarian Split Squat",
+    "MuscleGroup": "Quads/Glutes",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=2C-uNgKwPLE",
+    "Description": "Rear foot elevated, torso slight forward lean. Front knee tracks toe, drive through heel, control down."
+  },
+  {
+    "ExerciseID": "EX023",
+    "Name": "Snatch",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Barbell",
+    "Difficulty": "Advanced",
+    "Type": "Olympic",
+    "VideoURL": "https://www.youtube.com/watch?v=9xGJgK3WYMk",
+    "Description": "Wide grip, explosive triple extension, catch overhead. Bar close to body, fast drop under, stable catch."
+  },
+  {
+    "ExerciseID": "EX024",
+    "Name": "Clean",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Barbell",
+    "Difficulty": "Advanced",
+    "Type": "Olympic",
+    "VideoURL": "https://www.youtube.com/watch?v=EKRiW9Yt3Ps",
+    "Description": "Power or full, front rack catch, elbows fast. Triple extension, shrug high, rotate elbows around bar."
+  },
+  {
+    "ExerciseID": "EX025",
+    "Name": "Clean & Jerk",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Barbell",
+    "Difficulty": "Advanced",
+    "Type": "Olympic",
+    "VideoURL": "https://www.youtube.com/watch?v=PjY1rY4CM4A",
+    "Description": "Two-step lift: clean to shoulders, jerk overhead. Dip and drive, split or push jerk, lock arms."
+  },
+  {
+    "ExerciseID": "EX026",
+    "Name": "Push Press",
+    "MuscleGroup": "Shoulders/Legs",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=iaBVSJmHkoY",
+    "Description": "Leg dip drive, finish with strict press lockout. Dip shallow, drive through heels, no re-bend."
+  },
+  {
+    "ExerciseID": "EX027",
+    "Name": "Goblet Squat",
+    "MuscleGroup": "Quads/Core",
+    "Equipment": "Dumbbell/KB",
+    "Difficulty": "Beginner",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=MeIiIdhvXT4",
+    "Description": "Hold at chest, upright torso, full depth. Elbows inside knees, drive knees out, chest up."
+  },
+  {
+    "ExerciseID": "EX028",
+    "Name": "Kettlebell Swing",
+    "MuscleGroup": "Posterior Chain",
+    "Equipment": "Kettlebell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=sxVtnT78NCY",
+    "Description": "Hip hinge not squat, explosive snap, float at top. Power from hips, arms passive, snap hips forward."
+  },
+  {
+    "ExerciseID": "EX029",
+    "Name": "Farmers Walk",
+    "MuscleGroup": "Grip/Traps",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Beginner",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=Fkzk_RqlYig",
+    "Description": "Heavy weights, tall posture, controlled steps. Shoulders back, core tight, short strides, no sway."
+  },
+  {
+    "ExerciseID": "EX030",
+    "Name": "T-Bar Row",
+    "MuscleGroup": "Back",
+    "Equipment": "T-Bar",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=TyLoy3n_a10",
+    "Description": "Chest supported, squeeze shoulder blades. Hinge at hips, pull to lower chest, control eccentric."
+  },
+  {
+    "ExerciseID": "EX031",
+    "Name": "Seated Row",
+    "MuscleGroup": "Back",
+    "Equipment": "Cable",
+    "Difficulty": "Beginner",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=GZbfZ033f74",
+    "Description": "Drive elbows back, scapula retraction. Chest against pad, pull to navel, squeeze back, slow return."
+  },
+  {
+    "ExerciseID": "EX032",
+    "Name": "Dumbbell Shoulder Press",
+    "MuscleGroup": "Shoulders",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=qEwLoNlSW6o",
+    "Description": "Neutral or pronated grip, full ROM. Press overhead without arching, control down to shoulder level."
+  },
+  {
+    "ExerciseID": "EX033",
+    "Name": "Chest-Supported Row",
+    "MuscleGroup": "Back",
+    "Equipment": "Machine",
+    "Difficulty": "Beginner",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=HJs7sL0eNHs",
+    "Description": "Eliminates momentum, strict back focus. Chest on pad, pull elbows back, squeeze mid-back."
+  },
+  {
+    "ExerciseID": "EX034",
+    "Name": "Leg Press Calf Raise",
+    "MuscleGroup": "Calves",
+    "Equipment": "Leg Press",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=KxEYX_b3QGE",
+    "Description": "Toes on platform edge, full stretch and squeeze. Heels drop below toes, press through balls of feet."
+  },
+  {
+    "ExerciseID": "EX035",
+    "Name": "Hanging Leg Raise",
+    "MuscleGroup": "Abs",
+    "Equipment": "Pull-Up Bar",
+    "Difficulty": "Intermediate",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=hdngXjzGfHs",
+    "Description": "No swing, curl pelvis up to ribs. Dead hang, posterior pelvic tilt, raise legs to 90\u00b0, control down."
+  },
+  {
+    "ExerciseID": "EX036",
+    "Name": "Trap Bar Deadlift",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Trap Bar",
+    "Difficulty": "Beginner",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=vm5fWinKyv0",
+    "Description": "Neutral grip, upright torso, safe for beginners. Hinge hips back, chest up, drive through floor."
+  },
+  {
+    "ExerciseID": "EX037",
+    "Name": "Box Jump",
+    "MuscleGroup": "Legs/Power",
+    "Equipment": "Plyo Box",
+    "Difficulty": "Intermediate",
+    "Type": "Plyo",
+    "VideoURL": "https://www.youtube.com/watch?v=52r_Ur5tRJY",
+    "Description": "Soft landing, full hip extension, step down. Land quietly, absorb force, stand tall at top."
+  },
+  {
+    "ExerciseID": "EX038",
+    "Name": "Medicine Ball Slam",
+    "MuscleGroup": "Full Body/Power",
+    "Equipment": "Med Ball",
+    "Difficulty": "Beginner",
+    "Type": "Plyo",
+    "VideoURL": "https://www.youtube.com/watch?v=0mXTiUnhS0k",
+    "Description": "Overhead to ground, full extension to triple flexion. Explosive slam, follow through, catch on bounce."
+  },
+  {
+    "ExerciseID": "EX039",
+    "Name": "Turkish Get-Up",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Kettlebell",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=1iFbH7_2mZM",
+    "Description": "7-step sequence, stable overhead position throughout. Keep arm vertical, eyes on kettlebell, slow and controlled."
+  },
+  {
+    "ExerciseID": "EX040",
+    "Name": "Sled Push",
+    "MuscleGroup": "Legs/Power",
+    "Equipment": "Sled",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=sK5A3e8l7tE",
+    "Description": "Low angle, powerful strides, full extension. Drive through balls of feet, arms straight, core braced."
+  },
+  {
+    "ExerciseID": "EX041",
+    "Name": "Dumbbell Bench Press",
+    "MuscleGroup": "Chest/Triceps",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Flat bench, neutral grip, controlled descent. Elbows tuck ~45\u00b0, press to lockout, squeeze chest."
+  },
+  {
+    "ExerciseID": "EX042",
+    "Name": "Incline Barbell Press",
+    "MuscleGroup": "Upper Chest",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "30-45\u00b0 incline, retract scapula, bar to upper chest. Drive feet into floor, press up and slightly back."
+  },
+  {
+    "ExerciseID": "EX043",
+    "Name": "Decline Bench Press",
+    "MuscleGroup": "Lower Chest",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Decline angle, shorter range, focus lower pecs. Secure legs, controlled touch to lower chest."
+  },
+  {
+    "ExerciseID": "EX044",
+    "Name": "Dumbbell Fly",
+    "MuscleGroup": "Chest",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Intermediate",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Slight elbow bend, wide arc, squeeze at top. Lower until stretch felt, control eccentric, no bouncing."
+  },
+  {
+    "ExerciseID": "EX045",
+    "Name": "Pec Deck Fly",
+    "MuscleGroup": "Chest",
+    "Equipment": "Machine",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Elbows at shoulder height, squeeze at midline. Control return, maintain elbow angle, feel chest stretch."
+  },
+  {
+    "ExerciseID": "EX046",
+    "Name": "Close-Grip Bench Press",
+    "MuscleGroup": "Triceps/Chest",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hands shoulder-width, elbows tucked tight. Lower to lower chest, press through triceps, lock out."
+  },
+  {
+    "ExerciseID": "EX047",
+    "Name": "Skull Crusher",
+    "MuscleGroup": "Triceps",
+    "Equipment": "Barbell/EZ",
+    "Difficulty": "Intermediate",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Lower to forehead/behind head, elbows fixed. Extend fully, squeeze triceps, control negative."
+  },
+  {
+    "ExerciseID": "EX048",
+    "Name": "Overhead Tricep Extension",
+    "MuscleGroup": "Triceps",
+    "Equipment": "Cable/Dumbbell",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Elbows tight to head, full extension overhead. Hinge at elbows only, squeeze at lockout, slow lower."
+  },
+  {
+    "ExerciseID": "EX049",
+    "Name": "Dumbbell Kickback",
+    "MuscleGroup": "Triceps",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hinge forward, upper arm parallel to floor. Extend fully, pause at top, control return, no swinging."
+  },
+  {
+    "ExerciseID": "EX050",
+    "Name": "Diamond Push-Up",
+    "MuscleGroup": "Chest/Triceps",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hands close, diamond shape, elbows tuck. Chest to hands, full extension, core tight, no sag."
+  },
+  {
+    "ExerciseID": "EX051",
+    "Name": "Incline Push-Up",
+    "MuscleGroup": "Chest",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Beginner",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hands on elevated surface, body straight line. Lower chest to surface, press up, control tempo."
+  },
+  {
+    "ExerciseID": "EX052",
+    "Name": "Decline Push-Up",
+    "MuscleGroup": "Upper Chest",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Feet elevated, hands under shoulders. Lower chest to floor, press up, more upper chest emphasis."
+  },
+  {
+    "ExerciseID": "EX053",
+    "Name": "Archer Push-Up",
+    "MuscleGroup": "Chest",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "One arm extends side, other does most work. Alternate sides, control eccentric, full extension."
+  },
+  {
+    "ExerciseID": "EX054",
+    "Name": "Pike Push-Up",
+    "MuscleGroup": "Shoulders",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hips high, head to floor, vertical pressing angle. Elbows tuck, crown of head nearly touches ground."
+  },
+  {
+    "ExerciseID": "EX055",
+    "Name": "Handstand Push-Up",
+    "MuscleGroup": "Shoulders",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Wall-supported or free, full overhead press. Lower controlled, head between hands, press to lockout."
+  },
+  {
+    "ExerciseID": "EX056",
+    "Name": "Arnold Press",
+    "MuscleGroup": "Shoulders",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Rotate palms from facing body to forward as press. Full range, control rotation, no arching back."
+  },
+  {
+    "ExerciseID": "EX057",
+    "Name": "Upright Row",
+    "MuscleGroup": "Shoulders/Traps",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Pull to chin, elbows high and out. Control negative, avoid excessive internal rotation if shoulder issues."
+  },
+  {
+    "ExerciseID": "EX058",
+    "Name": "Shrugs",
+    "MuscleGroup": "Traps",
+    "Equipment": "Barbell/Dumbbells",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Shrug shoulders to ears, hold at top, squeeze. Control down, no rolling, straight up and down motion."
+  },
+  {
+    "ExerciseID": "EX059",
+    "Name": "Reverse Fly",
+    "MuscleGroup": "Rear Delts",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Bent over, slight elbow bend, fly to sides. Squeeze rear delts, control negative, no swinging."
+  },
+  {
+    "ExerciseID": "EX060",
+    "Name": "Cable Lateral Raise",
+    "MuscleGroup": "Shoulders",
+    "Equipment": "Cable",
+    "Difficulty": "Intermediate",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Constant tension from cable, lead with elbow. Control both ways, no momentum, slight forward lean."
+  },
+  {
+    "ExerciseID": "EX061",
+    "Name": "Machine Shoulder Press",
+    "MuscleGroup": "Shoulders",
+    "Equipment": "Machine",
+    "Difficulty": "Beginner",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Fixed path, focus on pressing motion. Back supported, press overhead, control return, full ROM."
+  },
+  {
+    "ExerciseID": "EX062",
+    "Name": "Landmine Press",
+    "MuscleGroup": "Shoulders/Chest",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "One end anchored, press at angle. Neutral grip, press up and slightly forward, core braced."
+  },
+  {
+    "ExerciseID": "EX063",
+    "Name": "Z-Press",
+    "MuscleGroup": "Shoulders",
+    "Equipment": "Barbell",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Seated legs straight, no leg drive. Strict overhead press, core must stabilize, no cheating."
+  },
+  {
+    "ExerciseID": "EX064",
+    "Name": "Single-Arm Dumbbell Row",
+    "MuscleGroup": "Back",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Beginner",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "One knee on bench, flat back, pull to hip. Elbow close to body, squeeze lat, control negative."
+  },
+  {
+    "ExerciseID": "EX065",
+    "Name": "Meadows Row",
+    "MuscleGroup": "Back",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Landmine setup, one arm row. Pull to hip, twist slightly, squeeze lat, explosive concentric."
+  },
+  {
+    "ExerciseID": "EX066",
+    "Name": "Pendlay Row",
+    "MuscleGroup": "Back",
+    "Equipment": "Barbell",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Flat back parallel to floor, bar from floor each rep. Explosive pull to lower chest, reset between reps."
+  },
+  {
+    "ExerciseID": "EX067",
+    "Name": "Seal Row",
+    "MuscleGroup": "Back",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Prone on bench, arms hang straight, pull to bench. Eliminates momentum, strict back contraction."
+  },
+  {
+    "ExerciseID": "EX068",
+    "Name": "Inverted Row",
+    "MuscleGroup": "Back",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Beginner",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Under bar/rings, body straight, pull chest to bar. Squeeze shoulder blades, control negative, full ROM."
+  },
+  {
+    "ExerciseID": "EX069",
+    "Name": "Renegade Row",
+    "MuscleGroup": "Back/Core",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Plank position, row one dumbbell at a time. Minimize hip rotation, core tight, alternate arms."
+  },
+  {
+    "ExerciseID": "EX070",
+    "Name": "Straight-Arm Pulldown",
+    "MuscleGroup": "Back",
+    "Equipment": "Cable",
+    "Difficulty": "Intermediate",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Arms straight, pull from high to hips. Squeeze lats, no bend at elbows, control return."
+  },
+  {
+    "ExerciseID": "EX071",
+    "Name": "Pullover",
+    "MuscleGroup": "Back/Chest",
+    "Equipment": "Dumbbell/Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Upper back on bench, lower weight behind head. Feel lat stretch, pull over to chest, hips low."
+  },
+  {
+    "ExerciseID": "EX072",
+    "Name": "Good Morning",
+    "MuscleGroup": "Hamstrings/Lower Back",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Bar on back, hip hinge, flat back. Lower until torso near parallel, hamstring stretch, squeeze glutes up."
+  },
+  {
+    "ExerciseID": "EX073",
+    "Name": "Stiff-Leg Deadlift",
+    "MuscleGroup": "Hamstrings",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Minimal knee bend, bar close to shins. Hinge deep, feel hamstring stretch, control negative."
+  },
+  {
+    "ExerciseID": "EX074",
+    "Name": "Sumo Deadlift",
+    "MuscleGroup": "Posterior Chain",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Wide stance, toes out, grip inside legs. Drive through heels, chest up, hips through at lockout."
+  },
+  {
+    "ExerciseID": "EX075",
+    "Name": "Deficit Deadlift",
+    "MuscleGroup": "Posterior Chain",
+    "Equipment": "Barbell",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Stand on plates, increased range of motion. Same deadlift mechanics, more leg drive, harder lockout."
+  },
+  {
+    "ExerciseID": "EX076",
+    "Name": "Rack Pull",
+    "MuscleGroup": "Back/Traps",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Bar at knee height or below, reduced ROM. Overload top half, focus lockout, grip and upper back."
+  },
+  {
+    "ExerciseID": "EX077",
+    "Name": "Block Pull",
+    "MuscleGroup": "Posterior Chain",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Bar on blocks, mid-shin start. Between rack pull and deadlift, overload with better starting position."
+  },
+  {
+    "ExerciseID": "EX078",
+    "Name": "Jefferson Curl",
+    "MuscleGroup": "Spinal Flexibility",
+    "Equipment": "Barbell",
+    "Difficulty": "Advanced",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Round back intentionally, controlled spinal flexion. Light weight, slow tempo, flexibility and strength."
+  },
+  {
+    "ExerciseID": "EX079",
+    "Name": "Nordic Curl",
+    "MuscleGroup": "Hamstrings",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Advanced",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Anchor feet, lower body forward from knees. Control eccentric, hamstring strength, use band assist if needed."
+  },
+  {
+    "ExerciseID": "EX080",
+    "Name": "Glute-Ham Raise",
+    "MuscleGroup": "Hamstrings/Glutes",
+    "Equipment": "GHD",
+    "Difficulty": "Advanced",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Full body on GHD, lower forward, curl back up. Hamstring and glute focus, control negative."
+  },
+  {
+    "ExerciseID": "EX081",
+    "Name": "Back Extension",
+    "MuscleGroup": "Lower Back/Glutes",
+    "Equipment": "Hyperextension",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hips on pad, lower and raise torso. Squeeze glutes at top, control negative, no hyperextend."
+  },
+  {
+    "ExerciseID": "EX082",
+    "Name": "Reverse Hyper",
+    "MuscleGroup": "Glutes/Hamstrings",
+    "Equipment": "Reverse Hyper",
+    "Difficulty": "Intermediate",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Legs swing back, squeeze glutes at top. Control momentum, light weight, posterior chain pump."
+  },
+  {
+    "ExerciseID": "EX083",
+    "Name": "Hip Abduction Machine",
+    "MuscleGroup": "Glutes",
+    "Equipment": "Machine",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Push legs apart against resistance. Squeeze glutes, control return, sit tall, no leaning."
+  },
+  {
+    "ExerciseID": "EX084",
+    "Name": "Hip Adduction Machine",
+    "MuscleGroup": "Adductors",
+    "Equipment": "Machine",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Pull legs together against resistance. Control negative, squeeze inner thighs, sit back in machine."
+  },
+  {
+    "ExerciseID": "EX085",
+    "Name": "Cable Pull-Through",
+    "MuscleGroup": "Glutes/Hamstrings",
+    "Equipment": "Cable",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Rope between legs, hinge, pull through to stand. Squeeze glutes, cable tension constant, hip hinge."
+  },
+  {
+    "ExerciseID": "EX086",
+    "Name": "Banded Walk",
+    "MuscleGroup": "Glutes",
+    "Equipment": "Resistance Band",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Band around knees, step side or forward. Maintain tension, knees out, glute activation, small steps."
+  },
+  {
+    "ExerciseID": "EX087",
+    "Name": "Clamshell",
+    "MuscleGroup": "Glutes",
+    "Equipment": "Resistance Band",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Side-lying, knees bent, open top knee. Keep feet together, rotate from hip, squeeze glute medius."
+  },
+  {
+    "ExerciseID": "EX088",
+    "Name": "Fire Hydrant",
+    "MuscleGroup": "Glutes",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "On all fours, lift leg out to side. Knee bent 90\u00b0, rotate hip open, squeeze glute, control down."
+  },
+  {
+    "ExerciseID": "EX089",
+    "Name": "Donkey Kick",
+    "MuscleGroup": "Glutes",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "On all fours, push heel to ceiling. Knee stays bent, squeeze glute at top, no arch back."
+  },
+  {
+    "ExerciseID": "EX090",
+    "Name": "Glute Bridge",
+    "MuscleGroup": "Glutes",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Beginner",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Back on floor, feet flat, thrust hips up. Squeeze glutes at top, no arch lower back, control down."
+  },
+  {
+    "ExerciseID": "EX091",
+    "Name": "Single-Leg Glute Bridge",
+    "MuscleGroup": "Glutes",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "One leg elevated, thrust hips up. Eliminate asymmetry, harder balance, squeeze glute of working leg."
+  },
+  {
+    "ExerciseID": "EX092",
+    "Name": "Frog Pump",
+    "MuscleGroup": "Glutes",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Feet together knees out, thrust hips up. Glute focus, short ROM, high reps, squeeze at top."
+  },
+  {
+    "ExerciseID": "EX093",
+    "Name": "B-Stance RDL",
+    "MuscleGroup": "Hamstrings/Glutes",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "One foot back slightly, most weight on front leg. Hinge pattern, feel stretch, single-leg emphasis."
+  },
+  {
+    "ExerciseID": "EX094",
+    "Name": "Single-Leg RDL",
+    "MuscleGroup": "Hamstrings/Glutes",
+    "Equipment": "Dumbbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "One leg back, hinge, dumbbell lowers. Balance challenge, flat back, control negative, hip hinge."
+  },
+  {
+    "ExerciseID": "EX095",
+    "Name": "Step-Up",
+    "MuscleGroup": "Quads/Glutes",
+    "Equipment": "Dumbbells/Barbell",
+    "Difficulty": "Beginner",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Step onto box, drive through heel, full extension. Control down, alternate legs, no push off back foot."
+  },
+  {
+    "ExerciseID": "EX096",
+    "Name": "Walking Lunge",
+    "MuscleGroup": "Quads/Glutes",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Continuous walking lunge, no step back. Step forward, back knee down, push through front heel."
+  },
+  {
+    "ExerciseID": "EX097",
+    "Name": "Reverse Lunge",
+    "MuscleGroup": "Quads/Glutes",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Beginner",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Step back instead of forward, front leg works more. Torso upright, front knee tracks toe, control."
+  },
+  {
+    "ExerciseID": "EX098",
+    "Name": "Lateral Lunge",
+    "MuscleGroup": "Quads/Adductors",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Step wide to side, bend that knee, keep other straight. Push back to start, inner thigh stretch, control."
+  },
+  {
+    "ExerciseID": "EX099",
+    "Name": "Curtsy Lunge",
+    "MuscleGroup": "Quads/Glutes",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Step back and across behind front leg. Glute emphasis, balance challenge, control down and up."
+  },
+  {
+    "ExerciseID": "EX100",
+    "Name": "Pistol Squat",
+    "MuscleGroup": "Quads",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Single-leg squat to full depth, other leg forward. Balance, mobility, strength, control negative."
+  },
+  {
+    "ExerciseID": "EX101",
+    "Name": "Shrimp Squat",
+    "MuscleGroup": "Quads",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "One leg back, grab ankle, squat on one leg. Extreme balance and mobility, control descent."
+  },
+  {
+    "ExerciseID": "EX102",
+    "Name": "Sissy Squat",
+    "MuscleGroup": "Quads",
+    "Equipment": "Bodyweight/Sissy",
+    "Difficulty": "Advanced",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Heels elevated, lean back, knees forward. Quad isolation, extreme stretch, hold support if needed."
+  },
+  {
+    "ExerciseID": "EX103",
+    "Name": "Hack Squat",
+    "MuscleGroup": "Quads",
+    "Equipment": "Hack Squat",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Machine, back supported, feet low on platform. Deep quad focus, controlled descent, drive through heels."
+  },
+  {
+    "ExerciseID": "EX104",
+    "Name": "V-Squat",
+    "MuscleGroup": "Quads",
+    "Equipment": "Machine",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Angled machine, natural squat path. Back supported, deep squat, quad and glute emphasis."
+  },
+  {
+    "ExerciseID": "EX105",
+    "Name": "Belt Squat",
+    "MuscleGroup": "Quads/Glutes",
+    "Equipment": "Belt Squat",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Weight on hips via belt, free squat. No spinal load, deep squat, natural pattern, high volume."
+  },
+  {
+    "ExerciseID": "EX106",
+    "Name": "Pendulum Squat",
+    "MuscleGroup": "Quads",
+    "Equipment": "Machine",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Arched machine path, deep quad stretch. Controlled negative, explosive concentric, full ROM."
+  },
+  {
+    "ExerciseID": "EX107",
+    "Name": "Leg Press 45",
+    "MuscleGroup": "Quads/Glutes",
+    "Equipment": "Leg Press",
+    "Difficulty": "Beginner",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "45-degree sled, large foot platform. Full depth, controlled, feet placement varies emphasis."
+  },
+  {
+    "ExerciseID": "EX108",
+    "Name": "Vertical Leg Press",
+    "MuscleGroup": "Quads",
+    "Equipment": "Leg Press",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Back flat, press vertically. Different angle, more lower back support, controlled ROM."
+  },
+  {
+    "ExerciseID": "EX109",
+    "Name": "Seated Leg Curl",
+    "MuscleGroup": "Hamstrings",
+    "Equipment": "Machine",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hips flexed, curl legs down. Hamstring focus, control negative, squeeze at bottom, no momentum."
+  },
+  {
+    "ExerciseID": "EX110",
+    "Name": "Lying Leg Curl",
+    "MuscleGroup": "Hamstrings",
+    "Equipment": "Machine",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Prone, curl heels to glutes. Keep hips down, squeeze hamstrings, control negative, full ROM."
+  },
+  {
+    "ExerciseID": "EX111",
+    "Name": "Standing Leg Curl",
+    "MuscleGroup": "Hamstrings",
+    "Equipment": "Machine/Cable",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Standing, curl one leg at a time. Balance challenge, hamstring focus, control both ways."
+  },
+  {
+    "ExerciseID": "EX112",
+    "Name": "Nordic Hamstring Curl",
+    "MuscleGroup": "Hamstrings",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Advanced",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Partner or machine anchor, lower from knees. Eccentric focus, hamstring strength, control descent."
+  },
+  {
+    "ExerciseID": "EX113",
+    "Name": "Calf Raise Machine",
+    "MuscleGroup": "Calves",
+    "Equipment": "Machine",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Shoulders under pads, raise heels high. Full stretch at bottom, squeeze at top, control negative."
+  },
+  {
+    "ExerciseID": "EX114",
+    "Name": "Standing Calf Raise",
+    "MuscleGroup": "Calves",
+    "Equipment": "Machine/Bodyweight",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Standing, balls of feet on edge, raise up. Full ROM, stretch down, squeeze up, no bouncing."
+  },
+  {
+    "ExerciseID": "EX115",
+    "Name": "Seated Calf Raise",
+    "MuscleGroup": "Calves",
+    "Equipment": "Machine",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Seated, knees bent, raise heels. Targets soleus, control both ways, full stretch and squeeze."
+  },
+  {
+    "ExerciseID": "EX116",
+    "Name": "Donkey Calf Raise",
+    "MuscleGroup": "Calves",
+    "Equipment": "Machine/Partner",
+    "Difficulty": "Intermediate",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hinge forward, weight on lower back/hips. Intense calf stretch, full ROM, squeeze at top."
+  },
+  {
+    "ExerciseID": "EX117",
+    "Name": "Tibialis Raise",
+    "MuscleGroup": "Shins",
+    "Equipment": "Bodyweight/Dumbbell",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Pull toes up toward shin, heel on ground. Shin strength, ankle mobility, control both ways."
+  },
+  {
+    "ExerciseID": "EX118",
+    "Name": "Ab Wheel Rollout",
+    "MuscleGroup": "Abs",
+    "Equipment": "Ab Wheel",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Kneeling or standing, roll forward, maintain hollow. Do not arch back, control return, core tension."
+  },
+  {
+    "ExerciseID": "EX119",
+    "Name": "Cable Crunch",
+    "MuscleGroup": "Abs",
+    "Equipment": "Cable",
+    "Difficulty": "Intermediate",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Kneeling, crunch down, elbows to knees. Round spine, exhale hard, squeeze abs, control return."
+  },
+  {
+    "ExerciseID": "EX120",
+    "Name": "Machine Crunch",
+    "MuscleGroup": "Abs",
+    "Equipment": "Machine",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Seated crunch against resistance. Focus on spinal flexion, not hip flexion, squeeze abs."
+  },
+  {
+    "ExerciseID": "EX121",
+    "Name": "Reverse Crunch",
+    "MuscleGroup": "Abs",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Lift hips off floor, knees to chest. Posterior pelvic tilt, lower abs focus, control negative."
+  },
+  {
+    "ExerciseID": "EX122",
+    "Name": "Bicycle Crunch",
+    "MuscleGroup": "Abs",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Alternate elbow to opposite knee. Rotation focus, shoulder blades off floor, control tempo."
+  },
+  {
+    "ExerciseID": "EX123",
+    "Name": "Russian Twist",
+    "MuscleGroup": "Abs/Obliques",
+    "Equipment": "Bodyweight/Dumbbell",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Seated, lean back, rotate side to side. Feet off floor for harder version, control rotation, no momentum."
+  },
+  {
+    "ExerciseID": "EX124",
+    "Name": "Side Plank",
+    "MuscleGroup": "Obliques",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Beginner",
+    "Type": "Isometric",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "On side, elbow under shoulder, hips up. Straight line from head to feet, hold, no sagging."
+  },
+  {
+    "ExerciseID": "EX125",
+    "Name": "Pallof Press",
+    "MuscleGroup": "Core",
+    "Equipment": "Cable",
+    "Difficulty": "Intermediate",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Anti-rotation press, resist cable pull. Step out, press straight, core fights rotation, control."
+  },
+  {
+    "ExerciseID": "EX126",
+    "Name": "Woodchop",
+    "MuscleGroup": "Core/Obliques",
+    "Equipment": "Cable",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Diagonal chop from high to low or reverse. Rotate through core, control both ways, no arm swing."
+  },
+  {
+    "ExerciseID": "EX127",
+    "Name": "Mountain Climber",
+    "MuscleGroup": "Abs/Cardio",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Beginner",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Plank position, alternate knees to chest. Fast or slow, hips level, core tight, cardio element."
+  },
+  {
+    "ExerciseID": "EX128",
+    "Name": "Toes to Bar",
+    "MuscleGroup": "Abs",
+    "Equipment": "Pull-Up Bar",
+    "Difficulty": "Advanced",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hang, lift toes all the way to bar. Posterior pelvic tilt, controlled, no kipping if strict."
+  },
+  {
+    "ExerciseID": "EX129",
+    "Name": "Windshield Wiper",
+    "MuscleGroup": "Abs/Obliques",
+    "Equipment": "Pull-Up Bar",
+    "Difficulty": "Advanced",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hang or support, legs rotate side to side. Core control, oblique emphasis, minimize momentum."
+  },
+  {
+    "ExerciseID": "EX130",
+    "Name": "Dragon Flag",
+    "MuscleGroup": "Abs",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Advanced",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hold bench, body straight, lower and raise. Core tension, no bending at hips, controlled negative."
+  },
+  {
+    "ExerciseID": "EX131",
+    "Name": "Hollow Body Hold",
+    "MuscleGroup": "Core",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Intermediate",
+    "Type": "Isometric",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Back flat, arms and legs raised, hold. Press lower back to floor, breathe, core tension."
+  },
+  {
+    "ExerciseID": "EX132",
+    "Name": "Superman",
+    "MuscleGroup": "Lower Back",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Prone, lift arms and legs off floor. Squeeze lower back and glutes, hold, control down."
+  },
+  {
+    "ExerciseID": "EX133",
+    "Name": "Bird Dog",
+    "MuscleGroup": "Core",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "On all fours, extend opposite arm and leg. Flat back, no rotation, hold, alternate sides."
+  },
+  {
+    "ExerciseID": "EX134",
+    "Name": "Cat-Cow Stretch",
+    "MuscleGroup": "Spine Mobility",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "On all fours, arch and round spine. Mobility flow, breathe with movement, no forcing."
+  },
+  {
+    "ExerciseID": "EX135",
+    "Name": "Deadlift",
+    "MuscleGroup": "Posterior Chain",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Bar over mid-foot, hinge, grip, lift. Flat back, chest up, hips through, control negative."
+  },
+  {
+    "ExerciseID": "EX136",
+    "Name": "Conventional Deadlift",
+    "MuscleGroup": "Posterior Chain",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Standard stance, hands outside legs. Same as deadlift, classic form, drive floor away."
+  },
+  {
+    "ExerciseID": "EX137",
+    "Name": "Romanian Deadlift",
+    "MuscleGroup": "Hamstrings/Glutes",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hip hinge, bar to mid-shin, slight knee bend. Hamstring stretch, flat back, squeeze glutes up."
+  },
+  {
+    "ExerciseID": "EX138",
+    "Name": "Sumo Deadlift High Pull",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Sumo stance, deadlift to high pull. Explosive, triple extension, pull to chin, elbows high."
+  },
+  {
+    "ExerciseID": "EX139",
+    "Name": "Power Clean",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Barbell",
+    "Difficulty": "Advanced",
+    "Type": "Olympic",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "From floor, clean to shoulders. Fast first pull, triple extension, catch in front rack."
+  },
+  {
+    "ExerciseID": "EX140",
+    "Name": "Power Snatch",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Barbell",
+    "Difficulty": "Advanced",
+    "Type": "Olympic",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "From floor, snatch overhead in one motion. Wide grip, explosive, drop under fast, stable catch."
+  },
+  {
+    "ExerciseID": "EX141",
+    "Name": "Muscle Snatch",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Barbell",
+    "Difficulty": "Advanced",
+    "Type": "Olympic",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Snatch without dropping under. Strength focus, pull high, press out, no re-bend."
+  },
+  {
+    "ExerciseID": "EX142",
+    "Name": "Muscle Clean",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Barbell",
+    "Difficulty": "Advanced",
+    "Type": "Olympic",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Clean without dropping under. Pull high, rotate elbows, no re-bend, strength emphasis."
+  },
+  {
+    "ExerciseID": "EX143",
+    "Name": "Push Jerk",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Barbell",
+    "Difficulty": "Advanced",
+    "Type": "Olympic",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Dip drive, drop under, press out. Fast drop, split or squat, lock arms, stand."
+  },
+  {
+    "ExerciseID": "EX144",
+    "Name": "Split Jerk",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Barbell",
+    "Difficulty": "Advanced",
+    "Type": "Olympic",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Dip drive, split feet, catch overhead. Front-back split, recover, lock arms stable."
+  },
+  {
+    "ExerciseID": "EX145",
+    "Name": "Squat Jerk",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Barbell",
+    "Difficulty": "Advanced",
+    "Type": "Olympic",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Dip drive, squat under, catch overhead. Deep squat, fast recovery, extreme mobility."
+  },
+  {
+    "ExerciseID": "EX146",
+    "Name": "Hang Clean",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Barbell",
+    "Difficulty": "Advanced",
+    "Type": "Olympic",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Start at hang (above knee), clean to shoulders. Focus second pull, explosive extension, fast catch."
+  },
+  {
+    "ExerciseID": "EX147",
+    "Name": "Hang Snatch",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Barbell",
+    "Difficulty": "Advanced",
+    "Type": "Olympic",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Start at hang, snatch overhead. Focus second pull, wide grip, fast drop under."
+  },
+  {
+    "ExerciseID": "EX148",
+    "Name": "High Pull",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Deadlift to high pull, no catch. Triple extension, pull to chest/chin, elbows high."
+  },
+  {
+    "ExerciseID": "EX149",
+    "Name": "Barbell Shrug",
+    "MuscleGroup": "Traps",
+    "Equipment": "Barbell",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hold bar, shrug shoulders to ears. Squeeze traps, hold, control down, no rolling."
+  },
+  {
+    "ExerciseID": "EX150",
+    "Name": "Dumbbell Shrug",
+    "MuscleGroup": "Traps",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hold dumbbells, shrug shoulders up. Squeeze traps, hold at top, control negative."
+  },
+  {
+    "ExerciseID": "EX151",
+    "Name": "Cable Shrug",
+    "MuscleGroup": "Traps",
+    "Equipment": "Cable",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Cable handles, shrug up. Constant tension, squeeze traps, control both ways."
+  },
+  {
+    "ExerciseID": "EX152",
+    "Name": "Overhead Shrug",
+    "MuscleGroup": "Traps",
+    "Equipment": "Barbell/Dumbbells",
+    "Difficulty": "Intermediate",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hold overhead, shrug shoulders up. Upper trap focus, stable overhead, control."
+  },
+  {
+    "ExerciseID": "EX153",
+    "Name": "Scap Pull-Up",
+    "MuscleGroup": "Back",
+    "Equipment": "Pull-Up Bar",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hang, depress scapula without bending arms. Back activation, shoulder blade control, hold."
+  },
+  {
+    "ExerciseID": "EX154",
+    "Name": "Scap Push-Up",
+    "MuscleGroup": "Chest/Serratus",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Push-up position, protract/retract scapula. Serratus activation, shoulder health, no arm bend."
+  },
+  {
+    "ExerciseID": "EX155",
+    "Name": "Serratus Punch",
+    "MuscleGroup": "Serratus",
+    "Equipment": "Dumbbell/Cable",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Punch forward, protract scapula. Serratus emphasis, control return, light weight."
+  },
+  {
+    "ExerciseID": "EX156",
+    "Name": "Wall Slide",
+    "MuscleGroup": "Shoulder Mobility",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Back to wall, arms slide up and down. Shoulder mobility, no arching, full range."
+  },
+  {
+    "ExerciseID": "EX157",
+    "Name": "Band Pull-Apart",
+    "MuscleGroup": "Rear Delts",
+    "Equipment": "Resistance Band",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hold band, pull apart to sides. Rear delt focus, control return, various angles."
+  },
+  {
+    "ExerciseID": "EX158",
+    "Name": "Dislocates",
+    "MuscleGroup": "Shoulder Mobility",
+    "Equipment": "Band/Stick",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Wide grip, rotate over head and back. Shoulder mobility, gradual narrow grip, control."
+  },
+  {
+    "ExerciseID": "EX159",
+    "Name": "YTWL",
+    "MuscleGroup": "Rotator Cuff",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Four positions: Y, T, W, L. Light weight, rotator cuff and scapula stability, control."
+  },
+  {
+    "ExerciseID": "EX160",
+    "Name": "External Rotation",
+    "MuscleGroup": "Rotator Cuff",
+    "Equipment": "Dumbbell/Cable",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Elbow at side, rotate forearm out. Rotator cuff strength, control both ways, light weight."
+  },
+  {
+    "ExerciseID": "EX161",
+    "Name": "Internal Rotation",
+    "MuscleGroup": "Rotator Cuff",
+    "Equipment": "Dumbbell/Cable",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Elbow at side, rotate forearm in. Rotator cuff balance, control, light weight."
+  },
+  {
+    "ExerciseID": "EX162",
+    "Name": "Cuban Rotation",
+    "MuscleGroup": "Rotator Cuff",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Intermediate",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Elbows up, external rotation overhead. Advanced rotator cuff, control, light weight."
+  },
+  {
+    "ExerciseID": "EX163",
+    "Name": "Waiter Carry",
+    "MuscleGroup": "Core/Shoulders",
+    "Equipment": "Dumbbell/KB",
+    "Difficulty": "Intermediate",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hold weight overhead, walk. Core stability, shoulder endurance, no lean."
+  },
+  {
+    "ExerciseID": "EX164",
+    "Name": "Bottoms-Up Carry",
+    "MuscleGroup": "Grip/Shoulders",
+    "Equipment": "Kettlebell",
+    "Difficulty": "Advanced",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Kettlebell upside down, walk. Extreme grip and stability, elbow locked, control."
+  },
+  {
+    "ExerciseID": "EX165",
+    "Name": "Overhead Carry",
+    "MuscleGroup": "Core/Shoulders",
+    "Equipment": "Barbell/Dumbbells",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hold overhead, walk. Core bracing, shoulder stability, no arch back."
+  },
+  {
+    "ExerciseID": "EX166",
+    "Name": "Suitcase Carry",
+    "MuscleGroup": "Core/Grip",
+    "Equipment": "Dumbbell/KB",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hold one side, walk. Anti-lateral flexion, core fights side bend, grip work."
+  },
+  {
+    "ExerciseID": "EX167",
+    "Name": "Rack Carry",
+    "MuscleGroup": "Core/Upper Back",
+    "Equipment": "Kettlebell",
+    "Difficulty": "Intermediate",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Kettlebells at rack position, walk. Core tight, elbows in, upright posture."
+  },
+  {
+    "ExerciseID": "EX168",
+    "Name": "Sled Drag",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Sled",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Pull sled toward you, various attachments. Full body, grip, posterior chain, controlled."
+  },
+  {
+    "ExerciseID": "EX169",
+    "Name": "Sled Pull",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Sled",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Pull sled backward, facing it. Back, biceps, grip, controlled steps, upright torso."
+  },
+  {
+    "ExerciseID": "EX170",
+    "Name": "Battle Ropes",
+    "MuscleGroup": "Full Body/Cardio",
+    "Equipment": "Battle Ropes",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Waves, slams, alternating patterns. Core tight, generate from hips, high intensity intervals."
+  },
+  {
+    "ExerciseID": "EX171",
+    "Name": "Sledgehammer Swing",
+    "MuscleGroup": "Core/Cardio",
+    "Equipment": "Sledgehammer",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Swing hammer to tire or pad. Rotational power, core control, alternate sides."
+  },
+  {
+    "ExerciseID": "EX172",
+    "Name": "Tire Flip",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Tire",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Deadlift tire, drive through, flip. Explosive hip extension, chest up, controlled landing."
+  },
+  {
+    "ExerciseID": "EX173",
+    "Name": "Log Press",
+    "MuscleGroup": "Shoulders/Full Body",
+    "Equipment": "Log",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Clean log to rack, press overhead. Neutral grip, awkward implement, brute strength."
+  },
+  {
+    "ExerciseID": "EX174",
+    "Name": "Axle Clean",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Axle Bar",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Thick bar clean, grip challenge. Same mechanics as clean, harder grip, rotate elbows."
+  },
+  {
+    "ExerciseID": "EX175",
+    "Name": "Atlas Stone Lift",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Atlas Stone",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Lift stone from ground to platform or shoulder. Tacky grip, lap then load, full body."
+  },
+  {
+    "ExerciseID": "EX176",
+    "Name": "Keg Carry",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Keg",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Carry keg various positions. Unstable load, core fights rotation, grip and endurance."
+  },
+  {
+    "ExerciseID": "EX177",
+    "Name": "Sandbag Clean",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Sandbag",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Clean sandbag to shoulder. Unstable, grip challenge, same triple extension mechanics."
+  },
+  {
+    "ExerciseID": "EX178",
+    "Name": "Sandbag Shoulder",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Sandbag",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Lift sandbag to shoulder. Bear hug or grip, explosive, load over shoulder."
+  },
+  {
+    "ExerciseID": "EX179",
+    "Name": "Dumbbell Snatch",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Single-arm snatch overhead. Explosive hip, fast pull, punch under, lock out."
+  },
+  {
+    "ExerciseID": "EX180",
+    "Name": "Dumbbell Clean",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Single-arm clean to shoulder. Explosive hip, rotate dumbbell, catch at shoulder."
+  },
+  {
+    "ExerciseID": "EX181",
+    "Name": "Dumbbell Jerk",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Dumbbells",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Clean to shoulder, dip drive, press out. Single-arm, core fights rotation, lock out."
+  },
+  {
+    "ExerciseID": "EX182",
+    "Name": "Kettlebell Snatch",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Kettlebell",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Swing to snatch overhead in one motion. Punch through, bell rotates, no banging forearm."
+  },
+  {
+    "ExerciseID": "EX183",
+    "Name": "Kettlebell Clean",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Kettlebell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Swing to rack position. Punch through, bell rotates, soft catch at shoulder."
+  },
+  {
+    "ExerciseID": "EX184",
+    "Name": "Kettlebell Jerk",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Kettlebell",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Rack position, dip drive, press out. Double or single, core tight, lock out overhead."
+  },
+  {
+    "ExerciseID": "EX185",
+    "Name": "Kettlebell Press",
+    "MuscleGroup": "Shoulders",
+    "Equipment": "Kettlebell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Rack position, strict press overhead. Core braced, no leg drive, control negative."
+  },
+  {
+    "ExerciseID": "EX186",
+    "Name": "Kettlebell Squat",
+    "MuscleGroup": "Quads/Glutes",
+    "Equipment": "Kettlebell",
+    "Difficulty": "Beginner",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Goblet or double rack squat. Upright torso, full depth, core tight, drive through heels."
+  },
+  {
+    "ExerciseID": "EX187",
+    "Name": "Kettlebell Deadlift",
+    "MuscleGroup": "Posterior Chain",
+    "Equipment": "Kettlebell",
+    "Difficulty": "Beginner",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Hinge, grip horns, lift. Same deadlift mechanics, closer grip, control negative."
+  },
+  {
+    "ExerciseID": "EX188",
+    "Name": "Kettlebell Turkish Get-Up",
+    "MuscleGroup": "Full Body",
+    "Equipment": "Kettlebell",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "7-step sequence, stable overhead. Keep arm vertical, eyes on bell, slow and controlled."
+  },
+  {
+    "ExerciseID": "EX189",
+    "Name": "Kettlebell Windmill",
+    "MuscleGroup": "Shoulders/Hamstrings",
+    "Equipment": "Kettlebell",
+    "Difficulty": "Advanced",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Overhead bell, hinge to touch floor. Hip hinge, eyes on bell, hamstring stretch, control."
+  },
+  {
+    "ExerciseID": "EX190",
+    "Name": "Kettlebell Figure-8",
+    "MuscleGroup": "Core/Cardio",
+    "Equipment": "Kettlebell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Pass kettlebell through legs in figure-8. Squat pattern, core tight, continuous motion."
+  },
+  {
+    "ExerciseID": "EX191",
+    "Name": "Kettlebell Halo",
+    "MuscleGroup": "Shoulders/Mobility",
+    "Equipment": "Kettlebell",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Circle bell around head. Shoulder mobility, core tight, control, light weight."
+  },
+  {
+    "ExerciseID": "EX192",
+    "Name": "Kettlebell Around the World",
+    "MuscleGroup": "Core/Shoulders",
+    "Equipment": "Kettlebell",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Circle bell around body. Core tension, shoulder endurance, control, keep arms straight."
+  },
+  {
+    "ExerciseID": "EX193",
+    "Name": "Barbell Hip Thrust",
+    "MuscleGroup": "Glutes",
+    "Equipment": "Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Shoulders on bench, bar on hips, thrust up. Chin tucked, squeeze glutes, full extension, control."
+  },
+  {
+    "ExerciseID": "EX194",
+    "Name": "Banded Hip Thrust",
+    "MuscleGroup": "Glutes",
+    "Equipment": "Resistance Band",
+    "Difficulty": "Beginner",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Band over hips, thrust up against resistance. Same as hip thrust, variable resistance, squeeze."
+  },
+  {
+    "ExerciseID": "EX195",
+    "Name": "Single-Leg Hip Thrust",
+    "MuscleGroup": "Glutes",
+    "Equipment": "Bodyweight/Barbell",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "One leg elevated, thrust up. Unilateral glute focus, harder balance, control negative."
+  },
+  {
+    "ExerciseID": "EX196",
+    "Name": "Frog Pump",
+    "MuscleGroup": "Glutes",
+    "Equipment": "Bodyweight",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Feet together, knees out, thrust hips. Glute isolation, short ROM, high reps, squeeze at top."
+  },
+  {
+    "ExerciseID": "EX197",
+    "Name": "Reverse Hyperextension",
+    "MuscleGroup": "Glutes/Lower Back",
+    "Equipment": "Machine",
+    "Difficulty": "Intermediate",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Legs swing back, squeeze glutes. Posterior chain pump, control momentum, light weight."
+  },
+  {
+    "ExerciseID": "EX198",
+    "Name": "45-Degree Back Extension",
+    "MuscleGroup": "Lower Back/Glutes",
+    "Equipment": "Hyperextension",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "45-degree angle, lower and raise torso. Squeeze glutes at top, control negative, no hyperextend."
+  },
+  {
+    "ExerciseID": "EX199",
+    "Name": "Glute Kickback",
+    "MuscleGroup": "Glutes",
+    "Equipment": "Cable/Machine",
+    "Difficulty": "Beginner",
+    "Type": "Isolation",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Kick leg back, squeeze glute. Control negative, no arch back, keep core tight."
+  },
+  {
+    "ExerciseID": "EX200",
+    "Name": "Cable Glute Pull-Through",
+    "MuscleGroup": "Glutes/Hamstrings",
+    "Equipment": "Cable",
+    "Difficulty": "Intermediate",
+    "Type": "Compound",
+    "VideoURL": "https://www.youtube.com/watch?v=PLACEHOLDER",
+    "Description": "Rope between legs, hinge, pull through. Squeeze glutes, constant tension, hip hinge pattern."
+  }
+]

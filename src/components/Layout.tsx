@@ -27,6 +27,7 @@ import {
   Brain,
   MessageSquare,
   ChevronDown,
+  BookOpen,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Badge from "@/components/Badge";
@@ -44,6 +45,7 @@ interface LayoutProps {
 // Base secondary navigation (without Coach - added conditionally)
 const baseSecondaryNavItems = [
   { icon: Sparkles, label: "AI Builder", path: "/ai-program-builder" },
+  { icon: BookOpen, label: "Exercises", path: "/exercises" },
   { icon: CalendarIcon, label: "Schedule", path: "/schedule" },
   { icon: Scale, label: "Bio Print", path: "/bioprint" },
   { icon: Camera, label: "Photos", path: "/progress-photos" },
