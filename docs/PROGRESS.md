@@ -13,5 +13,7 @@
 - Dashboard rings (steps/sleep/HRV) — manual entry, no wearables yet
 - Check-in due card → currently links to /bioprint placeholder
 - AI pages (CoachAI, AIProgramBuilder) — local logic, no edge function
-- workout_log_entries table — pending human decision (app writes to it but table missing)
 - Storage bucket for progress photos
+
+## DB fixes
+- workout_log_entries created live on 2026-07-17, matching schema.sql
