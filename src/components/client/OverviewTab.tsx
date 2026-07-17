@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   User,
@@ -11,12 +12,17 @@ import {
   Flame,
   Activity,
   Droplets,
+  Plus,
 } from "lucide-react";
 import type { Client, ClientNutritionPlan } from "@/types/client";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { useBodyComposition } from "@/components/bodycomp/useBodyComposition";
+import { AssessmentWizard } from "@/components/bodycomp/AssessmentWizard";
 
 interface OverviewTabProps {
   client: Client;
+  clientId: string;
   nutritionPlan: ClientNutritionPlan | null;
 }
 
@@ -28,8 +34,17 @@ const fadeUp = {
 
 export default function OverviewTab({
   client,
+  clientId,
   nutritionPlan,
 }: OverviewTabProps) {
+  const [showWizard, setShowWizard] = useState(false);
+  const {
+    loading,
+    latestBodyComposition,
+    latestAssessment,
+    assessments,
+  } = useBodyComposition(clientId);
+
   const bmi =
     client.height && client.weight
       ? +(client.weight / (client.height / 100) ** 2).toFixed(1)
@@ -311,7 +326,131 @@ export default function OverviewTab({
           )}
         </motion.div>
       </div>
+
+      {/* Body Composition */}
+      <BodyCompositionCard
+        loading={loading}
+        latestBodyComposition={latestBodyComposition}
+        latestAssessment={latestAssessment}
+        assessments={assessments}
+        onNewAssessment={() => setShowWizard(true)}
+      />
+
+      <AssessmentWizard
+        clientId={clientId}
+        isOpen={showWizard}
+        onClose={() => setShowWizard(false)}
+        onSaved={() => setShowWizard(false)}
+      />
     </div>
+  );
+}
+
+function BodyCompositionCard({
+  loading,
+  latestBodyComposition,
+  latestAssessment,
+  assessments,
+  onNewAssessment,
+}: {
+  loading: boolean;
+  latestBodyComposition: import("@/components/bodycomp/useBodyComposition").BodyCompositionRow | null;
+  latestAssessment: import("@/components/bodycomp/useBodyComposition").SkinfoldAssessmentRow | null;
+  assessments: import("@/components/bodycomp/useBodyComposition").SkinfoldAssessmentRow[];
+  onNewAssessment: () => void;
+}) {
+  const latestWeight = latestBodyComposition?.weight_kg ?? latestAssessment?.weight_kg ?? null;
+  const latestBF = latestAssessment?.body_fat_pct ?? latestBodyComposition?.body_fat_percentage ?? null;
+  const latestSum = latestAssessment?.sum_mm ?? null;
+  const recentAssessments = assessments.slice(0, 5);
+
+  return (
+    <motion.div
+      {...fadeUp}
+      className="rounded-2xl border p-4"
+      style={{
+        backgroundColor: "var(--card-bg)",
+        borderColor: "var(--card-border)",
+      }}
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold" style={{ color: "var(--page-text)" }}>
+          Body Composition
+        </h3>
+        <Button
+          onClick={onNewAssessment}
+          size="sm"
+          className="gap-1"
+          style={{ background: "linear-gradient(135deg, #00AEEF, #8B5CF6)" }}
+        >
+          <Plus className="h-3.5 w-3.5" /> New Assessment
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="h-24 animate-pulse rounded-xl bg-slate-800" />
+      ) : (
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-xl border p-3 text-center" style={{ borderColor: "var(--card-border)" }}>
+              <p className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>Weight</p>
+              <p className="text-lg font-bold" style={{ color: "var(--page-text)" }}>
+                {latestWeight != null ? `${latestWeight.toFixed(1)} kg` : "—"}
+              </p>
+            </div>
+            <div className="rounded-xl border p-3 text-center" style={{ borderColor: "var(--card-border)" }}>
+              <p className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>Body Fat</p>
+              <p className="text-lg font-bold" style={{ color: "#8B5CF6" }}>
+                {latestBF != null ? `${latestBF.toFixed(1)}%` : "—"}
+              </p>
+            </div>
+            <div className="rounded-xl border p-3 text-center" style={{ borderColor: "var(--card-border)" }}>
+              <p className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>Skinfold Sum</p>
+              <p className="text-lg font-bold" style={{ color: "#00AEEF" }}>
+                {latestSum != null ? `${latestSum.toFixed(1)} mm` : "—"}
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 text-xs font-medium" style={{ color: "var(--light-text-secondary)" }}>
+              Recent Assessments
+            </p>
+            {recentAssessments.length === 0 ? (
+              <p className="text-sm" style={{ color: "var(--light-text-muted)" }}>
+                No assessments yet.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {recentAssessments.map((a) => (
+                  <div
+                    key={a.id}
+                    className="flex items-center justify-between rounded-lg border p-2"
+                    style={{ borderColor: "var(--card-border)" }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="rounded px-1.5 py-0.5 text-[10px]"
+                        style={{ background: "rgba(139, 92, 246, 0.15)", color: "#8B5CF6" }}
+                      >
+                        {a.protocol.toUpperCase()}
+                      </span>
+                      <span className="text-xs" style={{ color: "var(--page-text)" }}>
+                        {new Date(a.recorded_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <span className="text-xs" style={{ color: "var(--light-text-muted)" }}>
+                      {a.sum_mm?.toFixed(1)} mm
+                      {a.body_fat_pct != null ? ` • ${a.body_fat_pct.toFixed(1)}%` : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </motion.div>
   );
 }
 

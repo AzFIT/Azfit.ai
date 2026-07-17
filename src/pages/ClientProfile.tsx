@@ -216,7 +216,7 @@ export default function ClientProfile() {
             transition={{ duration: 0.2 }}
           >
             {activeTab === "overview" && (
-              <OverviewTab client={client} nutritionPlan={nutritionPlan} />
+              <OverviewTab client={client} clientId={clientId!} nutritionPlan={nutritionPlan} />
             )}
             {activeTab === "bio" && <BioHistoryTab entries={bioHistory} />}
             {activeTab === "nutrition" && (
