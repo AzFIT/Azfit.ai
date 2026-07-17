@@ -212,7 +212,7 @@ export function SessionExerciseCard({
 
       {/* Expanded Body */}
       <div
-        className={`overflow-hidden transition-all duration-350 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+        className={`overflow-hidden transition-all duration-300 ease-out ${
           isExpanded ? 'max-h-[900px] opacity-100' : 'max-h-0 opacity-0'
         }`}
       >
