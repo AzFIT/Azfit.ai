@@ -18,3 +18,4 @@
 
 ## DB fixes
 - workout_log_entries created live on 2026-07-17, matching schema.sql
+- Recreated on_auth_user_created trigger live on 2026-07-17 — was missing; signups were getting no profiles row.
