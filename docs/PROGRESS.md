@@ -4,6 +4,7 @@
 - Trainer dashboard: needs-attention strip, quick actions (b74140b)
 - Real-time messaging via Supabase Realtime (30d7ead)
 - Sessions table + booking requests + realtime (dfa953f)
+- DB reconciliation: RLS fixes on category tables, program-library schema dump, notifications table
 ## Next
 - Check-in forms + habit tracking (Phase 5)
 - Voice notes + push notifications
@@ -12,3 +13,5 @@
 - Dashboard rings (steps/sleep/HRV) — manual entry, no wearables yet
 - Check-in due card → currently links to /bioprint placeholder
 - AI pages (CoachAI, AIProgramBuilder) — local logic, no edge function
+- workout_log_entries table — pending human decision (app writes to it but table missing)
+- Storage bucket for progress photos
