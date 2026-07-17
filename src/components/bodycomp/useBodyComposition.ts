@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-import type { Database } from "@/types/supabase";
+import type { Database, Json } from "@/types/supabase";
 import type { SkinfoldProtocol, SkinfoldSite } from "@/lib/bodyfat";
 
 export type BodyCompositionRow = Database["public"]["Tables"]["body_composition"]["Row"];
@@ -96,7 +96,7 @@ function useResolvedClientId(propClientId?: string) {
 export function useBodyComposition(propClientId?: string) {
   const { user } = useAuth();
   const userId = user?.id || null;
-  const { clientId, hasRecord, resolving } = useResolvedClientId(propClientId);
+  const { clientId, hasRecord: hasClientRecord, resolving } = useResolvedClientId(propClientId);
   const [loading, setLoading] = useState(false);
   const [bodyComposition, setBodyComposition] = useState<BodyCompositionRow[]>([]);
   const [assessments, setAssessments] = useState<SkinfoldAssessmentRow[]>([]);
@@ -177,7 +177,7 @@ export function useBodyComposition(propClientId?: string) {
         }));
 
       if (rows.length > 0) {
-        const { error } = await supabase.from("body_composition").insert(rows as Database["public"]["Tables"]["body_composition"]["Insert"]);
+        const { error } = await supabase.from("body_composition").insert(rows as Database["public"]["Tables"]["body_composition"]["Insert"][]);
         if (error) {
           console.error("[useBodyComposition] migration failed:", error);
           toast.error("Could not migrate old BioPrint data");
@@ -288,7 +288,7 @@ export function useBodyComposition(propClientId?: string) {
         assessed_by: userId,
         recorded_at: input.recorded_at || new Date().toISOString(),
         protocol: input.protocol,
-        sites: input.sites as Record<string, unknown>,
+        sites: input.sites as unknown as Json,
         sum_mm: input.sum_mm,
         body_fat_pct: input.body_fat_pct ?? null,
         weight_kg: input.weight_kg ?? null,

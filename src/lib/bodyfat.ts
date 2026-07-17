@@ -117,5 +117,5 @@ export function sumSites(sites: Partial<Record<SkinfoldSite, number>>, protocol:
 
 /** Validate that every required site for a protocol is present and > 0. */
 export function validateSites(sites: Partial<Record<SkinfoldSite, number>>, protocol: SkinfoldProtocol): SkinfoldSite[] {
-  return PROTOCOL_SITES[protocol].filter((site) => !(sites[site] ?? 0) > 0);
+  return PROTOCOL_SITES[protocol].filter((site) => (sites[site] ?? 0) <= 0);
 }
