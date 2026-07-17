@@ -46,30 +46,6 @@ export function calculateBMI(weightKg: number, heightCm: number): number {
   return +(weightKg / (heightM * heightM)).toFixed(1);
 }
 
-/**
- * Calculate BMR using Mifflin-St Jeor equation
- */
-export function calculateBMR(
-  weightKg: number,
-  heightCm: number,
-  age: number,
-  gender: 'male' | 'female'
-): number {
-  if (!weightKg || !heightCm || !age || !gender) return 0;
-  const base = 10 * weightKg + 6.25 * heightCm - 5 * age;
-  return Math.round(gender === 'male' ? base + 5 : base - 161);
-}
+import { calculateBMR, calculateTDEE } from "./tdee";
 
-/**
- * Calculate TDEE from BMR and activity level
- */
-export function calculateTDEE(bmr: number, activityLevel: string): number {
-  const multipliers: Record<string, number> = {
-    sedentary: 1.2,
-    light: 1.375,
-    moderate: 1.55,
-    very: 1.725,
-    extreme: 1.9,
-  };
-  return Math.round(bmr * (multipliers[activityLevel] || 1.2));
-}
+export { calculateBMR, calculateTDEE };
