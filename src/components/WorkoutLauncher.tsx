@@ -1,18 +1,41 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Play, Dumbbell, Calendar, Layers, ChevronRight, Clock } from 'lucide-react';
-import { masterPrograms, type MasterProgram, type MasterPhase, type MasterWorkout } from '@/data/masterWorkouts';
+import { useClientPrograms, type ClientProgram } from '@/hooks/useClientPrograms';
 import { SessionLauncher } from './SessionLauncher';
+import { splitProgramIntoPhases, type ProgramPhase } from '@/lib/workoutSession';
 
 type Step = 'program' | 'phase' | 'week' | 'workout';
 
+interface SelectedWorkout {
+  workout: ClientProgram['workouts'][number];
+  phaseName: string;
+  weekNumber: number;
+  dayNumber: number;
+}
+
 export function WorkoutLauncher({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const { programs, loading } = useClientPrograms();
   const [step, setStep] = useState<Step>('program');
-  const [selectedProgram, setSelectedProgram] = useState<MasterProgram | null>(null);
-  const [selectedPhase, setSelectedPhase] = useState<MasterPhase | null>(null);
+  const [selectedProgram, setSelectedProgram] = useState<ClientProgram | null>(null);
+  const [selectedPhase, setSelectedPhase] = useState<ProgramPhase | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
-  const [selectedWorkout, setSelectedWorkout] = useState<MasterWorkout | null>(null);
+  const [selectedWorkout, setSelectedWorkout] = useState<SelectedWorkout | null>(null);
   const [showSessionLauncher, setShowSessionLauncher] = useState(false);
+
+  const phases = useMemo(() => {
+    if (!selectedProgram) return [];
+    return splitProgramIntoPhases(selectedProgram.duration_weeks || 1);
+  }, [selectedProgram]);
+
+  const weeks = useMemo(() => {
+    if (!selectedPhase) return [];
+    const list: number[] = [];
+    for (let w = selectedPhase.startWeek; w <= selectedPhase.endWeek; w++) {
+      list.push(w);
+    }
+    return list;
+  }, [selectedPhase]);
 
   const reset = () => {
     setStep('program');
@@ -28,14 +51,14 @@ export function WorkoutLauncher({ isOpen, onClose }: { isOpen: boolean; onClose:
     onClose();
   };
 
-  const handleSelectProgram = (program: MasterProgram) => {
+  const handleSelectProgram = (program: ClientProgram) => {
     setSelectedProgram(program);
     setStep('phase');
   };
 
-  const handleSelectPhase = (phase: MasterPhase) => {
+  const handleSelectPhase = (phase: ProgramPhase) => {
     setSelectedPhase(phase);
-    setSelectedWeek(1);
+    setSelectedWeek(phase.startWeek);
     setStep('week');
   };
 
@@ -44,25 +67,15 @@ export function WorkoutLauncher({ isOpen, onClose }: { isOpen: boolean; onClose:
     setStep('workout');
   };
 
-  const handleSelectWorkout = (workout: MasterWorkout) => {
-    setSelectedWorkout(workout);
+  const handleSelectWorkout = (workout: ClientProgram['workouts'][number], index: number) => {
+    setSelectedWorkout({
+      workout,
+      phaseName: selectedPhase?.label || 'Phase',
+      weekNumber: selectedWeek,
+      dayNumber: index + 1,
+    });
     setShowSessionLauncher(true);
   };
-
-  const getWeeksForPhase = (phase: MasterPhase): number[] => {
-    const weeks: number[] = [];
-    // Parse starting week from phase id or default
-    let startWeek = 1;
-    if (phase.id.includes('phase-1') || phase.id.includes('p1')) startWeek = 1;
-    else if (phase.id.includes('phase-2') || phase.id.includes('p2')) startWeek = 5;
-    else if (phase.id.includes('phase-3') || phase.id.includes('p3')) startWeek = 9;
-    for (let i = 0; i < phase.durationWeeks; i++) {
-      weeks.push(startWeek + i);
-    }
-    return weeks;
-  };
-
-  const getDayNumber = (workoutIndex: number): number => workoutIndex + 1;
 
   if (!isOpen) return null;
 
@@ -71,7 +84,6 @@ export function WorkoutLauncher({ isOpen, onClose }: { isOpen: boolean; onClose:
       <AnimatePresence>
         {isOpen && !showSessionLauncher && (
           <>
-            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -79,62 +91,63 @@ export function WorkoutLauncher({ isOpen, onClose }: { isOpen: boolean; onClose:
               className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
               onClick={handleClose}
             />
-
-            {/* Modal */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-50 bg-[#0B1120] border border-slate-700/50 rounded-2xl md:w-full md:max-w-lg md:max-h-[80vh] overflow-hidden flex flex-col"
+              className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-50 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl md:w-full md:max-w-lg md:max-h-[80vh] overflow-hidden flex flex-col"
             >
-              {/* Header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--card-border)]">
                 <div>
-                  <h2 className="text-lg font-bold text-white">Start Workout</h2>
-                  <p className="text-xs text-slate-400">
+                  <h2 className="text-lg font-bold text-[var(--text-primary)]">Start Workout</h2>
+                  <p className="text-xs text-[var(--text-muted)]">
                     {step === 'program' && 'Select a training program'}
                     {step === 'phase' && `${selectedProgram?.name} — Select phase`}
-                    {step === 'week' && `${selectedPhase?.name} — Select week`}
+                    {step === 'week' && `${selectedPhase?.label} — Select week`}
                     {step === 'workout' && `Week ${selectedWeek} — Select workout`}
                   </p>
                 </div>
                 <button
                   onClick={handleClose}
-                  className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 transition-colors"
+                  className="p-2 rounded-xl bg-[var(--card-bg)] hover:bg-[var(--card-border)] text-[var(--text-muted)] transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* Breadcrumb */}
-              <div className="px-5 py-2 bg-slate-900/50 border-b border-slate-800/50 flex items-center gap-1 text-[11px]">
-                <span className={`${step === 'program' ? 'text-[#00AEEF] font-medium' : 'text-slate-500'}`}>Program</span>
-                <ChevronRight className="w-3 h-3 text-slate-600" />
-                <span className={`${step === 'phase' ? 'text-[#00AEEF] font-medium' : step === 'program' ? 'text-slate-600' : 'text-slate-500'}`}>Phase</span>
-                <ChevronRight className="w-3 h-3 text-slate-600" />
-                <span className={`${step === 'week' ? 'text-[#00AEEF] font-medium' : step === 'workout' ? 'text-slate-500' : 'text-slate-600'}`}>Week</span>
-                <ChevronRight className="w-3 h-3 text-slate-600" />
-                <span className={`${step === 'workout' ? 'text-[#00AEEF] font-medium' : 'text-slate-600'}`}>Workout</span>
+              <div className="px-5 py-2 bg-[var(--card-bg)]/50 border-b border-[var(--card-border)]/50 flex items-center gap-1 text-[11px]">
+                <span className={`${step === 'program' ? 'text-[#00AEEF] font-medium' : 'text-[var(--text-muted)]'}`}>Program</span>
+                <ChevronRight className="w-3 h-3 text-[var(--text-muted)]" />
+                <span className={`${step === 'phase' ? 'text-[#00AEEF] font-medium' : step === 'program' ? 'text-[var(--text-muted)]/60' : 'text-[var(--text-muted)]'}`}>Phase</span>
+                <ChevronRight className="w-3 h-3 text-[var(--text-muted)]" />
+                <span className={`${step === 'week' ? 'text-[#00AEEF] font-medium' : step === 'workout' ? 'text-[var(--text-muted)]' : 'text-[var(--text-muted)]/60'}`}>Week</span>
+                <ChevronRight className="w-3 h-3 text-[var(--text-muted)]" />
+                <span className={`${step === 'workout' ? 'text-[#00AEEF] font-medium' : 'text-[var(--text-muted)]/60'}`}>Workout</span>
               </div>
 
-              {/* Content */}
               <div className="flex-1 overflow-y-auto p-5">
-                <AnimatePresence mode="wait">
-                  {/* PROGRAM STEP */}
-                  {step === 'program' && (
-                    <motion.div
-                      key="program"
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      className="space-y-3"
-                    >
-                      {masterPrograms.map((program) => (
+                {loading && (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-16 rounded-xl bg-[var(--card-border)]/30 animate-pulse" />
+                    ))}
+                  </div>
+                )}
+
+                {!loading && step === 'program' && (
+                  <div className="space-y-3">
+                    {programs.length === 0 ? (
+                      <div className="text-center py-8">
+                        <Dumbbell className="w-8 h-8 text-[var(--text-muted)] mx-auto mb-2" />
+                        <p className="text-sm text-[var(--text-muted)]">No active programs assigned.</p>
+                      </div>
+                    ) : (
+                      programs.map((program) => (
                         <button
                           key={program.id}
                           onClick={() => handleSelectProgram(program)}
-                          className="w-full text-left p-4 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:border-[#00AEEF]/50 hover:bg-slate-800 transition-all group"
+                          className="w-full text-left p-4 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] hover:border-[#00AEEF]/50 hover:bg-[var(--card-border)]/50 transition-all group"
                         >
                           <div className="flex items-start gap-3">
                             <div className="w-10 h-10 rounded-lg bg-[#00AEEF]/10 flex items-center justify-center shrink-0">
@@ -142,178 +155,145 @@ export function WorkoutLauncher({ isOpen, onClose }: { isOpen: boolean; onClose:
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <h3 className="text-sm font-semibold text-white group-hover:text-[#00AEEF] transition-colors">
+                                <h3 className="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[#00AEEF] transition-colors">
                                   {program.name}
                                 </h3>
-                                <span className="px-1.5 py-0.5 rounded bg-slate-700 text-[10px] text-slate-400">
-                                  {program.category}
-                                </span>
                               </div>
-                              <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{program.description}</p>
+                              <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-2">{program.description}</p>
                               <div className="flex items-center gap-3 mt-2">
-                                <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                                  <Layers className="w-3 h-3" />
-                                  {program.phases.length} phases
-                                </span>
-                                <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                                <span className="text-[10px] text-[var(--text-muted)] flex items-center gap-1">
                                   <Calendar className="w-3 h-3" />
-                                  {program.totalWeeks} weeks
+                                  {program.duration_weeks} weeks
                                 </span>
-                                <span className="text-[10px] text-slate-500">{program.level}</span>
+                                <span className="text-[10px] text-[var(--text-muted)] flex items-center gap-1">
+                                  <Layers className="w-3 h-3" />
+                                  {program.frequency_per_week}x/week
+                                </span>
                               </div>
                             </div>
-                            <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-[#00AEEF] transition-colors shrink-0 mt-1" />
+                            <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[#00AEEF] transition-colors shrink-0 mt-1" />
                           </div>
                         </button>
-                      ))}
-                    </motion.div>
-                  )}
+                      ))
+                    )}
+                  </div>
+                )}
 
-                  {/* PHASE STEP */}
-                  {step === 'phase' && selectedProgram && (
-                    <motion.div
-                      key="phase"
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      className="space-y-3"
-                    >
+                {!loading && step === 'phase' && selectedProgram && (
+                  <div className="space-y-3">
+                    <button onClick={() => setStep('program')} className="text-xs text-[#00AEEF] hover:underline mb-2">
+                      ← Back to programs
+                    </button>
+                    {phases.map((phase) => (
                       <button
-                        onClick={() => setStep('program')}
-                        className="text-xs text-[#00AEEF] hover:underline mb-2"
+                        key={phase.key}
+                        onClick={() => handleSelectPhase(phase)}
+                        className="w-full text-left p-4 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] hover:border-[#00AEEF]/50 hover:bg-[var(--card-border)]/50 transition-all group"
                       >
-                        ← Back to programs
-                      </button>
-                      {selectedProgram.phases.map((phase) => (
-                        <button
-                          key={phase.id}
-                          onClick={() => handleSelectPhase(phase)}
-                          className="w-full text-left p-4 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:border-[#00AEEF]/50 hover:bg-slate-800 transition-all group"
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-teal-500/10 flex items-center justify-center shrink-0">
-                              <Layers className="w-5 h-5 text-teal-400" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h3 className="text-sm font-semibold text-white group-hover:text-teal-400 transition-colors">
-                                {phase.name}
-                              </h3>
-                              <p className="text-xs text-slate-400 mt-0.5">{phase.goal}</p>
-                              <div className="flex items-center gap-3 mt-2">
-                                <span className="text-[10px] text-slate-500">{phase.block}</span>
-                                <span className="text-[10px] text-slate-500">{phase.durationWeeks} weeks</span>
-                                <span className="text-[10px] text-slate-500">{phase.workouts.length} workouts</span>
-                              </div>
-                            </div>
-                            <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-teal-400 transition-colors shrink-0 mt-1" />
-                          </div>
-                        </button>
-                      ))}
-                    </motion.div>
-                  )}
-
-                  {/* WEEK STEP */}
-                  {step === 'week' && selectedPhase && (
-                    <motion.div
-                      key="week"
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      className="space-y-3"
-                    >
-                      <button
-                        onClick={() => setStep('phase')}
-                        className="text-xs text-[#00AEEF] hover:underline mb-2"
-                      >
-                        ← Back to phases
-                      </button>
-                      <div className="grid grid-cols-4 gap-2">
-                        {getWeeksForPhase(selectedPhase).map((week) => (
-                          <button
-                            key={week}
-                            onClick={() => handleSelectWeek(week)}
-                            className="p-3 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:border-[#00AEEF]/50 hover:bg-slate-800 transition-all text-center group"
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                            style={{ backgroundColor: `${phase.color}15` }}
                           >
-                            <div className="text-lg font-bold text-white group-hover:text-[#00AEEF]">W{week}</div>
-                            <div className="text-[10px] text-slate-500 mt-0.5">Week {week}</div>
-                          </button>
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {/* WORKOUT STEP */}
-                  {step === 'workout' && selectedPhase && (
-                    <motion.div
-                      key="workout"
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      className="space-y-3"
-                    >
-                      <button
-                        onClick={() => setStep('week')}
-                        className="text-xs text-[#00AEEF] hover:underline mb-2"
-                      >
-                        ← Back to weeks
+                            <Layers className="w-5 h-5" style={{ color: phase.color }} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[#00AEEF] transition-colors">
+                              {phase.label}
+                            </h3>
+                            <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                              Weeks {phase.startWeek}–{phase.endWeek}
+                            </p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[#00AEEF] transition-colors shrink-0 mt-1" />
+                        </div>
                       </button>
-                      {selectedPhase.workouts.map((workout, idx) => {
+                    ))}
+                  </div>
+                )}
+
+                {!loading && step === 'week' && selectedPhase && (
+                  <div className="space-y-3">
+                    <button onClick={() => setStep('phase')} className="text-xs text-[#00AEEF] hover:underline mb-2">
+                      ← Back to phases
+                    </button>
+                    <div className="grid grid-cols-4 gap-2">
+                      {weeks.map((week) => (
+                        <button
+                          key={week}
+                          onClick={() => handleSelectWeek(week)}
+                          className="p-3 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] hover:border-[#00AEEF]/50 hover:bg-[var(--card-border)]/50 transition-all text-center group"
+                        >
+                          <div className="text-lg font-bold text-[var(--text-primary)] group-hover:text-[#00AEEF]">W{week}</div>
+                          <div className="text-[10px] text-[var(--text-muted)] mt-0.5">Week {week}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!loading && step === 'workout' && selectedProgram && (
+                  <div className="space-y-3">
+                    <button onClick={() => setStep('week')} className="text-xs text-[#00AEEF] hover:underline mb-2">
+                      ← Back to weeks
+                    </button>
+                    {selectedProgram.workouts
+                      .filter((w) => w.week_number === selectedWeek || (!w.week_number && selectedWeek === 1))
+                      .map((workout, idx) => {
                         const exerciseCount = workout.exercises.length;
                         const estimatedDuration = Math.round(exerciseCount * 4.5);
                         return (
                           <button
                             key={workout.id}
-                            onClick={() => handleSelectWorkout(workout)}
-                            className="w-full text-left p-4 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:border-emerald-500/50 hover:bg-slate-800 transition-all group"
+                            onClick={() => handleSelectWorkout(workout, idx)}
+                            className="w-full text-left p-4 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] hover:border-emerald-500/50 hover:bg-[var(--card-border)]/50 transition-all group"
                           >
                             <div className="flex items-start gap-3">
                               <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
                                 <Play className="w-5 h-5 text-emerald-400" />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <h3 className="text-sm font-semibold text-white group-hover:text-emerald-400 transition-colors">
+                                <h3 className="text-sm font-semibold text-[var(--text-primary)] group-hover:text-emerald-400 transition-colors">
                                   {workout.name}
                                 </h3>
-                                <p className="text-xs text-slate-400 mt-0.5">
-                                  Day {getDayNumber(idx)} • {exerciseCount} exercises
+                                <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                                  Day {workout.day_of_week || idx + 1} • {exerciseCount} exercises
                                 </p>
                                 <div className="flex items-center gap-3 mt-2">
-                                  <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                                  <span className="text-[10px] text-[var(--text-muted)] flex items-center gap-1">
                                     <Clock className="w-3 h-3" />
                                     ~{estimatedDuration} min
                                   </span>
-                                  <span className="text-[10px] text-slate-500">
-                                    {workout.exercises.reduce((sum, ex) => sum + ex.sets, 0)} total sets
+                                  <span className="text-[10px] text-[var(--text-muted)]">
+                                    {workout.exercises.reduce((sum, ex) => sum + (ex.sets || 0), 0)} total sets
                                   </span>
                                 </div>
                               </div>
-                              <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-emerald-400 transition-colors shrink-0 mt-1" />
+                              <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-emerald-400 transition-colors shrink-0 mt-1" />
                             </div>
                           </button>
                         );
                       })}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                  </div>
+                )}
               </div>
             </motion.div>
           </>
         )}
       </AnimatePresence>
 
-      {/* Session Launcher */}
-      {showSessionLauncher && selectedWorkout && selectedPhase && selectedProgram && (
+      {showSessionLauncher && selectedWorkout && selectedProgram && (
         <SessionLauncher
           isOpen={showSessionLauncher}
           onClose={() => {
             setShowSessionLauncher(false);
             handleClose();
           }}
-          workoutId={selectedWorkout.id}
-          programId={selectedProgram.id}
-          phaseName={selectedPhase.name}
-          weekNumber={selectedWeek}
-          dayNumber={selectedPhase.workouts.findIndex((w) => w.id === selectedWorkout.id) + 1}
+          workoutId={selectedWorkout.workout.id}
+          workoutName={selectedWorkout.workout.name}
+          phaseName={selectedWorkout.phaseName}
+          weekNumber={selectedWorkout.weekNumber}
+          dayNumber={selectedWorkout.dayNumber}
         />
       )}
     </>
