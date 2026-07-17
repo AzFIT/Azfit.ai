@@ -43,32 +43,22 @@ const LEGACY_HISTORY_KEY = "azfit_bio_history";
 
 function useResolvedClientId(propClientId?: string) {
   const { user, loading: authLoading } = useAuth();
+  const email = user?.email;
   const [clientId, setClientId] = useState<string | null>(propClientId || null);
   const [hasRecord, setHasRecord] = useState<boolean>(!!propClientId);
-  const [resolving, setResolving] = useState(!propClientId && !authLoading);
+  const [resolving, setResolving] = useState(!propClientId);
 
   useEffect(() => {
-    if (propClientId) {
-      setClientId(propClientId);
-      setHasRecord(true);
-      setResolving(false);
-      return;
-    }
-    if (!user?.email) {
-      setClientId(null);
-      setHasRecord(false);
-      setResolving(false);
-      return;
-    }
+    if (propClientId) return;
+    if (!email) return;
 
     let cancelled = false;
-    setResolving(true);
 
     const resolve = async () => {
       const { data, error } = await supabase
         .from("clients")
         .select("id")
-        .eq("email", user.email)
+        .eq("email", email)
         .order("created_at", { ascending: false })
         .limit(1)
         .single();
@@ -88,7 +78,7 @@ function useResolvedClientId(propClientId?: string) {
     return () => {
       cancelled = true;
     };
-  }, [propClientId, user?.email]);
+  }, [propClientId, email]);
 
   return { clientId, hasRecord, resolving: resolving || authLoading };
 }

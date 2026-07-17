@@ -48,41 +48,36 @@ function formatSiteName(site: string): string {
 
 function useResolvedClientId(propClientId?: string) {
   const { user } = useAuth();
+  const email = user?.email;
   const [clientId, setClientId] = useState<string | null>(propClientId || null);
   const [resolving, setResolving] = useState(!propClientId);
 
   useEffect(() => {
-    if (propClientId) {
-      setClientId(propClientId);
-      setResolving(false);
-      return;
-    }
-    if (!user?.email) {
-      setClientId(null);
-      setResolving(false);
-      return;
-    }
+    if (propClientId) return;
+    if (!email) return;
 
     let cancelled = false;
-    setResolving(true);
-    supabase
-      .from("clients")
-      .select("id")
-      .eq("email", user.email)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single()
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (!error && data) setClientId(data.id);
-        else setClientId(null);
-        setResolving(false);
-      });
 
+    const resolve = async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id")
+        .eq("email", email)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (cancelled) return;
+      if (!error && data) setClientId(data.id);
+      else setClientId(null);
+      setResolving(false);
+    };
+
+    resolve();
     return () => {
       cancelled = true;
     };
-  }, [propClientId, user?.email]);
+  }, [propClientId, email]);
 
   return { clientId, resolving };
 }
@@ -95,7 +90,6 @@ function useClientProfile(clientId: string | null) {
     if (!clientId) return;
 
     let cancelled = false;
-    setLoading(true);
 
     const load = async () => {
       const { data } = await supabase
