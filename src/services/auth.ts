@@ -142,13 +142,17 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
 // Listen to auth state changes
 export function onAuthStateChange(callback: (user: AuthUser | null) => void) {
-  return supabase.auth.onAuthStateChange(async (_event, session) => {
-    if (session) {
-      const user = await getCurrentUser();
-      callback(user);
-    } else {
+  return supabase.auth.onAuthStateChange((_event, session) => {
+    if (!session) {
       callback(null);
+      return;
     }
+    // Defer async profile fetch OUT of the auth callback (supabase-js deadlock guard)
+    setTimeout(() => {
+      getCurrentUser()
+        .then((user) => callback(user))
+        .catch(() => callback(null));
+    }, 0);
   });
 }
 

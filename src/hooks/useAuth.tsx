@@ -21,7 +21,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = async () => {
     try {
-      const currentUser = await getCurrentUser();
+      const currentUser = await Promise.race([
+        getCurrentUser(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('getCurrentUser timed out')), 5000)
+        ),
+      ]);
       setUser(currentUser);
     } catch (error) {
       console.error('Error fetching user:', error);
