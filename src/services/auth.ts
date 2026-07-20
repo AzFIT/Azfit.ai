@@ -40,16 +40,13 @@ export interface ClientProfileData {
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'admin@azfit.ai';
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || '';
 
-// Check if admin quick login is available (always true for demo)
+// Check if admin quick login is available (dev builds only)
 export function isAdminQuickLoginAvailable(): boolean {
-  return true;
+  return import.meta.env.DEV === true;
 }
 
-// Check if credentials match admin (accepts any email with admin password, or demo mode)
+// Check if credentials match configured admin credentials
 export function isAdminCredentials(email: string, password: string): boolean {
-  // Always allow admin@azfit.ai with any password for demo
-  if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) return true;
-  // Also check if password matches configured admin password
   if (!ADMIN_PASSWORD) return false;
   return email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && password === ADMIN_PASSWORD;
 }
@@ -89,9 +86,11 @@ export async function signIn(email: string, password: string) {
   return data;
 }
 
-// Admin login - bypasses normal auth, creates a mock session
+// Admin login - bypasses normal auth, creates a mock session (dev only)
 export async function adminLogin(): Promise<AuthUser> {
-  // Always return mock admin user - no real auth needed for demo/admin access
+  if (import.meta.env.DEV !== true) {
+    throw new Error('Admin quick login is disabled in production');
+  }
   return {
     id: 'admin-mock-id-001',
     email: ADMIN_EMAIL,
