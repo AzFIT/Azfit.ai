@@ -23,11 +23,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
       - name: Run ESLint
         run: npm run lint
 
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Run unit tests
+        run: npm run test
+
       - name: Build project
         run: npm run build
+
+      - name: Run Playwright smoke tests
+        run: npm run test:e2e
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
