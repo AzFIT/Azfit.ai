@@ -14,9 +14,10 @@
 - Foundation Sprint — product analytics: `posthog-js` + Plausible script injection, `useAnalytics()` hook for SPA pageviews (foundation/sprint-1)
 - Foundation Sprint — brand consolidation: honest stats, unified AzFIT/AzTechFit story, removed fake "10,000+ athletes" claims, App Store/Google Play marked "Coming Soon", footer dead links cleaned (foundation/sprint-1)
 - Foundation Sprint — environment documentation: comprehensive `.env.example` with dev/staging/prod strategy and all env vars (foundation/sprint-1)
+- Foundation Sprint — RLS audit: static SQL checks for self-referencing policies, `is_trainer()` usage, missing ENABLE RLS; `docs/RLS-AUDIT.md` + `src/services/rlsAudit.test.ts` (4 tests) (foundation/sprint-1)
 
 ## Next
-- Foundation Sprint (active): RLS audit tests
+- Phase 1: real backend, multi-tenant schema, RLS integration tests with live DB
 - Check-in forms + habit tracking (Phase 5)
 - Voice notes + push notifications
 - Stripe payments (HUMAN GATE — needs founder approval)
