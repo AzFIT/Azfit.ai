@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, Dumbbell, ArrowLeft, Shield } from 'lucide-react';
@@ -7,13 +7,20 @@ import { useAuth } from '@/hooks/useAuth';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { refreshUser, loginAsAdmin } = useAuth();
+  const { user, loginAsAdmin } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Once the auth context finishes the async profile fetch after sign-in, redirect.
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,8 +36,7 @@ export default function Login() {
       }
 
       await signIn(email, password);
-      await refreshUser();
-      navigate('/dashboard');
+      // Auth context updates user asynchronously via onAuthStateChange; useEffect handles redirect.
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Invalid email or password');
     } finally {

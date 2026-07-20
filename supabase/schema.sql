@@ -196,13 +196,19 @@ CREATE POLICY "Users can update own profile"
   USING (auth.uid() = id);
 
 -- Trainers can read all profiles
+CREATE OR REPLACE FUNCTION public.is_trainer()
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+  SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'trainer');
+$$;
+
 CREATE POLICY "Trainers can read all profiles"
   ON profiles FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'trainer'
-    )
-  );
+  USING (public.is_trainer());
 
 -- CLIENTS: Trainers can manage their clients, clients can read their own
 CREATE POLICY "Trainers can manage their clients"
