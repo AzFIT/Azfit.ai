@@ -389,10 +389,10 @@ function StatsSection() {
     >
       <div className="mx-auto grid w-full max-w-5xl grid-cols-2 gap-8 px-6 lg:grid-cols-4 lg:gap-0">
         {[
-          { value: 10000, suffix: "+", label: "Active Athletes", prefix: "" },
-          { value: 2500000, suffix: "+", label: "Workouts Logged", prefix: "" },
-          { value: 150000, suffix: "+", label: "Personal Records", prefix: "" },
-          { value: 49, suffix: "", label: "App Store Rating", prefix: "" },
+          { value: 270, suffix: "+", label: "Exercise Movements", prefix: "" },
+          { value: 3, suffix: "", label: "Simple Tiers", prefix: "" },
+          { value: 116, suffix: "+", label: "Clients Coached by AzTechFit", prefix: "" },
+          { value: 1, suffix: "/5", label: "Built for Coaches First", prefix: "" },
         ].map((stat, i) => (
           <ScrollReveal
             key={stat.label}
@@ -407,9 +407,9 @@ function StatsSection() {
                   "0 0 12px rgba(6,182,212,0.4), 0 2px 4px rgba(0,0,0,0.3)",
               }}
             >
-              {stat.label === "App Store Rating" ? (
+              {stat.label === "Built for Coaches First" ? (
                 <>
-                  4.9<span className="text-lg">/5</span>
+                  5<span className="text-lg">/5</span>
                 </>
               ) : (
                 <AnimatedCounter
@@ -671,22 +671,22 @@ function HowItWorksSection() {
 
 const testimonials = [
   {
-    name: "Alex Chen",
-    role: "Powerlifter, 3 years",
+    name: "Coach in Hong Kong",
+    role: "Personal Trainer",
     quote:
-      "AzFIT transformed how I track my training. The spreadsheet mode is genius — I can log my entire workout in under 2 minutes, and the progress rings keep me honest about my sleep and steps.",
+      "AzFIT transformed how I program for my clients. The spreadsheet mode is fast — I can build a full week in minutes, and the progress rings keep my clients accountable for sleep and habits.",
     avatar: "./avatar-alex.jpg",
   },
   {
-    name: "Sarah Kim",
-    role: "CrossFit Athlete",
+    name: "Client in Hong Kong",
+    role: "Strength Trainee",
     quote:
-      "My coach uses the coach view to program my workouts and track my progress remotely. The achievement badges are surprisingly motivating — I'm chasing that 10,000 sets badge now!",
+      "My coach uses the coach view to program my workouts and track my progress remotely. The achievement badges are surprisingly motivating, and the BioPrint tracking is something no other app gave me.",
     avatar: "./avatar-sarah.jpg",
   },
   {
-    name: "Marcus Johnson",
-    role: "Bodybuilder, 5 years",
+    name: "Competitive Athlete",
+    role: "Powerlifter",
     quote:
       "I've tried dozens of fitness apps. AzFIT is the first one that actually understands how serious lifters track data. The RPE logging, rest timer, and volume charts are exactly what I needed.",
     avatar: "./avatar-marcus.jpg",
@@ -713,7 +713,7 @@ function TestimonialsSection() {
             className="text-3xl font-bold tracking-tight lg:text-[40px]"
             style={{ color: "#0F172A" }}
           >
-            Loved by Athletes Worldwide
+            Built with Coaches, For Clients
           </h2>
         </ScrollReveal>
 
@@ -874,7 +874,7 @@ function PricingSection({ onNavigate }: { onNavigate: (path: string) => void }) 
   ];
 
   return (
-    <section className="px-6 py-16 lg:py-24" style={{ backgroundColor: "#0F172A" }}>
+    <section id="pricing" className="px-6 py-16 lg:py-24" style={{ backgroundColor: "#0F172A" }}>
       <div className="mx-auto max-w-6xl">
         <ScrollReveal className="mb-12 text-center lg:mb-16">
           <p
@@ -982,7 +982,7 @@ function DownloadCTA({ onNavigate }: { onNavigate: (path: string) => void }) {
               textShadow: "0 2px 4px rgba(0,0,0,0.6), 0 0 20px rgba(0,0,0,0.3)",
             }}
           >
-            Download AzFIT and join 10,000+ athletes who train smarter.
+            Try AzFIT in your browser today. Native iOS and Android apps are on the roadmap.
           </p>
 
           {/* CTA Button */}
@@ -997,73 +997,31 @@ function DownloadCTA({ onNavigate }: { onNavigate: (path: string) => void }) {
             Try AzFIT Free
           </button>
 
-          {/* App Store Badges */}
-          <div className="mt-6 flex justify-center gap-3">
-            {/* Apple App Store badge */}
-            <svg
-              className="h-14 w-auto cursor-pointer opacity-90 transition-opacity hover:opacity-100"
-              viewBox="0 0 120 40"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <rect width="120" height="40" rx="6" fill="#000" />
-              <text
-                x="38"
-                y="16"
-                fill="#fff"
-                fontSize="8"
-                fontFamily="-apple-system, Inter, sans-serif"
+          {/* App Store badges — disabled until native apps ship */}
+          <div className="mt-6 flex flex-col items-center gap-2">
+            <div className="flex items-center gap-3">
+              <div
+                className="flex items-center gap-2 rounded-full border px-4 py-2 text-sm opacity-70"
+                style={{ borderColor: "#334155", color: "#94A3B8" }}
               >
-                Download on the
-              </text>
-              <text
-                x="38"
-                y="30"
-                fill="#fff"
-                fontSize="14"
-                fontWeight="600"
-                fontFamily="-apple-system, Inter, sans-serif"
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+                </svg>
+                <span>App Store — Coming Soon</span>
+              </div>
+              <div
+                className="flex items-center gap-2 rounded-full border px-4 py-2 text-sm opacity-70"
+                style={{ borderColor: "#334155", color: "#94A3B8" }}
               >
-                App Store
-              </text>
-              <path
-                d="M24 14.5c.1-1.6 1-3 2.4-3.8-.9-1.3-2.4-2-3.9-2-1.7 0-3.2 1-4 1-2.1 0-4.1 1.8-4.1 5.5 0 1.6.6 3.3 1.4 4.4.9 1.2 1.7 2.5 3.1 2.4 1.2 0 1.7-.8 3.2-.8 1.4 0 1.8.8 3.1.8 1.3 0 2.1-1.2 2.9-2.3.9-1.3 1.3-2.6 1.3-2.7-.1-.1-2.5-1-2.5-3.7-.1-2.3 2-3.4 2.1-3.5-1.1-1.6-2.9-1.8-3.5-1.9-1.5-.1-3 1-3.7 1z"
-                fill="#fff"
-              />
-            </svg>
-
-            {/* Google Play badge */}
-            <svg
-              className="h-14 w-auto cursor-pointer opacity-90 transition-opacity hover:opacity-100"
-              viewBox="0 0 135 40"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <rect width="135" height="40" rx="6" fill="#000" />
-              <text
-                x="44"
-                y="16"
-                fill="#fff"
-                fontSize="8"
-                fontFamily="-apple-system, Inter, sans-serif"
-              >
-                GET IT ON
-              </text>
-              <text
-                x="44"
-                y="30"
-                fill="#fff"
-                fontSize="14"
-                fontWeight="600"
-                fontFamily="-apple-system, Inter, sans-serif"
-              >
-                Google Play
-              </text>
-              <path d="M12.5 12.5v15l11.5-7.5L12.5 12.5z" fill="#EA4335" />
-              <path d="M12.5 12.5L4 20l8.5 7.5v-15z" fill="#FBBC04" />
-              <path d="M24 20l-11.5-7.5V20H24z" fill="#4285F4" />
-              <path d="M24 20L12.5 27.5V20H24z" fill="#34A853" />
-            </svg>
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.5,12.92 20.16,13.19L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/>
+                </svg>
+                <span>Google Play — Coming Soon</span>
+              </div>
+            </div>
+            <p className="text-xs" style={{ color: "#64748B" }}>
+              PWA install available on mobile browsers now.
+            </p>
           </div>
         </ScrollReveal>
       </div>

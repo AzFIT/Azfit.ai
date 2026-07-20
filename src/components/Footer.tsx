@@ -19,10 +19,10 @@ const Footer = memo(function Footer() {
             </span>
           </div>
           <p className="text-xs" style={{ color: 'var(--dark-text-muted)' }}>
-            Personal training, reimagined.
+            Personal training, reimagined. Built by AzTechFit Hong Kong.
           </p>
           <p className="mt-2 text-xs" style={{ color: 'var(--dark-text-muted)' }}>
-            &copy; 2025 AzFIT
+            &copy; 2026 AzFIT
           </p>
         </div>
 
@@ -31,16 +31,20 @@ const Footer = memo(function Footer() {
           <h4 className="text-sm font-semibold" style={{ color: 'var(--dark-text-primary)' }}>
             Product
           </h4>
-          {['Features', 'Pricing', 'Changelog', 'Roadmap'].map((item) => (
+          {[
+            { label: 'Features', href: '#features' },
+            { label: 'Pricing', href: '#pricing' },
+            { label: 'Demo', href: '/demo' },
+          ].map((item) => (
             <a
-              key={item}
-              href="#"
+              key={item.label}
+              href={item.href}
               className="text-sm transition-colors duration-200 hover:underline"
               style={{ color: 'var(--dark-text-muted)' }}
               onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--dark-text-secondary)')}
               onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--dark-text-muted)')}
             >
-              {item}
+              {item.label}
             </a>
           ))}
         </div>
@@ -48,55 +52,46 @@ const Footer = memo(function Footer() {
         {/* Resources Column */}
         <div className="flex flex-col gap-3">
           <h4 className="text-sm font-semibold" style={{ color: 'var(--dark-text-primary)' }}>
-            Resources
+            Contact
           </h4>
-          {['Blog', 'Exercise Library', 'Nutrition Guide', 'API'].map((item) => (
-            <a
-              key={item}
-              href="#"
-              className="text-sm transition-colors duration-200 hover:underline"
-              style={{ color: 'var(--dark-text-muted)' }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--dark-text-secondary)')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--dark-text-muted)')}
-            >
-              {item}
-            </a>
-          ))}
+          <a
+            href="mailto:hello@aztechfit.com"
+            className="text-sm transition-colors duration-200 hover:underline"
+            style={{ color: 'var(--dark-text-muted)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--dark-text-secondary)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--dark-text-muted)')}
+          >
+            hello@aztechfit.com
+          </a>
+          <p className="text-sm" style={{ color: 'var(--dark-text-muted)' }}>
+            Hong Kong
+          </p>
         </div>
 
         {/* Company Column */}
         <div className="flex flex-col gap-3">
           <h4 className="text-sm font-semibold" style={{ color: 'var(--dark-text-primary)' }}>
-            Company
+            Legal
           </h4>
-          {['About', 'Careers', 'Privacy', 'Terms'].map((item) => (
-            <a
-              key={item}
-              href="#"
-              className="text-sm transition-colors duration-200 hover:underline"
-              style={{ color: 'var(--dark-text-muted)' }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--dark-text-secondary)')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--dark-text-muted)')}
-            >
-              {item}
-            </a>
-          ))}
+          <span className="text-sm" style={{ color: 'var(--dark-text-muted)' }}>
+            Privacy Policy — coming soon
+          </span>
+          <span className="text-sm" style={{ color: 'var(--dark-text-muted)' }}>
+            Terms of Service — coming soon
+          </span>
         </div>
       </div>
 
       {/* Social Icons Row */}
       <div className="mt-8 flex justify-center gap-5">
         {[Instagram, Twitter, Youtube, Github].map((Icon, i) => (
-          <a
+          <span
             key={i}
-            href="#"
-            className="transition-colors duration-200"
+            className="cursor-not-allowed transition-colors duration-200"
             style={{ color: 'var(--dark-text-muted)' }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--dark-text-secondary)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--dark-text-muted)')}
           >
             <Icon size={20} />
-          </a>
+          </span>
         ))}
       </div>
     </footer>
