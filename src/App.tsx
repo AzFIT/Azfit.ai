@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router";
 import { Suspense, lazy, useEffect } from "react";
 import * as Sentry from "@sentry/react";
+import { useAnalytics } from "@/hooks/useAnalytics";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ChatProvider } from "@/components/chat/ChatContext";
@@ -97,6 +98,7 @@ function ErrorFallback() {
 }
 
 export default function App() {
+  useAnalytics();
   useEffect(() => {
     registerServiceWorker();
     // One-time dev test error to verify Sentry wiring (replace with real DSN to see it in dashboard)
