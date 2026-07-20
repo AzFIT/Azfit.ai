@@ -26,7 +26,7 @@ test.describe('Smoke: public pages', () => {
   });
 
   test('login page loads', async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('/#/login');
     await expect(page.getByRole('heading', { name: /Welcome Back/i })).toBeVisible();
     await expect(page.getByPlaceholder(/you@example.com/i)).toBeVisible();
   });
@@ -34,13 +34,13 @@ test.describe('Smoke: public pages', () => {
 
 test.describe('Smoke: auth flow', () => {
   test('client logs in and sees dashboard content', async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('/#/login');
     await page.getByPlaceholder(/you@example.com/i).fill(DEMO_CLIENT.email);
     await page.getByPlaceholder(/Enter your password/i).fill(DEMO_CLIENT.password);
     await page.getByRole('button', { name: /Sign In/i }).click();
 
     // Wait for auth context + redirect to dashboard
-    await page.waitForURL('**/dashboard', { timeout: 10000 });
+    await page.waitForURL('**/#/dashboard', { timeout: 10000 });
 
     // The dashboard should render actual content (not a blank white screen)
     await expect(page.locator('body')).not.toBeEmpty();
@@ -48,12 +48,12 @@ test.describe('Smoke: auth flow', () => {
   });
 
   test('trainer logs in and sees client list', async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('/#/login');
     await page.getByPlaceholder(/you@example.com/i).fill(DEMO_TRAINER.email);
     await page.getByPlaceholder(/Enter your password/i).fill(DEMO_TRAINER.password);
     await page.getByRole('button', { name: /Sign In/i }).click();
 
-    await page.waitForURL('**/dashboard', { timeout: 10000 });
+    await page.waitForURL('**/#/dashboard', { timeout: 10000 });
 
     // Trainer dashboard should show client-related content
     await expect(page.locator('body')).not.toBeEmpty();
