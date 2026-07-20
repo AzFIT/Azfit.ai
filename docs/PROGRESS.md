@@ -13,9 +13,10 @@
 - Foundation Sprint — Sentry wiring: `@sentry/react` + `@sentry/vite-plugin`, runtime init gated by `VITE_SENTRY_DSN`, one-time dev test error, production ErrorBoundary (foundation/sprint-1)
 - Foundation Sprint — product analytics: `posthog-js` + Plausible script injection, `useAnalytics()` hook for SPA pageviews (foundation/sprint-1)
 - Foundation Sprint — brand consolidation: honest stats, unified AzFIT/AzTechFit story, removed fake "10,000+ athletes" claims, App Store/Google Play marked "Coming Soon", footer dead links cleaned (foundation/sprint-1)
+- Foundation Sprint — environment documentation: comprehensive `.env.example` with dev/staging/prod strategy and all env vars (foundation/sprint-1)
 
 ## Next
-- Foundation Sprint (active): RLS audit tests, env docs
+- Foundation Sprint (active): RLS audit tests
 - Check-in forms + habit tracking (Phase 5)
 - Voice notes + push notifications
 - Stripe payments (HUMAN GATE — needs founder approval)
