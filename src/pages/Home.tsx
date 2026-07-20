@@ -173,6 +173,20 @@ function HeroNav({
         >
           View Demo
         </button>
+        <button
+          onClick={() => onNavigate("/login")}
+          className="text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-80"
+          style={{ textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}
+        >
+          Log In
+        </button>
+        <button
+          onClick={() => onNavigate("/signup")}
+          className="rounded-full border-2 border-white/60 px-5 py-2 text-sm font-semibold text-white transition-all duration-200 hover:bg-white/10 hover:border-white/80 active:scale-[0.97]"
+          style={{ textShadow: "0 1px 3px rgba(0,0,0,0.3)" }}
+        >
+          Sign Up
+        </button>
       </div>
 
       {/* Mobile hamburger */}
@@ -1140,6 +1154,24 @@ function MobileDrawer({
                 className="flex h-12 items-center gap-4 rounded-lg bg-[#0D9488] px-3 text-sm font-semibold text-white active:scale-[0.98]"
               >
                 Go to Dashboard
+              </button>
+              <button
+                onClick={() => {
+                  onNavigate("/login");
+                  onClose();
+                }}
+                className="flex h-12 items-center gap-4 rounded-lg px-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+              >
+                Log In
+              </button>
+              <button
+                onClick={() => {
+                  onNavigate("/signup");
+                  onClose();
+                }}
+                className="flex h-12 items-center gap-4 rounded-lg border border-white/40 px-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+              >
+                Sign Up
               </button>
               <button
                 onClick={() => {
