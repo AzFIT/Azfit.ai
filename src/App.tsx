@@ -3,6 +3,7 @@ import { Suspense, lazy } from "react";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ChatProvider } from "@/components/chat/ChatContext";
+import { AIContextProvider } from "@/components/ai-copilot/AIContextProvider";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Toaster } from "@/components/ui/sonner";
 import OfflineBanner from "@/components/OfflineBanner";
@@ -61,202 +62,204 @@ export default function App() {
     <AuthProvider>
       <ThemeProvider>
         <ChatProvider>
-          <Toaster />
-          <OfflineBanner />
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              <Route path="/demo" element={<DemoDashboard />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/" element={<Home />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/analytics"
-                element={
-                  <ProtectedRoute>
-                    <Analytics />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/coach"
-                element={
-                  <ProtectedRoute requireTrainer>
-                    <Coach />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/coach-ai"
-                element={
-                  <ProtectedRoute requireTrainer>
-                    <CoachAIPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/program-builder"
-                element={
-                  <ProtectedRoute requireTrainer>
-                    <ProgramBuilder />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/sheets"
-                element={
-                  <ProtectedRoute>
-                    <SheetsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/settings"
-                element={
-                  <ProtectedRoute>
-                    <Settings />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/onboarding"
-                element={
-                  <ProtectedRoute>
-                    <OnboardingPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/bioprint"
-                element={
-                  <ProtectedRoute>
-                    <BioPrintPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/nutrition"
-                element={
-                  <ProtectedRoute>
-                    <NutritionPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/ai-program-builder"
-                element={
-                  <ProtectedRoute>
-                    <AIProgramBuilderPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/schedule"
-                element={
-                  <ProtectedRoute>
-                    <SchedulePage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/progress-photos"
-                element={
-                  <ProtectedRoute>
-                    <ProgressPhotosPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/export"
-                element={
-                  <ProtectedRoute>
-                    <ExportSharePage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/timer"
-                element={
-                  <ProtectedRoute>
-                    <TimerModesPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/notifications"
-                element={
-                  <ProtectedRoute>
-                    <NotificationsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/client/:clientId"
-                element={
-                  <ProtectedRoute>
-                    <ClientProfile />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/clients"
-                element={
-                  <ProtectedRoute>
-                    <ClientsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/leaderboard"
-                element={
-                  <ProtectedRoute>
-                    <LeaderboardPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/warmup"
-                element={
-                  <ProtectedRoute>
-                    <WarmupGeneratorPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/deload"
-                element={
-                  <ProtectedRoute>
-                    <DeloadDetectionPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/messages"
-                element={
-                  <ProtectedRoute>
-                    <Messages />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/exercises"
-                element={
-                  <ProtectedRoute>
-                    <ExercisesPage />
-                  </ProtectedRoute>
-                }
-              />
-            </Routes>
-          </Suspense>
+          <AIContextProvider>
+            <Toaster />
+            <OfflineBanner />
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/demo" element={<DemoDashboard />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/" element={<Home />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/analytics"
+                  element={
+                    <ProtectedRoute>
+                      <Analytics />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/coach"
+                  element={
+                    <ProtectedRoute requireTrainer>
+                      <Coach />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/coach-ai"
+                  element={
+                    <ProtectedRoute requireTrainer>
+                      <CoachAIPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/program-builder"
+                  element={
+                    <ProtectedRoute requireTrainer>
+                      <ProgramBuilder />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/sheets"
+                  element={
+                    <ProtectedRoute>
+                      <SheetsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/settings"
+                  element={
+                    <ProtectedRoute>
+                      <Settings />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/onboarding"
+                  element={
+                    <ProtectedRoute>
+                      <OnboardingPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/bioprint"
+                  element={
+                    <ProtectedRoute>
+                      <BioPrintPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/nutrition"
+                  element={
+                    <ProtectedRoute>
+                      <NutritionPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/ai-program-builder"
+                  element={
+                    <ProtectedRoute>
+                      <AIProgramBuilderPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/schedule"
+                  element={
+                    <ProtectedRoute>
+                      <SchedulePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/progress-photos"
+                  element={
+                    <ProtectedRoute>
+                      <ProgressPhotosPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/export"
+                  element={
+                    <ProtectedRoute>
+                      <ExportSharePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/timer"
+                  element={
+                    <ProtectedRoute>
+                      <TimerModesPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/notifications"
+                  element={
+                    <ProtectedRoute>
+                      <NotificationsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/client/:clientId"
+                  element={
+                    <ProtectedRoute>
+                      <ClientProfile />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/clients"
+                  element={
+                    <ProtectedRoute>
+                      <ClientsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/leaderboard"
+                  element={
+                    <ProtectedRoute>
+                      <LeaderboardPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/warmup"
+                  element={
+                    <ProtectedRoute>
+                      <WarmupGeneratorPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/deload"
+                  element={
+                    <ProtectedRoute>
+                      <DeloadDetectionPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/messages"
+                  element={
+                    <ProtectedRoute>
+                      <Messages />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/exercises"
+                  element={
+                    <ProtectedRoute>
+                      <ExercisesPage />
+                    </ProtectedRoute>
+                  }
+                />
+              </Routes>
+            </Suspense>
+          </AIContextProvider>
         </ChatProvider>
       </ThemeProvider>
     </AuthProvider>
