@@ -7,6 +7,7 @@
 - DB reconciliation: RLS fixes on category tables, program-library schema dump, notifications table
 - Body Composition Assessments: skinfold_assessments table, JP3/JP7/Poliquin math, Katch-McArdle TDEE, BioPrint rebuild, trainer ClientProfile card (7398f5f)
 - Workout Session Experience: DB-backed launcher, active session hook, phase breadcrumb chips, sticky summary bar with target volume, exercise cards with set logging, PB detection, rest timer, finish/summary modal (feature/session-experience)
+- Auth/login flow fix: removed Supabase calls inside `onAuthStateChange` callback (fix/auth-hang, bb35d92), replaced self-referencing `profiles` RLS policy with `public.is_trainer()` SECURITY DEFINER function and made `Login.tsx` redirect wait for auth context (fix/login-flow, ac0684c)
 ## Next
 - Check-in forms + habit tracking (Phase 5)
 - Voice notes + push notifications
