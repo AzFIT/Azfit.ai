@@ -22,6 +22,7 @@
 - Client management Supabase migration: QuickAddClientModal writes to `clients` table, Clients list loads from Supabase with edit/archive + legacy import banner, ClientProfile crash-guards bad/missing UUIDs (fix/clients-supabase)
 - Habit tracker UI: `useHabits` hook + `HabitRow` component, client "My Habits" and trainer "Client Habits" sections on `/check-ins`, "Today's Habits" card on client dashboard; all data via Supabase, no localStorage (feat/habits-ui)
 - Real client health grid: replaced `MOCK_HEALTH_GRID` with Supabase-backed `useClientHealth`, per-client RAG status from sessions/workout_logs/check-ins, real attention-strip counts, archive button default filter fix (feat/health-grid)
+- Workout logger polish: RPE auto-adjust hints (≥9 drop/keep, ≤7 with target-rep hit increase), plate calculator under client load, rest-timer preset chips (0:30–5:00) with per-exercise in-memory last preset (feat/logger-polish)
 
 ## Next
 - Voice notes + push notifications

@@ -16,6 +16,67 @@ import type { SetType } from '@/lib/storage';
 import { getAllExercisesFlat } from '@/data/exerciseDatabase';
 import { toast } from 'sonner';
 
+const BAR_WEIGHT_KG = 20;
+const PLATES_KG = [25, 20, 15, 10, 5, 2.5, 1.25];
+const PRESET_SECONDS = [30, 60, 90, 120, 180, 300];
+
+interface PlateBreakdown {
+  plates: number[];
+  exact: boolean;
+  actualLoad: number;
+}
+
+function plateBreakdown(load: number, barWeight = BAR_WEIGHT_KG): PlateBreakdown {
+  if (load <= barWeight) return { plates: [], exact: true, actualLoad: barWeight };
+  const targetPerSide = (load - barWeight) / 2;
+  let remaining = targetPerSide;
+  const plates: number[] = [];
+  for (const plate of PLATES_KG) {
+    while (remaining >= plate - 0.001) {
+      plates.push(plate);
+      remaining -= plate;
+    }
+  }
+  const actualPerSide = targetPerSide - remaining;
+  const actualLoad = barWeight + actualPerSide * 2;
+  return { plates, exact: remaining < 0.001, actualLoad };
+}
+
+function formatPlateBreakdown(load: number, unit: 'kg' | 'lbs'): string {
+  if (!load || load <= BAR_WEIGHT_KG) return '';
+  const { plates, exact, actualLoad } = plateBreakdown(unit === 'lbs' ? load * 0.453592 : load);
+  if (plates.length === 0) return '';
+  const plateText = plates.length === 1 ? `${plates[0]}` : plates.join(' + ');
+  const loadDisplay = unit === 'lbs' ? Math.round(actualLoad / 0.453592) : actualLoad;
+  const targetDisplay = unit === 'lbs' ? Math.round(load / 0.453592) : load;
+  if (exact) {
+    return `${targetDisplay}${unit} = ${BAR_WEIGHT_KG} bar + ${plateText} /side`;
+  }
+  return `${targetDisplay}${unit} → ${loadDisplay}${unit} nearest: ${BAR_WEIGHT_KG} bar + ${plateText} /side`;
+}
+
+function getRpeHint(rpe: number, reps: number, targetReps: number, load: number, unit: 'kg' | 'lbs'): string | null {
+  if (!rpe || rpe < 1) return null;
+  if (rpe >= 9) {
+    return `That was RPE ${rpe} — keep ${load}${unit} or drop 2.5${unit} for the next set.`;
+  }
+  if (rpe <= 7 && reps >= targetReps) {
+    return `That was RPE ${rpe} — consider +2.5${unit} next set.`;
+  }
+  return null;
+}
+
+function parseTargetReps(reps: string): number {
+  const match = reps.match(/\d+/);
+  return match ? parseInt(match[0], 10) : 0;
+}
+
+function formatPreset(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s === 0 ? `${m}:00` : `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 interface SessionExerciseCardProps {
   exercise: SessionExercise;
   isExpanded: boolean;
@@ -56,6 +117,8 @@ export function SessionExerciseCard({
   const [showPr, setShowPr] = useState<number | null>(null);
   const [showSwap, setShowSwap] = useState(false);
   const [swapQuery, setSwapQuery] = useState('');
+  const [lastPresetSeconds, setLastPresetSeconds] = useState<Record<string, number>>({});
+  const [rpeHint, setRpeHint] = useState<{ setIndex: number; text: string } | null>(null);
 
   const allDone = useMemo(() => exercise.sets.length > 0 && exercise.sets.every((s) => s.done), [exercise.sets]);
   const completedCount = useMemo(() => exercise.sets.filter((s) => s.done).length, [exercise.sets]);
@@ -102,6 +165,9 @@ export function SessionExerciseCard({
         if (restTimer?.active && restTimer?.setIndex === setIdx) {
           onSkipRest(exercise.id);
         }
+        if (rpeHint?.setIndex === setIdx) {
+          setRpeHint(null);
+        }
         return;
       }
 
@@ -116,9 +182,14 @@ export function SessionExerciseCard({
         toast.success(`New PB: ${exercise.name} ${pbLabel}`);
       }
 
-      onStartRest(exercise.id, setIdx, s.restSeconds || 60);
+      const targetReps = parseTargetReps(exercise.targetReps);
+      const hint = getRpeHint(s.rpe, s.reps, targetReps, s.load || s.clientLoad || exercise.targetLoad || 0, unit);
+      setRpeHint(hint ? { setIndex: setIdx, text: hint } : null);
+
+      const restSeconds = lastPresetSeconds[exercise.id] ?? s.restSeconds ?? 60;
+      onStartRest(exercise.id, setIdx, restSeconds);
     },
-    [exercise, onToggleDone, onStartRest, onSkipRest, restTimer, unit]
+    [exercise, onToggleDone, onStartRest, onSkipRest, restTimer, unit, lastPresetSeconds, rpeHint]
   );
 
   const handleSwap = useCallback(
@@ -254,6 +325,9 @@ export function SessionExerciseCard({
                     {lastLoad > 0 && (
                       <span className="block text-[10px] text-[var(--text-muted)] mt-0.5">last: {lastLoad}{unit}</span>
                     )}
+                    {s.clientLoad > 20 && (
+                      <span className="block text-[10px] text-[#00AEEF] mt-0.5">{formatPlateBreakdown(s.clientLoad, unit)}</span>
+                    )}
                   </td>
                   <td className="py-2 px-2 font-semibold text-[var(--text-primary)] tabular-nums">{s.load || '—'}</td>
                   <td className="py-2 px-2">
@@ -278,22 +352,48 @@ export function SessionExerciseCard({
                       className="w-10 h-8 px-1 text-center text-[13px] bg-[var(--page-bg)] border-[var(--card-border)] focus:border-[#00AEEF] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] tabular-nums"
                     />
                   </td>
-                  <td className="py-2 px-2 tabular-nowrap">
+                  <td className="py-2 px-2 tabular-nowrap align-top">
                     {restTimer?.active && restTimer?.setIndex === si ? (
-                      <div className="flex items-center gap-1">
-                        <span
-                          className={`text-[13px] tabular-nums ${
-                            restTimer.remaining < 15 ? 'text-red-500 font-semibold' : restTimer.remaining < 30 ? 'text-amber-400' : 'text-[#00AEEF]'
-                          }`}
-                        >
-                          {formatRest(s)}
-                        </span>
-                        <button onClick={() => onSkipRest(exercise.id)} className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)] ml-1">
-                          Skip
-                        </button>
-                        <button onClick={() => onAddRest(exercise.id, 30)} className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)]">
-                          +30
-                        </button>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1">
+                          <span
+                            className={`text-[13px] tabular-nums ${
+                              restTimer.remaining < 15 ? 'text-red-500 font-semibold' : restTimer.remaining < 30 ? 'text-amber-400' : 'text-[#00AEEF]'
+                            }`}
+                          >
+                            {formatRest(s)}
+                          </span>
+                          <button onClick={() => onSkipRest(exercise.id)} className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)] ml-1">
+                            Skip
+                          </button>
+                          <button onClick={() => onAddRest(exercise.id, -15)} className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                            -15
+                          </button>
+                          <button onClick={() => onAddRest(exercise.id, 15)} className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                            +15
+                          </button>
+                          <button onClick={() => onAddRest(exercise.id, 30)} className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                            +30
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {PRESET_SECONDS.map((sec) => (
+                            <button
+                              key={sec}
+                              onClick={() => {
+                                setLastPresetSeconds((prev) => ({ ...prev, [exercise.id]: sec }));
+                                onStartRest(exercise.id, si, sec);
+                              }}
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-medium border transition-colors ${
+                                lastPresetSeconds[exercise.id] === sec
+                                  ? 'bg-[#00AEEF] text-[#0B1120] border-[#00AEEF]'
+                                  : 'bg-[var(--page-bg)] text-[var(--text-muted)] border-[var(--card-border)] hover:border-[#00AEEF] hover:text-[#00AEEF]'
+                              }`}
+                            >
+                              {formatPreset(sec)}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     ) : (
                       <select
@@ -352,6 +452,13 @@ export function SessionExerciseCard({
               ))}
             </tbody>
           </table>
+
+          {/* RPE auto-adjust hint */}
+          {rpeHint && (
+            <div className="mt-2 text-[11px] font-medium" style={{ color: '#00AEEF' }}>
+              {rpeHint.text}
+            </div>
+          )}
 
           {/* Quick Adjust Pills */}
           <div className="flex items-center gap-2 mt-2 mb-1">
