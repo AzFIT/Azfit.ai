@@ -860,7 +860,9 @@ function PricingSection({ onNavigate }: { onNavigate: (path: string) => void }) 
   ];
 
   return (
-    <section className="px-6 py-16 lg:py-24" style={{ backgroundColor: "#0F172A" }}>
+    <section
+      id="pricing"
+      className="px-6 py-16 lg:py-24" style={{ backgroundColor: "#0F172A" }}>
       <div className="mx-auto max-w-6xl">
         <ScrollReveal className="mb-12 text-center lg:mb-16">
           <p
