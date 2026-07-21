@@ -3,14 +3,14 @@ import type { ChatAction } from "./types";
 
 type EventMetadata = Record<string, string | number | boolean | null>;
 
-export function logChatMessage(
+export async function logChatMessage(
   userId: string | undefined,
   role: "user" | "assistant",
   content: string,
   extras?: { intent?: string; tokensInput?: number; tokensOutput?: number; modelUsed?: string; latencyMs?: number }
-) {
-  if (!userId) return;
-  supabase
+): Promise<string | null> {
+  if (!userId) return null;
+  const { data, error } = await supabase
     .from("chat_messages")
     .insert({
       user_id: userId,
@@ -22,12 +22,14 @@ export function logChatMessage(
       model_used: extras?.modelUsed || null,
       latency_ms: extras?.latencyMs || null,
     })
-    .then(
-      ({ error }) => {
-        if (error) console.error("Failed to log chat message:", error.message);
-      },
-      (err) => console.error("Failed to log chat message:", err)
-    );
+    .select("id")
+    .single();
+
+  if (error) {
+    console.error("Failed to log chat message:", error.message);
+    return null;
+  }
+  return data?.id ?? null;
 }
 
 export function logChatEvent(
@@ -49,6 +51,44 @@ export function logChatEvent(
       },
       (err) => console.error("Failed to log chat event:", err)
     );
+}
+
+export async function submitFeedback(
+  messageId: string | undefined,
+  userId: string | undefined,
+  rating: 1 | -1
+): Promise<boolean> {
+  if (!messageId || !userId) return false;
+
+  const { data: existing } = await supabase
+    .from("chat_feedback")
+    .select("id")
+    .eq("message_id", messageId)
+    .eq("user_id", userId)
+    .single();
+
+  if (existing) {
+    const { error } = await supabase
+      .from("chat_feedback")
+      .update({ rating })
+      .eq("id", existing.id);
+    if (error) {
+      console.error("Failed to update feedback:", error.message);
+      return false;
+    }
+    return true;
+  }
+
+  const { error } = await supabase.from("chat_feedback").insert({
+    message_id: messageId,
+    user_id: userId,
+    rating,
+  });
+  if (error) {
+    console.error("Failed to insert feedback:", error.message);
+    return false;
+  }
+  return true;
 }
 
 export function logActionClick(userId: string | undefined, action: ChatAction) {

@@ -1,16 +1,47 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Send, X, User, Bot, ChevronRight, Maximize2 } from "lucide-react";
+import { Sparkles, Send, X, User, Bot, ChevronRight, Maximize2, ThumbsUp, ThumbsDown } from "lucide-react";
 import { useChatContext } from "./ChatContext";
 import { classifyIntent, getPageContext } from "./intentClassifier";
 import { generateResponse } from "./responseGenerator";
+import { tryHandleGuidedFlow } from "./guidedFlows";
 import { useAuth } from "@/hooks/useAuth";
-import { logChatMessage, logActionClick } from "./chatLogging";
+import { logChatMessage, logActionClick, submitFeedback } from "./chatLogging";
 import type { ChatMessage, ChatAction } from "./types";
 
+interface ChipDef {
+  label: string;
+  type: "navigate" | "suggest";
+  payload: string;
+}
+
+const CLIENT_CHIPS: ChipDef[] = [
+  { label: "💪 Start workout", type: "navigate", payload: "/sheets" },
+  { label: "⚖️ Log weight", type: "suggest", payload: "log my weight" },
+  { label: "✅ My habits", type: "navigate", payload: "/check-ins" },
+  { label: "💬 Message coach", type: "navigate", payload: "/messages" },
+];
+
+const TRAINER_CHIPS: ChipDef[] = [
+  { label: "⚠️ Who needs attention", type: "navigate", payload: "/coach" },
+  { label: "➕ Add client", type: "navigate", payload: "/clients" },
+  { label: "🏗️ Build program", type: "navigate", payload: "/program-builder" },
+  { label: "💬 Unread messages", type: "navigate", payload: "/messages" },
+];
+
 export default function AzFitChat() {
-  const { isOpen, messages, unreadCount, toggleChat, closeChat, addMessage } = useChatContext();
+  const {
+    isOpen,
+    messages,
+    unreadCount,
+    toggleChat,
+    closeChat,
+    addMessage,
+    updateMessage,
+    pendingFlow,
+    setPendingFlow,
+  } = useChatContext();
   const { user } = useAuth();
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -20,7 +51,7 @@ export default function AzFitChat() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const userRole = user?.role === 'admin' ? 'trainer' : user?.role;
+  const userRole = user?.role === "admin" ? "trainer" : user?.role;
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -35,54 +66,93 @@ export default function AzFitChat() {
     }
   }, [isOpen]);
 
-  const handleSend = useCallback(async () => {
-    const text = input.trim();
-    if (!text) return;
-
-    const userMsg: ChatMessage = {
-      id: `u-${Date.now()}`,
-      role: "user",
-      text,
-      timestamp: Date.now(),
-    };
-    addMessage(userMsg);
-    setInput("");
-    setIsTyping(true);
-
-    logChatMessage(user?.id, "user", text);
-
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(async () => {
-      const intentResult = classifyIntent(text);
-      const currentPage = getPageContext(location.pathname);
-      const response = await generateResponse(text, {
-        intentResult,
-        currentPage: currentPage || undefined,
-        userRole: userRole || "client",
-        userId: user?.id,
-        userEmail: user?.email,
-        messageHistory: messages,
-      });
-
-      const assistantMsg: ChatMessage = {
-        id: `a-${Date.now()}`,
-        role: "assistant",
-        text: response.text,
-        timestamp: Date.now(),
-        actions: response.actions,
-        content: response.content,
-      };
-      addMessage(assistantMsg);
-      setIsTyping(false);
-      logChatMessage(user?.id, "assistant", response.text, { intent: intentResult.intent });
-    }, 600);
-  }, [input, location.pathname, messages, addMessage, user?.id, user?.email, userRole]);
-
+  // Cleanup pending response timer
   useEffect(() => {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
+
+  const handleFeedback = useCallback(
+    async (message: ChatMessage, rating: 1 | -1) => {
+      if (!message.dbId || !user?.id) return;
+      const ok = await submitFeedback(message.dbId, user.id, rating);
+      if (ok) updateMessage(message.id, { feedback: rating });
+    },
+    [user, updateMessage]
+  );
+
+  const handleSend = useCallback(
+    async (textOverride?: string) => {
+      const text = (textOverride ?? input).trim();
+      if (!text || isTyping) return;
+
+      const userMsg: ChatMessage = {
+        id: `u-${Date.now()}`,
+        role: "user",
+        text,
+        timestamp: Date.now(),
+      };
+      addMessage(userMsg);
+      setInput("");
+      setIsTyping(true);
+      logChatMessage(user?.id, "user", text);
+
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(async () => {
+        const flow = await tryHandleGuidedFlow(text, {
+          userId: user?.id,
+          userEmail: user?.email,
+          userRole: userRole || "client",
+          pendingFlow,
+        });
+
+        if (flow) {
+          if (flow.pendingFlow !== undefined) setPendingFlow(flow.pendingFlow);
+
+          const assistantMsg: ChatMessage = {
+            id: `a-${Date.now()}`,
+            role: "assistant",
+            text: flow.text,
+            timestamp: Date.now(),
+            actions: flow.actions,
+          };
+          addMessage(assistantMsg);
+          setIsTyping(false);
+          logChatMessage(user?.id, "assistant", flow.text).then((id) => {
+            if (id) updateMessage(assistantMsg.id, { dbId: id });
+          });
+          return;
+        }
+
+        const intentResult = classifyIntent(text);
+        const currentPage = getPageContext(location.pathname);
+        const response = await generateResponse(text, {
+          intentResult,
+          currentPage: currentPage || undefined,
+          userRole: userRole || "client",
+          userId: user?.id,
+          userEmail: user?.email,
+          messageHistory: messages,
+        });
+
+        const assistantMsg: ChatMessage = {
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          text: response.text,
+          timestamp: Date.now(),
+          actions: response.actions,
+          content: response.content,
+        };
+        addMessage(assistantMsg);
+        setIsTyping(false);
+        logChatMessage(user?.id, "assistant", response.text, { intent: intentResult.intent }).then((id) => {
+          if (id) updateMessage(assistantMsg.id, { dbId: id });
+        });
+      }, 600);
+    },
+    [input, isTyping, location.pathname, messages, addMessage, user?.id, user?.email, userRole, pendingFlow, setPendingFlow, updateMessage]
+  );
 
   const handleAction = useCallback(
     (action: ChatAction) => {
@@ -100,12 +170,27 @@ export default function AzFitChat() {
     [navigate, closeChat, user?.id]
   );
 
+  const handleChip = useCallback(
+    (chip: ChipDef) => {
+      if (chip.type === "navigate") {
+        navigate(chip.payload);
+        closeChat();
+      } else {
+        handleSend(chip.payload);
+      }
+    },
+    [navigate, closeChat, handleSend]
+  );
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
   };
+
+  const chips = userRole === "trainer" ? TRAINER_CHIPS : CLIENT_CHIPS;
+  const showChips = isOpen && messages.length <= 1;
 
   return (
     <>
@@ -191,7 +276,7 @@ export default function AzFitChat() {
                 </div>
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => navigate('/coach-ai')}
+                    onClick={() => navigate("/coach-ai")}
                     className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-slate-800"
                     title="Open full chat"
                   >
@@ -217,7 +302,7 @@ export default function AzFitChat() {
                 {messages.map((msg) => (
                   <div
                     key={msg.id}
-                    className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
+                    className={`group flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
                   >
                     {/* Avatar */}
                     <div
@@ -284,6 +369,32 @@ export default function AzFitChat() {
                           ))}
                         </div>
                       )}
+
+                      {/* Feedback */}
+                      {msg.role === "assistant" && (
+                        <div className="mt-1 flex items-center gap-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+                          <button
+                            onClick={() => handleFeedback(msg, 1)}
+                            aria-label="Helpful"
+                            className="rounded p-1 hover:bg-slate-800"
+                          >
+                            <ThumbsUp
+                              className="h-3 w-3"
+                              style={{ color: msg.feedback === 1 ? "#00AEEF" : "var(--text-muted)" }}
+                            />
+                          </button>
+                          <button
+                            onClick={() => handleFeedback(msg, -1)}
+                            aria-label="Not helpful"
+                            className="rounded p-1 hover:bg-slate-800"
+                          >
+                            <ThumbsDown
+                              className="h-3 w-3"
+                              style={{ color: msg.feedback === -1 ? "#EF4444" : "var(--text-muted)" }}
+                            />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -332,6 +443,24 @@ export default function AzFitChat() {
                 className="border-t p-3"
                 style={{ borderColor: "var(--card-border)" }}
               >
+                {showChips && (
+                  <div className="mb-2 flex gap-1.5 overflow-x-auto pb-1">
+                    {chips.map((chip) => (
+                      <button
+                        key={chip.label}
+                        onClick={() => handleChip(chip)}
+                        className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors hover:opacity-80"
+                        style={{
+                          backgroundColor: "var(--light-elevated)",
+                          color: "var(--text-primary)",
+                          border: "1px solid var(--card-border)",
+                        }}
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
                   <input
                     ref={inputRef}
@@ -346,7 +475,7 @@ export default function AzFitChat() {
                     }}
                   />
                   <button
-                    onClick={handleSend}
+                    onClick={() => handleSend()}
                     disabled={!input.trim() || isTyping}
                     className="flex h-9 w-9 items-center justify-center rounded-full transition-all disabled:opacity-40"
                     style={{

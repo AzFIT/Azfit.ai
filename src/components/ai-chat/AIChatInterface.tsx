@@ -1,17 +1,18 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Send, Sparkles, X, Bot, User, ChevronRight } from "lucide-react";
+import { Send, Sparkles, X, Bot, User, ChevronRight, ThumbsUp, ThumbsDown } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useChatContext } from "../chat/ChatContext";
 import { classifyIntent, getPageContext } from "../chat/intentClassifier";
 import { generateResponse } from "../chat/responseGenerator";
+import { tryHandleGuidedFlow } from "../chat/guidedFlows";
 import type { ChatMessage, ChatAction, MessageContent } from "../chat/types";
 import { ProgramCard } from "./ProgramCard";
 import { ExerciseSwapCard } from "./ExerciseSwapCard";
 import { QuickActionsBar } from "./QuickActionsBar";
 import { useLocation } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
-import { logChatMessage, logActionClick } from "../chat/chatLogging";
+import { logChatMessage, logActionClick, submitFeedback } from "../chat/chatLogging";
 
 /* ── Components ────────────────────────────────────────── */
 
@@ -25,7 +26,51 @@ function TypingIndicator() {
   );
 }
 
-function MessageBubble({ message, onAction }: { message: ChatMessage; onAction: (action: ChatAction) => void }) {
+function MessageFeedback({
+  message,
+  onFeedback,
+}: {
+  message: ChatMessage;
+  onFeedback: (rating: 1 | -1) => void;
+}) {
+  if (message.role !== "assistant") return null;
+  return (
+    <div className="mt-1 flex items-center gap-1">
+      <button
+        onClick={() => onFeedback(1)}
+        title="Helpful"
+        className="rounded p-1 transition-colors hover:bg-slate-800"
+        aria-label="Thumbs up"
+      >
+        <ThumbsUp
+          className="h-3.5 w-3.5"
+          style={{ color: message.feedback === 1 ? "#00AEEF" : "var(--text-muted)" }}
+        />
+      </button>
+      <button
+        onClick={() => onFeedback(-1)}
+        title="Not helpful"
+        className="rounded p-1 transition-colors hover:bg-slate-800"
+        aria-label="Thumbs down"
+      >
+        <ThumbsDown
+          className="h-3.5 w-3.5"
+          style={{ color: message.feedback === -1 ? "#EF4444" : "var(--text-muted)" }}
+        />
+      </button>
+    </div>
+  );
+}
+
+function MessageBubble({
+  message,
+  onAction,
+  onFeedback,
+}: {
+  message: ChatMessage;
+  onAction: (action: ChatAction) => void;
+  onFeedback: (rating: 1 | -1) => void;
+}) {
   const isUser = message.role === "user";
   const navigate = useNavigate();
 
@@ -96,6 +141,8 @@ function MessageBubble({ message, onAction }: { message: ChatMessage; onAction: 
             ))}
           </div>
         )}
+
+        <MessageFeedback message={message} onFeedback={onFeedback} />
       </div>
     </motion.div>
   );
@@ -108,7 +155,7 @@ interface AIChatInterfaceProps {
 }
 
 export function AIChatInterface({ onClose }: AIChatInterfaceProps) {
-  const { messages, addMessage, clearMessages } = useChatContext();
+  const { messages, addMessage, updateMessage, clearMessages, pendingFlow, setPendingFlow } = useChatContext();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [input, setInput] = useState("");
@@ -138,6 +185,15 @@ export function AIChatInterface({ onClose }: AIChatInterfaceProps) {
     };
   }, []);
 
+  const handleFeedback = useCallback(
+    async (message: ChatMessage, rating: 1 | -1) => {
+      if (!message.dbId || !user?.id) return;
+      const ok = await submitFeedback(message.dbId, user.id, rating);
+      if (ok) updateMessage(message.id, { feedback: rating });
+    },
+    [user, updateMessage]
+  );
+
   const sendMessage = useCallback(
     async (textOverride?: string) => {
       const text = (textOverride ?? input).trim();
@@ -156,6 +212,31 @@ export function AIChatInterface({ onClose }: AIChatInterfaceProps) {
 
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       timeoutRef.current = setTimeout(async () => {
+        const flow = await tryHandleGuidedFlow(text, {
+          userId: user?.id,
+          userEmail: user?.email,
+          userRole: userRole || "client",
+          pendingFlow,
+        });
+
+        if (flow) {
+          if (flow.pendingFlow !== undefined) setPendingFlow(flow.pendingFlow);
+
+          const assistantMsg: ChatMessage = {
+            id: `a-${Date.now()}`,
+            role: "assistant",
+            text: flow.text,
+            timestamp: Date.now(),
+            actions: flow.actions,
+          };
+          addMessage(assistantMsg);
+          setIsTyping(false);
+          logChatMessage(user?.id, "assistant", flow.text).then((id) => {
+            if (id) updateMessage(assistantMsg.id, { dbId: id });
+          });
+          return;
+        }
+
         const intentResult = classifyIntent(text);
         const currentPage = getPageContext(location.pathname);
         const response = await generateResponse(text, {
@@ -177,10 +258,12 @@ export function AIChatInterface({ onClose }: AIChatInterfaceProps) {
         };
         addMessage(assistantMsg);
         setIsTyping(false);
-        logChatMessage(user?.id, "assistant", response.text, { intent: intentResult.intent });
+        logChatMessage(user?.id, "assistant", response.text, { intent: intentResult.intent }).then((id) => {
+          if (id) updateMessage(assistantMsg.id, { dbId: id });
+        });
       }, 800);
     },
-    [input, isTyping, location.pathname, messages, addMessage, user?.id, user?.email, userRole]
+    [input, isTyping, location.pathname, messages, addMessage, user?.id, user?.email, userRole, pendingFlow, setPendingFlow, updateMessage]
   );
 
   const handleSend = useCallback(() => sendMessage(), [sendMessage]);
@@ -254,7 +337,12 @@ export function AIChatInterface({ onClose }: AIChatInterfaceProps) {
       <div className="flex-1 overflow-y-auto px-4 py-4">
         <div className="mx-auto max-w-3xl space-y-6">
           {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} onAction={handleAction} />
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              onAction={handleAction}
+              onFeedback={(rating) => handleFeedback(msg, rating)}
+            />
           ))}
           {isTyping && <TypingIndicator />}
           <div ref={messagesEndRef} />

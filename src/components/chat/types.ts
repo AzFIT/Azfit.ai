@@ -37,6 +37,10 @@ export interface InsightContent {
 
 export type MessageContent = ProgramContent | ExerciseSwapContent | InsightContent;
 
+export type GuidedFlow =
+  | { type: 'log_weight' }
+  | { type: 'habit_done'; candidates: { id: string; name: string }[] };
+
 /* ── Base Types ────────────────────────────────────────── */
 
 export type IntentType =
@@ -61,6 +65,8 @@ export interface ChatMessage {
   timestamp: number;
   actions?: ChatAction[];
   content?: MessageContent;
+  dbId?: string;
+  feedback?: 1 | -1;
 }
 
 export interface ChatAction {

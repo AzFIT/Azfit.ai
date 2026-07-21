@@ -290,6 +290,65 @@ export async function getSessionCompliance(clientId: string, weeks = 4): Promise
   };
 }
 
+export async function getActiveHabits(clientId: string) {
+  const { data, error } = await supabase
+    .from("habits")
+    .select("id, name, target_frequency")
+    .eq("client_id", clientId)
+    .eq("active", true)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("getActiveHabits error:", error.message);
+    return [];
+  }
+  return data || [];
+}
+
+export async function upsertHabitLog(habitId: string, clientId: string, done: boolean) {
+  const today = new Date().toISOString().split("T")[0];
+  const { error } = await supabase
+    .from("habit_logs")
+    .upsert(
+      { habit_id: habitId, client_id: clientId, log_date: today, done },
+      { onConflict: "habit_id,log_date" }
+    );
+  if (error) throw error;
+}
+
+export async function getHabitStreak(habitId: string, clientId: string): Promise<number> {
+  const today = new Date();
+  const logs: { log_date: string; done: boolean }[] = [];
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().split("T")[0];
+    const { data, error } = await supabase
+      .from("habit_logs")
+      .select("log_date, done")
+      .eq("habit_id", habitId)
+      .eq("client_id", clientId)
+      .eq("log_date", dateStr)
+      .single();
+    if (error || !data) break;
+    if (!data.done) break;
+    logs.push(data);
+  }
+  return logs.length;
+}
+
+export async function insertBodyComposition(
+  clientId: string,
+  values: { weight_kg?: number; body_fat_percentage?: number }
+) {
+  const { error } = await supabase.from("body_composition").insert({
+    client_id: clientId,
+    weight_kg: values.weight_kg ?? null,
+    body_fat_percentage: values.body_fat_percentage ?? null,
+  });
+  if (error) throw error;
+}
+
 export function estimateOneRepMax(weight: number, reps: number): number {
   if (weight <= 0 || reps <= 0) return 0;
   return weight * (1 + reps / 30);

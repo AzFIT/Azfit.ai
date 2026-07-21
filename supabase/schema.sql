@@ -363,6 +363,16 @@ CREATE POLICY "Clients can read own body composition"
     )
   );
 
+CREATE POLICY "Clients can insert own body composition"
+  ON body_composition FOR INSERT
+  WITH CHECK (
+    client_id IN (
+      SELECT id FROM clients WHERE email = (
+        SELECT email FROM profiles WHERE id = auth.uid()
+      )
+    )
+  );
+
 -- MESSAGES
 CREATE POLICY "Users can send messages"
   ON messages FOR INSERT

@@ -1,16 +1,19 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import type { ChatMessage } from './types';
+import type { ChatMessage, GuidedFlow } from './types';
 
 interface ChatContextType {
   isOpen: boolean;
   messages: ChatMessage[];
   unreadCount: number;
+  pendingFlow: GuidedFlow | null;
   openChat: () => void;
   closeChat: () => void;
   toggleChat: () => void;
   addMessage: (message: ChatMessage) => void;
+  updateMessage: (id: string, updates: Partial<ChatMessage>) => void;
   clearMessages: () => void;
+  setPendingFlow: (flow: GuidedFlow | null) => void;
   markRead: () => void;
 }
 
@@ -47,6 +50,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>(loadMessages);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingFlow, setPendingFlowState] = useState<GuidedFlow | null>(null);
 
   const openChat = useCallback(() => {
     setIsOpen(true);
@@ -72,18 +76,31 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, [isOpen]);
 
+  const updateMessage = useCallback((id: string, updates: Partial<ChatMessage>) => {
+    setMessages((prev) => {
+      const next = prev.map((m) => (m.id === id ? { ...m, ...updates } : m));
+      saveMessages(next);
+      return next;
+    });
+  }, []);
+
+  const setPendingFlow = useCallback((flow: GuidedFlow | null) => {
+    setPendingFlowState(flow);
+  }, []);
+
   const clearMessages = useCallback(() => {
     const welcome = loadMessages();
     setMessages(welcome);
     saveMessages(welcome);
+    setPendingFlowState(null);
   }, []);
 
   const markRead = useCallback(() => setUnreadCount(0), []);
 
   return (
     <ChatContext.Provider value={{
-      isOpen, messages, unreadCount,
-      openChat, closeChat, toggleChat, addMessage, clearMessages, markRead,
+      isOpen, messages, unreadCount, pendingFlow,
+      openChat, closeChat, toggleChat, addMessage, updateMessage, clearMessages, setPendingFlow, markRead,
     }}>
       {children}
     </ChatContext.Provider>
