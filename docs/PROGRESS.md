@@ -21,6 +21,7 @@
 - Check-in Forms UI: trainer form builder + client submission flow at `/check-ins`, demo seed data for trainer@azfit.demo/client@azfit.demo (feat/checkins-ui)
 - Client management Supabase migration: QuickAddClientModal writes to `clients` table, Clients list loads from Supabase with edit/archive + legacy import banner, ClientProfile crash-guards bad/missing UUIDs (fix/clients-supabase)
 - Habit tracker UI: `useHabits` hook + `HabitRow` component, client "My Habits" and trainer "Client Habits" sections on `/check-ins`, "Today's Habits" card on client dashboard; all data via Supabase, no localStorage (feat/habits-ui)
+- Real client health grid: replaced `MOCK_HEALTH_GRID` with Supabase-backed `useClientHealth`, per-client RAG status from sessions/workout_logs/check-ins, real attention-strip counts, archive button default filter fix (feat/health-grid)
 
 ## Next
 - Voice notes + push notifications
@@ -30,6 +31,7 @@
 - Dashboard rings (steps/sleep/HRV) — manual entry, no wearables yet
 - Check-in due card → currently links to /bioprint placeholder
 - AI pages (CoachAI, AIProgramBuilder) — local logic, no edge function
+- AI Insights panel, Revenue snapshot, Weekly metrics, Active Clients card — still mock data on trainer dashboard (noted for later phases)
 
 ## DB fixes
 - workout_log_entries created live on 2026-07-17, matching schema.sql

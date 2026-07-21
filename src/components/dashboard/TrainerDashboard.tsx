@@ -32,9 +32,10 @@ import { CollapsibleSection } from "./shared/CollapsibleSection";
 import { ClientHealthGrid } from "./ClientHealthGrid";
 import { AIInsightsPanel } from "./AIInsightsPanel";
 import { RevenueSnapshot } from "./RevenueSnapshot";
+import { useClientHealth } from "./useClientHealth";
 import { useSessions } from "@/hooks/useSessions";
 import QuickAddClientModal from "@/components/QuickAddClientModal";
-import type { ClientHealthItem, AIInsight, RevenueSnapshotData } from "./types";
+import type { AIInsight, RevenueSnapshotData } from "./types";
 
 /* ═══════════════════════════════════════════════════════════════════
    Trainer Dashboard — Restructured (Phase 2)
@@ -72,32 +73,12 @@ const scaleIn = {
 // TODO: wire to Supabase
 // Session data replaced by useSessions hook
 
-// TODO: wire to Supabase — attention counts
-const MOCK_ATTENTION = {
-  missedWorkouts: 3,
-  checkinsPending: 5,
-  unreadMessages: 8,
-};
-
 // TODO: wire to Supabase — active clients count
 const MOCK_ACTIVE_CLIENTS = {
   count: 24,
   trend: "+2" as string,
   trendPositive: true,
 };
-
-const MOCK_HEALTH_GRID: ClientHealthItem[] = [
-  { id: "h1", name: "Sarah Chen", initials: "SC", status: "on_track" },
-  { id: "h2", name: "Marcus Johnson", initials: "MJ", status: "on_track" },
-  { id: "h3", name: "Alex Rivera", initials: "AR", status: "at_risk", missedSessions: 2, lastActiveDays: 4 },
-  { id: "h4", name: "Emma Wilson", initials: "EW", status: "on_track" },
-  { id: "h5", name: "David Kim", initials: "DK", status: "needs_attention", weightStalledWeeks: 3, lastActiveDays: 1 },
-  { id: "h6", name: "Lisa Lau", initials: "LL", status: "on_track" },
-  { id: "h7", name: "Jason Chan", initials: "JC", status: "deload" },
-  { id: "h8", name: "Tom Wong", initials: "TW", status: "on_track" },
-  { id: "h9", name: "Jenny Lee", initials: "JL", status: "on_track" },
-  { id: "h10", name: "Kevin Ho", initials: "KH", status: "needs_attention", hrvChange: -8, lastActiveDays: 2 },
-];
 
 const MOCK_AI_INSIGHTS: AIInsight[] = [
   {
@@ -167,17 +148,13 @@ export default function TrainerDashboard() {
   const [mounted, setMounted] = useState(false);
   const [showAddClientModal, setShowAddClientModal] = useState(false);
 
+  const { clients: healthClients, counts: attentionCounts, hasAttention } = useClientHealth();
   const firstName = user?.full_name?.split(" ")[0] || "Marcus";
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
     return () => clearTimeout(t);
   }, []);
-
-  const hasAttention =
-    MOCK_ATTENTION.missedWorkouts > 0 ||
-    MOCK_ATTENTION.checkinsPending > 0 ||
-    MOCK_ATTENTION.unreadMessages > 0;
 
   // Real today's sessions from useSessions
   const todaysSessionList = todaySessions();
@@ -218,12 +195,12 @@ export default function TrainerDashboard() {
               }}
             >
               <Bell className="h-4 w-4" />
-              {MOCK_ATTENTION.unreadMessages > 0 && (
+              {attentionCounts.unreadMessages > 0 && (
                 <span
                   className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
                   style={{ backgroundColor: "#F87171" }}
                 >
-                  {MOCK_ATTENTION.unreadMessages}
+                  {attentionCounts.unreadMessages}
                 </span>
               )}
             </motion.button>
@@ -252,7 +229,7 @@ export default function TrainerDashboard() {
           className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3"
         >
           {/* Missed Workouts */}
-          {MOCK_ATTENTION.missedWorkouts > 0 && (
+          {attentionCounts.missedWorkouts > 0 && (
             <motion.div variants={fadeInUp}>
               <button
                 onClick={() => navigate("/clients")}
@@ -270,7 +247,7 @@ export default function TrainerDashboard() {
                 </div>
                 <div>
                   <p className="text-lg font-bold" style={{ color: "#F87171" }}>
-                    {MOCK_ATTENTION.missedWorkouts}
+                    {attentionCounts.missedWorkouts}
                   </p>
                   <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>
                     clients missed workouts this week
@@ -281,10 +258,10 @@ export default function TrainerDashboard() {
           )}
 
           {/* Check-ins Pending */}
-          {MOCK_ATTENTION.checkinsPending > 0 && (
+          {attentionCounts.checkinsPending > 0 && (
             <motion.div variants={fadeInUp}>
               <button
-                onClick={() => navigate("/coach")}
+                onClick={() => navigate("/check-ins")}
                 className="flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-all hover:-translate-y-0.5"
                 style={{
                   backgroundColor: "rgba(245,158,11,0.06)",
@@ -299,7 +276,7 @@ export default function TrainerDashboard() {
                 </div>
                 <div>
                   <p className="text-lg font-bold" style={{ color: "#F59E0B" }}>
-                    {MOCK_ATTENTION.checkinsPending}
+                    {attentionCounts.checkinsPending}
                   </p>
                   <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>
                     check-ins awaiting review
@@ -310,7 +287,7 @@ export default function TrainerDashboard() {
           )}
 
           {/* Unread Messages */}
-          {MOCK_ATTENTION.unreadMessages > 0 && (
+          {attentionCounts.unreadMessages > 0 && (
             <motion.div variants={fadeInUp}>
               <button
                 onClick={() => navigate("/messages")}
@@ -328,7 +305,7 @@ export default function TrainerDashboard() {
                 </div>
                 <div>
                   <p className="text-lg font-bold" style={{ color: "#06B6D4" }}>
-                    {MOCK_ATTENTION.unreadMessages}
+                    {attentionCounts.unreadMessages}
                   </p>
                   <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>
                     unread messages
@@ -739,9 +716,9 @@ export default function TrainerDashboard() {
         className="mb-6"
       >
         <ClientHealthGrid
-          clients={MOCK_HEALTH_GRID}
+          clients={healthClients}
           onClientClick={(clientId) => navigate(`/client/${clientId}`)}
-          onSendMessage={(clientId) => navigate(`/client/${clientId}`)}
+          onSendMessage={() => navigate("/messages")}
         />
       </motion.section>
 

@@ -16,6 +16,8 @@ export interface ClientHealthItem {
   lastActiveDays?: number;
   hrvChange?: number;
   weightStalledWeeks?: number;
+  checkInsDue?: number;
+  reason?: string;
 }
 
 /* ── Constants ───────────────────────────────────────── */
@@ -97,11 +99,7 @@ export function ClientHealthGrid({
                 {/* Alert indicator */}
                 {client.status !== "on_track" && (
                   <span className="text-[10px] font-bold" style={{ color: cfg.color }}>
-                    {client.status === "at_risk" && client.missedSessions
-                      ? `${client.missedSessions} missed`
-                      : client.status === "needs_attention" && client.weightStalledWeeks
-                        ? "?"
-                        : "!"}
+                    {client.reason || "!"}
                   </span>
                 )}
               </button>
@@ -127,11 +125,16 @@ export function ClientHealthGrid({
                       {cfg.label}
                     </p>
                     <div className="mt-2 space-y-1 text-[10px]" style={{ color: "var(--text-muted)" }}>
-                      {client.lastActiveDays !== undefined && (
-                        <p>Last active: {client.lastActiveDays}d ago</p>
+                      {client.lastActiveDays !== undefined ? (
+                        <p>Last workout: {client.lastActiveDays === 0 ? "today" : `${client.lastActiveDays}d ago`}</p>
+                      ) : (
+                        <p>Last workout: never</p>
                       )}
                       {client.missedSessions !== undefined && client.missedSessions > 0 && (
                         <p>Missed: {client.missedSessions} sessions</p>
+                      )}
+                      {client.checkInsDue !== undefined && client.checkInsDue > 0 && (
+                        <p>Check-ins due: {client.checkInsDue}</p>
                       )}
                       {client.hrvChange !== undefined && (
                         <p>HRV: {client.hrvChange > 0 ? "+" : ""}{client.hrvChange}%</p>

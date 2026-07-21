@@ -45,7 +45,7 @@ function statusLabel(status: DbClient["status"]) {
 export default function ClientsPage() {
   const [mode, setMode] = useState<"dashboard" | "sheets">("dashboard");
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"All" | "Active" | "Paused" | "Archived">("All");
+  const [filter, setFilter] = useState<"All" | "Active" | "Paused" | "Archived">("Active");
   const [clients, setClients] = useState<DbClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
@@ -99,10 +99,13 @@ export default function ClientsPage() {
         client.full_name.toLowerCase().includes(search.toLowerCase()) ||
         client.email.toLowerCase().includes(search.toLowerCase());
       const matchesFilter =
-        filter === "All" ||
-        (filter === "Active" && client.status === "active") ||
-        (filter === "Paused" && client.status === "on_hold") ||
-        (filter === "Archived" && client.status === "archived");
+        filter === "Active"
+          ? client.status === "active"
+          : filter === "Paused"
+            ? client.status === "on_hold" || client.status === "inactive"
+            : filter === "Archived"
+              ? client.status === "archived"
+              : client.status !== "archived";
       return matchesSearch && matchesFilter;
     });
   }, [clients, search, filter]);
