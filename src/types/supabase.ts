@@ -1181,6 +1181,151 @@ export type Database = {
           }
         ];
       };
+      faq_entries: {
+        Row: {
+          id: string;
+          question: string;
+          answer: string;
+          keywords: string[];
+          roles: string[];
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          question: string;
+          answer: string;
+          keywords?: string[];
+          roles?: string[];
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          question?: string;
+          answer?: string;
+          keywords?: string[];
+          roles?: string[];
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      chat_messages: {
+        Row: {
+          id: string;
+          user_id: string;
+          role: "user" | "assistant";
+          content: string;
+          intent: string | null;
+          tokens_input: number | null;
+          tokens_output: number | null;
+          model_used: string | null;
+          latency_ms: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          role: "user" | "assistant";
+          content: string;
+          intent?: string | null;
+          tokens_input?: number | null;
+          tokens_output?: number | null;
+          model_used?: string | null;
+          latency_ms?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          role?: "user" | "assistant";
+          content?: string;
+          intent?: string | null;
+          tokens_input?: number | null;
+          tokens_output?: number | null;
+          model_used?: string | null;
+          latency_ms?: number | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      chat_events: {
+        Row: {
+          id: string;
+          user_id: string;
+          event_type: string;
+          metadata: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          event_type: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          event_type?: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "chat_events_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      chat_feedback: {
+        Row: {
+          id: string;
+          message_id: string;
+          user_id: string;
+          rating: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          message_id: string;
+          user_id: string;
+          rating: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          message_id?: string;
+          user_id?: string;
+          rating?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "chat_feedback_message_id_fkey";
+            columns: ["message_id"];
+            isOneToOne: false;
+            referencedRelation: "chat_messages";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "chat_feedback_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       [_ in never]: never;

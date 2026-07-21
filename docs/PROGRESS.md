@@ -23,6 +23,7 @@
 - Habit tracker UI: `useHabits` hook + `HabitRow` component, client "My Habits" and trainer "Client Habits" sections on `/check-ins`, "Today's Habits" card on client dashboard; all data via Supabase, no localStorage (feat/habits-ui)
 - Real client health grid: replaced `MOCK_HEALTH_GRID` with Supabase-backed `useClientHealth`, per-client RAG status from sessions/workout_logs/check-ins, real attention-strip counts, archive button default filter fix (feat/health-grid)
 - Workout logger polish: RPE auto-adjust hints (≥9 drop/keep, ≤7 with target-rep hit increase), plate calculator under client load, rest-timer preset chips (0:30–5:00) with per-exercise in-memory last preset (feat/logger-polish)
+- AI Chat Stage 1: chat logging (`chat_messages`, `chat_events`, `chat_feedback`), FAQ table, safety guards (crisis + medical), real-data responses for deload/analyze, removed fake apply actions, wired floating chat + Coach AI page (feat/ai-chat-stage1)
 
 ## Next
 - Voice notes + push notifications
@@ -31,7 +32,7 @@
 ## Deferred (mocks to wire later)
 - Dashboard rings (steps/sleep/HRV) — manual entry, no wearables yet
 - Check-in due card → currently links to /bioprint placeholder
-- AI pages (CoachAI, AIProgramBuilder) — local logic, no edge function
+- AI Chat Stage 2 (live edge function) — pending; Stage 1 uses real DB + local logic
 - AI Insights panel, Revenue snapshot, Weekly metrics, Active Clients card — still mock data on trainer dashboard (noted for later phases)
 
 ## DB fixes

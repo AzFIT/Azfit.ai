@@ -5,17 +5,22 @@ import { Sparkles, Send, X, User, Bot, ChevronRight, Maximize2 } from "lucide-re
 import { useChatContext } from "./ChatContext";
 import { classifyIntent, getPageContext } from "./intentClassifier";
 import { generateResponse } from "./responseGenerator";
+import { useAuth } from "@/hooks/useAuth";
+import { logChatMessage, logActionClick } from "./chatLogging";
 import type { ChatMessage, ChatAction } from "./types";
 
 export default function AzFitChat() {
-  const { isOpen, messages, unreadCount, toggleChat, closeChat, addMessage } =
-    useChatContext();
+  const { isOpen, messages, unreadCount, toggleChat, closeChat, addMessage } = useChatContext();
+  const { user } = useAuth();
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  const userRole = user?.role === 'admin' ? 'trainer' : user?.role;
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -30,7 +35,7 @@ export default function AzFitChat() {
     }
   }, [isOpen]);
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text) return;
 
@@ -44,13 +49,18 @@ export default function AzFitChat() {
     setInput("");
     setIsTyping(true);
 
-    // Simulate AI response
-    const timeoutId = setTimeout(() => {
+    logChatMessage(user?.id, "user", text);
+
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(async () => {
       const intentResult = classifyIntent(text);
       const currentPage = getPageContext(location.pathname);
-      const response = generateResponse(text, {
+      const response = await generateResponse(text, {
         intentResult,
         currentPage: currentPage || undefined,
+        userRole: userRole || "client",
+        userId: user?.id,
+        userEmail: user?.email,
         messageHistory: messages,
       });
 
@@ -60,25 +70,34 @@ export default function AzFitChat() {
         text: response.text,
         timestamp: Date.now(),
         actions: response.actions,
+        content: response.content,
       };
       addMessage(assistantMsg);
       setIsTyping(false);
+      logChatMessage(user?.id, "assistant", response.text, { intent: intentResult.intent });
     }, 600);
+  }, [input, location.pathname, messages, addMessage, user?.id, user?.email, userRole]);
 
-    return () => clearTimeout(timeoutId);
-  }, [input, location.pathname, messages, addMessage]);
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   const handleAction = useCallback(
     (action: ChatAction) => {
+      logActionClick(user?.id, action);
       if (action.type === "navigate") {
         navigate(action.payload);
         closeChat();
+      } else if (action.type === "link") {
+        window.open(action.payload, "_blank", "noopener,noreferrer");
       } else if (action.type === "suggest") {
         setInput(action.payload);
         inputRef.current?.focus();
       }
     },
-    [navigate, closeChat],
+    [navigate, closeChat, user?.id]
   );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

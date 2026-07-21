@@ -1,19 +1,109 @@
-
-
+import {
+  resolveClientId,
+  getTrainerClients,
+  getLastWorkout,
+  getUnreadMessages,
+  getLatestBodyComp,
+  getTrainerAttention,
+  getLatestOneRepMaxPRs,
+  getSessionCompliance,
+  getLastWorkoutVolumeTrend,
+  daysBetween,
+  estimateOneRepMax,
+  type OneRepMaxEntry,
+  type TrainerAttentionSummary,
+} from './chatData';
+import { logCrisisFlag, logMedicalGuard, fetchFaqEntries } from './chatLogging';
 import type { IntentResult, ChatMessage, ChatAction, PageContext, MessageContent } from './types';
 
 interface ResponseContext {
   intentResult: IntentResult;
   currentPage?: PageContext;
   userRole?: 'trainer' | 'client' | 'admin';
+  userId?: string;
+  userEmail?: string;
   messageHistory: ChatMessage[];
 }
 
-export function generateResponse(input: string, ctx: ResponseContext): { text: string; actions?: ChatAction[]; content?: MessageContent } {
-  const { intentResult, currentPage, userRole } = ctx;
+interface ResponseResult {
+  text: string;
+  actions?: ChatAction[];
+  content?: MessageContent;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Safety guards — checked before any intent handling
+   ═══════════════════════════════════════════════════════════════════ */
+
+const CRISIS_KEYWORDS = [
+  'self-harm',
+  'suicide',
+  'kill myself',
+  'end it all',
+  'eating disorder',
+  'anorexia',
+  'bulimia',
+];
+
+const MEDICAL_KEYWORDS = [
+  'diagnosis',
+  'chest pain',
+  'doctor',
+  'injury diagnosis',
+  'sharp pain',
+  'severe pain',
+  'medical advice',
+];
+
+function checkSafety(input: string, userId: string | undefined): ResponseResult | null {
+  const lower = input.toLowerCase();
+
+  if (CRISIS_KEYWORDS.some((kw) => lower.includes(kw))) {
+    logCrisisFlag(userId, input);
+    return {
+      text: "I'm really sorry you're feeling this way. I'm an AI fitness assistant, not a mental health professional. If you're in crisis or thinking about hurting yourself, please contact local emergency services or a crisis helpline right away. You don't have to go through this alone.",
+      actions: [
+        { label: 'Find crisis resources', type: 'link', payload: 'https://findahelpline.com' },
+      ],
+    };
+  }
+
+  if (MEDICAL_KEYWORDS.some((kw) => lower.includes(kw))) {
+    logMedicalGuard(userId, input);
+    return {
+      text: "I'm not a medical professional. For pain, injury, or any medical concern, please see a doctor or physiotherapist. In the meantime, I can suggest joint-friendly exercise substitutions if you'd like.",
+      actions: [
+        { label: 'Exercise substitutions', type: 'suggest', payload: 'swap squat for knee pain' },
+        { label: 'Find a physio', type: 'link', payload: 'https://www.google.com/search?q=physiotherapist+near+me' },
+      ],
+    };
+  }
+
+  return null;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Main entry point
+   ═══════════════════════════════════════════════════════════════════ */
+
+export async function generateResponse(input: string, ctx: ResponseContext): Promise<ResponseResult> {
+  const { intentResult, currentPage, userRole, userId, userEmail } = ctx;
   const { intent, confidence } = intentResult;
 
-  // Low confidence → ask clarifying question
+  const safety = checkSafety(input, userId);
+  if (safety) return safety;
+
+  // FAQ fallback before low-confidence generic response
+  if (confidence < 60) {
+    const faq = await matchFaq(input, userRole || 'client');
+    if (faq) {
+      return {
+        text: faq.answer,
+        actions: faq.actions,
+      };
+    }
+  }
+
   if (confidence < 30) {
     return {
       text: "I'm not sure I understood. Are you looking for help with workouts, nutrition, tracking progress, or something else?",
@@ -40,7 +130,7 @@ export function generateResponse(input: string, ctx: ResponseContext): { text: s
       return handleNutritionIntent(input, currentPage);
 
     case 'progress':
-      return handleProgressIntent(input, currentPage);
+      return handleProgressIntent(input, currentPage, userRole, userId, userEmail);
 
     case 'client':
       return handleClientIntent(input, currentPage, userRole);
@@ -48,9 +138,7 @@ export function generateResponse(input: string, ctx: ResponseContext): { text: s
     case 'settings':
       return {
         text: "You can manage your account, theme, units, and notifications in Settings.",
-        actions: [
-          { label: 'Open Settings', type: 'navigate', payload: '/settings' },
-        ],
+        actions: [{ label: 'Open Settings', type: 'navigate', payload: '/settings' }],
       };
 
     case 'help':
@@ -74,25 +162,70 @@ export function generateResponse(input: string, ctx: ResponseContext): { text: s
       return handleExerciseSubstitute(input);
 
     case 'deload':
-      return handleDeload(input);
+      return handleDeload(input, userRole, userId, userEmail);
 
     case 'analyze':
-      return handleAnalyze(input);
+      return handleAnalyze(input, userRole, userId, userEmail);
 
-    default:
+    default: {
+      const faq = await matchFaq(input, userRole || 'client');
+      if (faq) return { text: faq.answer, actions: faq.actions };
       return {
         text: "I can help with workouts, nutrition, progress tracking, or navigating the app. What do you need?",
         actions: quickActions(currentPage),
       };
+    }
   }
 }
 
-/* ── Enhanced Intent Handlers ─────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════
+   FAQ helper
+   ═══════════════════════════════════════════════════════════════════ */
 
-function handleGenerateProgram(input: string): { text: string; actions?: ChatAction[]; content?: MessageContent } {
+async function matchFaq(
+  input: string,
+  role: 'trainer' | 'client' | 'admin'
+): Promise<{ answer: string; actions: ChatAction[] } | null> {
   const lower = input.toLowerCase();
+  const entries = await fetchFaqEntries(role);
 
-  // Parse basic constraints from input
+  let best: { answer: string; actions: ChatAction[]; score: number } | null = null;
+
+  for (const entry of entries) {
+    let score = 0;
+    for (const kw of entry.keywords) {
+      if (lower.includes(kw.toLowerCase())) score += 1;
+    }
+    if (score > 0 && (!best || score > best.score)) {
+      best = {
+        answer: entry.answer,
+        actions: [{ label: 'Open related page', type: 'navigate', payload: faqPathForAnswer(entry.answer) }],
+        score,
+      };
+    }
+  }
+
+  return best ? { answer: best.answer, actions: best.actions } : null;
+}
+
+function faqPathForAnswer(answer: string): string {
+  if (answer.includes('/sheets')) return '/sheets';
+  if (answer.includes('/bioprint')) return '/bioprint';
+  if (answer.includes('/messages')) return '/messages';
+  if (answer.includes('/check-ins')) return '/check-ins';
+  if (answer.includes('/clients')) return '/clients';
+  if (answer.includes('/program-builder')) return '/program-builder';
+  if (answer.includes('/nutrition')) return '/nutrition';
+  if (answer.includes('/progress-photos')) return '/progress-photos';
+  return '/dashboard';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Intent handlers
+   ═══════════════════════════════════════════════════════════════════ */
+
+function handleGenerateProgram(input: string): ResponseResult {
+  const lower = input.toLowerCase();
   const daysMatch = lower.match(/(\d+)\s*day/);
   const daysPerWeek = daysMatch ? parseInt(daysMatch[1]) : 4;
   const weeks = lower.includes('6 week') ? 6 : lower.includes('8 week') ? 8 : 4;
@@ -145,20 +278,18 @@ function handleGenerateProgram(input: string): { text: string; actions?: ChatAct
   };
 
   return {
-    text: `Here's a customized ${weeks}-week ${daysPerWeek}-day ${goal} program. I've designed it with progressive overload and appropriate volume for your goals.`,
+    text: `Here's a ${weeks}-week ${daysPerWeek}-day ${goal} STARTING TEMPLATE. You can customize it in the Program Builder or use the AI Program Builder for more options.`,
     actions: [
-      { label: 'Apply Full Program', type: 'apply', payload: 'apply_program' },
-      { label: 'Modify', type: 'customize', payload: 'modify_program' },
-      { label: 'Export as PDF', type: 'link', payload: '/export' },
+      { label: 'Open in Program Builder', type: 'navigate', payload: '/program-builder' },
+      { label: 'AI Program Builder', type: 'navigate', payload: '/ai-program-builder' },
     ],
     content: programContent,
   };
 }
 
-function handleExerciseSubstitute(input: string): { text: string; actions?: ChatAction[]; content?: MessageContent } {
+function handleExerciseSubstitute(input: string): ResponseResult {
   const lower = input.toLowerCase();
 
-  // Common substitution pairs
   const substitutions: Record<string, { replacement: string; reasoning: string; sets: string; reps: string; rpe: string }> = {
     deadlift: { replacement: 'Rack Pull (below knee)', reasoning: 'Reduces lower back stress while maintaining posterior chain development', sets: '3', reps: '6-8', rpe: '8' },
     squat: { replacement: 'Belt Squat', reasoning: 'Eliminates spinal loading while maintaining quad development', sets: '3', reps: '10-12', rpe: '9' },
@@ -202,67 +333,204 @@ function handleExerciseSubstitute(input: string): { text: string; actions?: Chat
   };
 
   return {
-    text: `Got it! Replaced ${matchedExercise} with ${sub.replacement} to reduce ${reason}.`,
+    text: `Got it! Replaced ${matchedExercise} with ${sub.replacement} to reduce ${reason}. Open the Program Builder to apply this to a workout.`,
     actions: [
-      { label: 'Apply Changes', type: 'apply', payload: 'apply_swap' },
-      { label: 'Undo', type: 'dismiss', payload: 'undo_swap' },
+      { label: 'Open Program Builder', type: 'navigate', payload: '/program-builder' },
       { label: 'Explain Choice', type: 'suggest', payload: 'why this substitution?' },
     ],
     content: swapContent,
   };
 }
 
-function handleDeload(input: string): { text: string; actions?: ChatAction[]; content?: MessageContent } {
-  const lower = input.toLowerCase();
-  const clientName = lower.includes('mike') ? 'Mike' : lower.includes('alex') ? 'Alex' : 'your client';
+async function handleDeload(
+  _input: string,
+  userRole: 'trainer' | 'client' | 'admin' | undefined,
+  userId: string | undefined,
+  userEmail: string | undefined
+): Promise<ResponseResult> {
+  if (!userId) {
+    return {
+      text: "I can help you plan a deload, but I need you to be signed in first.",
+      actions: [{ label: 'Sign In', type: 'navigate', payload: '/login' }],
+    };
+  }
 
-  const insightContent: MessageContent = {
-    type: 'insight',
-    severity: 'warning',
-    clientName,
-    title: `Recommend deload for ${clientName}`,
-    description: `${clientName} hasn't logged a workout in 4 days. HRV is down 12% according to Apple Health sync. Training volume has been high for 6 consecutive weeks.`,
-    suggestedAction: 'Apply 60% volume deload',
-  };
+  if (userRole === 'trainer') {
+    const attention = await getTrainerAttention(userId);
+    const atRisk = attention.atRiskClients.slice(0, 5);
+
+    if (atRisk.length === 0) {
+      return {
+        text: "All your clients have logged workouts within the last 7 days. No one needs a deload right now based on activity data.",
+        actions: [{ label: 'View Clients', type: 'navigate', payload: '/clients' }],
+      };
+    }
+
+    const list = atRisk
+      .map((c) => {
+        const date = c.lastWorkoutDate ? new Date(c.lastWorkoutDate).toLocaleDateString() : 'never';
+        return `• ${c.name} — last workout ${c.daysSinceWorkout === Infinity ? 'never' : `${c.daysSinceWorkout}d ago`} (${date})`;
+      })
+      .join('\n');
+
+    return {
+      text: `These clients haven't logged a workout in 7+ days and may benefit from a deload or check-in:\n\n${list}\n\nGeneral deload protocol: cut volume by 40-50%, keep intensity moderate, and add one recovery-focused session.`,
+      actions: [
+        { label: 'View Clients', type: 'navigate', payload: '/clients' },
+        { label: 'Check-ins', type: 'navigate', payload: '/check-ins' },
+      ],
+    };
+  }
+
+  // Client view
+  if (!userEmail) {
+    return {
+      text: "I can suggest a deload plan, but I need your account email to look up your client record.",
+      actions: [{ label: 'Settings', type: 'navigate', payload: '/settings' }],
+    };
+  }
+
+  const clientId = await resolveClientId(userId, userEmail);
+  if (!clientId) {
+    return {
+      text: "I couldn't find your client record. Please ask your trainer to connect your account.",
+      actions: [{ label: 'Message Coach', type: 'navigate', payload: '/messages' }],
+    };
+  }
+
+  const lastWorkout = await getLastWorkout(clientId);
+  const daysSince = lastWorkout ? daysBetween(new Date(lastWorkout.created_at), new Date()) : null;
+  const volumeTrend = await getLastWorkoutVolumeTrend(clientId);
+
+  let text = "Here's what I see for your training:\n";
+  if (daysSince !== null) {
+    text += `• Last workout: ${daysSince} day${daysSince === 1 ? '' : 's'} ago\n`;
+  } else {
+    text += "• No recent workouts logged.\n";
+  }
+  if (volumeTrend) {
+    const change = volumeTrend.previous === 0 ? 0 : Math.round(((volumeTrend.current - volumeTrend.previous) / volumeTrend.previous) * 100);
+    text += `• This week's volume vs last week: ${change >= 0 ? '+' : ''}${change}%\n`;
+  }
+
+  text += "\nIf you've been training hard for 3+ weeks or feel run down, a deload can help: reduce sets by 30-40%, keep weights the same or slightly lighter, and prioritize sleep and recovery.";
 
   return {
-    text: `Based on ${clientName}'s recovery data and training history, I recommend:\n\n1. Deload to 60% volume this week\n2. Prioritize sleep (avg 6.2h → target 7.5h)\n3. Substitute heavy squats with mobility work\n4. Re-test next Monday`,
+    text,
     actions: [
-      { label: 'Apply Recommendations', type: 'apply', payload: 'apply_deload' },
-      { label: 'Customize', type: 'customize', payload: 'customize_deload' },
-      { label: 'Dismiss', type: 'dismiss', payload: 'dismiss' },
+      { label: 'Start Workout', type: 'navigate', payload: '/sheets' },
+      { label: 'View Progress', type: 'navigate', payload: '/bioprint' },
     ],
-    content: insightContent,
   };
 }
 
-function handleAnalyze(input: string): { text: string; actions?: ChatAction[]; content?: MessageContent } {
-  const lower = input.toLowerCase();
-  const clientName = lower.includes('mike') ? 'Mike Wong' : lower.includes('lisa') ? 'Lisa Lau' : lower.includes('alex') ? 'Alex Rivera' : 'your client';
+async function handleAnalyze(
+  input: string,
+  userRole: 'trainer' | 'client' | 'admin' | undefined,
+  userId: string | undefined,
+  userEmail: string | undefined
+): Promise<ResponseResult> {
+  if (!userId) {
+    return {
+      text: "Please sign in so I can pull your real workout data.",
+      actions: [{ label: 'Sign In', type: 'navigate', payload: '/login' }],
+    };
+  }
 
-  const insightContent: MessageContent = {
-    type: 'insight',
-    severity: 'info',
-    clientName,
-    title: `${clientName} hit a new PR`,
-    description: `${clientName} bench pressed 62.5kg x 5 yesterday — a 7.5kg improvement from 8 weeks ago. Compliance is at 92%, and volume has been consistently increasing.`,
-    suggestedAction: 'Auto-progress program',
-  };
+  if (userRole === 'trainer') {
+    const clients = await getTrainerClients(userId);
+    if (clients.length === 0) {
+      return {
+        text: "You don't have any clients yet. Add a client to start analyzing their progress.",
+        actions: [{ label: 'Add Client', type: 'navigate', payload: '/clients' }],
+      };
+    }
+
+    const lower = input.toLowerCase();
+    const matched = clients.find((c) => lower.includes(c.full_name.toLowerCase()) || lower.includes(c.email.toLowerCase()));
+
+    if (!matched) {
+      const clientList = clients.slice(0, 5).map((c) => ({ label: c.full_name, type: 'suggest' as const, payload: `analyze ${c.full_name}` }));
+      return {
+        text: "Which client would you like me to analyze?",
+        actions: clientList,
+      };
+    }
+
+    const [prs, compliance] = await Promise.all([
+      getLatestOneRepMaxPRs(matched.id),
+      getSessionCompliance(matched.id, 4),
+    ]);
+
+    const topPrs = prs.slice(0, 3);
+    let text = `Analysis for ${matched.full_name}:\n`;
+    text += `• Session compliance (last 4 weeks): ${compliance.completed}/${compliance.scheduled} (${compliance.rate}%)\n`;
+    if (topPrs.length > 0) {
+      text += `• Estimated 1RM PRs:\n`;
+      topPrs.forEach((pr) => {
+        text += `  — ${pr.exerciseName}: ~${Math.round(pr.estOneRepMax)} kg (${pr.weight} kg × ${pr.reps})\n`;
+      });
+    } else {
+      text += "• No logged sets with load/reps yet, so I can't estimate 1RM PRs.\n";
+    }
+
+    return {
+      text,
+      actions: [
+        { label: 'View Profile', type: 'navigate', payload: `/client/${matched.id}` },
+        { label: 'Analytics', type: 'navigate', payload: '/analytics' },
+      ],
+    };
+  }
+
+  // Client view
+  if (!userEmail) {
+    return {
+      text: "I need your account email to look up your client record.",
+      actions: [{ label: 'Settings', type: 'navigate', payload: '/settings' }],
+    };
+  }
+
+  const clientId = await resolveClientId(userId, userEmail);
+  if (!clientId) {
+    return {
+      text: "I couldn't find your client record. Please ask your trainer to connect your account.",
+      actions: [{ label: 'Message Coach', type: 'navigate', payload: '/messages' }],
+    };
+  }
+
+  const [prs, compliance, lastWorkout] = await Promise.all([
+    getLatestOneRepMaxPRs(clientId),
+    getSessionCompliance(clientId, 4),
+    getLastWorkout(clientId),
+  ]);
+
+  const topPrs = prs.slice(0, 3);
+  let text = "Here's your current performance:\n";
+  text += `• Session compliance (last 4 weeks): ${compliance.completed}/${compliance.scheduled} (${compliance.rate}%)\n`;
+  if (lastWorkout) {
+    const daysAgo = daysBetween(new Date(lastWorkout.created_at), new Date());
+    text += `• Last workout: ${daysAgo} day${daysAgo === 1 ? '' : 's'} ago\n`;
+  }
+  if (topPrs.length > 0) {
+    text += `• Estimated 1RM PRs:\n`;
+    topPrs.forEach((pr) => {
+      text += `  — ${pr.exerciseName}: ~${Math.round(pr.estOneRepMax)} kg (${pr.weight} kg × ${pr.reps})\n`;
+    });
+  } else {
+    text += "• No logged sets with load/reps yet, so I can't estimate 1RM PRs.\n";
+  }
 
   return {
-    text: `${clientName} is performing well! Here's what stands out:\n\n• New PR on bench: 62.5kg x 5 (+7.5kg from 8 weeks ago)\n• Compliance: 92% (excellent)\n• Weekly volume trending up 8%\n• Sleep average: 7.1h (good)\n\nShould I auto-progress their program for the next mesocycle?`,
+    text,
     actions: [
-      { label: 'Progress Program', type: 'apply', payload: 'progress_program' },
-      { label: 'Review First', type: 'navigate', payload: '/analytics' },
-      { label: 'Dismiss', type: 'dismiss', payload: 'dismiss' },
+      { label: 'Start Workout', type: 'navigate', payload: '/sheets' },
+      { label: 'View Progress', type: 'navigate', payload: '/bioprint' },
     ],
-    content: insightContent,
   };
 }
 
-/* ── Existing Intent Handlers ──────────────────────────── */
-
-function handleWorkoutIntent(input: string, _currentPage?: PageContext, userRole?: string): { text: string; actions?: ChatAction[] } {
+function handleWorkoutIntent(input: string, _currentPage?: PageContext, userRole?: string): ResponseResult {
   const lower = input.toLowerCase();
 
   if (lower.includes('start') || lower.includes('begin') || lower.includes('log')) {
@@ -277,12 +545,14 @@ function handleWorkoutIntent(input: string, _currentPage?: PageContext, userRole
 
   if (lower.includes('program') || lower.includes('routine') || lower.includes('split')) {
     return {
-      text: userRole === 'trainer'
-        ? "You can build custom programs or view existing ones."
-        : "Your trainer will assign programs. You can view them in your dashboard.",
-      actions: userRole === 'trainer'
-        ? [{ label: 'Program Builder', type: 'navigate', payload: '/program-builder' }]
-        : [{ label: 'View Dashboard', type: 'navigate', payload: '/dashboard' }],
+      text:
+        userRole === 'trainer'
+          ? "You can build custom programs or view existing ones."
+          : "Your trainer will assign programs. You can view them in your dashboard.",
+      actions:
+        userRole === 'trainer'
+          ? [{ label: 'Program Builder', type: 'navigate', payload: '/program-builder' }]
+          : [{ label: 'View Dashboard', type: 'navigate', payload: '/dashboard' }],
     };
   }
 
@@ -295,24 +565,20 @@ function handleWorkoutIntent(input: string, _currentPage?: PageContext, userRole
   };
 }
 
-function handleNutritionIntent(input: string, _currentPage?: PageContext): { text: string; actions?: ChatAction[] } {
+function handleNutritionIntent(input: string, _currentPage?: PageContext): ResponseResult {
   const lower = input.toLowerCase();
 
   if (lower.includes('log') || lower.includes('track') || lower.includes('add')) {
     return {
       text: "Let's log your food! 🍎 Track meals and hit your macro targets.",
-      actions: [
-        { label: 'Log Food', type: 'navigate', payload: '/nutrition' },
-      ],
+      actions: [{ label: 'Log Food', type: 'navigate', payload: '/nutrition' }],
     };
   }
 
   if (lower.includes('water') || lower.includes('hydration')) {
     return {
       text: "Stay hydrated! 💧 Your daily water goal is based on your body weight.",
-      actions: [
-        { label: 'View Nutrition', type: 'navigate', payload: '/nutrition' },
-      ],
+      actions: [{ label: 'View Nutrition', type: 'navigate', payload: '/nutrition' }],
     };
   }
 
@@ -325,15 +591,43 @@ function handleNutritionIntent(input: string, _currentPage?: PageContext): { tex
   };
 }
 
-function handleProgressIntent(input: string, _currentPage?: PageContext): { text: string; actions?: ChatAction[] } {
+async function handleProgressIntent(
+  input: string,
+  _currentPage?: PageContext,
+  userRole?: string,
+  userId?: string,
+  userEmail?: string
+): Promise<ResponseResult> {
   const lower = input.toLowerCase();
+
+  if (userRole === 'client' && userId && userEmail) {
+    const clientId = await resolveClientId(userId, userEmail);
+    if (clientId) {
+      const [bodyComp, unread] = await Promise.all([getLatestBodyComp(clientId), getUnreadMessages(userId)]);
+      let text = "Here's your latest progress:\n";
+      if (bodyComp) {
+        text += `• Weight: ${bodyComp.weight_kg ?? '—'} kg\n`;
+        text += `• Body fat: ${bodyComp.body_fat_percentage ?? '—'}%\n`;
+        text += `• Recorded: ${new Date(bodyComp.recorded_at).toLocaleDateString()}\n`;
+      } else {
+        text += "• No body composition entries yet.\n";
+      }
+      if (unread > 0) text += `\nYou have ${unread} unread message${unread === 1 ? '' : 's'} from your coach.`;
+
+      return {
+        text,
+        actions: [
+          { label: 'Bio Print', type: 'navigate', payload: '/bioprint' },
+          { label: 'Progress Photos', type: 'navigate', payload: '/progress-photos' },
+        ],
+      };
+    }
+  }
 
   if (lower.includes('weight') || lower.includes('body fat') || lower.includes('measurement')) {
     return {
       text: "Track your body composition changes over time with Bio Print.",
-      actions: [
-        { label: 'Bio Print', type: 'navigate', payload: '/bioprint' },
-      ],
+      actions: [{ label: 'Bio Print', type: 'navigate', payload: '/bioprint' }],
     };
   }
 
@@ -356,7 +650,7 @@ function handleProgressIntent(input: string, _currentPage?: PageContext): { text
   };
 }
 
-function handleClientIntent(_input: string, _currentPage?: PageContext, userRole?: string): { text: string; actions?: ChatAction[] } {
+function handleClientIntent(_input: string, _currentPage?: PageContext, userRole?: string): ResponseResult {
   if (userRole === 'trainer') {
     return {
       text: "Manage your clients, view their progress, and assign programs from the Coach dashboard.",
@@ -376,7 +670,7 @@ function handleClientIntent(_input: string, _currentPage?: PageContext, userRole
   };
 }
 
-function handleNavigationIntent(input: string, _currentPage?: PageContext): { text: string; actions?: ChatAction[] } {
+function handleNavigationIntent(input: string, _currentPage?: PageContext): ResponseResult {
   const lower = input.toLowerCase();
 
   for (const page of [
@@ -423,3 +717,6 @@ function quickActions(currentPage?: PageContext): ChatAction[] {
 
   return actions.slice(0, 4);
 }
+
+export { estimateOneRepMax };
+export type { OneRepMaxEntry, TrainerAttentionSummary };

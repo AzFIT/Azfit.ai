@@ -725,5 +725,91 @@ CREATE POLICY "Trainers can read logs for their habits"
   );
 
 -- ============================================================
+-- AI Chat Tables (Stage 1)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.faq_entries (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  question text NOT NULL,
+  answer text NOT NULL,
+  keywords text[] NOT NULL DEFAULT '{}',
+  roles text[] NOT NULL DEFAULT '{trainer,client}',
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.chat_messages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  role text NOT NULL CHECK (role IN ('user', 'assistant')),
+  content text NOT NULL,
+  intent text,
+  tokens_input int,
+  tokens_output int,
+  model_used text,
+  latency_ms int,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.chat_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  event_type text NOT NULL,
+  metadata jsonb DEFAULT '{}',
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.chat_feedback (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  message_id uuid REFERENCES public.chat_messages(id) ON DELETE CASCADE NOT NULL,
+  user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  rating int NOT NULL CHECK (rating IN (-1, 1)),
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS chat_messages_user_created_idx ON public.chat_messages (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS chat_events_user_type_idx ON public.chat_events (user_id, event_type);
+CREATE INDEX IF NOT EXISTS faq_entries_keywords_idx ON public.faq_entries USING gin (keywords);
+
+ALTER TABLE public.faq_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chat_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chat_feedback ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "FAQ read authenticated"
+  ON public.faq_entries FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "Users insert own messages"
+  ON public.chat_messages FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users select own messages"
+  ON public.chat_messages FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users insert own events"
+  ON public.chat_events FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users select own events"
+  ON public.chat_events FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users insert own feedback"
+  ON public.chat_feedback FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users select own feedback"
+  ON public.chat_feedback FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+-- ============================================================
 -- DONE! Your AzFIT database is ready.
 -- ============================================================

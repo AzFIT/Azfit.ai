@@ -1,26 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { toast } from "sonner";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
-import type { ClientHealthItem, HealthStatus } from "./ClientHealthGrid";
-import type { Database } from "@/types/supabase";
-
-type DbClient = Database["public"]["Tables"]["clients"]["Row"];
-
-export interface AttentionCounts {
-  missedWorkouts: number;
-  checkinsPending: number;
-  unreadMessages: number;
-}
-
-interface RawData {
-  clients: DbClient[];
-  sessions: Database["public"]["Tables"]["sessions"]["Row"][];
-  workoutLogs: Database["public"]["Tables"]["workout_logs"]["Row"][];
-  activeForms: Database["public"]["Tables"]["check_in_forms"]["Row"][];
-  submissions: Database["public"]["Tables"]["check_in_submissions"]["Row"][];
-  unreadMessages: number;
-}
+import type { ClientHealthItem, HealthStatus } from "@/components/dashboard/ClientHealthGrid";
+import {
+  fetchHealthData,
+  computeAttentionCounts,
+  daysBetween,
+  type HealthRawData,
+  type AttentionCounts,
+} from "@/lib/clientHealthQueries";
 
 function getInitials(name: string): string {
   return name
@@ -30,15 +17,6 @@ function getInitials(name: string): string {
     .slice(0, 2)
     .join("")
     .toUpperCase();
-}
-
-function startOfDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function daysBetween(a: Date, b: Date): number {
-  const ms = startOfDay(b).getTime() - startOfDay(a).getTime();
-  return Math.round(ms / (1000 * 60 * 60 * 24));
 }
 
 export function useClientHealth() {
@@ -51,69 +29,7 @@ export function useClientHealth() {
   });
   const [loading, setLoading] = useState(true);
 
-  const fetchData = useCallback(async (): Promise<RawData | null> => {
-    if (!user) return null;
-
-    const now = new Date();
-    const sevenDaysAgo = new Date(now);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const isoSevenDaysAgo = sevenDaysAgo.toISOString();
-    const isoNow = now.toISOString();
-
-    const [clientsResult, sessionsResult, workoutLogsResult, formsResult, submissionsResult, messagesResult] =
-      await Promise.all([
-        supabase
-          .from("clients")
-          .select("*")
-          .eq("trainer_id", user.id)
-          .neq("status", "archived")
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("sessions")
-          .select("*")
-          .eq("trainer_id", user.id)
-          .gte("starts_at", isoSevenDaysAgo)
-          .lte("starts_at", isoNow),
-        supabase
-          .from("workout_logs")
-          .select("*")
-          .gte("created_at", isoSevenDaysAgo),
-        supabase.from("check_in_forms").select("*").eq("trainer_id", user.id).eq("active", true),
-        supabase
-          .from("check_in_submissions")
-          .select("*")
-          .gte("submitted_at", isoSevenDaysAgo),
-        supabase.from("messages").select("*", { count: "exact", head: true }).eq("receiver_id", user.id).is("read_at", null),
-      ]);
-
-    if (clientsResult.error) {
-      toast.error("Failed to load clients: " + clientsResult.error.message);
-      return null;
-    }
-    if (sessionsResult.error) toast.error("Failed to load sessions: " + sessionsResult.error.message);
-    if (workoutLogsResult.error) toast.error("Failed to load workout logs: " + workoutLogsResult.error.message);
-    if (formsResult.error) toast.error("Failed to load check-in forms: " + formsResult.error.message);
-    if (submissionsResult.error) toast.error("Failed to load submissions: " + submissionsResult.error.message);
-    if (messagesResult.error) toast.error("Failed to load messages: " + messagesResult.error.message);
-
-    const activeForms = formsResult.data || [];
-    const activeFormIds = activeForms.map((f) => f.id);
-
-    // Filter submissions to those for this trainer's active forms so the trainer hover
-    // counts and attention counts are accurate and RLS-friendly.
-    const trainerSubmissions = (submissionsResult.data || []).filter((s) => activeFormIds.includes(s.form_id));
-
-    return {
-      clients: clientsResult.data || [],
-      sessions: sessionsResult.data || [],
-      workoutLogs: workoutLogsResult.data || [],
-      activeForms,
-      submissions: trainerSubmissions,
-      unreadMessages: messagesResult.count || 0,
-    };
-  }, [user]);
-
-  const computeHealth = useCallback((data: RawData): ClientHealthItem[] => {
+  const computeHealth = useCallback((data: HealthRawData): ClientHealthItem[] => {
     const now = new Date();
     const sevenDaysAgo = new Date(now);
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -182,38 +98,16 @@ export function useClientHealth() {
     });
   }, []);
 
-  const computeCounts = useCallback((data: RawData): AttentionCounts => {
-    const now = new Date();
-    const sevenDaysAgo = new Date(now);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-    const clientsWithMissedSessions = new Set(
-      data.sessions
-        .filter((s) => {
-          const start = new Date(s.starts_at);
-          return start >= sevenDaysAgo && start < now && !["completed", "cancelled"].includes(s.status);
-        })
-        .map((s) => s.client_id)
-    );
-
-    const pendingReview = data.submissions.filter((s) => s.reviewed_at === null).length;
-
-    return {
-      missedWorkouts: clientsWithMissedSessions.size,
-      checkinsPending: pendingReview,
-      unreadMessages: data.unreadMessages,
-    };
-  }, []);
-
   const refresh = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
-    const data = await fetchData();
+    const data = await fetchHealthData(user.id);
     if (data) {
       setClients(computeHealth(data));
-      setCounts(computeCounts(data));
+      setCounts(computeAttentionCounts(data));
     }
     setLoading(false);
-  }, [fetchData, computeHealth, computeCounts]);
+  }, [user, computeHealth]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -227,3 +121,5 @@ export function useClientHealth() {
 
   return { clients, counts, loading, hasAttention, refresh };
 }
+
+export type { AttentionCounts };

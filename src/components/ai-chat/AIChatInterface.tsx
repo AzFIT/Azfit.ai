@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Send, Sparkles, X, Bot, User, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router";
 import { useChatContext } from "../chat/ChatContext";
 import { classifyIntent, getPageContext } from "../chat/intentClassifier";
 import { generateResponse } from "../chat/responseGenerator";
@@ -9,6 +10,8 @@ import { ProgramCard } from "./ProgramCard";
 import { ExerciseSwapCard } from "./ExerciseSwapCard";
 import { QuickActionsBar } from "./QuickActionsBar";
 import { useLocation } from "react-router";
+import { useAuth } from "@/hooks/useAuth";
+import { logChatMessage, logActionClick } from "../chat/chatLogging";
 
 /* ── Components ────────────────────────────────────────── */
 
@@ -24,6 +27,7 @@ function TypingIndicator() {
 
 function MessageBubble({ message, onAction }: { message: ChatMessage; onAction: (action: ChatAction) => void }) {
   const isUser = message.role === "user";
+  const navigate = useNavigate();
 
   return (
     <motion.div
@@ -58,17 +62,17 @@ function MessageBubble({ message, onAction }: { message: ChatMessage; onAction: 
         {message.content?.type === "program" && (
           <ProgramCard
             content={message.content}
-            onApply={() => console.log("Apply program")}
-            onModify={() => console.log("Modify program")}
-            onExport={() => console.log("Export program")}
+            onApply={() => navigate("/program-builder")}
+            onModify={() => navigate("/program-builder")}
+            onExport={() => {}}
           />
         )}
         {message.content?.type === "exercise_swap" && (
           <ExerciseSwapCard
             content={message.content}
-            onApply={() => console.log("Apply swap")}
-            onUndo={() => console.log("Undo swap")}
-            onExplain={() => console.log("Explain swap")}
+            onApply={() => navigate("/program-builder")}
+            onUndo={() => navigate("/program-builder")}
+            onExplain={() => {}}
           />
         )}
 
@@ -105,11 +109,16 @@ interface AIChatInterfaceProps {
 
 export function AIChatInterface({ onClose }: AIChatInterfaceProps) {
   const { messages, addMessage, clearMessages } = useChatContext();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const location = useLocation();
+
+  const userRole = user?.role === "admin" ? "trainer" : user?.role;
 
   // Auto-scroll
   useEffect(() => {
@@ -122,53 +131,81 @@ export function AIChatInterface({ onClose }: AIChatInterfaceProps) {
     return () => clearTimeout(t);
   }, []);
 
-  const handleSend = useCallback(() => {
-    const text = input.trim();
-    if (!text) return;
-
-    const userMsg: ChatMessage = {
-      id: `u-${Date.now()}`,
-      role: "user",
-      text,
-      timestamp: Date.now(),
+  // Cleanup pending response timer
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-    addMessage(userMsg);
-    setInput("");
-    setIsTyping(true);
-
-    setTimeout(() => {
-      const intentResult = classifyIntent(text);
-      const currentPage = getPageContext(location.pathname);
-      const response = generateResponse(text, {
-        intentResult,
-        currentPage: currentPage || undefined,
-        messageHistory: messages,
-      });
-
-      const assistantMsg: ChatMessage = {
-        id: `a-${Date.now()}`,
-        role: "assistant",
-        text: response.text,
-        timestamp: Date.now(),
-        actions: response.actions,
-        content: response.content as MessageContent | undefined,
-      };
-      addMessage(assistantMsg);
-      setIsTyping(false);
-    }, 800);
-  }, [input, location.pathname, messages, addMessage]);
-
-  const handleAction = useCallback((action: ChatAction) => {
-    if (action.type === "suggest") {
-      setInput(action.payload);
-      inputRef.current?.focus();
-    }
   }, []);
 
-  const handleQuickAction = useCallback((prompt: string) => {
-    setInput(prompt);
-    setTimeout(() => handleSend(), 100);
-  }, [handleSend]);
+  const sendMessage = useCallback(
+    async (textOverride?: string) => {
+      const text = (textOverride ?? input).trim();
+      if (!text || isTyping) return;
+
+      const userMsg: ChatMessage = {
+        id: `u-${Date.now()}`,
+        role: "user",
+        text,
+        timestamp: Date.now(),
+      };
+      addMessage(userMsg);
+      setInput("");
+      setIsTyping(true);
+      logChatMessage(user?.id, "user", text);
+
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(async () => {
+        const intentResult = classifyIntent(text);
+        const currentPage = getPageContext(location.pathname);
+        const response = await generateResponse(text, {
+          intentResult,
+          currentPage: currentPage || undefined,
+          userRole: userRole || "client",
+          userId: user?.id,
+          userEmail: user?.email,
+          messageHistory: messages,
+        });
+
+        const assistantMsg: ChatMessage = {
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          text: response.text,
+          timestamp: Date.now(),
+          actions: response.actions,
+          content: response.content as MessageContent | undefined,
+        };
+        addMessage(assistantMsg);
+        setIsTyping(false);
+        logChatMessage(user?.id, "assistant", response.text, { intent: intentResult.intent });
+      }, 800);
+    },
+    [input, isTyping, location.pathname, messages, addMessage, user?.id, user?.email, userRole]
+  );
+
+  const handleSend = useCallback(() => sendMessage(), [sendMessage]);
+
+  const handleAction = useCallback(
+    (action: ChatAction) => {
+      logActionClick(user?.id, action);
+      if (action.type === "navigate") {
+        navigate(action.payload);
+      } else if (action.type === "link") {
+        window.open(action.payload, "_blank", "noopener,noreferrer");
+      } else if (action.type === "suggest") {
+        setInput(action.payload);
+        inputRef.current?.focus();
+      }
+    },
+    [navigate, user?.id]
+  );
+
+  const handleQuickAction = useCallback(
+    (prompt: string) => {
+      sendMessage(prompt);
+    },
+    [sendMessage]
+  );
 
   return (
     <div className="flex h-[100dvh] flex-col" style={{ backgroundColor: "var(--page-bg)" }}>
