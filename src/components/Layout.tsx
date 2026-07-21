@@ -28,6 +28,7 @@ import {
   MessageSquare,
   ChevronDown,
   BookOpen,
+  ClipboardCheck,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Badge from "@/components/Badge";
@@ -77,6 +78,7 @@ export default function Layout({
   // Dynamic navigation based on user role
   const primaryNavItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+    { icon: ClipboardCheck, label: "Check-ins", path: "/check-ins" },
     { icon: Users, label: "Clients", path: "/clients" },
     { icon: Dumbbell, label: "Workouts", path: "/sheets" },
     { icon: Apple, label: "Nutrition", path: "/nutrition" },
@@ -92,6 +94,7 @@ export default function Layout({
   const tabItems = isTrainer
     ? [
         { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+        { icon: ClipboardCheck, label: "Check-ins", path: "/check-ins" },
         { icon: Users, label: "Clients", path: "/clients" },
         { icon: Dumbbell, label: "Workouts", path: "/sheets" },
         { icon: MessageSquare, label: "Messages", path: "/messages" },
@@ -99,6 +102,7 @@ export default function Layout({
       ]
     : [
         { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+        { icon: ClipboardCheck, label: "Check-ins", path: "/check-ins" },
         { icon: Dumbbell, label: "Workouts", path: "/sheets" },
         { icon: Apple, label: "Nutrition", path: "/nutrition" },
         { icon: MessageSquare, label: "Messages", path: "/messages" },
