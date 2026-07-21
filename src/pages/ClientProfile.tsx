@@ -89,6 +89,7 @@ function mapDbClientToClient(row: Database["public"]["Tables"]["clients"]["Row"]
 
 export default function ClientProfile() {
   const { clientId } = useParams<{ clientId: string }>();
+  const hasValidId = isValidUUID(clientId);
   const [searchParams, setSearchParams] = useSearchParams();
   const urlTab = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState<TabId>(
@@ -96,19 +97,14 @@ export default function ClientProfile() {
   );
   const [client, setClient] = useState<Client | null>(null);
   const [notes, setNotes] = useState<ClientNote[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(hasValidId);
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const hasValidId = isValidUUID(clientId);
-
   useEffect(() => {
-    if (!hasValidId) {
-      setClient(null);
-      setLoading(false);
-      return;
-    }
+    if (!hasValidId) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     const load = async () => {
       const { data, error } = await supabase

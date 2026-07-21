@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -55,7 +55,7 @@ export default function ClientsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const loadClients = async () => {
+  const loadClients = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     const { data, error } = await supabase
@@ -72,11 +72,11 @@ export default function ClientsPage() {
 
     setClients(data || []);
     setLoading(false);
-  };
+  }, [user]);
 
   useEffect(() => {
     loadClients();
-  }, [user]);
+  }, [loadClients]);
 
   useEffect(() => {
     try {
