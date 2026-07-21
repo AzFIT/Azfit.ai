@@ -7,10 +7,8 @@ insert into storage.buckets (id, name, public)
 values ('progress-photos', 'progress-photos', false)
 on conflict (id) do nothing;
 
--- Ensure RLS is enabled on storage.objects
-alter table storage.objects enable row level security;
-
--- Drop existing policies for this bucket to avoid duplicates during re-runs
+-- RLS is already enabled on storage.objects in Supabase hosted.
+-- Drop existing policies for this bucket to avoid duplicates during re-runs.
 drop policy if exists "progress-photos_select" on storage.objects;
 drop policy if exists "progress-photos_insert" on storage.objects;
 drop policy if exists "progress-photos_update" on storage.objects;
