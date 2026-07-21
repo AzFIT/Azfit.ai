@@ -19,6 +19,7 @@
 - Progress Photos: Supabase Storage bucket `progress-photos` with folder-per-user RLS; page now uploads, lists, signs URLs, compares two selected photos, and deletes (feat/progress-photos)
 - Check-in Forms + Habits schema: `check_in_forms`, `check_in_submissions`, `habits`, `habit_logs` tables with folder-per-user RLS using email-match and trainer ownership patterns (feat/checkins-schema)
 - Check-in Forms UI: trainer form builder + client submission flow at `/check-ins`, demo seed data for trainer@azfit.demo/client@azfit.demo (feat/checkins-ui)
+- Client management Supabase migration: QuickAddClientModal writes to `clients` table, Clients list loads from Supabase with edit/archive + legacy import banner, ClientProfile crash-guards bad/missing UUIDs (fix/clients-supabase)
 
 ## Next
 - Habits UI (Phase 5)
