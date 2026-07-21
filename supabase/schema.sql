@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS clients (
   body_fat_percentage NUMERIC(5,2),
   fitness_goal TEXT,
   experience_level TEXT CHECK (experience_level IN ('beginner', 'intermediate', 'advanced')),
-  status TEXT NOT NULL CHECK (status IN ('active', 'inactive', 'on_hold')) DEFAULT 'active',
+  status TEXT NOT NULL CHECK (status IN ('active', 'inactive', 'on_hold', 'archived')) DEFAULT 'active',
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

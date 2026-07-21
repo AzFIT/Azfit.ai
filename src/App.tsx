@@ -56,6 +56,7 @@ const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const CoachAIPage = lazy(() => import("@/pages/CoachAIPage"));
 const Messages = lazy(() => import("@/pages/Messages"));
 const ExercisesPage = lazy(() => import("@/pages/ExercisesPage"));
+const CheckInsPage = lazy(() => import("@/pages/CheckInsPage"));
 
 // Loading fallback
 function PageLoader() {
@@ -225,6 +226,14 @@ export default function App() {
                     element={
                       <ProtectedRoute>
                         <ProgressPhotosPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/check-ins"
+                    element={
+                      <ProtectedRoute>
+                        <CheckInsPage />
                       </ProtectedRoute>
                     }
                   />

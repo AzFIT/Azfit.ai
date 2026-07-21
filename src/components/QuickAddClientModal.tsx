@@ -1,57 +1,86 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X, User, Mail, ChevronDown, Check,
+  X, User, Mail, Phone, ChevronDown, Check,
   LayoutDashboard, Dumbbell, Apple, MessageCircle, ArrowRight,
 } from 'lucide-react';
-import { saveClient } from '@/lib/storage';
-import type { StoredClient } from '@/lib/storage';
 import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
+import type { Database } from '@/types/supabase';
 
 /**
  * ═══════════════════════════════════════════════════════════════
- * QuickAddClientModal — Streamlined 3-field client creation
- * Phase 3: Client Management UX Enhancement
+ * QuickAddClientModal — Supabase-backed client creation + edit
  * ═══════════════════════════════════════════════════════════════
- *
- * Two-state modal: Input form → Success panel with smart routing.
- * Uses AnimatePresence for fluid transitions between states.
  */
 
 export interface QuickAddClientModalProps {
   open: boolean;
   onClose: () => void;
-  onSuccess?: (client: StoredClient) => void;
+  onSuccess?: () => void;
+  clientToEdit?: Database["public"]["Tables"]["clients"]["Row"] | null;
 }
+
+type DbClient = Database["public"]["Tables"]["clients"]["Row"];
+type DbClientStatus = DbClient["status"];
 
 /* ─── Status options ─── */
 
-const STATUS_OPTIONS: { value: StoredClient['status']; label: string }[] = [
+const STATUS_OPTIONS: { value: DbClientStatus; label: string }[] = [
   { value: 'active', label: 'Active' },
-  { value: 'paused', label: 'Paused' },
+  { value: 'on_hold', label: 'Paused' },
   { value: 'archived', label: 'Archived' },
+  { value: 'inactive', label: 'Inactive' },
 ];
 
 /* ─── Main Component ─── */
 
-export default function QuickAddClientModal({ open, onClose, onSuccess }: QuickAddClientModalProps) {
+export default function QuickAddClientModal({
+  open,
+  onClose,
+  onSuccess,
+  clientToEdit,
+}: QuickAddClientModalProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   /* Form state */
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [status, setStatus] = useState<StoredClient['status']>('active');
+  const [phone, setPhone] = useState('');
+  const [status, setStatus] = useState<DbClientStatus>('active');
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   /* Success state */
-  const [createdClient, setCreatedClient] = useState<StoredClient | null>(null);
+  const [createdClient, setCreatedClient] = useState<DbClient | null>(null);
 
-  /* ── Reset form on open ── */
+  /* ── Reset/prefill on open ── */
+  useEffect(() => {
+    if (!open) return;
+    if (clientToEdit) {
+      setFullName(clientToEdit.full_name || '');
+      setEmail(clientToEdit.email || '');
+      setPhone(clientToEdit.phone || '');
+      setStatus(clientToEdit.status);
+    } else {
+      setFullName('');
+      setEmail('');
+      setPhone('');
+      setStatus('active');
+    }
+    setCreatedClient(null);
+    setErrors({});
+    setShowStatusDropdown(false);
+  }, [open, clientToEdit]);
+
   const handleClose = () => {
     setFullName('');
     setEmail('');
+    setPhone('');
     setStatus('active');
     setErrors({});
     setCreatedClient(null);
@@ -60,7 +89,7 @@ export default function QuickAddClientModal({ open, onClose, onSuccess }: QuickA
   };
 
   /* ── Validate & save ── */
-  const handleSave = () => {
+  const handleSave = async () => {
     const newErrors: Record<string, string> = {};
     if (!fullName.trim()) newErrors.fullName = 'Full name is required';
     if (!email.trim()) newErrors.email = 'Email is required';
@@ -71,24 +100,53 @@ export default function QuickAddClientModal({ open, onClose, onSuccess }: QuickA
       return;
     }
 
+    if (!user) {
+      toast.error('You must be signed in');
+      return;
+    }
+
     setIsSubmitting(true);
 
-    const client: StoredClient = {
-      id: `client_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      fullName: fullName.trim(),
+    const payload = {
+      full_name: fullName.trim(),
       email: email.trim(),
+      phone: phone.trim() || null,
       status,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
     };
 
-    saveClient(client);
-    onSuccess?.(client);
+    try {
+      if (clientToEdit) {
+        const { error } = await supabase
+          .from('clients')
+          .update({ ...payload, updated_at: new Date().toISOString() })
+          .eq('id', clientToEdit.id)
+          .eq('trainer_id', user.id);
 
-    // Transition to success state
+        if (error) throw error;
+        setCreatedClient({ ...clientToEdit, ...payload });
+        toast.success('Client updated');
+        onSuccess?.();
+      } else {
+        const { data, error } = await supabase
+          .from('clients')
+          .insert({ ...payload, trainer_id: user.id })
+          .select()
+          .single();
+
+        if (error) throw error;
+        setCreatedClient(data);
+        toast.success('Client created');
+        onSuccess?.();
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      toast.error((clientToEdit ? 'Failed to update client: ' : 'Failed to create client: ') + message);
+      setIsSubmitting(false);
+      return;
+    }
+
     setTimeout(() => {
       setIsSubmitting(false);
-      setCreatedClient(client);
     }, 400);
   };
 
@@ -105,7 +163,7 @@ export default function QuickAddClientModal({ open, onClose, onSuccess }: QuickA
         {
           id: 'dashboard',
           icon: LayoutDashboard,
-          title: `Set up [${createdClient.fullName}]'s Client Dashboard`,
+          title: `Set up [${createdClient.full_name}]'s Client Dashboard`,
           description: 'Configure the specific dashboard view they will see when they sign up.',
           route: `/client/${createdClient.id}?tab=overview`,
         },
@@ -169,10 +227,10 @@ export default function QuickAddClientModal({ open, onClose, onSuccess }: QuickA
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <p className="text-[10px] font-bold tracking-[0.15em] uppercase text-slate-400 mb-1">
-                    New Client
+                    {clientToEdit ? 'Edit Client' : 'New Client'}
                   </p>
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                    Quick Add Client
+                    {clientToEdit ? 'Edit Client' : 'Quick Add Client'}
                   </h2>
                 </div>
                 <button
@@ -229,6 +287,23 @@ export default function QuickAddClientModal({ open, onClose, onSuccess }: QuickA
                   )}
                 </div>
 
+                {/* Phone */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                    Phone <span className="text-slate-400 font-normal">(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+1 555 123 4567"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0D9488]/30 focus:border-[#0D9488] transition-all"
+                    />
+                  </div>
+                </div>
+
                 {/* Status */}
                 <div className="relative">
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
@@ -238,7 +313,7 @@ export default function QuickAddClientModal({ open, onClose, onSuccess }: QuickA
                     onClick={() => setShowStatusDropdown(!showStatusDropdown)}
                     className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white hover:border-[#0D9488] transition-colors"
                   >
-                    <span className="capitalize">{status}</span>
+                    <span className="capitalize">{STATUS_OPTIONS.find((o) => o.value === status)?.label || status}</span>
                     <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showStatusDropdown ? 'rotate-180' : ''}`} />
                   </button>
 
@@ -281,7 +356,7 @@ export default function QuickAddClientModal({ open, onClose, onSuccess }: QuickA
                   disabled={isSubmitting}
                   className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-[#0D9488] hover:bg-[#0B7A75] text-white disabled:opacity-50 transition-colors"
                 >
-                  {isSubmitting ? 'Saving...' : 'Save Client'}
+                  {isSubmitting ? 'Saving...' : (clientToEdit ? 'Save Changes' : 'Save Client')}
                 </button>
               </div>
             </motion.div>
@@ -306,10 +381,10 @@ export default function QuickAddClientModal({ open, onClose, onSuccess }: QuickA
                   <Check className="w-8 h-8 text-[#0D9488]" strokeWidth={3} />
                 </motion.div>
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">
-                  Success! Client [{createdClient.fullName}] Created
+                  Success! Client [{createdClient.full_name}] {clientToEdit ? 'Updated' : 'Created'}
                 </h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  What's next for {createdClient.fullName}?
+                  What's next for {createdClient.full_name}?
                 </p>
               </div>
 

@@ -9,6 +9,7 @@ import {
   CalendarDays,
   Layers,
   StickyNote,
+  ArrowLeft,
 } from "lucide-react";
 import ClientProfileHeader from "@/components/client/ClientProfileHeader";
 import {
@@ -22,7 +23,6 @@ import {
 } from "@/components/client";
 import type { Client, ClientNote } from "@/types/client";
 import {
-  loadClientById,
   getClientNutritionPlan,
   getClientNutritionLogs,
   getClientBioHistory,
@@ -32,6 +32,9 @@ import {
   getClientNotes,
   saveClientNotes,
 } from "@/lib/client-demo";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
+import type { Database } from "@/types/supabase";
 
 const tabs = [
   { id: "overview", label: "Overview", icon: User },
@@ -45,6 +48,45 @@ const tabs = [
 
 type TabId = (typeof tabs)[number]["id"];
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidUUID(value: string | undefined): value is string {
+  return typeof value === "string" && UUID_REGEX.test(value);
+}
+
+function mapDbClientToClient(row: Database["public"]["Tables"]["clients"]["Row"]): Client {
+  return {
+    id: row.id,
+    name: row.full_name,
+    email: row.email,
+    phone: row.phone,
+    dateOfBirth: row.date_of_birth,
+    gender: row.gender,
+    weight: row.weight_kg ?? 0,
+    goalWeight: null,
+    height: row.height_cm ?? 0,
+    bodyFatPercentage: row.body_fat_percentage,
+    primaryGoal: row.fitness_goal,
+    trainingExperience: row.experience_level,
+    trainingFrequency: null,
+    activityLevel: null,
+    availableEquipment: [],
+    preferredStyle: [],
+    injuries: null,
+    status: row.status,
+    avatar: null,
+    location: null,
+    age: undefined,
+    fitnessScore: undefined,
+    compliance: undefined,
+    progress: undefined,
+    streak: undefined,
+    lastActive: null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 export default function ClientProfile() {
   const { clientId } = useParams<{ clientId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -56,21 +98,37 @@ export default function ClientProfile() {
   const [notes, setNotes] = useState<ClientNote[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const hasValidId = isValidUUID(clientId);
 
   useEffect(() => {
-    if (!clientId) return;
-    const raf = window.requestAnimationFrame(() => setLoading(true));
-    const timer = window.setTimeout(() => {
-      const loaded = loadClientById(clientId);
-      setClient(loaded);
-      setNotes(getClientNotes(clientId));
+    if (!hasValidId) {
+      setClient(null);
       setLoading(false);
-    }, 150);
-    return () => {
-      window.cancelAnimationFrame(raf);
-      clearTimeout(timer);
+      return;
+    }
+
+    setLoading(true);
+    const load = async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("*")
+        .eq("id", clientId)
+        .maybeSingle();
+
+      if (error || !data) {
+        setClient(null);
+        setNotes([]);
+      } else {
+        setClient(mapDbClientToClient(data));
+        setNotes(getClientNotes(data.id));
+      }
+      setLoading(false);
     };
-  }, [clientId]);
+
+    load();
+  }, [clientId, hasValidId, user?.id]);
 
   const handleAddNote = useCallback(
     (content: string) => {
@@ -86,7 +144,7 @@ export default function ClientProfile() {
       setNotes(updated);
       saveClientNotes(clientId, updated);
     },
-    [clientId, notes],
+    [clientId, notes]
   );
 
   const handleDeleteNote = useCallback(
@@ -96,7 +154,7 @@ export default function ClientProfile() {
       setNotes(updated);
       saveClientNotes(clientId, updated);
     },
-    [clientId, notes],
+    [clientId, notes]
   );
 
   const handleBuildProgram = useCallback(() => {
@@ -123,13 +181,19 @@ export default function ClientProfile() {
     );
   }
 
-  if (!client) {
+  if (!hasValidId || !client) {
     return (
       <div
-        className="min-h-screen flex items-center justify-center"
+        className="min-h-screen flex items-center justify-center px-4"
         style={{ backgroundColor: "var(--page-bg)" }}
       >
-        <div className="text-center">
+        <div
+          className="w-full max-w-md rounded-2xl border p-8 text-center"
+          style={{
+            backgroundColor: "var(--card-bg)",
+            borderColor: "var(--card-border)",
+          }}
+        >
           <User
             size={40}
             style={{ color: "var(--light-text-muted)" }}
@@ -145,8 +209,16 @@ export default function ClientProfile() {
             className="text-sm mt-1"
             style={{ color: "var(--light-text-muted)" }}
           >
-            The client you're looking for doesn't exist.
+            The client you're looking for doesn't exist or the link is invalid.
           </p>
+          <button
+            onClick={() => navigate("/clients")}
+            className="mt-5 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+            style={{ backgroundColor: "var(--azfit-primary)" }}
+          >
+            <ArrowLeft size={16} />
+            Back to Clients
+          </button>
         </div>
       </div>
     );

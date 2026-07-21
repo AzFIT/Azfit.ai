@@ -54,7 +54,7 @@ export type Database = {
           body_fat_percentage: number | null;
           fitness_goal: string | null;
           experience_level: "beginner" | "intermediate" | "advanced" | null;
-          status: "active" | "inactive" | "on_hold";
+          status: "active" | "inactive" | "on_hold" | "archived";
           notes: string | null;
           created_at: string;
           updated_at: string;
@@ -72,7 +72,7 @@ export type Database = {
           body_fat_percentage?: number | null;
           fitness_goal?: string | null;
           experience_level?: "beginner" | "intermediate" | "advanced" | null;
-          status?: "active" | "inactive" | "on_hold";
+          status?: "active" | "inactive" | "on_hold" | "archived";
           notes?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -90,7 +90,7 @@ export type Database = {
           body_fat_percentage?: number | null;
           fitness_goal?: string | null;
           experience_level?: "beginner" | "intermediate" | "advanced" | null;
-          status?: "active" | "inactive" | "on_hold";
+          status?: "active" | "inactive" | "on_hold" | "archived";
           notes?: string | null;
           created_at?: string;
           updated_at?: string;
