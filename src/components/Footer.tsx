@@ -1,4 +1,4 @@
-import { Github, Instagram, Twitter, Youtube } from 'lucide-react';
+import { Github } from 'lucide-react';
 import { memo } from 'react';
 
 const Footer = memo(function Footer() {
@@ -19,7 +19,7 @@ const Footer = memo(function Footer() {
             </span>
           </div>
           <p className="text-xs" style={{ color: 'var(--dark-text-muted)' }}>
-            Personal training, reimagined. Built by AzTechFit Hong Kong.
+            Personal training, reimagined.
           </p>
           <p className="mt-2 text-xs" style={{ color: 'var(--dark-text-muted)' }}>
             &copy; 2026 AzFIT
@@ -34,7 +34,6 @@ const Footer = memo(function Footer() {
           {[
             { label: 'Features', href: '#features' },
             { label: 'Pricing', href: '#pricing' },
-            { label: 'Demo', href: '/demo' },
           ].map((item) => (
             <a
               key={item.label}
@@ -52,47 +51,43 @@ const Footer = memo(function Footer() {
         {/* Resources Column */}
         <div className="flex flex-col gap-3">
           <h4 className="text-sm font-semibold" style={{ color: 'var(--dark-text-primary)' }}>
-            Contact
+            Resources
           </h4>
           <a
-            href="mailto:hello@aztechfit.com"
+            href="#/exercises"
             className="text-sm transition-colors duration-200 hover:underline"
             style={{ color: 'var(--dark-text-muted)' }}
             onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--dark-text-secondary)')}
             onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--dark-text-muted)')}
           >
-            hello@aztechfit.com
+            Exercise Library
           </a>
-          <p className="text-sm" style={{ color: 'var(--dark-text-muted)' }}>
-            Hong Kong
-          </p>
         </div>
 
-        {/* Company Column */}
+        {/* Company Column — removed until pages exist */}
         <div className="flex flex-col gap-3">
           <h4 className="text-sm font-semibold" style={{ color: 'var(--dark-text-primary)' }}>
-            Legal
+            Company
           </h4>
           <span className="text-sm" style={{ color: 'var(--dark-text-muted)' }}>
-            Privacy Policy — coming soon
-          </span>
-          <span className="text-sm" style={{ color: 'var(--dark-text-muted)' }}>
-            Terms of Service — coming soon
+            Coming soon
           </span>
         </div>
       </div>
 
       {/* Social Icons Row */}
       <div className="mt-8 flex justify-center gap-5">
-        {[Instagram, Twitter, Youtube, Github].map((Icon, i) => (
-          <span
-            key={i}
-            className="cursor-not-allowed transition-colors duration-200"
-            style={{ color: 'var(--dark-text-muted)' }}
-          >
-            <Icon size={20} />
-          </span>
-        ))}
+        <a
+          href="https://github.com/AzFIT/Azfit.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="transition-colors duration-200"
+          style={{ color: 'var(--dark-text-muted)' }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--dark-text-secondary)')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--dark-text-muted)')}
+        >
+          <Github size={20} />
+        </a>
       </div>
     </footer>
   );

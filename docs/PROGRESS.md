@@ -15,6 +15,8 @@
 - Foundation Sprint — brand consolidation: honest stats, unified AzFIT/AzTechFit story, removed fake "10,000+ athletes" claims, App Store/Google Play marked "Coming Soon", footer dead links cleaned (foundation/sprint-1)
 - Foundation Sprint — environment documentation: comprehensive `.env.example` with dev/staging/prod strategy and all env vars (foundation/sprint-1)
 - Foundation Sprint — RLS audit: static SQL checks for self-referencing policies, `is_trainer()` usage, missing ENABLE RLS; `docs/RLS-AUDIT.md` + `src/services/rlsAudit.test.ts` (4 tests) (foundation/sprint-1)
+- PWA + footer fixes: register SW under `import.meta.env.BASE_URL`, make manifest paths relative, fix manifest link, remove dead footer links, keep Features/Pricing anchors + Exercise Library + GitHub (feat/pwa-footer-fixes)
+- Progress Photos: Supabase Storage bucket `progress-photos` with folder-per-user RLS; page now uploads, lists, signs URLs, compares two selected photos, and deletes (feat/progress-photos)
 
 ## Next
 - Phase 1: real backend, multi-tenant schema, RLS integration tests with live DB
@@ -26,7 +28,6 @@
 - Dashboard rings (steps/sleep/HRV) — manual entry, no wearables yet
 - Check-in due card → currently links to /bioprint placeholder
 - AI pages (CoachAI, AIProgramBuilder) — local logic, no edge function
-- Storage bucket for progress photos
 
 ## DB fixes
 - workout_log_entries created live on 2026-07-17, matching schema.sql
