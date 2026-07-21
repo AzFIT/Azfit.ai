@@ -1002,6 +1002,185 @@ export type Database = {
         };
         Relationships: [];
       };
+      check_in_forms: {
+        Row: {
+          id: string;
+          trainer_id: string;
+          title: string;
+          description: string | null;
+          fields: Json;
+          frequency: string;
+          active: boolean;
+          created_at: string;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          trainer_id: string;
+          title: string;
+          description?: string | null;
+          fields?: Json;
+          frequency?: string;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          trainer_id?: string;
+          title?: string;
+          description?: string | null;
+          fields?: Json;
+          frequency?: string;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "check_in_forms_trainer_id_fkey";
+            columns: ["trainer_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      check_in_submissions: {
+        Row: {
+          id: string;
+          form_id: string;
+          client_id: string;
+          answers: Json;
+          submitted_at: string;
+          reviewed_at: string | null;
+          trainer_notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          form_id: string;
+          client_id: string;
+          answers?: Json;
+          submitted_at?: string;
+          reviewed_at?: string | null;
+          trainer_notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          form_id?: string;
+          client_id?: string;
+          answers?: Json;
+          submitted_at?: string;
+          reviewed_at?: string | null;
+          trainer_notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "check_in_submissions_form_id_fkey";
+            columns: ["form_id"];
+            isOneToOne: false;
+            referencedRelation: "check_in_forms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "check_in_submissions_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      habits: {
+        Row: {
+          id: string;
+          trainer_id: string;
+          client_id: string;
+          name: string;
+          target_frequency: string;
+          active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          trainer_id: string;
+          client_id: string;
+          name: string;
+          target_frequency?: string;
+          active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          trainer_id?: string;
+          client_id?: string;
+          name?: string;
+          target_frequency?: string;
+          active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "habits_trainer_id_fkey";
+            columns: ["trainer_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "habits_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      habit_logs: {
+        Row: {
+          id: string;
+          habit_id: string;
+          client_id: string;
+          log_date: string;
+          done: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          habit_id: string;
+          client_id: string;
+          log_date: string;
+          done?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          habit_id?: string;
+          client_id?: string;
+          log_date?: string;
+          done?: boolean;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "habit_logs_habit_id_fkey";
+            columns: ["habit_id"];
+            isOneToOne: false;
+            referencedRelation: "habits";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "habit_logs_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       [_ in never]: never;

@@ -17,10 +17,10 @@
 - Foundation Sprint — RLS audit: static SQL checks for self-referencing policies, `is_trainer()` usage, missing ENABLE RLS; `docs/RLS-AUDIT.md` + `src/services/rlsAudit.test.ts` (4 tests) (foundation/sprint-1)
 - PWA + footer fixes: register SW under `import.meta.env.BASE_URL`, make manifest paths relative, fix manifest link, remove dead footer links, keep Features/Pricing anchors + Exercise Library + GitHub (feat/pwa-footer-fixes)
 - Progress Photos: Supabase Storage bucket `progress-photos` with folder-per-user RLS; page now uploads, lists, signs URLs, compares two selected photos, and deletes (feat/progress-photos)
+- Check-in Forms + Habits schema: `check_in_forms`, `check_in_submissions`, `habits`, `habit_logs` tables with folder-per-user RLS using email-match and trainer ownership patterns (feat/checkins-schema)
 
 ## Next
-- Phase 1: real backend, multi-tenant schema, RLS integration tests with live DB
-- Check-in forms + habit tracking (Phase 5)
+- Check-in forms + habit tracking UI (Phase 5)
 - Voice notes + push notifications
 - Stripe payments (HUMAN GATE — needs founder approval)
 
