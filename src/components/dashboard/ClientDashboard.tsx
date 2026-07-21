@@ -21,6 +21,8 @@ import {
 import { useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { useSessions } from "@/hooks/useSessions";
+import { useHabits, last7Days, isDoneOnDate } from "@/components/checkins/useHabits";
+import HabitRow from "@/components/checkins/HabitRow";
 import { GlassCard } from "./shared/GlassCard";
 import { ProgressRing } from "./shared/ProgressRing";
 import { CollapsibleSection } from "./shared/CollapsibleSection";
@@ -165,6 +167,10 @@ export default function ClientDashboard() {
 
   // Weekly compliance
   const [complianceData] = useState(WEEKLY_COMPLIANCE);
+
+  // Habits
+  const { habits, logs, loading: habitsLoading, toggleToday } = useHabits({ role: "client" });
+  const today = last7Days()[6];
 
   /* ── Derived Values ────────────────────────────────────────────── */
   const stepsPct = calcPct(stepsCurrent, stepsTarget);
@@ -809,6 +815,45 @@ export default function ClientDashboard() {
               <span className="text-[11px] font-medium" style={{ color: "var(--page-text)" }}>Weight</span>
             </button>
           </div>
+        </GlassCard>
+      </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          TODAY'S HABITS CARD
+          ═══════════════════════════════════════════════════════════ */}
+      <motion.div
+        variants={fadeInUp}
+        initial="hidden"
+        animate={mounted ? "visible" : "hidden"}
+        className="mb-6"
+      >
+        <GlassCard
+          title="Today's Habits"
+          titleIcon={<Footprints className="h-4 w-4" />}
+          glass
+          hover
+          accentColor="#0D9488"
+          className="!p-4"
+        >
+          {habitsLoading ? (
+            <div className="h-24 rounded-2xl animate-pulse" style={{ backgroundColor: "var(--card-bg)" }} />
+          ) : habits.length === 0 ? (
+            <p className="py-4 text-sm" style={{ color: "var(--text-muted)" }}>
+              No habits assigned yet.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {habits.map((habit) => (
+                <HabitRow
+                  key={habit.id}
+                  habit={habit}
+                  logs={logs}
+                  isTodayDone={isDoneOnDate(logs, habit.id, today)}
+                  onToggle={(done) => toggleToday(habit.id, done)}
+                />
+              ))}
+            </div>
+          )}
         </GlassCard>
       </motion.div>
 

@@ -16,6 +16,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import type { Database } from "@/types/supabase";
+import ClientHabits from "@/components/checkins/ClientHabits";
+import TrainerHabits from "@/components/checkins/TrainerHabits";
 
 /* ── Types ─────────────────────────────────────────────── */
 
@@ -296,6 +298,13 @@ function TrainerCheckIns() {
                 ))}
               </div>
             )}
+
+            <div className="mt-10">
+              <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+                Client Habits
+              </h2>
+              <TrainerHabits />
+            </div>
           </>
         )}
       </div>
@@ -852,6 +861,10 @@ function ClientCheckIns() {
             ))}
           </div>
         )}
+        <h2 className="mb-4 mt-10 text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+          My Habits
+        </h2>
+        <ClientHabits />
       </div>
     </div>
   );

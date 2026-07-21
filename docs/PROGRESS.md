@@ -20,9 +20,9 @@
 - Check-in Forms + Habits schema: `check_in_forms`, `check_in_submissions`, `habits`, `habit_logs` tables with folder-per-user RLS using email-match and trainer ownership patterns (feat/checkins-schema)
 - Check-in Forms UI: trainer form builder + client submission flow at `/check-ins`, demo seed data for trainer@azfit.demo/client@azfit.demo (feat/checkins-ui)
 - Client management Supabase migration: QuickAddClientModal writes to `clients` table, Clients list loads from Supabase with edit/archive + legacy import banner, ClientProfile crash-guards bad/missing UUIDs (fix/clients-supabase)
+- Habit tracker UI: `useHabits` hook + `HabitRow` component, client "My Habits" and trainer "Client Habits" sections on `/check-ins`, "Today's Habits" card on client dashboard; all data via Supabase, no localStorage (feat/habits-ui)
 
 ## Next
-- Habits UI (Phase 5)
 - Voice notes + push notifications
 - Stripe payments (HUMAN GATE — needs founder approval)
 
