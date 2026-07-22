@@ -29,6 +29,7 @@
 - Navigation polish + Messages RLS fix + CI unit-test fix: logout redirects use `navigate('/login')` instead of `window.location.href`, back/forward buttons in `HistoryNav`, themed `NotFound` catch-all, client can now read trainer's profile via `public.my_trainer_id()` SECURITY DEFINER policy, conversation list falls back to email prefix, RLS audit test excludes `storage` schema, e2e marked `continue-on-error` due to parallel-worker flakiness (fix/navigation-polish)
 - Scheduling upgrades: dropped unused `public.my_email()`; conflict detection on book/edit/block and recurring bookings; weekly repeat sessions with conflict skip; `.ics` export for single sessions and upcoming bundle (feat/scheduling-upgrades)
 - Program Creator v2: `AIProgramBuilder` is now the canonical create/assign flow, wired to Supabase (`programs` → `workouts` → `exercises`) with real trainer clients, live load/save, legacy localStorage import, and client-name context; `ProgramBuilder` remains the manual editor; added `aiProgramMapper` + unit tests (feat/program-creator-v2)
+- Router poison + launcher fix: stabilized `useSupabaseQuery` (stops ProgramBuilder re-render loop that froze HashRouter), mounted `WorkoutLauncher` on client dashboard, gated `/ai-program-builder` to trainers, fixed "Coach Coach" greeting, hid sidebar Clients for clients, and wired ClientProfile Programs tab to real Supabase programs (fix/router-launcher)
 
 ## Next
 - Voice notes + push notifications

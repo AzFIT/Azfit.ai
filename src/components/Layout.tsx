@@ -80,7 +80,7 @@ export default function Layout({
   const primaryNavItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
     { icon: ClipboardCheck, label: "Check-ins", path: "/check-ins" },
-    { icon: Users, label: "Clients", path: "/clients" },
+    ...(isTrainer ? [{ icon: Users, label: "Clients", path: "/clients" }] : []),
     { icon: Dumbbell, label: "Workouts", path: "/sheets" },
     { icon: Apple, label: "Nutrition", path: "/nutrition" },
     { icon: BarChart3, label: "Analytics", path: "/analytics" },

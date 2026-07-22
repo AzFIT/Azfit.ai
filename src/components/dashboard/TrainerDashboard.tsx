@@ -149,7 +149,12 @@ export default function TrainerDashboard() {
   const [showAddClientModal, setShowAddClientModal] = useState(false);
 
   const { clients: healthClients, counts: attentionCounts, hasAttention } = useClientHealth();
-  const firstName = user?.full_name?.split(" ")[0] || "Marcus";
+  const firstName = (() => {
+    const parts = (user?.full_name || "").trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "Marcus";
+    // Skip a leading "Coach" honorific so the greeting doesn't read "Coach Coach"
+    return parts[0] === "Coach" ? (parts[1] || "Marcus") : parts[0];
+  })();
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);

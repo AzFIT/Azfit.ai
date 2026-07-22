@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase, withRetry } from "@/lib/supabase";
 import type { Database } from "@/types/supabase";
 
@@ -22,8 +22,12 @@ interface UseSupabaseQueryResult<T> {
 
 // ─── Generic Hook Factory ───
 function useSupabaseQuery<T>(
-  queryFn: () => Promise<{ data: T | null; error: { message: string } | null }>
+  queryFn: () => Promise<{ data: T | null; error: { message: string } | null }>,
+  deps: readonly unknown[] = []
 ): UseSupabaseQueryResult<T> {
+  const queryRef = useRef(queryFn);
+  queryRef.current = queryFn;
+
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +36,7 @@ function useSupabaseQuery<T>(
     setLoading(true);
     setError(null);
     try {
-      const { data, error } = await withRetry(queryFn, 2, 500);
+      const { data, error } = await withRetry(() => queryRef.current(), 2, 500);
       if (error) throw new Error(error.message);
       setData(data);
     } catch (err) {
@@ -40,11 +44,12 @@ function useSupabaseQuery<T>(
     } finally {
       setLoading(false);
     }
-  }, [queryFn]);
+  }, []);
 
   useEffect(() => {
     fetch();
-  }, [fetch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetch, ...deps]);
 
   return { data, loading, error, refetch: fetch };
 }
@@ -202,7 +207,7 @@ export function useWeeklyStructuresByGoal(
       .eq("goal_name", goalName)
       .order("day_label");
     return { data, error };
-  });
+  }, [goalName]);
 }
 
 // ─── useGoalMethods: Fetch top methods for a goal (uses scoring function) ───
@@ -223,7 +228,7 @@ export function useGoalMethods(
       p_limit: topN,
     });
     return { data: data as GoalMethodResult[] | null, error };
-  });
+  }, [goalId, topN]);
 }
 
 // ─── useMethodPrograms: Fetch top program templates for a method ───
@@ -244,7 +249,7 @@ export function useMethodPrograms(
       p_limit: topN,
     });
     return { data: data as MethodProgramResult[] | null, error };
-  });
+  }, [methodId, topN]);
 }
 
 // ─── useTopPipelines: Fetch top goal→method→program pipelines ───
@@ -266,7 +271,7 @@ export function useTopPipelines(
       p_limit: topN,
     });
     return { data: data as PipelineResult[] | null, error };
-  });
+  }, [goalId, topN]);
 }
 
 // ─── useGoalWithTags: Fetch a single goal with its tags ───
@@ -286,7 +291,7 @@ export function useGoalWithTags(goalId: string | null): UseSupabaseQueryResult<G
       .eq("id", goalId)
       .single();
     return { data: data as GoalWithTags | null, error };
-  });
+  }, [goalId]);
 }
 
 // ─── useProgramTemplateWithTags: Fetch a single program template with tags ───
@@ -308,7 +313,7 @@ export function useProgramTemplateWithTags(
       .eq("id", programTemplateId)
       .single();
     return { data: data as ProgramTemplateWithTags | null, error };
-  });
+  }, [programTemplateId]);
 }
 
 // ─── useTrainerClients: Fetch clients managed by the current trainer ───

@@ -209,7 +209,7 @@ export default function App() {
                   <Route
                     path="/ai-program-builder"
                     element={
-                      <ProtectedRoute>
+                      <ProtectedRoute requireTrainer>
                         <AIProgramBuilderPage />
                       </ProtectedRoute>
                     }

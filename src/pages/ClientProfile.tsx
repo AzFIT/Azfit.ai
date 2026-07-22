@@ -21,18 +21,18 @@ import {
   ProgramsTab,
   NotesTab,
 } from "@/components/client";
-import type { Client, ClientNote } from "@/types/client";
+import type { Client, ClientNote, ClientGeneratedProgram } from "@/types/client";
 import {
   getClientNutritionPlan,
   getClientNutritionLogs,
   getClientBioHistory,
   getClientWorkoutLogs,
   getClientScheduleEvents,
-  getClientPrograms,
   getClientNotes,
   saveClientNotes,
 } from "@/lib/client-demo";
 import { supabase } from "@/lib/supabase";
+import { codeFromOrderIndex, parseExerciseNotes } from "@/lib/aiProgramMapper";
 import { useAuth } from "@/hooks/useAuth";
 import type { Database } from "@/types/supabase";
 
@@ -87,6 +87,79 @@ function mapDbClientToClient(row: Database["public"]["Tables"]["clients"]["Row"]
   };
 }
 
+async function fetchClientPrograms(clientId: string): Promise<ClientGeneratedProgram[]> {
+  const { data: programs, error: programsError } = await supabase
+    .from("programs")
+    .select("*")
+    .eq("client_id", clientId)
+    .order("created_at", { ascending: false });
+
+  if (programsError || !programs || programs.length === 0) return [];
+
+  const programIds = programs.map((p) => p.id);
+  const { data: workouts } = await supabase
+    .from("workouts")
+    .select("*")
+    .in("program_id", programIds)
+    .order("week_number", { ascending: true })
+    .order("day_of_week", { ascending: true });
+
+  const workoutIds = (workouts || []).map((w) => w.id);
+  const { data: exercises } = workoutIds.length
+    ? await supabase
+        .from("exercises")
+        .select("*")
+        .in("workout_id", workoutIds)
+        .order("order_index", { ascending: true })
+    : { data: [] };
+
+  return programs.map((p) => {
+    const programWorkouts = (workouts || []).filter((w) => w.program_id === p.id);
+    return {
+      id: p.id,
+      clientId: p.client_id || undefined,
+      name: p.name,
+      description: p.description || "",
+      category: "Custom",
+      level: "Custom",
+      totalWeeks: p.duration_weeks || 4,
+      goal: p.description || "",
+      frequency: p.frequency_per_week || 1,
+      phases: [
+        {
+          id: `phase-${p.id}`,
+          name: "Program Phase",
+          block: "Block 1",
+          durationWeeks: p.duration_weeks || 4,
+          goal: p.description || "",
+          workouts: programWorkouts.map((w) => {
+            const wExercises = (exercises || []).filter((e) => e.workout_id === w.id);
+            return {
+              id: w.id,
+              name: w.name,
+              dayNumber: w.day_of_week || 1,
+              focus: w.name,
+              estimatedMinutes: Math.max(30, wExercises.length * 5),
+              exercises: wExercises.map((e) => {
+                const extra = parseExerciseNotes(e.notes);
+                return {
+                  order: codeFromOrderIndex(e.order_index),
+                  name: e.name,
+                  category: "custom",
+                  sets: e.sets || 0,
+                  reps: e.reps || "",
+                  tempo: extra.tempo,
+                  restSeconds: e.rest_seconds || 60,
+                };
+              }),
+            };
+          }),
+        },
+      ],
+    };
+  });
+}
+
 export default function ClientProfile() {
   const { clientId } = useParams<{ clientId: string }>();
   const hasValidId = isValidUUID(clientId);
@@ -97,6 +170,7 @@ export default function ClientProfile() {
   );
   const [client, setClient] = useState<Client | null>(null);
   const [notes, setNotes] = useState<ClientNote[]>([]);
+  const [programs, setPrograms] = useState<ClientGeneratedProgram[]>([]);
   const [loading, setLoading] = useState(hasValidId);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -125,6 +199,19 @@ export default function ClientProfile() {
 
     load();
   }, [clientId, hasValidId, user?.id]);
+
+  useEffect(() => {
+    if (!client?.id) return;
+
+    let cancelled = false;
+    fetchClientPrograms(client.id).then((result) => {
+      if (!cancelled) setPrograms(result);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [client?.id]);
 
   const handleAddNote = useCallback(
     (content: string) => {
@@ -225,7 +312,6 @@ export default function ClientProfile() {
   const bioHistory = getClientBioHistory(client.id);
   const workoutLogs = getClientWorkoutLogs(client.id);
   const scheduleEvents = getClientScheduleEvents(client.id);
-  const programs = getClientPrograms(client.id);
 
   return (
     <div

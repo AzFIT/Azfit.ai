@@ -25,6 +25,7 @@ import { useSessions } from "@/hooks/useSessions";
 import { useHabits, last7Days, isDoneOnDate } from "@/components/checkins/useHabits";
 import HabitRow from "@/components/checkins/HabitRow";
 import { generateICS, downloadICS, icsFilename } from "@/lib/ics";
+import { WorkoutLauncher } from "@/components/WorkoutLauncher";
 import { GlassCard } from "./shared/GlassCard";
 import { ProgressRing } from "./shared/ProgressRing";
 import { CollapsibleSection } from "./shared/CollapsibleSection";
@@ -136,6 +137,7 @@ export default function ClientDashboard() {
   const { user } = useAuth();
   const { nextUpcomingSession, loading: sessionsLoading } = useSessions();
   const [mounted, setMounted] = useState(false);
+  const [launcherOpen, setLauncherOpen] = useState(false);
 
   const firstName = user?.full_name?.split(" ")[0] || "Alex";
 
@@ -450,7 +452,7 @@ export default function ClientDashboard() {
           }
           headerAction={
             <button
-              onClick={() => navigate("/sheets")}
+              onClick={() => setLauncherOpen(true)}
               className="flex items-center gap-0.5 text-[11px] font-medium transition-opacity hover:opacity-70"
               style={{ color: "var(--azfit-primary)" }}
             >
@@ -462,7 +464,7 @@ export default function ClientDashboard() {
           {/* Start Workout Button */}
           <motion.button
             whileTap={{ scale: 0.98 }}
-            onClick={() => navigate("/sheets")}
+            onClick={() => setLauncherOpen(true)}
             className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold text-white transition-all"
             style={{ backgroundColor: "var(--azfit-primary)" }}
           >
@@ -976,6 +978,8 @@ export default function ClientDashboard() {
           </div>
         </GlassCard>
       </motion.div>
+
+      <WorkoutLauncher isOpen={launcherOpen} onClose={() => setLauncherOpen(false)} />
     </div>
   );
 }
