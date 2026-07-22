@@ -59,15 +59,19 @@ describe("RLS audit: static SQL checks", () => {
   });
 
   it("every table with a CREATE POLICY statement has ENABLE ROW LEVEL SECURITY", () => {
+    // Supabase-managed schemas (e.g. storage.objects) already have RLS enabled by
+    // the platform and our Postgres role cannot run ALTER TABLE on them, so skip them.
     const policyTables = Array.from(
-      allSql.matchAll(/CREATE\s+POLICY\s+[^\s]+\s+ON\s+(\w+)/gi)
+      allSql.matchAll(/CREATE\s+POLICY\s+[^\s]+\s+ON\s+((?:\w+\.)?\w+)/gi)
     ).map((m) => m[1]);
 
     const enabledTables = Array.from(
-      allSql.matchAll(/ALTER\s+TABLE\s+(\w+)\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY/gi)
+      allSql.matchAll(/ALTER\s+TABLE\s+((?:\w+\.)?\w+)\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY/gi)
     ).map((m) => m[1]);
 
-    const missing = [...new Set(policyTables)].filter((t) => !enabledTables.includes(t));
+    const missing = [...new Set(policyTables)]
+      .filter((t) => !enabledTables.includes(t))
+      .filter((t) => !t.startsWith("storage."));
     expect(missing, `Tables with policies but no ENABLE RLS: ${missing.join(", ")}`).toEqual([]);
   });
 });

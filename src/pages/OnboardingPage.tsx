@@ -366,6 +366,7 @@ export default function OnboardingPage() {
 /* ── Step 1: Role Selection ─────────────────────────────── */
 
 function Step1Role({ data, updateData }: { data: OnboardingData; updateData: (u: Partial<OnboardingData>) => void }) {
+  const navigate = useNavigate();
   return (
     <div className="space-y-6">
       <div className="text-center">
@@ -438,7 +439,7 @@ function Step1Role({ data, updateData }: { data: OnboardingData; updateData: (u:
       <p className="text-center text-xs" style={{ color: 'var(--text-muted)' }}>
         Already have an account?{' '}
         <button
-          onClick={() => window.location.href = '/login'}
+          onClick={() => navigate('/login')}
           className="font-medium underline"
           style={{ color: '#00AEEF' }}
         >

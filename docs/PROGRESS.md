@@ -26,6 +26,7 @@
 - AI Chat Stage 1: chat logging (`chat_messages`, `chat_events`, `chat_feedback`), FAQ table, safety guards (crisis + medical), real-data responses for deload/analyze, removed fake apply actions, wired floating chat + Coach AI page (feat/ai-chat-stage1)
 - AI Chat Stage 1B: guided weight/habit flows, thumbs feedback on assistant messages, role-aware quick chips in the bubble (feat/ai-chat-stage1b)
 - Exercise swap engine: ranked substitution suggestions from the library (category/equipment/muscle/keyword scoring), wired into the session swap picker and AI chat fallback (feat/exercise-swap)
+- Navigation polish + Messages RLS fix + CI unit-test fix: logout redirects use `navigate('/login')` instead of `window.location.href`, back/forward buttons in `HistoryNav`, themed `NotFound` catch-all, client can now read trainer's profile via `public.my_trainer_id()` SECURITY DEFINER policy, conversation list falls back to email prefix, RLS audit test excludes `storage` schema, e2e marked `continue-on-error` due to parallel-worker flakiness (fix/navigation-polish)
 
 ## Next
 - Voice notes + push notifications

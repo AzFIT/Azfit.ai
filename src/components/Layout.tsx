@@ -34,6 +34,7 @@ import Navbar from "@/components/Navbar";
 import Badge from "@/components/Badge";
 import AzFitChat from "@/components/chat/AzFitChat";
 import PageBreadcrumbs from "@/components/PageBreadcrumbs";
+import HistoryNav from "@/components/HistoryNav";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -419,7 +420,7 @@ export default function Layout({
           <button
             onClick={async () => {
               await supabase.auth.signOut();
-              window.location.href = '/';
+              navigate('/login', { replace: true });
             }}
             className="flex h-12 w-full items-center gap-4 rounded-lg px-3 text-left transition-all duration-150 hover:bg-[var(--light-elevated)] active:scale-[0.98]"
             style={{ color: "var(--light-text-muted)" }}
@@ -626,6 +627,17 @@ export default function Layout({
         className={`min-h-[100dvh] pb-16 lg:ml-[280px] lg:pb-0 ${showNav ? "pt-14" : ""}`}
         style={{ backgroundColor: "var(--page-bg)" }}
       >
+        {showNav && user && (
+          <div
+            className="flex items-center gap-2 border-b px-4 py-2 lg:px-6"
+            style={{
+              backgroundColor: "var(--page-bg)",
+              borderColor: "var(--card-border)",
+            }}
+          >
+            <HistoryNav />
+          </div>
+        )}
         <PageBreadcrumbs />
         {children}
       </main>

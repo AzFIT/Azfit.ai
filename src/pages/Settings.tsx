@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router';
 import {
   Palette,
   Ruler,
@@ -216,6 +217,7 @@ function DeviceRow({ device }: { device: DeviceItem }) {
 export default function Settings() {
   const { theme, toggleTheme } = useTheme();
   const { logout } = useAuth();
+  const navigate = useNavigate();
   const isDark = theme === 'dark';
 
   /* ---- units state ---- */
@@ -834,7 +836,7 @@ export default function Settings() {
           <button
             onClick={async () => {
               await logout();
-              window.location.href = '/';
+              navigate('/login', { replace: true });
             }}
             className="flex w-full items-center justify-center gap-2 rounded-lg border border-transparent px-4 py-3 font-mono text-sm font-semibold transition-all duration-200 active:scale-[0.97]"
             style={{

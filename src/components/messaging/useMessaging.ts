@@ -18,6 +18,13 @@ function getInitials(name: string | null): string {
     .toUpperCase();
 }
 
+function displayName(profile: PartnerProfile | null): string {
+  if (profile?.full_name?.trim()) return profile.full_name.trim();
+  const email = profile?.email?.trim();
+  if (email) return email.split("@")[0] || email;
+  return "Unknown";
+}
+
 export function useMessaging() {
   const { user } = useAuth();
   const myId = user?.id;
@@ -71,7 +78,7 @@ export function useMessaging() {
       if (partnerIds.length > 0) {
         const { data: profiles } = await supabase
           .from("profiles")
-          .select("id, full_name, avatar_url")
+          .select("id, full_name, avatar_url, email")
           .in("id", partnerIds);
 
         for (const p of profiles || []) {
@@ -92,11 +99,12 @@ export function useMessaging() {
         unread += unreadCount;
 
         const profile = entry.profile;
+        const name = displayName(profile);
         convs.push({
           partnerId,
-          partnerName: profile?.full_name || "Unknown",
+          partnerName: name,
           partnerAvatar: profile?.avatar_url || null,
-          partnerInitials: getInitials(profile?.full_name || null),
+          partnerInitials: getInitials(name === "Unknown" ? null : name),
           lastMessage: latest?.content || "",
           lastMessageAt: latest?.createdAt || "",
           unreadCount,

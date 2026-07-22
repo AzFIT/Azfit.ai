@@ -10,6 +10,7 @@ import { registerServiceWorker } from "@/lib/registerSW";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Toaster } from "@/components/ui/sonner";
 import OfflineBanner from "@/components/OfflineBanner";
+import NotFound from "@/components/NotFound";
 
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
 if (sentryDsn) {
@@ -317,6 +318,7 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
             </AIContextProvider>

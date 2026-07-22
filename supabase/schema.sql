@@ -210,6 +210,21 @@ CREATE POLICY "Trainers can read all profiles"
   ON profiles FOR SELECT
   USING (public.is_trainer());
 
+CREATE OR REPLACE FUNCTION public.my_trainer_id()
+RETURNS uuid
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT trainer_id FROM public.clients WHERE email = auth.email() LIMIT 1;
+$$;
+
+CREATE POLICY "Clients can read their trainer's profile"
+  ON profiles FOR SELECT
+  TO authenticated
+  USING (id = public.my_trainer_id());
+
 -- CLIENTS: Trainers can manage their clients, clients can read their own
 CREATE POLICY "Trainers can manage their clients"
   ON clients FOR ALL

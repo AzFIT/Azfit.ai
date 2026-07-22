@@ -21,4 +21,5 @@ export interface PartnerProfile {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
+  email: string | null;
 }
