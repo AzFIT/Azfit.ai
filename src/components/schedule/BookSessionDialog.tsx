@@ -25,7 +25,8 @@ import type { CalendarEvent } from '@/types';
 interface BookSessionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onBook: (event: CalendarEvent) => void;
+  onBook: (event: CalendarEvent, recurringCount: number) => void;
+  isTrainer?: boolean;
   clients: { id: string; name: string; avatar?: string }[];
   initialDate?: string;
 }
@@ -47,6 +48,7 @@ export function BookSessionDialog({
   open,
   onOpenChange,
   onBook,
+  isTrainer = false,
   clients,
   initialDate,
 }: BookSessionDialogProps) {
@@ -58,6 +60,7 @@ export function BookSessionDialog({
   const [sessionType, setSessionType] = useState('session');
   const [notes, setNotes] = useState('');
   const [recurring, setRecurring] = useState(false);
+  const [recurringCount, setRecurringCount] = useState(4);
 
   const selectedClient = clients.find((c) => c.id === clientId);
 
@@ -77,6 +80,7 @@ export function BookSessionDialog({
     setSessionType('session');
     setNotes('');
     setRecurring(false);
+    setRecurringCount(4);
   };
 
   const handleBook = () => {
@@ -90,8 +94,9 @@ export function BookSessionDialog({
       clientId,
       clientName: selectedClient?.name,
       description: notes,
+      location: null,
     };
-    onBook(event);
+    onBook(event, isTrainer && recurring ? recurringCount : 1);
     resetForm();
     onOpenChange(false);
   };
@@ -246,13 +251,37 @@ export function BookSessionDialog({
                   className="mt-1 border-[#2A3447] bg-[#111827] text-[#F0F0F0]"
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  checked={recurring}
-                  onCheckedChange={(v) => setRecurring(v as boolean)}
-                />
-                <Label className="text-sm text-[#94A3B8]">Recurring session</Label>
-              </div>
+              {isTrainer && (
+                <div className="space-y-3 rounded-lg border border-[#2A3447]/50 bg-[#111827]/50 p-3">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={recurring}
+                      onCheckedChange={(v) => setRecurring(v as boolean)}
+                    />
+                    <Label className="text-sm text-[#94A3B8]">Repeat weekly</Label>
+                  </div>
+                  {recurring && (
+                    <div className="flex items-center gap-3">
+                      <Label className="text-xs text-[#94A3B8]">Occurrences</Label>
+                      <Select
+                        value={recurringCount.toString()}
+                        onValueChange={(v) => setRecurringCount(parseInt(v, 10))}
+                      >
+                        <SelectTrigger className="w-24 border-[#2A3447] bg-[#111827] text-[#F0F0F0] text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="border-[#2A3447] bg-[#1A2235]">
+                          {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                            <SelectItem key={n} value={n.toString()} className="text-[#F0F0F0] text-xs">
+                              {n} week{n > 1 ? 's' : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -285,6 +314,12 @@ export function BookSessionDialog({
                     {SESSION_TYPES.find((t) => t.value === sessionType)?.label}
                   </span>
                 </div>
+                {recurring && isTrainer && (
+                  <div className="flex justify-between">
+                    <span className="text-[#94A3B8]">Repeat</span>
+                    <span className="font-medium text-[#F0F0F0]">{recurringCount} weeks</span>
+                  </div>
+                )}
                 {notes && (
                   <div className="flex justify-between">
                     <span className="text-[#94A3B8]">Notes</span>

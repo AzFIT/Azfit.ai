@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CalendarPlus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -17,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { generateICS, downloadICS, icsFilename } from '@/lib/ics';
 import type { CalendarEvent } from '@/types';
 
 interface EditSessionDialogProps {
@@ -68,6 +70,19 @@ export function EditSessionDialog({
     onCancelSession(event.id);
     setShowCancelConfirm(false);
     onOpenChange(false);
+  };
+
+  const handleAddToCalendar = () => {
+    if (!event) return;
+    const ics = generateICS({
+      id: event.id,
+      title: event.title,
+      startsAt: new Date(`${event.date}T${event.startTime}`).toISOString(),
+      endsAt: new Date(`${event.date}T${event.endTime}`).toISOString(),
+      location: event.location,
+      notes: event.description,
+    });
+    downloadICS(ics, icsFilename(new Date(`${event.date}T${event.startTime}`).toISOString()));
   };
 
   return (
@@ -198,6 +213,14 @@ export function EditSessionDialog({
                 className="border-[#2A3447] text-[#94A3B8]"
               >
                 Close
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleAddToCalendar}
+                className="border-[#2A3447] text-[#94A3B8]"
+              >
+                <CalendarPlus className="mr-1 h-4 w-4" />
+                Add to Calendar
               </Button>
               <Button
                 onClick={handleSave}

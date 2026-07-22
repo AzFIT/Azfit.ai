@@ -27,6 +27,7 @@
 - AI Chat Stage 1B: guided weight/habit flows, thumbs feedback on assistant messages, role-aware quick chips in the bubble (feat/ai-chat-stage1b)
 - Exercise swap engine: ranked substitution suggestions from the library (category/equipment/muscle/keyword scoring), wired into the session swap picker and AI chat fallback (feat/exercise-swap)
 - Navigation polish + Messages RLS fix + CI unit-test fix: logout redirects use `navigate('/login')` instead of `window.location.href`, back/forward buttons in `HistoryNav`, themed `NotFound` catch-all, client can now read trainer's profile via `public.my_trainer_id()` SECURITY DEFINER policy, conversation list falls back to email prefix, RLS audit test excludes `storage` schema, e2e marked `continue-on-error` due to parallel-worker flakiness (fix/navigation-polish)
+- Scheduling upgrades: dropped unused `public.my_email()`; conflict detection on book/edit/block and recurring bookings; weekly repeat sessions with conflict skip; `.ics` export for single sessions and upcoming bundle (feat/scheduling-upgrades)
 
 ## Next
 - Voice notes + push notifications

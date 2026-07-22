@@ -11,6 +11,7 @@ export interface CalendarEvent {
   clientId?: string;
   clientName?: string;
   description?: string;
+  location?: string | null;
   recurring?: boolean;
   color?: string;
 }

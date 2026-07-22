@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { findSessionConflicts, type ConflictCandidate } from "@/lib/sessionConflicts";
 
 /* ═══════════════════════════════════════════════════════════════════
    useSessions — Real-time session scheduling hook
@@ -198,6 +199,46 @@ export function useSessions() {
     [myId, fetchSessions]
   );
 
+  /* ── Batch create sessions (recurring) ──────────────────────────── */
+  const createSessions = useCallback(
+    async (sessionsToCreate: Omit<Session, "id" | "createdAt">[]) => {
+      if (!myId || sessionsToCreate.length === 0) return { success: false, count: 0 };
+      setSaving(true);
+
+      try {
+        const payloads = sessionsToCreate.map((session) => ({
+          trainer_id: session.trainerId,
+          client_id: session.clientId,
+          title: session.title,
+          type: session.type,
+          status: session.status,
+          starts_at: session.startsAt,
+          ends_at: session.endsAt,
+          location: session.location,
+          notes: session.notes,
+        }));
+
+        const { error } = await supabase.from("sessions").insert(payloads);
+        if (error) throw error;
+
+        await fetchSessions();
+        return { success: true, count: sessionsToCreate.length };
+      } catch (err) {
+        console.error("Failed to create sessions:", err);
+        return { success: false, count: 0 };
+      } finally {
+        setSaving(false);
+      }
+    },
+    [myId, fetchSessions]
+  );
+
+  /* ── Find overlapping sessions for a candidate time range ──────── */
+  const findConflicts = useCallback(
+    (candidate: ConflictCandidate) => findSessionConflicts(sessions, candidate),
+    [sessions]
+  );
+
   /* ── Realtime subscription ─────────────────────────────────────── */
   useEffect(() => {
     if (!myId) return;
@@ -266,8 +307,10 @@ export function useSessions() {
     isTrainer,
     fetchSessions,
     createSession,
+    createSessions,
     updateSession,
     cancelSession,
+    findConflicts,
     todaySessions,
     nextUpcomingSession,
     weekSessions,

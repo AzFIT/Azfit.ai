@@ -3,10 +3,22 @@ import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import {
   ChevronLeft, ChevronRight, Calendar as CalendarIcon,
-  Users, Timer, Dumbbell,
+  Users, Timer, Dumbbell, Download,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useSessions } from '@/hooks/useSessions';
+import type { Session } from '@/hooks/useSessions';
+import { findSessionConflicts, generateWeeklyOccurrences, formatConflictList } from '@/lib/sessionConflicts';
+import { generateICSBundle, downloadICS } from '@/lib/ics';
 import type { CalendarEvent } from '@/types';
 import { CellContextMenu } from '@/components/schedule/CellContextMenu';
 import { BookSessionDialog } from '@/components/schedule/BookSessionDialog';
@@ -80,6 +92,7 @@ function sessionToEvent(session: ReturnType<typeof useSessions>['sessions'][numb
     clientId: session.clientId,
     clientName: session.clientName,
     description: session.notes || undefined,
+    location: session.location,
   };
 }
 
@@ -88,7 +101,7 @@ function sessionToEvent(session: ReturnType<typeof useSessions>['sessions'][numb
 export default function SchedulePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { loading, saving, isTrainer, createSession, updateSession, cancelSession, weekSessions } = useSessions();
+  const { sessions, loading, saving, isTrainer, createSession, createSessions, updateSession, cancelSession, weekSessions } = useSessions();
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
@@ -105,6 +118,21 @@ export default function SchedulePage() {
   const [editOpen, setEditOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+
+  // Conflict warning dialog
+  const [conflictDialog, setConflictDialog] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    onConfirm?: () => void;
+    allowSkip: boolean;
+  }>({ open: false, title: '', message: '', allowSkip: false });
+
+  const closeConflictDialog = () => setConflictDialog((p) => ({ ...p, open: false }));
+
+  const showConflictDialog = (title: string, message: string, onConfirm?: () => void, allowSkip = false) => {
+    setConflictDialog({ open: true, title, message, onConfirm, allowSkip });
+  };
 
   const weekStart = getWeekStart(currentDate);
   const weekDays = useMemo(() =>
@@ -183,22 +211,125 @@ export default function SchedulePage() {
     }
   }, [events]);
 
-  const handleBook = async (event: CalendarEvent) => {
+  const handleDownloadUpcoming = () => {
+    const now = new Date().toISOString();
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() + 56); // 8 weeks
+    const upcoming = sessions
+      .filter((s) => s.status !== 'cancelled' && s.startsAt > now && s.startsAt < cutoff.toISOString())
+      .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+
+    if (upcoming.length === 0) {
+      toast.info('No upcoming sessions in the next 8 weeks');
+      return;
+    }
+
+    const ics = generateICSBundle(
+      upcoming.map((s) => ({
+        id: s.id,
+        title: s.title,
+        startsAt: s.startsAt,
+        endsAt: s.endsAt,
+        location: s.location,
+        notes: s.notes,
+      }))
+    );
+    downloadICS(ics, `azfit-upcoming-${new Date().toISOString().split('T')[0]}.ics`);
+  };
+
+  const handleBook = async (event: CalendarEvent, recurringCount = 1) => {
     const startDate = new Date(`${event.date}T${event.startTime}`);
     const endDate = new Date(`${event.date}T${event.endTime}`);
 
-    const success = await createSession({
+    const baseSession = {
       trainerId: user?.id || '',
       clientId: event.clientId || '',
       title: event.title,
       type: event.type === 'blocked' ? 'blocked' : '1-on-1',
-      status: isTrainer ? 'scheduled' : 'requested',
+      status: (isTrainer ? 'scheduled' : 'requested') as Session['status'],
       startsAt: startDate.toISOString(),
       endsAt: endDate.toISOString(),
-      location: null,
+      location: event.location || null,
       notes: event.description || null,
+    };
+
+    // Clients just request; trainers need conflict checking.
+    if (!isTrainer) {
+      const success = await createSession(baseSession);
+      if (success) setBookOpen(false);
+      return;
+    }
+
+    if (recurringCount > 1) {
+      const occurrences = generateWeeklyOccurrences(baseSession, recurringCount);
+      const conflicts = occurrences.flatMap((occ) =>
+        findSessionConflicts(sessions, {
+          trainerId: occ.trainerId,
+          clientId: occ.clientId,
+          startsAt: occ.startsAt,
+          endsAt: occ.endsAt,
+        })
+      );
+      const uniqueConflicts = [...new Map(conflicts.map((c) => [c.id, c])).values()];
+
+      if (uniqueConflicts.length > 0) {
+        const conflictDates = uniqueConflicts
+          .map((s) => {
+            const d = new Date(s.startsAt);
+            return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+          })
+          .join(', ');
+        showConflictDialog(
+          'Recurring booking conflicts',
+          `Conflicts on: ${conflictDates}.\n\n${formatConflictList(uniqueConflicts)}`,
+          async () => {
+            const nonConflicting = occurrences.filter((occ) =>
+              findSessionConflicts(sessions, {
+                trainerId: occ.trainerId,
+                clientId: occ.clientId,
+                startsAt: occ.startsAt,
+                endsAt: occ.endsAt,
+              }).length === 0
+            );
+            const { success, count } = await createSessions(nonConflicting);
+            if (success) {
+              const skipped = occurrences.length - count;
+              toast.success(`${count} sessions booked${skipped > 0 ? ` (${skipped} skipped due to conflicts)` : ''}`);
+              setBookOpen(false);
+            } else {
+              toast.error('Failed to book recurring sessions');
+            }
+            closeConflictDialog();
+          },
+          true
+        );
+        return;
+      }
+
+      const { success, count } = await createSessions(occurrences);
+      if (success) {
+        toast.success(`${count} sessions booked`);
+        setBookOpen(false);
+      }
+      return;
+    }
+
+    const conflicts = findSessionConflicts(sessions, {
+      trainerId: baseSession.trainerId,
+      clientId: baseSession.clientId,
+      startsAt: baseSession.startsAt,
+      endsAt: baseSession.endsAt,
     });
 
+    if (conflicts.length > 0) {
+      showConflictDialog(
+        'Booking conflict',
+        `This time slot conflicts with an existing session:\n\n${formatConflictList(conflicts)}`
+      );
+      return;
+    }
+
+    const success = await createSession(baseSession);
     if (success) {
       setBookOpen(false);
     }
@@ -208,24 +339,47 @@ export default function SchedulePage() {
     const startDate = new Date(`${event.date}T${event.startTime}`);
     const endDate = new Date(`${event.date}T${event.endTime}`);
 
-    const success = await createSession({
+    const baseSession = {
       trainerId: user?.id || '',
       clientId: user?.id || '', // self-block
       title: event.title,
-      type: 'blocked',
-      status: 'scheduled',
+      type: 'blocked' as const,
+      status: 'scheduled' as const,
       startsAt: startDate.toISOString(),
       endsAt: endDate.toISOString(),
-      location: null,
+      location: event.location || null,
       notes: event.description || null,
+    };
+
+    const conflicts = findSessionConflicts(sessions, {
+      trainerId: baseSession.trainerId,
+      clientId: baseSession.clientId,
+      startsAt: baseSession.startsAt,
+      endsAt: baseSession.endsAt,
     });
 
+    if (conflicts.length > 0) {
+      showConflictDialog(
+        'Block time conflict',
+        `This block overlaps with an existing session:\n\n${formatConflictList(conflicts)}`
+      );
+      return;
+    }
+
+    const success = await createSession(baseSession);
     if (success) {
       setBlockOpen(false);
     }
   };
 
   const handleSaveEdit = async (id: string, updates: Partial<CalendarEvent>) => {
+    const original = sessions.find((s) => s.id === id);
+    if (!original) {
+      await updateSession(id, {});
+      setEditOpen(false);
+      return;
+    }
+
     const sessionUpdates: Parameters<typeof updateSession>[1] = {};
     if (updates.title !== undefined) sessionUpdates.title = updates.title;
     if (updates.type !== undefined) sessionUpdates.type = updates.type;
@@ -236,6 +390,36 @@ export default function SchedulePage() {
       sessionUpdates.endsAt = new Date(`${updates.date}T${updates.endTime}`).toISOString();
     }
     if (updates.description !== undefined) sessionUpdates.notes = updates.description;
+    if (updates.location !== undefined) sessionUpdates.location = updates.location;
+
+    // Only trainers scheduling/approving need conflict checks.
+    if (!isTrainer) {
+      await updateSession(id, sessionUpdates);
+      setEditOpen(false);
+      return;
+    }
+
+    const finalStatus = (updates.type === 'blocked' ? 'scheduled' : (sessionUpdates.status || original.status)) as Session['status'];
+    const finalStartsAt = sessionUpdates.startsAt || original.startsAt;
+    const finalEndsAt = sessionUpdates.endsAt || original.endsAt;
+
+    if (finalStatus === 'scheduled' || finalStatus === 'requested') {
+      const conflicts = findSessionConflicts(sessions, {
+        trainerId: original.trainerId,
+        clientId: original.clientId,
+        startsAt: finalStartsAt,
+        endsAt: finalEndsAt,
+        excludeId: id,
+      });
+
+      if (conflicts.length > 0) {
+        showConflictDialog(
+          'Update conflict',
+          `This change would overlap with an existing session:\n\n${formatConflictList(conflicts)}`
+        );
+        return;
+      }
+    }
 
     await updateSession(id, sessionUpdates);
     setEditOpen(false);
@@ -322,6 +506,16 @@ export default function SchedulePage() {
                   {stats.clients} clients
                 </span>
               </div>
+
+              {/* Download upcoming .ics */}
+              <button
+                onClick={handleDownloadUpcoming}
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-slate-700/50 text-slate-300"
+                title="Download all upcoming sessions (.ics)"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">.ics</span>
+              </button>
 
               {/* View Toggle */}
               <div className="flex items-center bg-slate-800/50 rounded-lg p-0.5">
@@ -439,6 +633,7 @@ export default function SchedulePage() {
         open={bookOpen}
         onOpenChange={setBookOpen}
         onBook={handleBook}
+        isTrainer={isTrainer}
         clients={[]}
         initialDate={contextMenu.date}
       />
@@ -461,6 +656,35 @@ export default function SchedulePage() {
         date={selectedEvent?.date || ''}
         onConfirm={() => selectedEvent && handleCancelSession(selectedEvent.id)}
       />
+
+      {/* Conflict Warning Dialog */}
+      <Dialog open={conflictDialog.open} onOpenChange={closeConflictDialog}>
+        <DialogContent className="max-w-md border-[#2A3447] bg-[#1A2235] text-[#F0F0F0]">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-[#F0F0F0]">{conflictDialog.title}</DialogTitle>
+          </DialogHeader>
+          <div className="whitespace-pre-line text-sm text-[#94A3B8] max-h-64 overflow-y-auto">
+            {conflictDialog.message}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={closeConflictDialog}
+              className="border-[#2A3447] text-[#94A3B8]"
+            >
+              Cancel
+            </Button>
+            {conflictDialog.allowSkip && conflictDialog.onConfirm && (
+              <Button
+                onClick={conflictDialog.onConfirm}
+                className="bg-[#00AEEF] text-white hover:bg-[#00BFFF]"
+              >
+                Skip & Book Rest
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

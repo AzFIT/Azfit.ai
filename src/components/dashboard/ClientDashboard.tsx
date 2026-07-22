@@ -13,6 +13,7 @@ import {
   Bell,
   MessageSquare,
   CalendarDays,
+  CalendarPlus,
   Play,
   Plus,
   BedDouble,
@@ -23,6 +24,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSessions } from "@/hooks/useSessions";
 import { useHabits, last7Days, isDoneOnDate } from "@/components/checkins/useHabits";
 import HabitRow from "@/components/checkins/HabitRow";
+import { generateICS, downloadICS, icsFilename } from "@/lib/ics";
 import { GlassCard } from "./shared/GlassCard";
 import { ProgressRing } from "./shared/ProgressRing";
 import { CollapsibleSection } from "./shared/CollapsibleSection";
@@ -198,6 +200,19 @@ export default function ClientDashboard() {
       current: Math.min(prev.current + amount, prev.target + 1),
     }));
   }, []);
+
+  const handleAddSessionToCalendar = () => {
+    if (!nextSession) return;
+    const ics = generateICS({
+      id: nextSession.id,
+      title: nextSession.title,
+      startsAt: nextSession.startsAt,
+      endsAt: nextSession.endsAt,
+      location: nextSession.location,
+      notes: nextSession.notes,
+    });
+    downloadICS(ics, icsFilename(nextSession.startsAt));
+  };
 
   /* ── Mount Animation ───────────────────────────────────────────── */
   useEffect(() => {
@@ -391,6 +406,21 @@ export default function ClientDashboard() {
                 <CalendarDays className="h-4 w-4" />
                 Book Session
               </motion.button>
+              {nextSession && (
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleAddSessionToCalendar}
+                  className="flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium transition-all"
+                  style={{
+                    backgroundColor: "var(--card-bg)",
+                    borderColor: "var(--card-border)",
+                    color: "var(--page-text)",
+                  }}
+                >
+                  <CalendarPlus className="h-4 w-4" />
+                  Add to Calendar
+                </motion.button>
+              )}
             </div>
           </div>
         </GlassCard>
