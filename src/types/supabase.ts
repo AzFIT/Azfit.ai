@@ -1326,6 +1326,110 @@ export type Database = {
           }
         ];
       };
+      foods_cache: {
+        Row: {
+          id: string;
+          source: "off" | "custom";
+          source_id: string | null;
+          name: string;
+          brand: string | null;
+          category: string | null;
+          serving_size_g: number | null;
+          calories: number;
+          protein: number;
+          carbs: number;
+          fats: number;
+          raw: Json | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          source?: "off" | "custom";
+          source_id?: string | null;
+          name: string;
+          brand?: string | null;
+          category?: string | null;
+          serving_size_g?: number | null;
+          calories?: number;
+          protein?: number;
+          carbs?: number;
+          fats?: number;
+          raw?: Json | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          source?: "off" | "custom";
+          source_id?: string | null;
+          name?: string;
+          brand?: string | null;
+          category?: string | null;
+          serving_size_g?: number | null;
+          calories?: number;
+          protein?: number;
+          carbs?: number;
+          fats?: number;
+          raw?: Json | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "foods_cache_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      nutrition_logs: {
+        Row: {
+          id: string;
+          user_id: string;
+          logged_date: string;
+          meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+          food_id: string;
+          quantity_g: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          logged_date?: string;
+          meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+          food_id: string;
+          quantity_g?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          logged_date?: string;
+          meal_type?: "breakfast" | "lunch" | "dinner" | "snacks";
+          food_id?: string;
+          quantity_g?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "nutrition_logs_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "nutrition_logs_food_id_fkey";
+            columns: ["food_id"];
+            isOneToOne: false;
+            referencedRelation: "foods_cache";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       [_ in never]: never;

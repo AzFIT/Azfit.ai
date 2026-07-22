@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
@@ -12,27 +12,26 @@ import {
   Droplets,
   ChevronDown,
   ChevronUp,
+  Loader2,
 } from "lucide-react";
 import FAB from "@/components/FAB";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ProgressRing from "@/components/ProgressRing";
+import {
+  searchFoods,
+  addCustomFood,
+  getDailyLog,
+  addFoodToLog,
+  removeFoodFromLog,
+  type FoodItem,
+} from "@/lib/foodApi";
 
 /* ── Types & Data ──────────────────────────────────────── */
 
-interface FoodItem {
-  id: string;
-  name: string;
-  category: string;
-  servingSize: number;
-  calories: number;
-  protein: number;
-  fats: number;
-  carbs: number;
-}
-
 interface MealEntry {
-  foodId: string;
+  logId: string;
+  food: FoodItem;
   quantity: number;
 }
 
@@ -47,159 +46,6 @@ interface DailyLog {
   waterIntake: number;
 }
 
-const FOOD_DB: FoodItem[] = [
-  {
-    id: "1",
-    name: "Chicken Breast",
-    category: "Protein",
-    servingSize: 100,
-    calories: 165,
-    protein: 31,
-    fats: 3.6,
-    carbs: 0,
-  },
-  {
-    id: "2",
-    name: "Rice (white, cooked)",
-    category: "Grains",
-    servingSize: 100,
-    calories: 130,
-    protein: 2.7,
-    fats: 0.3,
-    carbs: 28,
-  },
-  {
-    id: "3",
-    name: "Eggs (whole)",
-    category: "Protein",
-    servingSize: 50,
-    calories: 72,
-    protein: 6.3,
-    fats: 5,
-    carbs: 0.4,
-  },
-  {
-    id: "4",
-    name: "Salmon",
-    category: "Protein",
-    servingSize: 100,
-    calories: 208,
-    protein: 20,
-    fats: 13,
-    carbs: 0,
-  },
-  {
-    id: "5",
-    name: "Broccoli",
-    category: "Vegetables",
-    servingSize: 100,
-    calories: 34,
-    protein: 2.8,
-    fats: 0.4,
-    carbs: 7,
-  },
-  {
-    id: "6",
-    name: "Oats",
-    category: "Grains",
-    servingSize: 40,
-    calories: 150,
-    protein: 5,
-    fats: 2.5,
-    carbs: 27,
-  },
-  {
-    id: "7",
-    name: "Greek Yogurt",
-    category: "Dairy",
-    servingSize: 170,
-    calories: 100,
-    protein: 17,
-    fats: 0.7,
-    carbs: 6,
-  },
-  {
-    id: "8",
-    name: "Banana",
-    category: "Fruits",
-    servingSize: 118,
-    calories: 105,
-    protein: 1.3,
-    fats: 0.4,
-    carbs: 27,
-  },
-  {
-    id: "9",
-    name: "Almonds",
-    category: "Nuts",
-    servingSize: 28,
-    calories: 164,
-    protein: 6,
-    fats: 14,
-    carbs: 6,
-  },
-  {
-    id: "10",
-    name: "Sweet Potato",
-    category: "Vegetables",
-    servingSize: 100,
-    calories: 86,
-    protein: 1.6,
-    fats: 0.1,
-    carbs: 20,
-  },
-  {
-    id: "11",
-    name: "Tuna (canned)",
-    category: "Protein",
-    servingSize: 100,
-    calories: 116,
-    protein: 26,
-    fats: 1,
-    carbs: 0,
-  },
-  {
-    id: "12",
-    name: "Avocado",
-    category: "Fats",
-    servingSize: 100,
-    calories: 160,
-    protein: 2,
-    fats: 15,
-    carbs: 9,
-  },
-  {
-    id: "13",
-    name: "Pasta (cooked)",
-    category: "Grains",
-    servingSize: 100,
-    calories: 131,
-    protein: 5,
-    fats: 1.1,
-    carbs: 25,
-  },
-  {
-    id: "14",
-    name: "Protein Shake",
-    category: "Supplements",
-    servingSize: 30,
-    calories: 120,
-    protein: 24,
-    fats: 1,
-    carbs: 3,
-  },
-  {
-    id: "15",
-    name: "Olive Oil",
-    category: "Fats",
-    servingSize: 15,
-    calories: 120,
-    protein: 0,
-    fats: 14,
-    carbs: 0,
-  },
-];
-
 const MEAL_TYPES = [
   { type: "breakfast" as const, label: "Breakfast", icon: Coffee },
   { type: "lunch" as const, label: "Lunch", icon: Sun },
@@ -207,42 +53,45 @@ const MEAL_TYPES = [
   { type: "snack" as const, label: "Snacks", icon: Cookie },
 ];
 
-const STORAGE_KEY = "azfit_nutrition_log";
+const WATER_KEY = "azfit_nutrition_water";
 const PLAN_KEY = "azfit_nutrition_plan";
 
-function getLog(date: string): DailyLog {
+function emptyLog(date: string): DailyLog {
+  return {
+    date,
+    meals: MEAL_TYPES.map((m) => ({ type: m.type, foods: [] })),
+    waterIntake: getWater(date),
+  };
+}
+
+function getWater(date: string): number {
   try {
-    const all = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") as Record<
-      string,
-      DailyLog
-    >;
-    return (
-      all[date] || {
-        date,
-        meals: MEAL_TYPES.map((m) => ({ type: m.type, foods: [] })),
-        waterIntake: 0,
-      }
-    );
+    const all = JSON.parse(localStorage.getItem(WATER_KEY) || "{}") as Record<string, number>;
+    return all[date] || 0;
   } catch {
-    return {
-      date,
-      meals: MEAL_TYPES.map((m) => ({ type: m.type, foods: [] })),
-      waterIntake: 0,
-    };
+    return 0;
   }
 }
 
-function saveLog(log: DailyLog) {
+function saveWater(date: string, ml: number) {
   try {
-    const all = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") as Record<
-      string,
-      DailyLog
-    >;
-    all[log.date] = log;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    const all = JSON.parse(localStorage.getItem(WATER_KEY) || "{}") as Record<string, number>;
+    all[date] = ml;
+    localStorage.setItem(WATER_KEY, JSON.stringify(all));
   } catch {
     /* ignore */
   }
+}
+
+async function fetchLog(date: string): Promise<DailyLog> {
+  const db = await getDailyLog(date);
+  const log = emptyLog(date);
+  for (const entry of db.entries) {
+    const meal = log.meals.find((m) => m.type === entry.mealType);
+    if (!meal) continue;
+    meal.foods.push({ logId: entry.id, food: entry.food, quantity: entry.quantity });
+  }
+  return log;
 }
 
 function getTargets() {
@@ -264,7 +113,7 @@ function getTargets() {
 
 export default function NutritionPage() {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [log, setLog] = useState<DailyLog>(() => getLog(date));
+  const [log, setLog] = useState<DailyLog>(() => emptyLog(date));
   const [showFoodSearch, setShowFoodSearch] = useState<string | null>(null);
   const [expandedMeals, setExpandedMeals] = useState<Record<string, boolean>>({
     breakfast: true,
@@ -275,6 +124,16 @@ export default function NutritionPage() {
 
   const targets = useMemo(() => getTargets(), []);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetchLog(date).then((loaded) => {
+      if (!cancelled) setLog(loaded);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [date]);
+
   const totals = useMemo(() => {
     let calories = 0,
       protein = 0,
@@ -282,14 +141,11 @@ export default function NutritionPage() {
       carbs = 0;
     log.meals.forEach((meal) => {
       meal.foods.forEach((entry) => {
-        const food = FOOD_DB.find((f) => f.id === entry.foodId);
-        if (food) {
-          const ratio = entry.quantity / food.servingSize;
-          calories += food.calories * ratio;
-          protein += food.protein * ratio;
-          fats += food.fats * ratio;
-          carbs += food.carbs * ratio;
-        }
+        const ratio = entry.quantity / entry.food.servingSize;
+        calories += entry.food.calories * ratio;
+        protein += entry.food.protein * ratio;
+        fats += entry.food.fats * ratio;
+        carbs += entry.food.carbs * ratio;
       });
     });
     return {
@@ -300,38 +156,33 @@ export default function NutritionPage() {
     };
   }, [log]);
 
-  const updateLog = useCallback((newLog: DailyLog) => {
-    setLog(newLog);
-    saveLog(newLog);
-  }, []);
-
-  const addFood = (mealType: string, foodId: string, quantity: number) => {
-    const newLog = {
-      ...log,
-      meals: log.meals.map((m) =>
-        m.type === mealType
-          ? { ...m, foods: [...m.foods, { foodId, quantity }] }
-          : m,
-      ),
-    };
-    updateLog(newLog);
+  const addFood = async (mealType: string, foodId: string, quantity: number) => {
+    await addFoodToLog(
+      mealType as "breakfast" | "lunch" | "dinner" | "snacks",
+      foodId,
+      quantity,
+      date,
+    );
+    const loaded = await fetchLog(date);
+    setLog(loaded);
     setShowFoodSearch(null);
   };
 
-  const removeFood = (mealType: string, foodId: string) => {
-    const newLog = {
-      ...log,
-      meals: log.meals.map((m) =>
-        m.type === mealType
-          ? { ...m, foods: m.foods.filter((f) => f.foodId !== foodId) }
-          : m,
-      ),
-    };
-    updateLog(newLog);
+  const removeFood = async (logId: string) => {
+    await removeFoodFromLog(logId);
+    setLog((prev) => ({
+      ...prev,
+      meals: prev.meals.map((m) => ({
+        ...m,
+        foods: m.foods.filter((f) => f.logId !== logId),
+      })),
+    }));
   };
 
   const addWater = (amount: number) => {
-    updateLog({ ...log, waterIntake: Math.max(0, log.waterIntake + amount) });
+    const next = Math.max(0, log.waterIntake + amount);
+    setLog((prev) => ({ ...prev, waterIntake: next }));
+    saveWater(date, next);
   };
 
   return (
@@ -355,10 +206,7 @@ export default function NutritionPage() {
           <Input
             type="date"
             value={date}
-            onChange={(e) => {
-              setDate(e.target.value);
-              setLog(getLog(e.target.value));
-            }}
+            onChange={(e) => setDate(e.target.value)}
             className="mb-4"
           />
           <div className="grid grid-cols-4 gap-2">
@@ -396,12 +244,10 @@ export default function NutritionPage() {
             const isExpanded = expandedMeals[mealType.type];
             const mealTotals = meal?.foods.reduce(
               (sum, entry) => {
-                const food = FOOD_DB.find((f) => f.id === entry.foodId);
-                if (!food) return sum;
-                const ratio = entry.quantity / food.servingSize;
+                const ratio = entry.quantity / entry.food.servingSize;
                 return {
-                  calories: sum.calories + food.calories * ratio,
-                  protein: sum.protein + food.protein * ratio,
+                  calories: sum.calories + entry.food.calories * ratio,
+                  protein: sum.protein + entry.food.protein * ratio,
                 };
               },
               { calories: 0, protein: 0 },
@@ -469,14 +315,10 @@ export default function NutritionPage() {
                       >
                         {/* Food List */}
                         {meal?.foods.map((entry) => {
-                          const food = FOOD_DB.find(
-                            (f) => f.id === entry.foodId,
-                          );
-                          if (!food) return null;
-                          const ratio = entry.quantity / food.servingSize;
+                          const ratio = entry.quantity / entry.food.servingSize;
                           return (
                             <div
-                              key={entry.foodId}
+                              key={entry.logId}
                               className="flex items-center justify-between py-2"
                             >
                               <div>
@@ -484,18 +326,18 @@ export default function NutritionPage() {
                                   className="text-sm"
                                   style={{ color: "var(--text-primary)" }}
                                 >
-                                  {food.name}
+                                  {entry.food.name}
                                 </p>
                                 <p
                                   className="text-xs"
                                   style={{ color: "var(--text-muted)" }}
                                 >
                                   {Math.round(entry.quantity)}g •{" "}
-                                  {Math.round(food.calories * ratio)} kcal
+                                  {Math.round(entry.food.calories * ratio)} kcal
                                 </p>
                               </div>
                               <button
-                                onClick={() => removeFood(mealType.type, entry.foodId)}
+                                onClick={() => removeFood(entry.logId)}
                                 className="rounded-lg p-1 hover:bg-red-500/10"
                               >
                                 <Trash2 className="h-3.5 w-3.5 text-red-400" />
@@ -693,16 +535,59 @@ function FoodSearchModal({
   onClose: () => void;
 }) {
   const [search, setSearch] = useState("");
+  const [results, setResults] = useState<FoodItem[]>([]);
+  const [loading, setLoading] = useState(false);
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
   const [quantity, setQuantity] = useState(100);
+  const [showCustom, setShowCustom] = useState(false);
+  const [custom, setCustom] = useState({
+    name: "",
+    calories: "",
+    protein: "",
+    carbs: "",
+    fats: "",
+  });
+  const [customSaving, setCustomSaving] = useState(false);
 
-  const filtered = useMemo(
-    () =>
-      FOOD_DB.filter((f) =>
-        f.name.toLowerCase().includes(search.toLowerCase()),
-      ),
-    [search],
-  );
+  useEffect(() => {
+    const q = search.trim();
+    if (!q) {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const items = await searchFoods(q);
+        setResults(items);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const handleAddCustom = async () => {
+    if (!custom.name.trim() || !custom.calories) return;
+    setCustomSaving(true);
+    try {
+      const food = await addCustomFood({
+        name: custom.name.trim(),
+        category: "Custom",
+        calories: Number(custom.calories) || 0,
+        protein: Number(custom.protein) || 0,
+        carbs: Number(custom.carbs) || 0,
+        fats: Number(custom.fats) || 0,
+        serving_size_g: 100,
+      });
+      setSelectedFood(food);
+      setQuantity(food.servingSize);
+      setShowCustom(false);
+    } finally {
+      setCustomSaving(false);
+    }
+  };
 
   return (
     <motion.div
@@ -750,39 +635,123 @@ function FoodSearchModal({
                 className="pl-9"
               />
             </div>
-            <div className="max-h-[300px] overflow-y-auto space-y-1">
-              {filtered.map((food) => (
+
+            {!showCustom ? (
+              <>
+                <div className="max-h-[300px] overflow-y-auto space-y-1">
+                  {loading && (
+                    <div className="flex items-center justify-center py-6">
+                      <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#00AEEF" }} />
+                    </div>
+                  )}
+                  {!loading && search.trim() && results.length === 0 && (
+                    <p className="py-6 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+                      No foods found — try another search or add a custom food below.
+                    </p>
+                  )}
+                  {!loading &&
+                    results.map((food) => (
+                      <button
+                        key={food.id}
+                        onClick={() => {
+                          setSelectedFood(food);
+                          setQuantity(food.servingSize);
+                        }}
+                        className="flex w-full items-center justify-between rounded-xl border p-3 text-left transition-colors hover:bg-slate-800"
+                        style={{ borderColor: "var(--card-border)" }}
+                      >
+                        <div>
+                          <p
+                            className="text-sm font-medium"
+                            style={{ color: "var(--text-primary)" }}
+                          >
+                            {food.name}
+                          </p>
+                          <p
+                            className="text-xs"
+                            style={{ color: "var(--text-muted)" }}
+                          >
+                            {food.category} • {food.calories} kcal per{" "}
+                            {food.servingSize}g
+                          </p>
+                        </div>
+                        <ChevronDown
+                          className="h-4 w-4 rotate-[-90deg]"
+                          style={{ color: "var(--text-muted)" }}
+                        />
+                      </button>
+                    ))}
+                </div>
                 <button
-                  key={food.id}
-                  onClick={() => {
-                    setSelectedFood(food);
-                    setQuantity(food.servingSize);
-                  }}
-                  className="flex w-full items-center justify-between rounded-xl border p-3 text-left transition-colors hover:bg-slate-800"
-                  style={{ borderColor: "var(--card-border)" }}
+                  onClick={() => setShowCustom(true)}
+                  className="mt-3 flex w-full items-center justify-center gap-1 rounded-xl border-2 border-dashed py-2 text-sm font-medium transition-colors"
+                  style={{ borderColor: "var(--card-border)", color: "var(--text-muted)" }}
                 >
-                  <div>
-                    <p
-                      className="text-sm font-medium"
-                      style={{ color: "var(--text-primary)" }}
-                    >
-                      {food.name}
-                    </p>
-                    <p
-                      className="text-xs"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      {food.category} • {food.calories} kcal per{" "}
-                      {food.servingSize}g
-                    </p>
-                  </div>
-                  <ChevronDown
-                    className="h-4 w-4 rotate-[-90deg]"
-                    style={{ color: "var(--text-muted)" }}
-                  />
+                  <Plus className="h-4 w-4" /> Add custom food
                 </button>
-              ))}
-            </div>
+              </>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs" style={{ color: "var(--text-muted)" }}>Name</label>
+                  <Input
+                    value={custom.name}
+                    onChange={(e) => setCustom({ ...custom, name: e.target.value })}
+                    placeholder="e.g. Homemade protein bar"
+                  />
+                </div>
+                <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                  Macros per 100g
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs" style={{ color: "var(--text-muted)" }}>Calories (kcal)</label>
+                    <Input
+                      type="number"
+                      value={custom.calories}
+                      onChange={(e) => setCustom({ ...custom, calories: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs" style={{ color: "var(--text-muted)" }}>Protein (g)</label>
+                    <Input
+                      type="number"
+                      value={custom.protein}
+                      onChange={(e) => setCustom({ ...custom, protein: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs" style={{ color: "var(--text-muted)" }}>Carbs (g)</label>
+                    <Input
+                      type="number"
+                      value={custom.carbs}
+                      onChange={(e) => setCustom({ ...custom, carbs: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs" style={{ color: "var(--text-muted)" }}>Fats (g)</label>
+                    <Input
+                      type="number"
+                      value={custom.fats}
+                      onChange={(e) => setCustom({ ...custom, fats: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setShowCustom(false)} className="flex-1">
+                    Back
+                  </Button>
+                  <Button
+                    onClick={handleAddCustom}
+                    disabled={customSaving || !custom.name.trim() || !custom.calories}
+                    className="flex-1"
+                    style={{ background: "linear-gradient(135deg, #00AEEF, #8B5CF6)" }}
+                  >
+                    {customSaving ? "Saving…" : "Save food"}
+                  </Button>
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <div className="space-y-3">
