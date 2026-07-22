@@ -15,6 +15,7 @@ import {
 import type { SetType } from '@/lib/storage';
 import { getAllExercisesFlat } from '@/data/exerciseDatabase';
 import { toast } from 'sonner';
+import { findExerciseSubstitutions } from '@/lib/exerciseSwap';
 
 const BAR_WEIGHT_KG = 20;
 const PLATES_KG = [25, 20, 15, 10, 5, 2.5, 1.25];
@@ -93,6 +94,7 @@ interface SessionExerciseCardProps {
   restTimer: { active: boolean; remaining: number; setIndex: number } | undefined;
   lastLoad: number;
   unit?: 'kg' | 'lbs';
+  workoutExerciseNames?: string[];
 }
 
 export function SessionExerciseCard({
@@ -111,6 +113,7 @@ export function SessionExerciseCard({
   restTimer,
   lastLoad,
   unit = 'kg',
+  workoutExerciseNames,
 }: SessionExerciseCardProps) {
   const [focusedSet, setFocusedSet] = useState<number | null>(null);
   const [noteSet, setNoteSet] = useState<number | null>(null);
@@ -212,11 +215,16 @@ export function SessionExerciseCard({
   const prescribedText = (s: SessionSet) =>
     `${exercise.targetSets}×${exercise.targetReps} @ ${exercise.targetLoad || '-'}${unit} (tempo ${s.tempo})`;
 
-  const swapOptions = useMemo(() => {
-    const all = getAllExercisesFlat();
-    if (!swapQuery) return all.slice(0, 20);
+  const rankedSuggestions = useMemo(() => {
+    const excluded = (workoutExerciseNames || []).filter((n) => n !== exercise.name);
+    return findExerciseSubstitutions(exercise.name, { excluded });
+  }, [exercise.name, workoutExerciseNames]);
+
+  const browseOptions = useMemo(() => {
+    const all = getAllExercisesFlat().filter((n) => n !== exercise.name);
+    if (!swapQuery) return [];
     return all.filter((n) => n.toLowerCase().includes(swapQuery.toLowerCase())).slice(0, 20);
-  }, [swapQuery]);
+  }, [swapQuery, exercise.name]);
 
   return (
     <div
@@ -594,17 +602,52 @@ export function SessionExerciseCard({
                   placeholder="Search exercises..."
                   className="w-full h-10 mb-3 bg-[var(--page-bg)] border-[var(--card-border)] text-[var(--text-primary)]"
                 />
-                <div className="space-y-1">
-                  {swapOptions.map((name) => (
-                    <button
-                      key={name}
-                      onClick={() => handleSwap(name)}
-                      className="w-full text-left px-3 py-2 rounded-lg text-sm text-[var(--text-primary)] hover:bg-[var(--card-border)]/50 transition-colors"
-                    >
-                      {name}
-                    </button>
-                  ))}
-                </div>
+
+                {!swapQuery && (
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-[var(--text-muted)] mb-2">
+                      Top suggestions
+                    </p>
+                    <div className="space-y-2">
+                      {rankedSuggestions.map((s) => (
+                        <button
+                          key={s.name}
+                          onClick={() => handleSwap(s.name)}
+                          className="w-full text-left rounded-lg border border-[var(--card-border)] px-3 py-2 transition-colors hover:bg-[var(--card-border)]/30"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-[var(--text-primary)]">
+                              {s.name}
+                            </span>
+                            <span className="text-[10px] text-[var(--text-muted)]">
+                              {s.equipment.length > 0 ? s.equipment.join(", ") : "—"}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[var(--text-muted)]">{s.reason}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {browseOptions.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-xs font-semibold uppercase text-[var(--text-muted)] mb-2">
+                      Browse all
+                    </p>
+                    <div className="space-y-1">
+                      {browseOptions.map((name) => (
+                        <button
+                          key={name}
+                          onClick={() => handleSwap(name)}
+                          className="w-full text-left px-3 py-2 rounded-lg text-sm text-[var(--text-primary)] hover:bg-[var(--card-border)]/50 transition-colors"
+                        >
+                          {name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="p-4 border-t border-[var(--card-border)]">
                 <button

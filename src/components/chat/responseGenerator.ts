@@ -14,6 +14,7 @@ import {
   type TrainerAttentionSummary,
 } from './chatData';
 import { logCrisisFlag, logMedicalGuard, fetchFaqEntries } from './chatLogging';
+import { findExerciseSubstitutions, findExerciseNameInInput } from '@/lib/exerciseSwap';
 import type { IntentResult, ChatMessage, ChatAction, PageContext, MessageContent } from './types';
 
 interface ResponseContext {
@@ -306,39 +307,57 @@ function handleExerciseSubstitute(input: string): ResponseResult {
     }
   }
 
-  if (!matchedExercise) {
+  if (matchedExercise) {
+    const sub = substitutions[matchedExercise];
+    const reason = lower.includes('back') ? 'lower back stress' : lower.includes('shoulder') ? 'shoulder strain' : lower.includes('knee') ? 'knee stress' : 'joint-friendly alternative';
+
+    const swapContent: MessageContent = {
+      type: 'exercise_swap',
+      original: { name: matchedExercise.charAt(0).toUpperCase() + matchedExercise.slice(1), reason },
+      replacement: {
+        name: sub.replacement,
+        sets: sub.sets,
+        reps: sub.reps,
+        rpe: sub.rpe,
+        reasoning: sub.reasoning,
+      },
+    };
+
     return {
-      text: "I can suggest exercise substitutions based on injuries or equipment limitations. Which exercise would you like to replace, and what's the reason?",
+      text: `Got it! Replaced ${matchedExercise} with ${sub.replacement} to reduce ${reason}. Open the Program Builder to apply this to a workout.`,
       actions: [
-        { label: 'Back Pain', type: 'suggest', payload: 'swap deadlift for back pain' },
-        { label: 'Shoulder Issues', type: 'suggest', payload: 'swap bench press for shoulder pain' },
-        { label: 'Knee Pain', type: 'suggest', payload: 'swap squat for knee pain' },
+        { label: 'Open Program Builder', type: 'navigate', payload: '/program-builder' },
+        { label: 'Explain Choice', type: 'suggest', payload: 'why this substitution?' },
       ],
+      content: swapContent,
     };
   }
 
-  const sub = substitutions[matchedExercise];
-  const reason = lower.includes('back') ? 'lower back stress' : lower.includes('shoulder') ? 'shoulder strain' : lower.includes('knee') ? 'knee stress' : 'joint-friendly alternative';
-
-  const swapContent: MessageContent = {
-    type: 'exercise_swap',
-    original: { name: matchedExercise.charAt(0).toUpperCase() + matchedExercise.slice(1), reason },
-    replacement: {
-      name: sub.replacement,
-      sets: sub.sets,
-      reps: sub.reps,
-      rpe: sub.rpe,
-      reasoning: sub.reasoning,
-    },
-  };
+  const exerciseName = findExerciseNameInInput(input);
+  if (exerciseName) {
+    const suggestions = findExerciseSubstitutions(exerciseName, { reason: input }).slice(0, 3);
+    if (suggestions.length > 0) {
+      return {
+        text: `Here are some alternatives for ${exerciseName} based on the library. Tap one to keep the conversation going, or open the Program Builder to apply a swap.`,
+        actions: [
+          ...suggestions.map((s) => ({
+            label: `Try: ${s.name} — ${s.reason}`,
+            type: 'suggest' as const,
+            payload: `swap ${s.name}`,
+          })),
+          { label: 'Open Program Builder', type: 'navigate', payload: '/program-builder' },
+        ],
+      };
+    }
+  }
 
   return {
-    text: `Got it! Replaced ${matchedExercise} with ${sub.replacement} to reduce ${reason}. Open the Program Builder to apply this to a workout.`,
+    text: "I can suggest exercise substitutions based on injuries or equipment limitations. Which exercise would you like to replace, and what's the reason?",
     actions: [
-      { label: 'Open Program Builder', type: 'navigate', payload: '/program-builder' },
-      { label: 'Explain Choice', type: 'suggest', payload: 'why this substitution?' },
+      { label: 'Back Pain', type: 'suggest', payload: 'swap deadlift for back pain' },
+      { label: 'Shoulder Issues', type: 'suggest', payload: 'swap bench press for shoulder pain' },
+      { label: 'Knee Pain', type: 'suggest', payload: 'swap squat for knee pain' },
     ],
-    content: swapContent,
   };
 }
 

@@ -212,6 +212,7 @@ export default function SheetsPage() {
             onAddRest={addTime}
             restTimer={timers[exercise.id]}
             lastLoad={lastLoadPerExercise[exercise.name] || 0}
+            workoutExerciseNames={exercises.map((e) => e.name)}
           />
         ))}
 

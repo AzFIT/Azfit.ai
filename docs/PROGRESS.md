@@ -25,6 +25,7 @@
 - Workout logger polish: RPE auto-adjust hints (≥9 drop/keep, ≤7 with target-rep hit increase), plate calculator under client load, rest-timer preset chips (0:30–5:00) with per-exercise in-memory last preset (feat/logger-polish)
 - AI Chat Stage 1: chat logging (`chat_messages`, `chat_events`, `chat_feedback`), FAQ table, safety guards (crisis + medical), real-data responses for deload/analyze, removed fake apply actions, wired floating chat + Coach AI page (feat/ai-chat-stage1)
 - AI Chat Stage 1B: guided weight/habit flows, thumbs feedback on assistant messages, role-aware quick chips in the bubble (feat/ai-chat-stage1b)
+- Exercise swap engine: ranked substitution suggestions from the library (category/equipment/muscle/keyword scoring), wired into the session swap picker and AI chat fallback (feat/exercise-swap)
 
 ## Next
 - Voice notes + push notifications
