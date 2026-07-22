@@ -4,14 +4,14 @@
 // Wired to current generateProgram() backend.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Zap, Bot, Save, RotateCcw, ChevronDown, ChevronUp, Check, CheckCircle2,
   Dumbbell, TrendingUp, Flame, Wind, HeartPulse, GripVertical, Pencil, Trash2,
   Plus, Eye, BarChart3, Download, X, Search, Target, Award, Sparkles,
-  AlertTriangle, Layers, Calendar, Users, Play, ArrowLeft,
+  AlertTriangle, Layers, Calendar, Users, Play, ArrowLeft, Upload,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -19,6 +19,18 @@ import {
   type GeneratedProgram, type GeneratedWorkout, type ClientProfile,
 } from '@/lib/aiProgramGenerator';
 import { setActiveSession, type WorkoutLog, type LoggedExercise, type LoggedSet } from '@/lib/storage';
+import {
+  buildProgramInsert,
+  buildWorkoutRows,
+  buildExerciseRows,
+  programDataFromDb,
+  clientContextFromClientFields,
+  type DbExerciseInsert,
+} from '@/lib/aiProgramMapper';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
+import type { Database } from '@/types/supabase';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -27,17 +39,158 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 
 // TYPES
-interface ClientContext { ageRange: string; experience: string; bodyType: string; availability: string; limitations: string[]; otherLimitation: string; }
-interface ProgramPhase { id: string; name: string; weeks: number; focus: string; color: string; active: boolean; }
-interface ProgramSplit { day: string; active: boolean; workout: string; }
-interface ProgramExercise { code: string; name: string; sets: number; reps: string; pct1RM: string; tempo: string; rest: string; }
-interface ProgramData { id?: string; goal: string; method: string; clientContext: ClientContext; phases: ProgramPhase[]; weeklyHours: number; split: ProgramSplit[]; exercises: ProgramExercise[]; programName: string; description: string; tags: string[]; isPublic: boolean; assignedClient: string; }
-interface SavedProgram { id: string; createdAt: string; updatedAt: string; data: ProgramData; }
-interface StepProps { data: ProgramData; updateData: (partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => void; onSave?: () => void; onSaveAndAssign?: () => void; program?: GeneratedProgram | null; }
+export interface ClientContext { ageRange: string; experience: string; bodyType: string; availability: string; limitations: string[]; otherLimitation: string; }
+export interface ProgramPhase { id: string; name: string; weeks: number; focus: string; color: string; active: boolean; }
+export interface ProgramSplit { day: string; active: boolean; workout: string; }
+export interface ProgramExercise { code: string; name: string; sets: number; reps: string; pct1RM: string; tempo: string; rest: string; }
+export interface ProgramData { id?: string; goal: string; method: string; clientContext: ClientContext; phases: ProgramPhase[]; weeklyHours: number; split: ProgramSplit[]; exercises: ProgramExercise[]; programName: string; description: string; tags: string[]; isPublic: boolean; assignedClient: string; }
+export interface SavedProgram { id: string; createdAt: string; updatedAt: string; data: ProgramData; }
+interface StepProps { data: ProgramData; updateData: (partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => void; onSave?: () => void; onSaveAndAssign?: () => void; program?: GeneratedProgram | null; clientName?: string; clients?: ClientRow[]; }
+
+type ClientRow = Database['public']['Tables']['clients']['Row'];
+type ProgramRow = Database['public']['Tables']['programs']['Row'];
+type WorkoutRow = Database['public']['Tables']['workouts']['Row'];
+type ExerciseRow = Database['public']['Tables']['exercises']['Row'];
 
 const PROGRAMS_STORAGE_KEY = 'azfit-programs';
-function getSavedPrograms(): SavedProgram[] { try { const raw = localStorage.getItem(PROGRAMS_STORAGE_KEY); return raw ? (JSON.parse(raw) as SavedProgram[]) : []; } catch { return []; } }
-function saveProgram(data: ProgramData): SavedProgram { const programs = getSavedPrograms(); const now = new Date().toISOString(); const id = data.id || `prog_${Date.now()}`; const updated: ProgramData = { ...data, id }; const existingIndex = programs.findIndex((p) => p.id === id); const saved: SavedProgram = { id, createdAt: existingIndex >= 0 ? programs[existingIndex].createdAt : now, updatedAt: now, data: updated }; if (existingIndex >= 0) programs[existingIndex] = saved; else programs.push(saved); localStorage.setItem(PROGRAMS_STORAGE_KEY, JSON.stringify(programs)); return saved; }
+
+interface LegacySavedProgram { id: string; createdAt: string; updatedAt: string; data: ProgramData; }
+
+async function loadSavedPrograms(trainerId: string): Promise<SavedProgram[]> {
+  const { data: programsData, error: programsError } = await supabase
+    .from('programs')
+    .select('*')
+    .eq('trainer_id', trainerId)
+    .order('updated_at', { ascending: false });
+  if (programsError || !programsData) return [];
+
+  const programs = programsData as ProgramRow[];
+  if (programs.length === 0) return [];
+
+  const programIds = programs.map((p) => p.id);
+  const { data: workoutsData, error: workoutsError } = await supabase
+    .from('workouts')
+    .select('*')
+    .in('program_id', programIds)
+    .order('day_of_week', { ascending: true });
+  if (workoutsError || !workoutsData) return [];
+
+  const workouts = workoutsData as WorkoutRow[];
+  const workoutIds = workouts.map((w) => w.id);
+  let exercises: ExerciseRow[] = [];
+  if (workoutIds.length > 0) {
+    const { data: exercisesData, error: exercisesError } = await supabase
+      .from('exercises')
+      .select('*')
+      .in('workout_id', workoutIds)
+      .order('order_index', { ascending: true });
+    if (!exercisesError && exercisesData) exercises = exercisesData as ExerciseRow[];
+  }
+
+  const workoutsByProgram = new Map<string, WorkoutRow[]>();
+  const exercisesByWorkout = new Map<string, ExerciseRow[]>();
+  for (const w of workouts) {
+    const list = workoutsByProgram.get(w.program_id) || [];
+    list.push(w);
+    workoutsByProgram.set(w.program_id, list);
+  }
+  for (const e of exercises) {
+    const list = exercisesByWorkout.get(e.workout_id) || [];
+    list.push(e);
+    exercisesByWorkout.set(e.workout_id, list);
+  }
+
+  return programs.map((p) => {
+    const pWorkouts = workoutsByProgram.get(p.id) || [];
+    const pExercises = pWorkouts.flatMap((w) => exercisesByWorkout.get(w.id) || []);
+    return {
+      id: p.id,
+      createdAt: p.created_at,
+      updatedAt: p.updated_at,
+      data: programDataFromDb(p, pWorkouts, pExercises),
+    };
+  });
+}
+
+async function saveProgramToSupabase(
+  data: ProgramData,
+  trainerId: string,
+  assignedClientId: string | null
+): Promise<ProgramData | null> {
+  const programPayload = buildProgramInsert(data, trainerId, assignedClientId);
+  let programId = data.id;
+
+  if (programId) {
+    const { error } = await supabase
+      .from('programs')
+      .update(programPayload)
+      .eq('id', programId);
+    if (error) throw error;
+  } else {
+    const { data: inserted, error } = await supabase
+      .from('programs')
+      .insert(programPayload)
+      .select('id, created_at, updated_at')
+      .single();
+    if (error || !inserted) throw error;
+    programId = inserted.id;
+  }
+
+  await supabase.from('workouts').delete().eq('program_id', programId);
+
+  const workoutRows = buildWorkoutRows(data).map((w) => ({ ...w, program_id: programId! }));
+  if (workoutRows.length === 0) {
+    workoutRows.push({
+      program_id: programId!,
+      name: 'Workout',
+      day_of_week: 1,
+      week_number: 1,
+      notes: null,
+    });
+  }
+
+  const { data: insertedWorkouts, error: wError } = await supabase
+    .from('workouts')
+    .insert(workoutRows)
+    .select('id, day_of_week');
+  if (wError || !insertedWorkouts) throw wError;
+
+  const exerciseRows = buildExerciseRows(data.exercises);
+  const allExercises: DbExerciseInsert[] = [];
+  for (const w of insertedWorkouts as WorkoutRow[]) {
+    allExercises.push(...exerciseRows.map((e) => ({ ...e, workout_id: w.id })));
+  }
+  if (allExercises.length > 0) {
+    const { error: eError } = await supabase.from('exercises').insert(allExercises);
+    if (eError) throw eError;
+  }
+
+  const { data: programRow, error: fetchError } = await supabase
+    .from('programs')
+    .select('*')
+    .eq('id', programId)
+    .single();
+  if (fetchError || !programRow) throw fetchError;
+
+  const { data: savedWorkouts, error: fetchWError } = await supabase
+    .from('workouts')
+    .select('*')
+    .eq('program_id', programId);
+  if (fetchWError || !savedWorkouts) throw fetchWError;
+
+  const savedWorkoutIds = savedWorkouts.map((w) => w.id);
+  let savedExercises: ExerciseRow[] = [];
+  if (savedWorkoutIds.length > 0) {
+    const { data: exData, error: exError } = await supabase
+      .from('exercises')
+      .select('*')
+      .in('workout_id', savedWorkoutIds);
+    if (!exError && exData) savedExercises = exData as ExerciseRow[];
+  }
+
+  return programDataFromDb(programRow as ProgramRow, savedWorkouts as WorkoutRow[], savedExercises);
+}
+
 function loadClientProfile(): ClientProfile | null { try { const raw = localStorage.getItem('azfit_client_profile'); if (!raw) return null; const profile = JSON.parse(raw); return { trainingFrequency: profile.trainingFrequency || 3, trainingExperience: profile.trainingExperience || 'intermediate', primaryGoal: profile.primaryGoal || 'build_muscle', availableEquipment: profile.availableEquipment || ['Full Gym'], preferredStyle: profile.preferredStyle || ['Free Weights'], injuries: profile.injuries || '' }; } catch { return null; } }
 
 const GOAL_MAP: Record<string, string> = { lose_fat: 'fatloss', build_muscle: 'hypertrophy', strength: 'strength', recomposition: 'fatloss', performance: 'power', general_health: 'endurance' };
@@ -85,7 +238,7 @@ const SPLIT_DEFAULTS: Record<string, ProgramSplit[]> = {
 };
 const LIMITATIONS = ['None (healthy)', 'Lower back issues', 'Shoulder injury', 'Knee/Hip limitations', 'Wrist/Elbow pain', 'Neck/Upper back', 'Cardiovascular condition', 'Other'];
 const TAGS = ['Strength', 'Hypertrophy', 'Fat Loss', 'Endurance', 'Power', 'Rehab', 'Beginner', 'Advanced'];
-const CLIENTS = ['— Unassigned —', 'John Smith', 'Sarah Johnson', 'Mike Chen', 'Emma Davis', 'Alex Rodriguez'];
+// Client dropdown is now populated live from the trainer's clients table.
 const STEPS = [
   { title: 'Goal Selection', component: Step1Goal },
   { title: 'Method Selection', component: Step2Method },
@@ -409,7 +562,7 @@ function Step6Exercises({ data, updateData }: StepProps) {
   );
 }
 
-function Step7Preview({ data, program }: StepProps) {
+function Step7Preview({ data, program, clientName }: StepProps) {
   const navigate = useNavigate();
   const totalWeeks = useMemo(() => data.phases.filter((p) => p.active).reduce((s, p) => s + p.weeks, 0), [data.phases]);
   const totalExercises = data.exercises.length;
@@ -431,6 +584,7 @@ function Step7Preview({ data, program }: StepProps) {
           <div>
             <h3 className="text-[var(--page-text)] text-xl font-bold">{data.programName || 'Untitled Program'}</h3>
             <p className="text-[var(--page-text)]/60 text-sm mt-1">{goalName} — {methodName} — {totalWeeks} weeks — {activeDays} days/week</p>
+            <p className="text-[var(--page-text)]/80 text-sm mt-1 font-medium">Built for: {clientName || 'Unassigned'}</p>
           </div>
           <div className="text-right">
             <div className="text-[var(--page-text)]/60 text-[10px]">AI Confidence</div>
@@ -570,8 +724,9 @@ function Step7Preview({ data, program }: StepProps) {
   );
 }
 
-function Step8Save({ data, updateData, onSave, onSaveAndAssign }: StepProps) {
+function Step8Save({ data, updateData, onSave, onSaveAndAssign, clients }: StepProps) {
   const toggleTag = useCallback((tag: string) => updateData((prev) => { const next = prev.tags.includes(tag) ? prev.tags.filter((t) => t !== tag) : [...prev.tags, tag]; return { tags: next }; }), [updateData]);
+  const selectedClient = clients?.find((c) => c.id === data.assignedClient);
   return (
     <div className="space-y-5">
       <div>
@@ -598,9 +753,23 @@ function Step8Save({ data, updateData, onSave, onSaveAndAssign }: StepProps) {
       </label>
       <div>
         <label className="text-[var(--page-text)] text-sm font-semibold mb-1.5 block">Assign to Client</label>
-        <select value={data.assignedClient} onChange={(e) => updateData({ assignedClient: e.target.value })} className="w-full bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--page-text)] text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#00AEEF]">
-          {CLIENTS.map((c) => <option key={c} value={c === '— Unassigned —' ? '' : c}>{c}</option>)}
+        <select value={data.assignedClient} onChange={(e) => {
+          const clientId = e.target.value;
+          const client = clients?.find((c) => c.id === clientId);
+          const ctx = client
+            ? clientContextFromClientFields({
+                date_of_birth: client.date_of_birth,
+                experience_level: client.experience_level,
+              })
+            : {};
+          updateData((prev) => ({ assignedClient: clientId, clientContext: { ...prev.clientContext, ...ctx } }));
+        }} className="w-full bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--page-text)] text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#00AEEF]">
+          <option value="">— Unassigned —</option>
+          {clients?.map((c) => <option key={c.id} value={c.id}>{c.full_name} ({c.email})</option>)}
         </select>
+        {selectedClient && (
+          <p className="text-[var(--page-text)]/60 text-xs mt-2">Selected client: <span className="text-[var(--page-text)] font-medium">{selectedClient.full_name}</span></p>
+        )}
       </div>
       <div className="flex flex-col sm:flex-row gap-3 pt-2">
         <Button onClick={onSave} className="bg-[#00AEEF] hover:bg-[#0099D1] text-white font-semibold px-6"><Save className="w-4 h-4 mr-2" />Save Program</Button>
@@ -612,7 +781,7 @@ function Step8Save({ data, updateData, onSave, onSaveAndAssign }: StepProps) {
   );
 }
 
-function FloatingSummary({ data }: { data: ProgramData }) {
+function FloatingSummary({ data, clientName }: { data: ProgramData; clientName?: string }) {
   const totalWeeks = data.phases.filter((p) => p.active).reduce((s, p) => s + p.weeks, 0);
   const activeDays = data.split.filter((d) => d.active).length;
   const goalName = GOALS.find((g) => g.id === data.goal)?.name || '—';
@@ -621,7 +790,7 @@ function FloatingSummary({ data }: { data: ProgramData }) {
     <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 space-y-3 sticky top-4">
       <h4 className="text-[var(--page-text)] text-sm font-bold flex items-center gap-2"><Target className="w-4 h-4 text-[#00AEEF]" />Current Selections</h4>
       <div className="space-y-2 text-xs">
-        {[{ k: 'Goal', v: goalName }, { k: 'Method', v: methodName }, { k: 'Duration', v: `${totalWeeks} weeks` }, { k: 'Frequency', v: `${activeDays} days/wk` }, { k: 'Exercises', v: data.exercises.length }, { k: 'Weekly Hours', v: `${data.weeklyHours}h` }, ...(data.clientContext.ageRange ? [{ k: 'Client', v: data.clientContext.ageRange }] : [])].map((r) => (
+        {[{ k: 'Goal', v: goalName }, { k: 'Method', v: methodName }, { k: 'Duration', v: `${totalWeeks} weeks` }, { k: 'Frequency', v: `${activeDays} days/wk` }, { k: 'Exercises', v: data.exercises.length }, { k: 'Weekly Hours', v: `${data.weeklyHours}h` }, { k: 'Client', v: clientName || data.clientContext.ageRange || '—' }].map((r) => (
           <div key={r.k} className="flex justify-between"><span className="text-[var(--page-text)]/60">{r.k}</span><span className="text-[var(--page-text)] font-medium">{r.v}</span></div>
         ))}
       </div>
@@ -631,19 +800,117 @@ function FloatingSummary({ data }: { data: ProgramData }) {
 
 export default function AIProgramBuilderPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const profile = useMemo(() => loadClientProfile(), []);
-  const [data, setData] = useState<ProgramData>(() => { const editId = localStorage.getItem('azfit-creator-edit-id'); if (editId) { localStorage.removeItem('azfit-creator-edit-id'); const programs = getSavedPrograms(); const found = programs.find((p) => p.id === editId); if (found) return found.data; } return defaultData; });
+  const [data, setData] = useState<ProgramData>(defaultData);
   const [openSteps, setOpenSteps] = useState<Record<number, boolean>>({ 0: true });
-  const [savedList, setSavedList] = useState<SavedProgram[]>(getSavedPrograms());
+  const [savedList, setSavedList] = useState<SavedProgram[]>([]);
   const [saveFlash, setSaveFlash] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [program, setProgram] = useState<GeneratedProgram | null>(null);
+  const [clients, setClients] = useState<ClientRow[]>([]);
+  const [legacySaved, setLegacySaved] = useState<LegacySavedProgram[]>(() => {
+    try {
+      const raw = localStorage.getItem(PROGRAMS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as LegacySavedProgram[];
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore malformed localStorage
+    }
+    return [];
+  });
+
   const updateData = useCallback((partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => setData((prev) => ({ ...prev, ...(typeof partial === 'function' ? partial(prev) : partial) })), []);
+  const selectedClient = useMemo(() => clients.find((c) => c.id === data.assignedClient), [clients, data.assignedClient]);
+  const selectedClientName = selectedClient?.full_name || 'Unassigned';
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    const load = async () => {
+      const { data: rows, error } = await supabase
+        .from('clients')
+        .select('id, full_name, email, date_of_birth, experience_level')
+        .eq('trainer_id', user.id)
+        .neq('status', 'archived')
+        .order('full_name', { ascending: true });
+      if (!cancelled) {
+        if (!error && rows) setClients(rows as ClientRow[]);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    loadSavedPrograms(user.id).then(setSavedList).catch((err) => console.error('Failed to load saved programs:', err));
+  }, [user]);
+
   const handleAutoGenerate = useCallback(() => { setGenerating(true); const p = profile || { trainingFrequency: 3, trainingExperience: 'intermediate', primaryGoal: 'build_muscle', availableEquipment: ['Full Gym'], preferredStyle: ['Free Weights'] }; setTimeout(() => { const generated = generateProgram(p); setProgram(generated); setData(mapGeneratedToProgramData(generated, profile)); setGenerating(false); setOpenSteps({ 6: true }); saveGeneratedProgram(generated); }, 1500); }, [profile, setData]);
   const handleReset = useCallback(() => { setData(defaultData); setProgram(null); setOpenSteps({ 0: true }); }, []);
   const toggleStep = useCallback((idx: number) => setOpenSteps((prev) => ({ ...prev, [idx]: !prev[idx] })), []);
-  const handleSave = useCallback(() => { saveProgram(data); setSavedList(getSavedPrograms()); setSaveFlash(true); setTimeout(() => setSaveFlash(false), 1200); }, [data]);
-  const handleSaveAndAssign = useCallback(() => { const saved = saveProgram(data); setSavedList(getSavedPrograms()); navigate(`/sheets?program=${saved.id}`); }, [data, navigate]);
+  const handleSave = useCallback(async () => {
+    if (!user?.id) return;
+    const assignedClientId = data.assignedClient || null;
+    try {
+      const saved = await saveProgramToSupabase(data, user.id, assignedClientId);
+      if (saved) {
+        setData(saved);
+        setSavedList(await loadSavedPrograms(user.id));
+        setSaveFlash(true);
+        setTimeout(() => setSaveFlash(false), 1200);
+        toast.success(assignedClientId ? 'Program assigned to client' : 'Program saved as draft');
+      } else {
+        toast.error('Failed to save program');
+      }
+    } catch (err) {
+      console.error('Save program failed:', err);
+      toast.error('Failed to save program');
+    }
+  }, [data, user]);
+  const handleSaveAndAssign = useCallback(async () => {
+    if (!user?.id) return;
+    const assignedClientId = data.assignedClient || null;
+    if (!assignedClientId) {
+      toast.error('Please select a client before assigning');
+      return;
+    }
+    try {
+      const saved = await saveProgramToSupabase(data, user.id, assignedClientId);
+      if (saved) {
+        setData(saved);
+        setSavedList(await loadSavedPrograms(user.id));
+        toast.success('Program assigned to client');
+        navigate('/dashboard');
+      } else {
+        toast.error('Failed to assign program');
+      }
+    } catch (err) {
+      console.error('Assign program failed:', err);
+      toast.error('Failed to assign program');
+    }
+  }, [data, user, navigate]);
+  const handleImportLegacy = useCallback(async () => {
+    if (!user?.id || legacySaved.length === 0) return;
+    let imported = 0;
+    let failed = 0;
+    for (const p of legacySaved) {
+      try {
+        await saveProgramToSupabase(p.data, user.id, p.data.assignedClient || null);
+        imported++;
+      } catch {
+        failed++;
+      }
+    }
+    localStorage.removeItem(PROGRAMS_STORAGE_KEY);
+    setLegacySaved([]);
+    setSavedList(await loadSavedPrograms(user.id));
+    toast.success(`Imported ${imported} of ${legacySaved.length} legacy programs${failed > 0 ? ` (${failed} failed)` : ''}`);
+  }, [legacySaved, user]);
+  const dismissLegacy = useCallback(() => { localStorage.removeItem(PROGRAMS_STORAGE_KEY); setLegacySaved([]); }, []);
   const stepComplete = useMemo(() => [!!data.goal, !!data.method, !!(data.clientContext.ageRange && data.clientContext.experience), data.phases.some((p) => p.active), data.split.some((d) => d.active), data.exercises.length > 0, !!(data.goal && data.method), !!data.programName], [data]);
   const completionPercent = useMemo(() => Math.round((stepComplete.filter(Boolean).length / stepComplete.length) * 100), [stepComplete]);
   const loadSavedProgram = useCallback((saved: SavedProgram) => { setData(saved.data); setOpenSteps({ 6: true }); }, []);
@@ -681,6 +948,23 @@ export default function AIProgramBuilderPage() {
 
       <div className="border-b border-[var(--card-border)] bg-[var(--card-bg)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          {legacySaved.length > 0 && (
+            <div className="mb-4 flex flex-col items-start justify-between gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center" style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }}>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: 'var(--page-bg)' }}>
+                  <Upload className="h-5 w-5 text-[#00AEEF]" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-[var(--page-text)]">Import legacy local programs</h3>
+                  <p className="text-xs text-[var(--page-text)]/60">{legacySaved.length} saved program(s) found in local storage. Import them to the cloud to keep them.</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={handleImportLegacy} className="bg-[#00AEEF] hover:bg-[#0099D1] text-white text-xs font-semibold"><Upload className="w-3.5 h-3.5 mr-1" />Import to Cloud</Button>
+                <Button variant="outline" size="sm" onClick={dismissLegacy} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs">Dismiss</Button>
+              </div>
+            </div>
+          )}
           <div className="flex items-center gap-2 overflow-x-auto pb-1">
             <Sparkles className="w-4 h-4 text-[#8B5CF6] shrink-0" />
             <span className="text-[var(--page-text)]/60 text-xs font-medium mr-2 shrink-0">AI Quick Actions:</span>
@@ -709,7 +993,7 @@ export default function AIProgramBuilderPage() {
                   {isOpen && (
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }} className="overflow-hidden">
                       <div className="bg-[var(--card-bg)] border border-t-0 border-[var(--card-border)] rounded-b-xl p-4 sm:p-5">
-                        <Component data={data} updateData={updateData} program={program} onSave={handleSave} onSaveAndAssign={handleSaveAndAssign} />
+                        <Component data={data} updateData={updateData} program={program} onSave={handleSave} onSaveAndAssign={handleSaveAndAssign} clientName={selectedClientName} clients={clients} />
                       </div>
                     </motion.div>
                   )}
@@ -717,7 +1001,7 @@ export default function AIProgramBuilderPage() {
               </div>
             ); })}
           </div>
-          <div className="w-full lg:w-64 shrink-0"><FloatingSummary data={data} /></div>
+          <div className="w-full lg:w-64 shrink-0"><FloatingSummary data={data} clientName={selectedClientName} /></div>
         </div>
       </div>
     </div>
