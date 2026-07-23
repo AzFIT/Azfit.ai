@@ -206,7 +206,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
   return (
     <section
       id="hero"
-      className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden"
+      className="relative flex min-h-[100dvh] flex-col overflow-hidden"
     >
       {/* Background image with Ken Burns */}
       <motion.div
@@ -220,18 +220,20 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
         }}
       >
         <img
-          src="./azfit-hero-bg.png"
+          src={`${import.meta.env.BASE_URL}images/hero-logo.webp`}
           alt=""
+          fetchPriority="high"
           className="h-full w-full object-cover"
         />
       </motion.div>
 
-      {/* Dark overlay gradient */}
+      {/* Dark overlay gradient — keeps text readable while letting the
+          baked-in logo cluster show through */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            "linear-gradient(to bottom, rgba(15,23,42,0.3) 0%, rgba(15,23,42,0.7) 60%, rgba(15,23,42,0.95) 100%)",
+            "linear-gradient(to bottom, rgba(11,17,32,0.6) 0%, rgba(11,17,32,0.72) 55%, rgba(11,17,32,0.92) 100%)",
         }}
       />
 
@@ -244,9 +246,10 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
         }}
       />
 
-      {/* Hero content */}
-      <div className="relative z-10 flex flex-col items-center px-6 text-center">
-        {/* AI Showcase Orb */}
+      {/* Rotating rings + orbiting icons centered on the baked-in logo
+          cluster (nothing rendered inside — the image's own logo shows
+          through the center of the rings) */}
+      <div className="pointer-events-none absolute inset-x-0 top-[54%] z-10 flex -translate-y-1/2 justify-center">
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -254,7 +257,13 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
         >
           <AIShowcase />
         </motion.div>
+      </div>
 
+      {/* Hero content: headline at top, sub + CTA at bottom, logo cluster
+          framed by the rings in the middle */}
+      <div className="relative z-10 flex flex-1 flex-col items-center px-6 text-center">
+        {/* Top block: eyebrow + headline + badge */}
+        <div className="pt-24 lg:pt-28">
         {/* Eyebrow */}
         <motion.p
           initial={{ opacity: 0, y: -10 }}
@@ -292,6 +301,10 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
           <span>🚀</span>
           <span>Live Demo Available</span>
         </motion.div>
+        </div>
+
+        {/* Bottom block: subheadline + CTA + store badges */}
+        <div className="mt-auto pb-8">
         {/* Subheadline */}
         <motion.p
           initial={{ opacity: 0, y: 20 }}
@@ -359,6 +372,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
             <span>Google Play — Coming Soon</span>
           </div>
         </motion.div>
+        </div>
       </div>
 
       {/* Scroll indicator */}
@@ -472,10 +486,23 @@ function FeaturesSection() {
   return (
     <section
       id="features"
-      className="px-6 py-16 lg:py-24"
+      className="relative overflow-hidden px-6 py-16 lg:py-24"
       style={{ backgroundColor: "var(--light-bg, #F8FAFC)" }}
     >
-      <div className="mx-auto max-w-6xl">
+      {/* Holographic gym backdrop with a light overlay to preserve readability */}
+      <div className="pointer-events-none absolute inset-0">
+        <img
+          src={`${import.meta.env.BASE_URL}images/bg-holo-gym.webp`}
+          alt=""
+          loading="lazy"
+          className="h-full w-full object-cover"
+        />
+        <div
+          className="absolute inset-0"
+          style={{ background: "linear-gradient(rgba(248,250,252,0.9), rgba(241,245,249,0.94))" }}
+        />
+      </div>
+      <div className="relative z-10 mx-auto max-w-6xl">
         {/* Section header */}
         <ScrollReveal className="mb-12 text-center lg:mb-16">
           <p

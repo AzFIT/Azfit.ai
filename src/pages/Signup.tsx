@@ -67,7 +67,19 @@ export default function Signup() {
 
   if (success) {
     return (
-      <div className="flex min-h-[100dvh] items-center justify-center px-4" style={{ backgroundColor: '#0F172A' }}>
+      <div className="relative flex min-h-[100dvh] items-center justify-center px-4" style={{ backgroundColor: '#0F172A' }}>
+        <div className="pointer-events-none absolute inset-0">
+          <img
+            src={`${import.meta.env.BASE_URL}images/bg-wireframe-gym.webp`}
+            alt=""
+            loading="lazy"
+            className="h-full w-full object-cover"
+          />
+          <div
+            className="absolute inset-0"
+            style={{ background: 'linear-gradient(rgba(11,17,32,0.86), rgba(11,17,32,0.92))' }}
+          />
+        </div>
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -97,7 +109,20 @@ export default function Signup() {
   }
 
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center px-4" style={{ backgroundColor: '#0F172A' }}>
+    <div className="relative flex min-h-[100dvh] items-center justify-center px-4" style={{ backgroundColor: '#0F172A' }}>
+      {/* Wireframe gym backdrop with strong overlay for readability */}
+      <div className="pointer-events-none absolute inset-0">
+        <img
+          src={`${import.meta.env.BASE_URL}images/bg-wireframe-gym.webp`}
+          alt=""
+          loading="lazy"
+          className="h-full w-full object-cover"
+        />
+        <div
+          className="absolute inset-0"
+          style={{ background: 'linear-gradient(rgba(11,17,32,0.86), rgba(11,17,32,0.92))' }}
+        />
+      </div>
       {/* Background glow */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div

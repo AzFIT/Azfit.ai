@@ -53,9 +53,6 @@ export default function AIShowcase() {
     <div className="ai-showcase-wrap">
       {/* ── Inner container ── */}
       <div className="ai-visual-inner">
-        {/* Pedestal shadow */}
-        <div className="ai-pedestal" />
-
         {/* 3 expanding pulse wave rings */}
         <div className="ai-pulse-waves">
           <div className="ai-pulse-wave" />
@@ -63,24 +60,15 @@ export default function AIShowcase() {
           <div className="ai-pulse-wave" style={{ animationDelay: '2s' } as React.CSSProperties} />
         </div>
 
-        {/* Outer rotating ring with orbiting skill icons */}
+        {/* Outer rotating ring with orbiting skill icons.
+            Nothing inside — the background image's baked-in AzFIT
+            logo cluster shows through the center of the rings. */}
         <div className="ai-outer-ring" ref={ringRef}>
           {skillIcons.map(({ Icon, label }) => (
             <div key={label} className="ai-skill-icon" title={label}>
               <Icon size={20} strokeWidth={1.8} />
             </div>
           ))}
-        </div>
-
-        {/* Central breathing orb with AzFIT logo */}
-        <div className="ai-central-orb">
-          <div className="ai-central-glow" />
-          <img
-            src="./azfit-logo.png"
-            alt="AzFIT AI"
-            className="ai-orb-logo"
-            draggable={false}
-          />
         </div>
       </div>
     </div>
