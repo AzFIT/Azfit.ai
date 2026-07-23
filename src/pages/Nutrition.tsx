@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
@@ -31,6 +31,7 @@ import {
   type NutritionTargets,
 } from "@/lib/foodApi";
 import { supabase } from "@/lib/supabase";
+import TdeeCalculator from "@/components/nutrition/TdeeCalculator";
 
 /* ── Types & Data ──────────────────────────────────────── */
 
@@ -148,6 +149,7 @@ export default function NutritionPage() {
   const [targets, setTargets] = useState<Targets>({ ...DEFAULT_TARGETS, water: DEFAULT_WATER });
   const [editingTargets, setEditingTargets] = useState(false);
   const [targetsDraft, setTargetsDraft] = useState<NutritionTargets>(DEFAULT_TARGETS);
+  const [clientId, setClientId] = useState<string | null>(null);
   const [expandedMeals, setExpandedMeals] = useState<Record<string, boolean>>({
     breakfast: true,
     lunch: true,
@@ -155,10 +157,29 @@ export default function NutritionPage() {
     snack: true,
   });
 
+  const refreshTargets = useCallback(() => {
+    loadTargets().then(setTargets);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     loadTargets().then((t) => {
       if (!cancelled) setTargets(t);
+    });
+    // Resolve own clients.id for the TDEE calculator
+    supabase.auth.getUser().then(({ data: userData }) => {
+      const email = userData.user?.email;
+      if (!email || cancelled) return;
+      supabase
+        .from("clients")
+        .select("id")
+        .eq("email", email)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (!cancelled && data) setClientId(data.id);
+        });
     });
     return () => {
       cancelled = true;
@@ -366,6 +387,7 @@ export default function NutritionPage() {
               </div>
             </div>
           )}
+          {clientId && <TdeeCalculator clientId={clientId} onApplied={refreshTargets} />}
         </div>
         <div className="space-y-3">
           {MEAL_TYPES.map((mealType) => {

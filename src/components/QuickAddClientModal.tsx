@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import ClientIntakeWizard from '@/components/ClientIntakeWizard';
 import type { Database } from '@/types/supabase';
 
 /**
@@ -192,6 +193,11 @@ export default function QuickAddClientModal({
     : [];
 
   if (!open) return null;
+
+  // New-client flow uses the 5-step intake wizard; editing keeps the quick form
+  if (!clientToEdit) {
+    return <ClientIntakeWizard open={open} onClose={onClose} onSuccess={onSuccess} />;
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">

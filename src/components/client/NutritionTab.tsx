@@ -12,6 +12,7 @@ import {
   type LoggedFoodEntry,
 } from "@/lib/foodApi";
 import { toast } from "sonner";
+import TdeeCalculator from "@/components/nutrition/TdeeCalculator";
 
 interface NutritionTabProps {
   clientId: string;
@@ -26,7 +27,7 @@ const MEAL_LABELS: Record<string, string> = {
   snacks: "Snacks",
 };
 
-export default function NutritionTab({ clientEmail }: NutritionTabProps) {
+export default function NutritionTab({ clientId, clientEmail }: NutritionTabProps) {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [targets, setTargets] = useState<NutritionTargets>(DEFAULT_TARGETS);
@@ -101,6 +102,13 @@ export default function NutritionTab({ clientEmail }: NutritionTabProps) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const reloadTargets = async () => {
+    if (!profileId) return;
+    const t = await getNutritionTargets(profileId);
+    setTargets(t);
+    setDraft(t);
   };
 
   if (loading) {
@@ -237,6 +245,11 @@ export default function NutritionTab({ clientEmail }: NutritionTabProps) {
             </div>
           </div>
         )}
+        <TdeeCalculator
+          clientId={clientId}
+          targetProfileId={profileId}
+          onApplied={reloadTargets}
+        />
       </motion.div>
 
       {/* Today's totals */}

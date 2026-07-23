@@ -977,5 +977,11 @@ CREATE POLICY "Trainers can create log entries for clients"
   WITH CHECK (public.is_my_client_id(client_id));
 
 -- ============================================================
+-- CLIENT INTAKE PROFILE EXTRAS (Phase 16)
+-- ============================================================
+ALTER TABLE public.clients
+  ADD COLUMN IF NOT EXISTS intake_profile JSONB;
+
+-- ============================================================
 -- DONE! Your AzFIT database is ready.
 -- ============================================================

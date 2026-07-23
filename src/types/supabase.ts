@@ -56,6 +56,7 @@ export type Database = {
           experience_level: "beginner" | "intermediate" | "advanced" | null;
           status: "active" | "inactive" | "on_hold" | "archived";
           notes: string | null;
+          intake_profile: Json | null;
           created_at: string;
           updated_at: string;
         };
@@ -74,6 +75,7 @@ export type Database = {
           experience_level?: "beginner" | "intermediate" | "advanced" | null;
           status?: "active" | "inactive" | "on_hold" | "archived";
           notes?: string | null;
+          intake_profile?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -92,6 +94,7 @@ export type Database = {
           experience_level?: "beginner" | "intermediate" | "advanced" | null;
           status?: "active" | "inactive" | "on_hold" | "archived";
           notes?: string | null;
+          intake_profile?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
