@@ -31,17 +31,17 @@
 - Program Creator v2: `AIProgramBuilder` is now the canonical create/assign flow, wired to Supabase (`programs` → `workouts` → `exercises`) with real trainer clients, live load/save, legacy localStorage import, and client-name context; `ProgramBuilder` remains the manual editor; added `aiProgramMapper` + unit tests (feat/program-creator-v2)
 - Router poison + launcher fix: stabilized `useSupabaseQuery` (stops ProgramBuilder re-render loop that froze HashRouter), mounted `WorkoutLauncher` on client dashboard, gated `/ai-program-builder` to trainers, fixed "Coach Coach" greeting, hid sidebar Clients for clients, and wired ClientProfile Programs tab to real Supabase programs (fix/router-launcher)
 - Nutrition food database: `foods_cache` (Open Food Facts products cached on first search) + `nutrition_logs` (per-user meal entries) tables with RLS; Nutrition page now searches OFF via `src/lib/foodApi.ts`, supports custom foods, and persists daily logs to Supabase with quantity scaling; trainer read policy via `public.is_my_client()` SECURITY DEFINER (feat/nutrition-db)
+- Client-tile navigation + nutrition targets: clickable client tiles → `/client/:id`; clickable programs with expandable workouts/exercises + trainer "Start Workout" for a client (new `is_my_client_id()` + insert policies on `workout_logs`/`workout_log_entries`); `nutrition_targets` table replaces `PLAN_KEY` (one-time seed), Nutrition page targets editable, dashboard Macros card reads live logs + targets, trainer Nutrition tab on client profile with editable targets + today + 7-day adherence (feat/phase15b)
 
 ## Next
 - Voice notes + push notifications
 - Stripe payments (HUMAN GATE — needs founder approval)
 
 ## Deferred (mocks to wire later)
-- Dashboard rings (steps/sleep/HRV) — manual entry, no wearables yet
+- Dashboard rings (steps/sleep/HRV) — manual entry, no wearables yet; Steps card calories/distance still mock
 - Check-in due card → currently links to /bioprint placeholder
 - AI Chat Stage 2 (live edge function) — pending; Stage 1 uses real DB + local logic
 - AI Insights panel, Revenue snapshot, Weekly metrics, Active Clients card — still mock data on trainer dashboard (noted for later phases)
-- Nutrition macro targets still in `PLAN_KEY` localStorage; dashboard macro widget still uses static mock targets (reads no localStorage logs, so it doesn't crash) — both deferred to a later phase
 
 ## DB fixes
 - workout_log_entries created live on 2026-07-17, matching schema.sql

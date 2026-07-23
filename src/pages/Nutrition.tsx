@@ -24,8 +24,13 @@ import {
   getDailyLog,
   addFoodToLog,
   removeFoodFromLog,
+  getNutritionTargets,
+  saveNutritionTargets,
+  DEFAULT_TARGETS,
   type FoodItem,
+  type NutritionTargets,
 } from "@/lib/foodApi";
+import { supabase } from "@/lib/supabase";
 
 /* ── Types & Data ──────────────────────────────────────── */
 
@@ -94,19 +99,44 @@ async function fetchLog(date: string): Promise<DailyLog> {
   return log;
 }
 
-function getTargets() {
-  try {
-    const plan = JSON.parse(localStorage.getItem(PLAN_KEY) || "{}");
-    return {
-      calories: plan.calorieGoal || 2000,
-      protein: plan.proteinGrams || 150,
-      fats: plan.fatsGrams || 70,
-      carbs: plan.carbsGrams || 200,
-      water: plan.waterGoal || 2500,
-    };
-  } catch {
-    return { calories: 2000, protein: 150, fats: 70, carbs: 200, water: 2500 };
+interface Targets extends NutritionTargets {
+  water: number;
+}
+
+const DEFAULT_WATER = 2500;
+
+async function loadTargets(): Promise<Targets> {
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData.user?.id;
+
+  // One-time seed from legacy PLAN_KEY localStorage if no DB row exists
+  if (userId) {
+    const { data } = await supabase
+      .from("nutrition_targets")
+      .select("user_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!data) {
+      try {
+        const plan = JSON.parse(localStorage.getItem(PLAN_KEY) || "{}");
+        if (plan.calorieGoal) {
+          const seeded: NutritionTargets = {
+            calories: plan.calorieGoal,
+            protein: plan.proteinGrams || DEFAULT_TARGETS.protein,
+            carbs: plan.carbsGrams || DEFAULT_TARGETS.carbs,
+            fats: plan.fatsGrams || DEFAULT_TARGETS.fats,
+          };
+          await saveNutritionTargets(seeded);
+          return { ...seeded, water: DEFAULT_WATER };
+        }
+      } catch {
+        /* ignore */
+      }
+    }
   }
+
+  const dbTargets = await getNutritionTargets();
+  return { ...dbTargets, water: DEFAULT_WATER };
 }
 
 /* ── Main Component ────────────────────────────────────── */
@@ -115,6 +145,9 @@ export default function NutritionPage() {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [log, setLog] = useState<DailyLog>(() => emptyLog(date));
   const [showFoodSearch, setShowFoodSearch] = useState<string | null>(null);
+  const [targets, setTargets] = useState<Targets>({ ...DEFAULT_TARGETS, water: DEFAULT_WATER });
+  const [editingTargets, setEditingTargets] = useState(false);
+  const [targetsDraft, setTargetsDraft] = useState<NutritionTargets>(DEFAULT_TARGETS);
   const [expandedMeals, setExpandedMeals] = useState<Record<string, boolean>>({
     breakfast: true,
     lunch: true,
@@ -122,7 +155,15 @@ export default function NutritionPage() {
     snack: true,
   });
 
-  const targets = useMemo(() => getTargets(), []);
+  useEffect(() => {
+    let cancelled = false;
+    loadTargets().then((t) => {
+      if (!cancelled) setTargets(t);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -133,6 +174,12 @@ export default function NutritionPage() {
       cancelled = true;
     };
   }, [date]);
+
+  const handleSaveTargets = async () => {
+    await saveNutritionTargets(targetsDraft);
+    setTargets({ ...targetsDraft, water: DEFAULT_WATER });
+    setEditingTargets(false);
+  };
 
   const totals = useMemo(() => {
     let calories = 0,
@@ -235,9 +282,91 @@ export default function NutritionPage() {
               color="#22C55E"
             />
           </div>
-        </div>
 
-        {/* Meals */}
+          {/* Targets editor */}
+          {!editingTargets ? (
+            <button
+              onClick={() => {
+                setTargetsDraft({
+                  calories: targets.calories,
+                  protein: targets.protein,
+                  carbs: targets.carbs,
+                  fats: targets.fats,
+                });
+                setEditingTargets(true);
+              }}
+              className="mt-3 text-xs font-medium"
+              style={{ color: "#00AEEF" }}
+            >
+              Edit targets
+            </button>
+          ) : (
+            <div className="mt-3 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                    Calories (kcal)
+                  </label>
+                  <Input
+                    type="number"
+                    value={targetsDraft.calories}
+                    onChange={(e) =>
+                      setTargetsDraft({ ...targetsDraft, calories: Number(e.target.value) || 0 })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                    Protein (g)
+                  </label>
+                  <Input
+                    type="number"
+                    value={targetsDraft.protein}
+                    onChange={(e) =>
+                      setTargetsDraft({ ...targetsDraft, protein: Number(e.target.value) || 0 })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                    Carbs (g)
+                  </label>
+                  <Input
+                    type="number"
+                    value={targetsDraft.carbs}
+                    onChange={(e) =>
+                      setTargetsDraft({ ...targetsDraft, carbs: Number(e.target.value) || 0 })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                    Fats (g)
+                  </label>
+                  <Input
+                    type="number"
+                    value={targetsDraft.fats}
+                    onChange={(e) =>
+                      setTargetsDraft({ ...targetsDraft, fats: Number(e.target.value) || 0 })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setEditingTargets(false)} className="flex-1">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveTargets}
+                  className="flex-1"
+                  style={{ background: "linear-gradient(135deg, #00AEEF, #8B5CF6)" }}
+                >
+                  Save targets
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
         <div className="space-y-3">
           {MEAL_TYPES.map((mealType) => {
             const meal = log.meals.find((m) => m.type === mealType.type);

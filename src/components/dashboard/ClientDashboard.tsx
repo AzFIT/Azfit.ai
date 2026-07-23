@@ -25,6 +25,7 @@ import { useSessions } from "@/hooks/useSessions";
 import { useHabits, last7Days, isDoneOnDate } from "@/components/checkins/useHabits";
 import HabitRow from "@/components/checkins/HabitRow";
 import { generateICS, downloadICS, icsFilename } from "@/lib/ics";
+import { getDayTotals, getNutritionTargets } from "@/lib/foodApi";
 import { WorkoutLauncher } from "@/components/WorkoutLauncher";
 import { GlassCard } from "./shared/GlassCard";
 import { ProgressRing } from "./shared/ProgressRing";
@@ -148,13 +149,34 @@ export default function ClientDashboard() {
   const [stepsTarget] = useState(10000);
   const [stepsCurrent] = useState(9245);
 
-  // Macros
-  const [macros] = useState<MacroTarget>({
-    protein: { current: 145, target: 180 },
-    carbs: { current: 210, target: 250 },
-    fats: { current: 55, target: 70 },
-    calories: { current: 2150, target: 2600 },
+  // Macros — live from nutrition_logs + nutrition_targets
+  const [macros, setMacros] = useState<MacroTarget>({
+    protein: { current: 0, target: 150 },
+    carbs: { current: 0, target: 200 },
+    fats: { current: 0, target: 70 },
+    calories: { current: 0, target: 2000 },
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const [totals, targets] = await Promise.all([
+        getDayTotals(todayStr),
+        getNutritionTargets(),
+      ]);
+      if (cancelled) return;
+      setMacros({
+        protein: { current: totals.protein, target: targets.protein },
+        carbs: { current: totals.carbs, target: targets.carbs },
+        fats: { current: totals.fats, target: targets.fats },
+        calories: { current: totals.calories, target: targets.calories },
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Recovery
   const [recovery] = useState<RecoveryMetrics>({

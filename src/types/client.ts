@@ -179,6 +179,7 @@ export interface ClientGeneratedProgram {
         reps: string;
         tempo: string;
         restSeconds: number;
+        load?: number | null;
       }>;
     }>;
   }>;

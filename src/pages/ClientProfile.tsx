@@ -24,7 +24,6 @@ import {
 import type { Client, ClientNote, ClientGeneratedProgram } from "@/types/client";
 import {
   getClientNutritionPlan,
-  getClientNutritionLogs,
   getClientBioHistory,
   getClientWorkoutLogs,
   getClientScheduleEvents,
@@ -33,6 +32,7 @@ import {
 } from "@/lib/client-demo";
 import { supabase } from "@/lib/supabase";
 import { codeFromOrderIndex, parseExerciseNotes } from "@/lib/aiProgramMapper";
+import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import type { Database } from "@/types/supabase";
 
@@ -150,6 +150,7 @@ async function fetchClientPrograms(clientId: string): Promise<ClientGeneratedPro
                   reps: e.reps || "",
                   tempo: extra.tempo,
                   restSeconds: e.rest_seconds || 60,
+                  load: e.weight_kg ?? null,
                 };
               }),
             };
@@ -245,6 +246,22 @@ export default function ClientProfile() {
     navigate(`/program-builder?clientId=${client.id}`);
   }, [client, navigate]);
 
+  const handleStartWorkout = useCallback(
+    async (workoutId: string, clientId: string) => {
+      const { data: log, error } = await supabase
+        .from("workout_logs")
+        .insert({ client_id: clientId, workout_id: workoutId })
+        .select("id")
+        .single();
+      if (error || !log) {
+        toast.error(error?.message || "Failed to start workout");
+        return;
+      }
+      navigate(`/sheets?workoutLogId=${log.id}`);
+    },
+    [navigate]
+  );
+
   if (loading) {
     return (
       <div
@@ -308,7 +325,6 @@ export default function ClientProfile() {
   }
 
   const nutritionPlan = getClientNutritionPlan(client.id);
-  const nutritionLogs = getClientNutritionLogs(client.id);
   const bioHistory = getClientBioHistory(client.id);
   const workoutLogs = getClientWorkoutLogs(client.id);
   const scheduleEvents = getClientScheduleEvents(client.id);
@@ -374,16 +390,15 @@ export default function ClientProfile() {
             )}
             {activeTab === "bio" && <BioHistoryTab entries={bioHistory} />}
             {activeTab === "nutrition" && (
-              <NutritionTab
-                nutritionPlan={nutritionPlan}
-                nutritionLogs={nutritionLogs}
-              />
+              <NutritionTab clientId={client.id} clientEmail={client.email} />
             )}
             {activeTab === "workouts" && <WorkoutLogsTab logs={workoutLogs} />}
             {activeTab === "schedule" && (
               <ScheduleTab events={scheduleEvents} />
             )}
-            {activeTab === "programs" && <ProgramsTab programs={programs} />}
+            {activeTab === "programs" && (
+              <ProgramsTab programs={programs} onStartWorkout={handleStartWorkout} />
+            )}
             {activeTab === "notes" && (
               <NotesTab
                 notes={notes}

@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Dumbbell, Clock, ChevronDown, ChevronUp } from "lucide-react";
+import { Dumbbell, Clock, ChevronDown, ChevronUp, Play } from "lucide-react";
 import type { ClientGeneratedProgram } from "@/types/client";
 
 interface ProgramsTabProps {
   programs: ClientGeneratedProgram[];
+  onStartWorkout?: (workoutId: string, clientId: string) => void;
 }
 
-export default function ProgramsTab({ programs }: ProgramsTabProps) {
+export default function ProgramsTab({ programs, onStartWorkout }: ProgramsTabProps) {
   const [expandedProgram, setExpandedProgram] = useState<string | null>(null);
   const [expandedPhase, setExpandedPhase] = useState<string | null>(null);
+  const [expandedWorkout, setExpandedWorkout] = useState<string | null>(null);
 
   if (programs.length === 0) {
     return (
@@ -175,45 +177,117 @@ export default function ProgramsTab({ programs }: ProgramsTabProps) {
                               {phase.workouts.map((workout) => (
                                 <div
                                   key={workout.id}
-                                  className="flex items-center justify-between p-2.5 rounded-lg"
+                                  className="rounded-lg"
                                   style={{ backgroundColor: "var(--card-bg)" }}
                                 >
-                                  <div className="flex items-center gap-2">
-                                    <span
-                                      className="flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold"
-                                      style={{
-                                        backgroundColor:
-                                          "rgba(13,148,136,0.15)",
-                                        color: "#0D9488",
-                                      }}
-                                    >
-                                      {workout.dayNumber}
-                                    </span>
-                                    <div>
-                                      <p
-                                        className="text-xs font-medium"
-                                        style={{ color: "var(--page-text)" }}
-                                      >
-                                        {workout.name}
-                                      </p>
-                                      <p
-                                        className="text-[10px]"
+                                  <button
+                                    onClick={() =>
+                                      setExpandedWorkout(
+                                        expandedWorkout === workout.id ? null : workout.id,
+                                      )
+                                    }
+                                    className="w-full flex items-center justify-between p-2.5 text-left"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className="flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold"
                                         style={{
-                                          color: "var(--light-text-muted)",
+                                          backgroundColor:
+                                            "rgba(13,148,136,0.15)",
+                                          color: "#0D9488",
                                         }}
                                       >
-                                        {workout.focus} •{" "}
-                                        {workout.exercises.length} exercises
-                                      </p>
+                                        {workout.dayNumber}
+                                      </span>
+                                      <div>
+                                        <p
+                                          className="text-xs font-medium"
+                                          style={{ color: "var(--page-text)" }}
+                                        >
+                                          {workout.name}
+                                        </p>
+                                        <p
+                                          className="text-[10px]"
+                                          style={{
+                                            color: "var(--light-text-muted)",
+                                          }}
+                                        >
+                                          Day {workout.dayNumber} •{" "}
+                                          {workout.exercises.length} exercises
+                                        </p>
+                                      </div>
                                     </div>
-                                  </div>
-                                  <div
-                                    className="flex items-center gap-1 text-[10px]"
-                                    style={{ color: "var(--light-text-muted)" }}
-                                  >
-                                    <Clock size={10} />
-                                    {workout.estimatedMinutes}m
-                                  </div>
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className="flex items-center gap-1 text-[10px]"
+                                        style={{ color: "var(--light-text-muted)" }}
+                                      >
+                                        <Clock size={10} />
+                                        {workout.estimatedMinutes}m
+                                      </span>
+                                      {expandedWorkout === workout.id ? (
+                                        <ChevronUp size={14} style={{ color: "var(--light-text-muted)" }} />
+                                      ) : (
+                                        <ChevronDown size={14} style={{ color: "var(--light-text-muted)" }} />
+                                      )}
+                                    </div>
+                                  </button>
+
+                                  <AnimatePresence>
+                                    {expandedWorkout === workout.id && (
+                                      <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        className="overflow-hidden"
+                                      >
+                                        <div className="px-3 pb-3 space-y-1">
+                                          {workout.exercises.map((ex) => (
+                                            <div
+                                              key={ex.order + ex.name}
+                                              className="flex items-center justify-between rounded-md px-2 py-1.5"
+                                              style={{ backgroundColor: "var(--light-elevated)" }}
+                                            >
+                                              <div className="flex items-center gap-2 min-w-0">
+                                                <span
+                                                  className="text-[10px] font-bold font-mono shrink-0"
+                                                  style={{ color: "#0D9488" }}
+                                                >
+                                                  {ex.order}
+                                                </span>
+                                                <span
+                                                  className="text-xs truncate"
+                                                  style={{ color: "var(--page-text)" }}
+                                                >
+                                                  {ex.name}
+                                                </span>
+                                              </div>
+                                              <span
+                                                className="text-[10px] shrink-0"
+                                                style={{ color: "var(--light-text-muted)" }}
+                                              >
+                                                {ex.sets} × {ex.reps}
+                                                {ex.load ? ` @ ${ex.load}kg` : ""}
+                                              </span>
+                                            </div>
+                                          ))}
+
+                                          {onStartWorkout && program.clientId && (
+                                            <button
+                                              onClick={() =>
+                                                onStartWorkout(workout.id, program.clientId!)
+                                              }
+                                              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold text-white transition hover:opacity-90"
+                                              style={{ backgroundColor: "var(--azfit-primary)" }}
+                                            >
+                                              <Play size={12} />
+                                              Start Workout
+                                            </button>
+                                          )}
+                                        </div>
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
                                 </div>
                               ))}
                             </div>

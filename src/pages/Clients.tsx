@@ -371,12 +371,20 @@ export default function ClientsPage() {
                           animate={{ opacity: 1, y: 0 }}
                           whileHover={{ y: -1 }}
                           transition={{ duration: 0.18, ease: "easeOut" }}
-                          className={`flex w-full items-center gap-4 px-4 py-4 transition ${
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              navigate(`/client/${client.id}`);
+                            }
+                          }}
+                          className={`flex w-full cursor-pointer items-center gap-4 px-4 py-4 transition ${
                             isSelected
                               ? "bg-[var(--light-elevated)] shadow-sm"
                               : "hover:bg-[var(--light-elevated)]"
                           }`}
-                          onClick={() => setSelectedClientId(client.id)}
+                          onClick={() => navigate(`/client/${client.id}`)}
                         >
                           <div className="flex-1 min-w-0">
                             <p className="truncate font-semibold text-[var(--page-text)]">

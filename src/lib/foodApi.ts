@@ -191,15 +191,18 @@ export interface DailyNutritionLog {
   waterIntake: number;
 }
 
-export async function getDailyLog(date: string): Promise<DailyNutritionLog> {
-  const { data: userData } = await supabase.auth.getUser();
-  const userId = userData.user?.id;
-  if (!userId) return { date, entries: [], waterIntake: 0 };
+export async function getDailyLog(date: string, userId?: string): Promise<DailyNutritionLog> {
+  let uid = userId;
+  if (!uid) {
+    const { data: userData } = await supabase.auth.getUser();
+    uid = userData.user?.id;
+  }
+  if (!uid) return { date, entries: [], waterIntake: 0 };
 
   const { data, error } = await supabase
     .from("nutrition_logs")
     .select("id, meal_type, quantity_g, food:foods_cache(*)")
-    .eq("user_id", userId)
+    .eq("user_id", uid)
     .eq("logged_date", date)
     .order("created_at", { ascending: true });
 
@@ -247,4 +250,141 @@ export async function addFoodToLog(
 export async function removeFoodFromLog(logId: string): Promise<void> {
   const { error } = await supabase.from("nutrition_logs").delete().eq("id", logId);
   if (error) throw error;
+}
+
+/* ── Macro targets (nutrition_targets table) ─────────────── */
+
+export interface NutritionTargets {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+}
+
+export const DEFAULT_TARGETS: NutritionTargets = {
+  calories: 2000,
+  protein: 150,
+  carbs: 200,
+  fats: 70,
+};
+
+async function currentUserId(): Promise<string | undefined> {
+  const { data: userData } = await supabase.auth.getUser();
+  return userData.user?.id;
+}
+
+export async function getNutritionTargets(userId?: string): Promise<NutritionTargets> {
+  const uid = userId ?? (await currentUserId());
+  if (!uid) return DEFAULT_TARGETS;
+
+  const { data, error } = await supabase
+    .from("nutrition_targets")
+    .select("*")
+    .eq("user_id", uid)
+    .maybeSingle();
+
+  if (error || !data) return DEFAULT_TARGETS;
+  return {
+    calories: data.calories ?? DEFAULT_TARGETS.calories,
+    protein: data.protein_g ?? DEFAULT_TARGETS.protein,
+    carbs: data.carbs_g ?? DEFAULT_TARGETS.carbs,
+    fats: data.fats_g ?? DEFAULT_TARGETS.fats,
+  };
+}
+
+export async function saveNutritionTargets(
+  t: NutritionTargets,
+  userId?: string
+): Promise<void> {
+  const editorId = await currentUserId();
+  const uid = userId ?? editorId;
+  if (!uid) throw new Error('Not authenticated');
+
+  const payload = {
+    calories: t.calories,
+    protein_g: t.protein,
+    carbs_g: t.carbs,
+    fats_g: t.fats,
+    updated_by: editorId ?? null,
+  };
+
+  // Trainers can only UPDATE existing client rows (no INSERT policy for
+  // other users), so use update() when editing someone else's targets.
+  if (userId && userId !== editorId) {
+    const { error } = await supabase
+      .from('nutrition_targets')
+      .update(payload)
+      .eq('user_id', uid);
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabase.from('nutrition_targets').upsert(
+    { user_id: uid, ...payload },
+    { onConflict: 'user_id' }
+  );
+  if (error) throw error;
+}
+
+/* ── Day totals from nutrition_logs + foods_cache ────────── */
+
+export interface MacroTotals {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+}
+
+interface TotalsRow {
+  quantity_g: number;
+  food:
+    | {
+        calories: number;
+        protein: number;
+        carbs: number;
+        fats: number;
+        serving_size_g: number | null;
+      }
+    | Array<{
+        calories: number;
+        protein: number;
+        carbs: number;
+        fats: number;
+        serving_size_g: number | null;
+      }>
+    | null;
+}
+
+export async function getDayTotals(
+  date: string,
+  userId?: string
+): Promise<MacroTotals> {
+  const uid = userId ?? (await currentUserId());
+  const totals = { calories: 0, protein: 0, carbs: 0, fats: 0 };
+  if (!uid) return totals;
+
+  const { data, error } = await supabase
+    .from("nutrition_logs")
+    .select("quantity_g, food:foods_cache(calories, protein, carbs, fats, serving_size_g)")
+    .eq("user_id", uid)
+    .eq("logged_date", date);
+
+  if (error || !data) return totals;
+
+  for (const row of data as unknown as TotalsRow[]) {
+    const food = Array.isArray(row.food) ? row.food[0] : row.food;
+    if (!food) continue;
+    const ratio = row.quantity_g / (food.serving_size_g ?? 100);
+    totals.calories += food.calories * ratio;
+    totals.protein += food.protein * ratio;
+    totals.carbs += food.carbs * ratio;
+    totals.fats += food.fats * ratio;
+  }
+
+  return {
+    calories: Math.round(totals.calories),
+    protein: Math.round(totals.protein),
+    carbs: Math.round(totals.carbs),
+    fats: Math.round(totals.fats),
+  };
 }

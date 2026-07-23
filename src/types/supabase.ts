@@ -1430,6 +1430,44 @@ export type Database = {
           }
         ];
       };
+      nutrition_targets: {
+        Row: {
+          user_id: string;
+          calories: number | null;
+          protein_g: number | null;
+          carbs_g: number | null;
+          fats_g: number | null;
+          updated_by: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          calories?: number | null;
+          protein_g?: number | null;
+          carbs_g?: number | null;
+          fats_g?: number | null;
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          calories?: number | null;
+          protein_g?: number | null;
+          carbs_g?: number | null;
+          fats_g?: number | null;
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "nutrition_targets_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
