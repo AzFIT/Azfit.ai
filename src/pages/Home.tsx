@@ -208,16 +208,18 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
       id="hero"
       className="relative flex min-h-[100dvh] flex-col overflow-hidden"
     >
-      {/* Background image with Ken Burns */}
+      {/* Background image with Ken Burns (scaled up so the baked-in logo
+          cluster reads larger and stays centered) */}
       <motion.div
         className="absolute inset-0"
-        animate={{ scale: [1, 1.05] }}
+        animate={{ scale: [1.16, 1.24] }}
         transition={{
           duration: 20,
           ease: "linear",
           repeat: Infinity,
           repeatType: "reverse",
         }}
+        style={{ transformOrigin: "50% 54%" }}
       >
         <img
           src={`${import.meta.env.BASE_URL}images/hero-logo.webp`}
@@ -249,7 +251,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
       {/* Rotating rings + orbiting icons centered on the baked-in logo
           cluster (nothing rendered inside — the image's own logo shows
           through the center of the rings) */}
-      <div className="pointer-events-none absolute inset-x-0 top-[54%] z-10 flex -translate-y-1/2 justify-center">
+      <div className="pointer-events-none absolute left-1/2 top-[52%] z-10 -translate-x-1/2 -translate-y-1/2">
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -263,7 +265,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
           framed by the rings in the middle */}
       <div className="relative z-10 flex flex-1 flex-col items-center px-6 text-center">
         {/* Top block: eyebrow + headline + badge */}
-        <div className="pt-24 lg:pt-28">
+        <div className="flex flex-col items-center pt-24 lg:pt-28">
         {/* Eyebrow */}
         <motion.p
           initial={{ opacity: 0, y: -10 }}
@@ -304,13 +306,13 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
         </div>
 
         {/* Bottom block: subheadline + CTA + store badges */}
-        <div className="mt-auto pb-8">
+        <div className="mt-auto flex flex-col items-center pb-8">
         {/* Subheadline */}
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.6, ease: easeDefault }}
-          className="mt-6 max-w-[480px] text-base leading-relaxed lg:text-lg"
+          className="mx-auto mt-6 max-w-[480px] text-base leading-relaxed lg:text-lg"
           style={{
             color: "#CBD5E1",
             textShadow: "0 2px 4px rgba(0,0,0,0.6), 0 0 20px rgba(0,0,0,0.3)",
