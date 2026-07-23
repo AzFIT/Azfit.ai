@@ -1,0 +1,8 @@
+# Merge fix/router-launcher to main + deploy
+
+1. git checkout main && git pull origin main
+2. git merge fix/router-launcher (expect fast-forward or clean merge)
+3. Gates on merged main: npx tsc -b, npm run lint, npm run test, npm run build — all must pass
+4. Push origin main AND origin fix/router-launcher
+5. Verify deploy: curl -I https://azfit.github.io/Azfit.ai/ → HTTP 200 with fresh Last-Modified
+6. Report new main commit hash + deploy result, then STOP. No new work.

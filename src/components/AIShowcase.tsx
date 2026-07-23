@@ -23,9 +23,9 @@ const skillIcons = [
 ];
 
 /* ── Pre-calculate icon positions around the ring ──
-   8 icons evenly spaced at radius 130px from center
-   on a 280px diameter ring                                 */
-const RING_RADIUS = 130;
+   8 icons evenly spaced at radius 175px from center,
+   orbiting OUTSIDE the 240px ring like a solar system  */
+const RING_RADIUS = 175;
 const iconPositions = skillIcons.map((_, i) => {
   const angle = (i * 360) / skillIcons.length;
   const rad = (angle * Math.PI) / 180;
@@ -38,14 +38,15 @@ const iconPositions = skillIcons.map((_, i) => {
 export default function AIShowcase() {
   const ringRef = useRef<HTMLDivElement>(null);
 
-  /* ── Position icons around the ring on mount ── */
+  /* ── Position icons around the ring on mount (radius scales with viewport) ── */
   useEffect(() => {
     if (!ringRef.current) return;
+    const radius = window.innerWidth <= 640 ? 130 : 175;
     const icons = ringRef.current.querySelectorAll<HTMLDivElement>('.ai-skill-icon');
     icons.forEach((icon, i) => {
       const { x, y } = iconPositions[i];
-      icon.style.left = `calc(50% + ${x}px - 20px)`;
-      icon.style.top = `calc(50% + ${y}px - 20px)`;
+      icon.style.left = `calc(50% + ${(x / RING_RADIUS) * radius}px - 20px)`;
+      icon.style.top = `calc(50% + ${(y / RING_RADIUS) * radius}px - 20px)`;
     });
   }, []);
 
