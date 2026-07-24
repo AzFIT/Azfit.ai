@@ -213,45 +213,65 @@
    AI SHOWCASE COMPONENT STYLES
    ═══════════════════════════════════════════ */
 
-.ai-showcase-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.orb-unit {
+  --orb-size: min(320px, 64vw);
   position: relative;
-  margin-bottom: 16px;
+  width: var(--orb-size);
+  aspect-ratio: 1;
+  margin-inline: auto;
 }
 
-.ai-visual-inner {
-  position: relative;
-  width: 400px;
-  height: 400px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-@media (max-width: 640px) {
-  .ai-visual-inner {
-    width: 300px;
-    height: 300px;
-  }
-}
-
-/* ── Pedestal Shadow ── */
-.ai-pedestal {
+/* ── Logo + caption (centered, ~58% of unit) ── */
+.orb-logo {
   position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translate(-50%, 40px);
-  width: 200px;
-  height: 30px;
-  background: radial-gradient(ellipse, rgba(0, 174, 239, 0.08) 0%, transparent 70%);
-  border-radius: 50%;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--orb-size) * 0.02);
+}
+
+.orb-logo img {
+  width: calc(var(--orb-size) * 0.58);
+  object-fit: contain;
+  filter: drop-shadow(0 0 16px rgba(0, 174, 239, 0.6));
   pointer-events: none;
 }
 
-/* ── Pulse Wave Ripples ── */
-.ai-pulse-waves {
+.orb-caption {
+  margin: 0;
+  font-size: calc(var(--orb-size) * 0.036);
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: #22D3EE;
+  text-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+}
+
+/* ── Thin glow ring hugging the logo (~76% of unit) ── */
+.orb-ring {
+  position: absolute;
+  inset: calc(var(--orb-size) * 0.12);
+  border-radius: 50%;
+  border: 1px solid rgba(0, 174, 239, 0.28);
+  box-shadow: 0 0 20px rgba(0, 174, 239, 0.12), inset 0 0 20px rgba(0, 174, 239, 0.06);
+  pointer-events: none;
+}
+
+.orb-ring::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0deg, rgba(0, 174, 239, 0.55) 40deg, transparent 90deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px));
+  animation: spin-slow 6s linear infinite;
+}
+
+/* ── Pulse wave ripples ── */
+.orb-pulse-waves {
   position: absolute;
   inset: 0;
   display: flex;
@@ -260,129 +280,61 @@
   pointer-events: none;
 }
 
-.ai-pulse-wave {
+.orb-pulse-wave {
   position: absolute;
+  inset: calc(var(--orb-size) * 0.06);
   border-radius: 50%;
   border: 1px solid rgba(0, 174, 239, 0.15);
-  width: 280px;
-  height: 280px;
   animation: pulse-ring-anim 3s ease-out infinite;
 }
 
-.ai-pulse-wave:nth-child(2) {
+.orb-pulse-wave:nth-child(2) {
   border-color: rgba(0, 174, 239, 0.12);
   animation-delay: 1s;
 }
 
-.ai-pulse-wave:nth-child(3) {
+.orb-pulse-wave:nth-child(3) {
   border-color: rgba(0, 174, 239, 0.08);
   animation-delay: 2s;
 }
 
-@media (max-width: 640px) {
-  .ai-pulse-wave {
-    width: 220px;
-    height: 220px;
-  }
-}
-
-/* ── Outer Rotating Ring (hugs the logo cluster; icons orbit outside it) ── */
-.ai-outer-ring {
-  position: absolute;
-  width: 240px;
-  height: 240px;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 174, 239, 0.2);
-  animation: spin-slow 30s linear infinite;
-  pointer-events: none;
-}
-
-@media (max-width: 640px) {
-  .ai-outer-ring {
-    width: 200px;
-    height: 200px;
-  }
-}
-
-/* ── Skill Icons positioned around the ring ── */
-.ai-skill-icon {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: rgba(0, 174, 239, 0.08);
-  border: 1px solid rgba(0, 174, 239, 0.12);
-  color: #00AEEF;
-  animation: spin-slow 30s linear infinite reverse;
-  transition: all 0.3s ease;
-}
-
-.ai-skill-icon:hover {
-  background: rgba(0, 174, 239, 0.2);
-  border-color: rgba(0, 174, 239, 0.35);
-  transform: scale(1.1);
-}
-
-.ai-skill-icon svg {
-  width: 20px;
-  height: 20px;
-}
-
-@media (max-width: 640px) {
-  .ai-skill-icon {
-    width: 34px;
-    height: 34px;
-  }
-  .ai-skill-icon svg {
-    width: 16px;
-    height: 16px;
-  }
-}
-
-/* ── Central Breathing Orb ── */
-.ai-central-orb {
-  position: relative;
-  width: 180px;
-  height: 180px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(0, 174, 239, 0.2) 0%, transparent 70%);
-  border: 2px solid rgba(0, 174, 239, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: orb-breathe 4s ease-in-out infinite;
-}
-
-.ai-central-glow {
+/* ── Icon orbit (icons at ~48% radius, outside the ring) ── */
+.orb-icon-orbit {
   position: absolute;
   inset: 0;
+  animation: spin-slow 40s linear infinite;
+  pointer-events: none;
+}
+
+.orb-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 50%;
-  background: radial-gradient(circle at 40% 40%, rgba(0, 174, 239, 0.35) 0%, transparent 60%);
-  pointer-events: none;
+  background: rgba(0, 174, 239, 0.08);
+  border: 1px solid rgba(0, 174, 239, 0.18);
+  color: #00AEEF;
+  transform: rotate(calc(var(--i) * 45deg)) translate(calc(var(--orb-size) * 0.48)) rotate(calc(var(--i) * -45deg));
+  animation: orb-icon-counter 40s linear infinite;
 }
 
-/* AzFIT logo inside the orb — 2x size */
-.ai-orb-logo {
-  position: relative;
-  z-index: 2;
-  width: 140px;
-  height: 140px;
-  object-fit: contain;
-  filter: drop-shadow(0 0 16px rgba(0, 174, 239, 0.7));
-  pointer-events: none;
+.orb-icon svg {
+  width: 18px;
+  height: 18px;
 }
 
-@media (max-width: 640px) {
-  .ai-central-orb {
-    width: 140px;
-    height: 140px;
+@keyframes orb-icon-counter {
+  from {
+    transform: rotate(calc(var(--i) * 45deg)) translate(calc(var(--orb-size) * 0.48)) rotate(calc(var(--i) * -45deg)) rotate(0deg);
   }
-  .ai-orb-logo {
-    width: 110px;
-    height: 110px;
+  to {
+    transform: rotate(calc(var(--i) * 45deg)) translate(calc(var(--orb-size) * 0.48)) rotate(calc(var(--i) * -45deg)) rotate(-360deg);
   }
 }
 

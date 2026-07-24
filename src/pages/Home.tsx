@@ -208,21 +208,20 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
       id="hero"
       className="relative flex min-h-[100dvh] flex-col overflow-hidden"
     >
-      {/* Background image with Ken Burns (scaled up so the baked-in logo
-          cluster reads larger and stays centered) */}
+      {/* Background image (no baked logo) with a subtle Ken Burns drift */}
       <motion.div
         className="absolute inset-0"
-        animate={{ scale: [1.16, 1.24] }}
+        animate={{ scale: [1.05, 1.12] }}
         transition={{
           duration: 20,
           ease: "linear",
           repeat: Infinity,
           repeatType: "reverse",
         }}
-        style={{ transformOrigin: "50% 54%" }}
+        style={{ transformOrigin: "50% 50%" }}
       >
         <img
-          src={`${import.meta.env.BASE_URL}images/hero-logo.webp`}
+          src={`${import.meta.env.BASE_URL}images/bg-wireframe-gym.webp`}
           alt=""
           fetchPriority="high"
           className="h-full w-full object-cover"
@@ -248,21 +247,8 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
         }}
       />
 
-      {/* Rotating rings + orbiting icons centered on the baked-in logo
-          cluster (nothing rendered inside — the image's own logo shows
-          through the center of the rings) */}
-      <div className="pointer-events-none absolute left-1/2 top-[52%] z-10 -translate-x-1/2 -translate-y-1/2">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8, delay: 0.1, ease: easeDefault }}
-        >
-          <AIShowcase />
-        </motion.div>
-      </div>
-
-      {/* Hero content: headline at top, sub + CTA at bottom, logo cluster
-          framed by the rings in the middle */}
+      {/* Hero content: headline at top, orb unit in the middle, sub + CTA
+          at bottom — all in normal flow on one central axis */}
       <div className="relative z-10 flex flex-1 flex-col items-center px-6 text-center">
         {/* Top block: eyebrow + headline + badge */}
         <div className="flex flex-col items-center pt-24 lg:pt-28">
@@ -303,6 +289,17 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
           <span>🚀</span>
           <span>Live Demo Available</span>
         </motion.div>
+        </div>
+
+        {/* Orb unit in normal flow — centered between headline and sub */}
+        <div className="flex flex-1 items-center justify-center">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, delay: 0.1, ease: easeDefault }}
+          >
+            <AIShowcase />
+          </motion.div>
         </div>
 
         {/* Bottom block: subheadline + CTA + store badges */}
