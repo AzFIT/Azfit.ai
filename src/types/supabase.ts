@@ -1554,6 +1554,56 @@ export type Database = {
           }
         ];
       };
+      form_checks: {
+        Row: {
+          id: string;
+          owner_id: string;
+          storage_path: string;
+          exercise_name: string;
+          status: "pending" | "reviewed";
+          feedback: string | null;
+          positives: string | null;
+          improvements: string | null;
+          timestamp_notes: Json;
+          created_at: string;
+          reviewed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          storage_path: string;
+          exercise_name: string;
+          status?: "pending" | "reviewed";
+          feedback?: string | null;
+          positives?: string | null;
+          improvements?: string | null;
+          timestamp_notes?: Json;
+          created_at?: string;
+          reviewed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          storage_path?: string;
+          exercise_name?: string;
+          status?: "pending" | "reviewed";
+          feedback?: string | null;
+          positives?: string | null;
+          improvements?: string | null;
+          timestamp_notes?: Json;
+          created_at?: string;
+          reviewed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "form_checks_owner_id_fkey";
+            columns: ["owner_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       photo_metadata_owner: {

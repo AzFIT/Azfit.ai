@@ -29,6 +29,7 @@ import {
   ChevronDown,
   BookOpen,
   ClipboardCheck,
+  Video,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Badge from "@/components/Badge";
@@ -51,6 +52,7 @@ const baseSecondaryNavItems = [
   { icon: CalendarIcon, label: "Schedule", path: "/schedule" },
   { icon: Scale, label: "Bio Print", path: "/bioprint" },
   { icon: Camera, label: "Photos", path: "/progress-photos" },
+  { icon: Video, label: "Form Checks", path: "/form-checks" },
   { icon: Timer, label: "Timer", path: "/timer" },
   { icon: Flame, label: "Warm-up", path: "/warmup" },
   { icon: Brain, label: "Recovery", path: "/deload" },
@@ -98,6 +100,7 @@ export default function Layout({
         { icon: ClipboardCheck, label: "Check-ins", path: "/check-ins" },
         { icon: Users, label: "Clients", path: "/clients" },
         { icon: Dumbbell, label: "Workouts", path: "/sheets" },
+        { icon: Video, label: "Form Checks", path: "/form-checks" },
         { icon: MessageSquare, label: "Messages", path: "/messages" },
         { icon: Settings, label: "Settings", path: "/settings" },
       ]
@@ -106,6 +109,7 @@ export default function Layout({
         { icon: ClipboardCheck, label: "Check-ins", path: "/check-ins" },
         { icon: Dumbbell, label: "Workouts", path: "/sheets" },
         { icon: Apple, label: "Nutrition", path: "/nutrition" },
+        { icon: Video, label: "Form Checks", path: "/form-checks" },
         { icon: MessageSquare, label: "Messages", path: "/messages" },
         { icon: Settings, label: "Settings", path: "/settings" },
       ];

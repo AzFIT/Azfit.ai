@@ -58,6 +58,7 @@ const CoachAIPage = lazy(() => import("@/pages/CoachAIPage"));
 const Messages = lazy(() => import("@/pages/Messages"));
 const ExercisesPage = lazy(() => import("@/pages/ExercisesPage"));
 const CheckInsPage = lazy(() => import("@/pages/CheckInsPage"));
+const FormChecksPage = lazy(() => import("@/pages/FormChecks"));
 
 // Loading fallback
 function PageLoader() {
@@ -315,6 +316,14 @@ export default function App() {
                     element={
                       <ProtectedRoute>
                         <ExercisesPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/form-checks"
+                    element={
+                      <ProtectedRoute>
+                        <FormChecksPage />
                       </ProtectedRoute>
                     }
                   />
