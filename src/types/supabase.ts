@@ -899,7 +899,7 @@ export type Database = {
           }
         ];
       };
-      method_program_scores: {
+      method_program_template_scores: {
         Row: {
           method_id: string;
           program_template_id: string;
@@ -920,90 +920,20 @@ export type Database = {
         };
         Relationships: [
           {
-            foreignKeyName: "method_program_scores_method_id_fkey";
+            foreignKeyName: "method_program_template_scores_method_id_fkey";
             columns: ["method_id"];
             isOneToOne: false;
             referencedRelation: "methods";
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "method_program_scores_program_template_id_fkey";
+            foreignKeyName: "method_program_template_scores_program_template_id_fkey";
             columns: ["program_template_id"];
             isOneToOne: false;
             referencedRelation: "program_templates";
             referencedColumns: ["id"];
           }
         ];
-      };
-      pipeline_scores: {
-        Row: {
-          goal_id: string;
-          method_id: string;
-          program_template_id: string;
-          score: number;
-          updated_at: string;
-        };
-        Insert: {
-          goal_id: string;
-          method_id: string;
-          program_template_id: string;
-          score?: number;
-          updated_at?: string;
-        };
-        Update: {
-          goal_id?: string;
-          method_id?: string;
-          program_template_id?: string;
-          score?: number;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "pipeline_scores_goal_id_fkey";
-            columns: ["goal_id"];
-            isOneToOne: false;
-            referencedRelation: "goals";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "pipeline_scores_method_id_fkey";
-            columns: ["method_id"];
-            isOneToOne: false;
-            referencedRelation: "methods";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "pipeline_scores_program_template_id_fkey";
-            columns: ["program_template_id"];
-            isOneToOne: false;
-            referencedRelation: "program_templates";
-            referencedColumns: ["id"];
-          }
-        ];
-      };
-      settings_config: {
-        Row: {
-          id: string;
-          key: string;
-          value: string;
-          description: string | null;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          key: string;
-          value: string;
-          description?: string | null;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          key?: string;
-          value?: string;
-          description?: string | null;
-          updated_at?: string;
-        };
-        Relationships: [];
       };
       check_in_forms: {
         Row: {
