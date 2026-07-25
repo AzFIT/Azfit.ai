@@ -2,7 +2,6 @@ import type {
   Client,
   ClientNote,
   ClientNutritionPlan,
-  ClientNutritionLog,
   ClientBioEntry,
   ClientWorkoutLog,
   ClientScheduleEvent,
@@ -286,23 +285,6 @@ export function getClientNutritionPlan(
     // ignore
   }
   return null;
-}
-
-export function getClientNutritionLogs(
-  _clientId: string,
-): ClientNutritionLog[] {
-  return [
-    {
-      id: "log-today",
-      clientId: _clientId,
-      date: new Date().toISOString().split("T")[0],
-      caloriesConsumed: 2100,
-      proteinConsumed: 165,
-      carbsConsumed: 220,
-      fatsConsumed: 72,
-      waterConsumed: 2400,
-    },
-  ];
 }
 
 export function getClientBioHistory(clientId: string): ClientBioEntry[] {

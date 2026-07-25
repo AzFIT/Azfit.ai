@@ -584,10 +584,6 @@ export const EXERCISE_CATEGORIES: ExerciseCategory[] = [
 // HELPERS
 // ═══════════════════════════════════════════════════════════════
 
-export function getAllCategories(): ExerciseCategory[] {
-  return EXERCISE_CATEGORIES;
-}
-
 export function getCategoryById(id: string): ExerciseCategory | undefined {
   return EXERCISE_CATEGORIES.find((c) => c.id === id);
 }
@@ -616,14 +612,6 @@ export function findCategoryForExercise(exerciseName: string): string | null {
   return null;
 }
 
-export function getExerciseAlternatives(exerciseName: string): string[] {
-  const catId = findCategoryForExercise(exerciseName);
-  if (!catId) return [];
-  const cat = getCategoryById(catId);
-  if (!cat) return [];
-  return cat.alternatives.filter((e) => e !== exerciseName);
-}
-
 // ═══════════════════════════════════════════════════════════════
 // PROGRAM TEMPLATE BUILDER
 // When you select a category slot (A1, A2, B1, etc.),
@@ -638,20 +626,6 @@ export interface ProgramSlot {
   reps: string;
   tempo: string;
   restSeconds: number;
-}
-
-export function getSlotCategory(slotOrder: string): string {
-  const slotMap: Record<string, string> = {
-    A1: 'pulling',
-    A2: 'unilateral_quad',
-    B1: 'pressing',
-    B2: 'posterior',
-    C1: 'delt_scap',
-    C2: 'biceps',
-    C3: 'bracing',
-    D: 'metcon_bracing',
-  };
-  return slotMap[slotOrder] || 'target_areas';
 }
 
 export function getDefaultSlotExercise(slotOrder: string): string {

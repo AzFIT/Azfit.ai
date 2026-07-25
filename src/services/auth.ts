@@ -155,22 +155,6 @@ export function onAuthStateChange(callback: (user: AuthUser | null) => void) {
   });
 }
 
-// Update user profile
-export async function updateProfile(updates: {
-  full_name?: string;
-  avatar_url?: string;
-}) {
-  const session = await getSession();
-  if (!session) throw new Error('Not authenticated');
-
-  const { error } = await supabase
-    .from('profiles')
-    .update(updates as Database['public']['Tables']['profiles']['Update'])
-    .eq('id', session.user.id);
-
-  if (error) throw error;
-}
-
 // Create or update full client profile after onboarding
 export async function createClientProfile(
   data: ClientProfileData

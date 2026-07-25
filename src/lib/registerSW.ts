@@ -150,23 +150,3 @@ export function usePWA(): PWAState {
   };
 }
 
-/**
- * Trigger a background sync for offline data.
- * Phase 2 will use this to queue failed writes.
- */
-export async function triggerBackgroundSync(): Promise<void> {
-  if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
-    console.warn('[PWA] Cannot sync — no service worker active');
-    return;
-  }
-
-  try {
-    const registration = await navigator.serviceWorker.ready;
-    if ('sync' in registration) {
-      await (registration as unknown as { sync: { register: (tag: string) => Promise<void> } }).sync.register('azfit-sync');
-      console.log('[PWA] Background sync registered');
-    }
-  } catch (err) {
-    console.error('[PWA] Background sync failed:', err);
-  }
-}

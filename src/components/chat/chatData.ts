@@ -47,58 +47,6 @@ export async function getLastWorkout(clientId: string): Promise<DbWorkoutLog | n
   return data;
 }
 
-export async function getWeeklyVolume(clientId: string): Promise<number> {
-  const now = new Date();
-  const startOfWeek = new Date(now);
-  const day = startOfWeek.getDay();
-  const diff = (day === 0 ? -6 : 1) - day; // Monday start
-  startOfWeek.setDate(startOfWeek.getDate() + diff);
-  startOfWeek.setHours(0, 0, 0, 0);
-
-  const { data, error } = await supabase
-    .from("workout_log_entries")
-    .select("sets_completed, reps_per_set, weight_per_set")
-    .eq("client_id", clientId)
-    .gte("created_at", startOfWeek.toISOString());
-
-  if (error || !data) return 0;
-
-  return data.reduce((sum, entry) => {
-    let entryVol = 0;
-    for (let i = 0; i < entry.sets_completed; i++) {
-      const reps = entry.reps_per_set[i] || 0;
-      const weight = entry.weight_per_set[i] || 0;
-      entryVol += reps * weight;
-    }
-    return sum + entryVol;
-  }, 0);
-}
-
-export async function getNextSession(userId: string, role: "trainer" | "client"): Promise<DbSession | null> {
-  const now = new Date().toISOString();
-  let query = supabase.from("sessions").select("*").gte("starts_at", now).order("starts_at", { ascending: true }).limit(1);
-
-  if (role === "trainer") {
-    query = query.eq("trainer_id", userId);
-  } else {
-    const clientId = await resolveClientId(userId, ""); // email handled below
-    if (clientId) {
-      query = query.eq("client_id", clientId);
-    } else {
-      // Fallback: try to resolve email from profiles
-      const { data: profile } = await supabase.from("profiles").select("email").eq("id", userId).single();
-      if (profile?.email) {
-        const resolved = await resolveClientId(userId, profile.email);
-        if (resolved) query = query.eq("client_id", resolved);
-      }
-    }
-  }
-
-  const { data, error } = await query;
-  if (error || !data || data.length === 0) return null;
-  return data[0];
-}
-
 export async function getUnreadMessages(userId: string): Promise<number> {
   const { count, error } = await supabase
     .from("messages")
@@ -108,48 +56,6 @@ export async function getUnreadMessages(userId: string): Promise<number> {
 
   if (error) return 0;
   return count || 0;
-}
-
-export async function getCheckInsDue(clientId: string): Promise<number> {
-  const now = new Date();
-  const sevenDaysAgo = new Date(now);
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-  // Find the trainer for this client
-  const { data: client, error: clientError } = await supabase
-    .from("clients")
-    .select("trainer_id")
-    .eq("id", clientId)
-    .single();
-
-  if (clientError || !client) return 0;
-
-  const [{ data: forms }, { data: submissions }] = await Promise.all([
-    supabase.from("check_in_forms").select("id").eq("trainer_id", client.trainer_id).eq("active", true),
-    supabase
-      .from("check_in_submissions")
-      .select("form_id")
-      .eq("client_id", clientId)
-      .gte("submitted_at", sevenDaysAgo.toISOString()),
-  ]);
-
-  if (!forms || forms.length === 0) return 0;
-  const submittedFormIds = new Set((submissions || []).map((s) => s.form_id));
-  return forms.filter((f) => !submittedFormIds.has(f.id)).length;
-}
-
-export async function getHabitsToday(clientId: string) {
-  const today = new Date().toISOString().split("T")[0];
-
-  const [{ data: habits }, { data: logs }] = await Promise.all([
-    supabase.from("habits").select("*").eq("client_id", clientId).eq("active", true),
-    supabase.from("habit_logs").select("*").eq("client_id", clientId).eq("log_date", today),
-  ]);
-
-  return (habits || []).map((habit) => {
-    const log = (logs || []).find((l) => l.habit_id === habit.id);
-    return { habit, done: log?.done ?? false };
-  });
 }
 
 export async function getLatestBodyComp(clientId: string): Promise<DbBodyComposition | null> {
@@ -204,21 +110,6 @@ export async function getTrainerAttention(trainerId: string): Promise<TrainerAtt
     checkinsPending: counts.checkinsPending,
     unreadMessages: counts.unreadMessages,
   };
-}
-
-export async function getRecentWorkouts(clientId: string, days = 14) {
-  const since = new Date();
-  since.setDate(since.getDate() - days);
-
-  const { data, error } = await supabase
-    .from("workout_logs")
-    .select("*")
-    .eq("client_id", clientId)
-    .gte("created_at", since.toISOString())
-    .order("created_at", { ascending: false });
-
-  if (error) return [];
-  return data || [];
 }
 
 export interface OneRepMaxEntry {

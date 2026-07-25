@@ -120,29 +120,3 @@ export function getPageContext(path: string): PageContext | undefined {
   return contexts.find((p: PageContext) => path === p.path || path.startsWith(p.path + '/'));
 }
 
-export function getNavigationSuggestion(intent: IntentType, currentPath: string): string | null {
-  const suggestions: Record<IntentType, string[]> = {
-    workout: ['/sheets', '/program-builder'],
-    nutrition: ['/nutrition'],
-    client: ['/coach', '/onboarding'],
-    progress: ['/bioprint', '/analytics'],
-    settings: ['/settings'],
-    help: ['/dashboard'],
-    greeting: [],
-    navigation: [],
-    generate_program: ['/program-builder'],
-    exercise_substitute: ['/program-builder'],
-    deload: ['/deload'],
-    analyze: ['/analytics'],
-    unknown: [],
-  };
-
-  const paths = suggestions[intent];
-  if (!paths || paths.length === 0) return null;
-
-  // Don't suggest current page
-  const filtered = paths.filter((p) => p !== currentPath);
-  return filtered[0] || null;
-}
-
-

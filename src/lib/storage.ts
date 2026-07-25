@@ -51,10 +51,6 @@ function remove(key: string): void {
 
 export type Theme = "light" | "dark";
 
-export function getTheme(): Theme {
-  return get<Theme>(KEYS.THEME, "dark");
-}
-
 export function setTheme(theme: Theme): void {
   set(KEYS.THEME, theme);
 }
@@ -90,11 +86,6 @@ export function saveClient(client: StoredClient): void {
   } else {
     clients.push(client);
   }
-  set(KEYS.CLIENTS, clients);
-}
-
-export function deleteClient(clientId: string): void {
-  const clients = getClients().filter((c) => c.id !== clientId);
   set(KEYS.CLIENTS, clients);
 }
 
@@ -143,11 +134,6 @@ export function saveProgramTemplate(template: ProgramTemplate): void {
   set(KEYS.PROGRAMS, templates);
 }
 
-export function deleteProgramTemplate(id: string): void {
-  const templates = getProgramTemplates().filter((p) => p.id !== id);
-  set(KEYS.PROGRAMS, templates);
-}
-
 export interface AssignedProgram extends ClientGeneratedProgram {
   clientId: string;
   clientName: string;
@@ -189,17 +175,6 @@ export interface StoredProgram {
 
 export function getClientPrograms(): StoredProgram[] {
   return get<StoredProgram[]>(KEYS.CLIENT_PROGRAMS, []);
-}
-
-export function saveClientProgram(program: StoredProgram): void {
-  const programs = getClientPrograms();
-  const idx = programs.findIndex((p) => p.id === program.id);
-  if (idx >= 0) {
-    programs[idx] = program;
-  } else {
-    programs.push(program);
-  }
-  set(KEYS.CLIENT_PROGRAMS, programs);
 }
 
 // ─── Workout Sessions / Logs ───
@@ -276,35 +251,12 @@ export function getWorkoutLogs(): WorkoutLog[] {
   return get<WorkoutLog[]>(KEYS.WORKOUT_LOGS, []);
 }
 
-export function saveWorkoutLog(log: WorkoutLog): void {
-  const logs = getWorkoutLogs();
-  const idx = logs.findIndex((l) => l.id === log.id);
-  if (idx >= 0) {
-    logs[idx] = log;
-  } else {
-    logs.push(log);
-  }
-  set(KEYS.WORKOUT_LOGS, logs);
-}
-
-export function getActiveSession(): WorkoutLog | null {
-  return get<WorkoutLog | null>(KEYS.ACTIVE_SESSION, null);
-}
-
 export function setActiveSession(session: WorkoutLog | null): void {
   if (session) {
     set(KEYS.ACTIVE_SESSION, session);
   } else {
     remove(KEYS.ACTIVE_SESSION);
   }
-}
-
-export function getClientLogs(clientId: string): WorkoutLog[] {
-  return getWorkoutLogs().filter((l) => l.clientId === clientId);
-}
-
-export function getProgramLogs(programId: string): WorkoutLog[] {
-  return getWorkoutLogs().filter((l) => l.programId === programId);
 }
 
 // ─── Settings ───
@@ -346,18 +298,6 @@ export interface StoredUser {
   avatarUrl?: string;
 }
 
-export function getStoredUser(): StoredUser | null {
-  return get<StoredUser | null>(KEYS.CURRENT_USER, null);
-}
-
-export function setStoredUser(user: StoredUser | null): void {
-  if (user) {
-    set(KEYS.CURRENT_USER, user);
-  } else {
-    remove(KEYS.CURRENT_USER);
-  }
-}
-
 // ═══════════════════════════════════════════════════════════════
 // Phase 2: Workout Draft Helpers — Resilient State Management
 // ═══════════════════════════════════════════════════════════════
@@ -367,32 +307,6 @@ export interface WorkoutDraftData {
   notes: string;
   timestamp: number;
   synced: boolean;
-}
-
-export function getWorkoutDraft(userId: string, workoutLogId: string, exerciseId: string): WorkoutDraftData | null {
-  return get<WorkoutDraftData | null>(KEYS.WORKOUT_DRAFT(userId, workoutLogId, exerciseId), null);
-}
-
-export function setWorkoutDraft(userId: string, workoutLogId: string, exerciseId: string, data: Omit<WorkoutDraftData, 'timestamp' | 'synced'>): void {
-  set(KEYS.WORKOUT_DRAFT(userId, workoutLogId, exerciseId), {
-    ...data,
-    timestamp: Date.now(),
-    synced: false,
-  });
-}
-
-export function clearWorkoutDraft(userId: string, workoutLogId: string, exerciseId: string): void {
-  remove(KEYS.WORKOUT_DRAFT(userId, workoutLogId, exerciseId));
-}
-
-export function clearAllWorkoutDrafts(userId: string, workoutLogId: string): void {
-  const prefix = `${PREFIX}workout_draft:${userId}:${workoutLogId}:`;
-  for (let i = localStorage.length - 1; i >= 0; i--) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith(prefix)) {
-      remove(key);
-    }
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -407,18 +321,6 @@ export interface OfflineQueueItem {
   attempts: number;
   createdAt: string;
   error?: string;
-}
-
-export function getOfflineQueue(userId: string): OfflineQueueItem[] {
-  return get<OfflineQueueItem[]>(KEYS.OFFLINE_QUEUE(userId), []);
-}
-
-export function setOfflineQueue(userId: string, queue: OfflineQueueItem[]): void {
-  set(KEYS.OFFLINE_QUEUE(userId), queue);
-}
-
-export function clearOfflineQueue(userId: string): void {
-  remove(KEYS.OFFLINE_QUEUE(userId));
 }
 
 // ─── Onboarding Data ───
@@ -469,38 +371,4 @@ export function setOnboardingData(data: OnboardingState): void {
 
 export function clearOnboardingData(): void {
   remove(`${PREFIX}onboarding_data`);
-}
-
-// ─── Export / Import ───
-
-export function exportAllData(): string {
-  const data = {
-    clients: getClients(),
-    programs: getProgramTemplates(),
-    logs: getWorkoutLogs(),
-    settings: getSettings(),
-    exportedAt: new Date().toISOString(),
-  };
-  return JSON.stringify(data, null, 2);
-}
-
-export function importAllData(jsonString: string): boolean {
-  try {
-    const data = JSON.parse(jsonString);
-    if (data.clients) set(KEYS.CLIENTS, data.clients);
-    if (data.programs) set(KEYS.PROGRAMS, data.programs);
-    if (data.logs) set(KEYS.WORKOUT_LOGS, data.logs);
-    if (data.settings) set(KEYS.SETTINGS, data.settings);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// ─── Clear all ───
-
-export function clearAllData(): void {
-  Object.values(KEYS).forEach((key) => {
-    if (typeof key === "string") remove(key);
-  });
 }

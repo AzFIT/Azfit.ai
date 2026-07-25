@@ -4,7 +4,6 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { EXERCISE_CATEGORIES } from '@/data/exerciseDatabase';
-import { type MasterProgram } from '@/data/masterWorkouts';
 
 /* ── Types ─────────────────────────────────────────────── */
 
@@ -333,40 +332,6 @@ const GOAL_OPTIONS = [
   { value: 'general_health', label: 'General Health' },
 ];
 
-/* ── Convert to MasterProgram format ───────────────────── */
-
-export function generatedToMasterProgram(gen: GeneratedProgram): MasterProgram {
-  return {
-    id: gen.id,
-    name: gen.name,
-    description: gen.description,
-    category: 'Custom',
-    level: gen.level as 'Beginner' | 'Intermediate' | 'Advanced',
-    totalWeeks: gen.totalWeeks,
-    phases: gen.phases.map((phase) => ({
-      id: phase.id,
-      name: phase.name,
-      block: phase.block,
-      durationWeeks: phase.durationWeeks,
-      goal: phase.goal,
-      workouts: phase.workouts.map((w) => ({
-        id: w.id,
-        name: w.name,
-        exercises: w.exercises.map((ex) => ({
-          order: ex.order,
-          name: ex.name,
-          category: ex.category,
-          reps: ex.reps,
-          sets: ex.sets,
-          tempo: ex.tempo,
-          tut: 0,
-          restSeconds: ex.restSeconds,
-        })),
-      })),
-    })),
-  };
-}
-
 /* ── Similarity scoring for exercise replacement ───────── */
 
 export interface ScoredExercise {
@@ -476,9 +441,4 @@ export function saveGeneratedProgram(program: GeneratedProgram): void {
   const existing = JSON.parse(localStorage.getItem(key) || '[]') as GeneratedProgram[];
   existing.push(program);
   localStorage.setItem(key, JSON.stringify(existing));
-}
-
-export function getGeneratedPrograms(): GeneratedProgram[] {
-  const key = 'azfit_generated_programs';
-  return JSON.parse(localStorage.getItem(key) || '[]') as GeneratedProgram[];
 }
