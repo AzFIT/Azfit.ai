@@ -10,6 +10,7 @@ import {
   Layers,
   StickyNote,
   ArrowLeft,
+  Camera,
 } from "lucide-react";
 import ClientProfileHeader from "@/components/client/ClientProfileHeader";
 import {
@@ -20,6 +21,7 @@ import {
   ScheduleTab,
   ProgramsTab,
   NotesTab,
+  ClientPhotosTab,
 } from "@/components/client";
 import type { Client, ClientNote, ClientGeneratedProgram } from "@/types/client";
 import {
@@ -43,6 +45,7 @@ const tabs = [
   { id: "workouts", label: "Workout Logs", icon: Dumbbell },
   { id: "schedule", label: "Schedule", icon: CalendarDays },
   { id: "programs", label: "Programs", icon: Layers },
+  { id: "photos", label: "Photos", icon: Camera },
   { id: "notes", label: "Notes", icon: StickyNote },
 ] as const;
 
@@ -399,6 +402,7 @@ export default function ClientProfile() {
             {activeTab === "programs" && (
               <ProgramsTab programs={programs} onStartWorkout={handleStartWorkout} />
             )}
+            {activeTab === "photos" && <ClientPhotosTab clientEmail={client.email} />}
             {activeTab === "notes" && (
               <NotesTab
                 notes={notes}

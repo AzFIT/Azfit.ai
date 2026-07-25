@@ -1471,9 +1471,73 @@ export type Database = {
           }
         ];
       };
+      photo_metadata: {
+        Row: {
+          id: string;
+          storage_path: string;
+          owner_id: string;
+          category: "Front" | "Back" | "Side" | "Other" | null;
+          taken_on: string | null;
+          weight_kg: number | null;
+          body_fat_pct: number | null;
+          notes: string | null;
+          trainer_notes: string | null;
+          is_milestone: boolean | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          storage_path: string;
+          owner_id: string;
+          category?: "Front" | "Back" | "Side" | "Other" | null;
+          taken_on?: string | null;
+          weight_kg?: number | null;
+          body_fat_pct?: number | null;
+          notes?: string | null;
+          trainer_notes?: string | null;
+          is_milestone?: boolean | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          storage_path?: string;
+          owner_id?: string;
+          category?: "Front" | "Back" | "Side" | "Other" | null;
+          taken_on?: string | null;
+          weight_kg?: number | null;
+          body_fat_pct?: number | null;
+          notes?: string | null;
+          trainer_notes?: string | null;
+          is_milestone?: boolean | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "photo_metadata_owner_id_fkey";
+            columns: ["owner_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
-      [_ in never]: never;
+      photo_metadata_owner: {
+        Row: {
+          id: string;
+          storage_path: string;
+          owner_id: string;
+          category: "Front" | "Back" | "Side" | "Other" | null;
+          taken_on: string | null;
+          weight_kg: number | null;
+          body_fat_pct: number | null;
+          notes: string | null;
+          is_milestone: boolean | null;
+          created_at: string;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
       compute_jaccard: {

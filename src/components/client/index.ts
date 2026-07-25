@@ -5,3 +5,4 @@ export { default as WorkoutLogsTab } from './WorkoutLogsTab';
 export { default as ScheduleTab } from './ScheduleTab';
 export { default as ProgramsTab } from './ProgramsTab';
 export { default as NotesTab } from './NotesTab';
+export { default as ClientPhotosTab } from './ClientPhotosTab';
