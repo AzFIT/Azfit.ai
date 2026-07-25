@@ -537,7 +537,7 @@ function SubmissionsPanel({
         </div>
 
         <div className="mb-4">
-          <label className="mb-1 block text-xs font-medium" style={{ color: "var(--text-muted)" }}>Trainer Notes</label>
+          <label className="mb-1 block text-xs font-medium" style={{ color: "var(--text-muted)" }}>Coach Feedback (visible to client)</label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -857,6 +857,12 @@ function ClientCheckIns() {
                     </span>
                   )}
                 </div>
+                {sub.reviewed_at && sub.trainer_notes && (
+                  <div className="mt-3 rounded-xl border-l-4 border-l-[#00AEEF] bg-[#00AEEF]/5 px-3 py-2.5">
+                    <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#00AEEF]">Coach Feedback</p>
+                    <p className="whitespace-pre-wrap text-sm" style={{ color: "var(--page-text)" }}>{sub.trainer_notes}</p>
+                  </div>
+                )}
               </div>
             ))}
           </div>
