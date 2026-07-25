@@ -8,8 +8,8 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Zap, Bot, Save, RotateCcw, ChevronDown, ChevronUp, Check, CheckCircle2,
-  Dumbbell, TrendingUp, Flame, Wind, HeartPulse, GripVertical, Pencil, Trash2,
+  Zap, Bot, Save, RotateCcw, Check,
+  Dumbbell, TrendingUp, Flame, Wind, HeartPulse, Pencil, Trash2,
   Plus, Eye, BarChart3, Download, X, Search, Target, Award, Sparkles,
   AlertTriangle, Layers, Calendar, Users, Play, ArrowLeft, Upload,
 } from 'lucide-react';
@@ -193,6 +193,24 @@ async function saveProgramToSupabase(
 
 function loadClientProfile(): ClientProfile | null { try { const raw = localStorage.getItem('azfit_client_profile'); if (!raw) return null; const profile = JSON.parse(raw); return { trainingFrequency: profile.trainingFrequency || 3, trainingExperience: profile.trainingExperience || 'intermediate', primaryGoal: profile.primaryGoal || 'build_muscle', availableEquipment: profile.availableEquipment || ['Full Gym'], preferredStyle: profile.preferredStyle || ['Free Weights'], injuries: profile.injuries || '' }; } catch { return null; } }
 
+// Client-aware auto-generate: build a ClientProfile from a clients row's
+// intake_profile (Phase 16) + fitness_goal/experience_level. localStorage is
+// only a fallback when no client is selected and no intake_profile exists.
+const GOAL_SLUG_MAP: Record<string, string> = { lose_weight: 'lose_fat', build_muscle: 'build_muscle', strength: 'strength', endurance: 'general_health', athletic_performance: 'performance', rehab_mobility: 'recomposition', general_fitness: 'general_health' };
+const DEFAULT_PROFILE: ClientProfile = { trainingFrequency: 3, trainingExperience: 'intermediate', primaryGoal: 'build_muscle', availableEquipment: ['Full Gym'], preferredStyle: ['Free Weights'] };
+function profileFromClient(client: ClientRow): ClientProfile {
+  const ip = (client.intake_profile as Record<string, unknown> | null) || {};
+  const equipment = Array.isArray(ip.equipment) && ip.equipment.length > 0 ? (ip.equipment as string[]) : ['Full Gym'];
+  return {
+    trainingFrequency: (ip.sessions_per_week as number) || 3,
+    trainingExperience: client.experience_level || 'intermediate',
+    primaryGoal: GOAL_SLUG_MAP[client.fitness_goal || ''] || 'general_health',
+    availableEquipment: equipment,
+    preferredStyle: ['Free Weights'],
+    injuries: (ip.injuries as string) || '',
+  };
+}
+
 const GOAL_MAP: Record<string, string> = { lose_fat: 'fatloss', build_muscle: 'hypertrophy', strength: 'strength', recomposition: 'fatloss', performance: 'power', general_health: 'endurance' };
 const METHOD_MAP: Record<string, string> = { strength: '5x5', hypertrophy: 'german-volume', fatloss: 'hiit', power: 'triphasic', endurance: 'hiit', rehab: 'triphasic' };
 const PCT_MAP: Record<string, string> = { strength: '82.5%', hypertrophy: '75%', fatloss: '65%', power: '70%', endurance: '60%', rehab: '50%' };
@@ -250,21 +268,6 @@ const STEPS = [
   { title: 'Save & Assign', component: Step8Save },
 ];
 const defaultData: ProgramData = { goal: '', method: '', clientContext: { ageRange: '', experience: '', bodyType: '', availability: '', limitations: [], otherLimitation: '' }, phases: PHASES_DEFAULT.map((p) => ({ ...p })), weeklyHours: 4.5, split: SPLIT_DEFAULTS['Upper/Lower'].map((d) => ({ ...d })), exercises: DEFAULT_EXERCISES.map((e) => ({ ...e })), programName: '', description: '', tags: [], isPublic: false, assignedClient: '' };
-
-function StepHeader({ step, title, isOpen, isComplete, onToggle }: { step: number; title: string; isOpen: boolean; isComplete: boolean; onToggle: () => void }) {
-  return (
-    <button onClick={onToggle} className="flex items-center justify-between w-full py-4 px-5 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl hover:border-[var(--azfit-primary)]/50 transition-colors">
-      <div className="flex items-center gap-3">
-        <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold font-mono', isComplete ? 'bg-[#22C55E]/20 text-[#22C55E] border border-[#22C55E]/40' : 'bg-[var(--page-bg)] text-[var(--page-text)]/60 border border-[var(--card-border)]')}>
-          {isComplete ? <Check className="w-4 h-4" /> : step}
-        </div>
-        <span className="text-[var(--page-text)] font-semibold text-base">{title}</span>
-        {isComplete && <CheckCircle2 className="w-4 h-4 text-[#22C55E]" />}
-      </div>
-      {isOpen ? <ChevronUp className="w-5 h-5 text-[var(--page-text)]/60" /> : <ChevronDown className="w-5 h-5 text-[var(--page-text)]/60" />}
-    </button>
-  );
-}
 
 function Step1Goal({ data, updateData }: StepProps) {
   const [dropdownGoal, setDropdownGoal] = useState(data.goal || '');
@@ -448,45 +451,117 @@ function Step4Phases({ data, updateData }: StepProps) {
   );
 }
 
+function muscleTagsFor(workout: string): string[] {
+  const w = workout.toLowerCase();
+  if (w.includes('push')) return ['Chest', 'Shoulders', 'Triceps'];
+  if (w.includes('pull')) return ['Back', 'Biceps', 'Rear Delts'];
+  if (w.includes('squat') || w.includes('legs') || w.includes('quad')) return ['Quads', 'Glutes', 'Calves'];
+  if (w.includes('hinge') || w.includes('deadlift') || w.includes('ham')) return ['Hamstrings', 'Glutes', 'Lower Back'];
+  if (w.includes('upper')) return ['Chest', 'Back', 'Shoulders'];
+  if (w.includes('lower')) return ['Quads', 'Glutes', 'Hamstrings'];
+  if (w.includes('full')) return ['Full Body'];
+  if (w.includes('chest')) return ['Chest', 'Triceps'];
+  if (w.includes('back')) return ['Back', 'Biceps'];
+  if (w.includes('shoulder')) return ['Shoulders', 'Triceps'];
+  if (w.includes('arm')) return ['Biceps', 'Triceps'];
+  return ['General'];
+}
+
 function Step5Split({ data, updateData }: StepProps) {
   const [splitType, setSplitType] = useState('Upper/Lower');
   const toggleDay = useCallback((dayIdx: number) => updateData((prev) => ({ split: prev.split.map((d, i) => (i === dayIdx ? { ...d, active: !d.active } : d)) })), [updateData]);
   const updateDayWorkout = useCallback((dayIdx: number, value: string) => updateData((prev) => ({ split: prev.split.map((d, i) => (i === dayIdx ? { ...d, workout: value } : d)) })), [updateData]);
   const applySplit = useCallback((type: string) => { setSplitType(type); if (SPLIT_DEFAULTS[type]) updateData({ split: SPLIT_DEFAULTS[type].map((d) => ({ ...d })) }); }, [updateData]);
+
   const activeDays = useMemo(() => data.split.filter((d) => d.active).length, [data.split]);
-  const volumeDist = useMemo(() => { const dist: Record<string, number> = {}; data.split.forEach((d) => { if (d.active) { const key = d.workout.split('—')[0].trim() || 'General'; dist[key] = (dist[key] || 0) + 1; } }); return dist; }, [data.split]);
+  const restDays = useMemo(() => data.split.filter((d) => !d.active).length, [data.split]);
+  const perDayExercises = data.exercises.length;
+  const weeklyVolume = perDayExercises * activeDays;
+
   return (
-    <div className="space-y-5">
-      <div>
-        <label className="text-[var(--page-text)]/60 text-xs font-medium mb-1.5 block">Split Type</label>
-        <select value={splitType} onChange={(e) => applySplit(e.target.value)} className="bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--page-text)] text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#00AEEF]">
-          {Object.keys(SPLIT_DEFAULTS).map((type) => <option key={type}>{type}</option>)}
-        </select>
-      </div>
-      <div className="grid grid-cols-7 gap-2">
-        {data.split.map((day, idx) => { const dayColors = ['#EF4444', '#F59E0B', '#22C55E', '#00AEEF', '#8B5CF6', '#EC4899', '#6366F1']; return (
-          <motion.div key={day.day} layout className={cn('rounded-xl border overflow-hidden transition-all', day.active ? 'border-[var(--card-border)] bg-[var(--card-bg)]' : 'border-[var(--card-border)]/50 bg-[var(--page-bg)] opacity-50')}>
-            <div className="p-2 text-center border-b border-[var(--card-border)]">
-              <div className="flex items-center justify-center gap-1"><GripVertical className="w-3 h-3 text-[var(--page-text)]/40" /><input type="checkbox" checked={day.active} onChange={() => toggleDay(idx)} className="w-3.5 h-3.5 rounded accent-[#00AEEF]" /></div>
-              <span className="text-[10px] font-bold font-mono mt-1 block" style={{ color: day.active ? dayColors[idx] : 'var(--page-text)' }}>{day.day}</span>
-            </div>
-            <div className="p-2"><textarea value={day.workout} onChange={(e) => updateDayWorkout(idx, e.target.value)} className={cn('w-full text-[10px] text-center bg-transparent border-none outline-none resize-none', day.active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40')} rows={2} disabled={!day.active} /></div>
-          </motion.div>
-        ); })}
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-3">
-          <span className="text-[var(--page-text)]/60 text-xs">Training Frequency</span>
-          <div className="text-[var(--page-text)] text-lg font-bold font-mono">{activeDays} <span className="text-sm text-[var(--page-text)]/60 font-normal">days/week</span></div>
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_240px]">
+      {/* Left: split type + day cards */}
+      <div className="space-y-4">
+        <div>
+          <label className="text-[var(--page-text)]/60 text-xs font-medium mb-1.5 block">Split Type</label>
+          <select value={splitType} onChange={(e) => applySplit(e.target.value)} className="bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--page-text)] text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#00AEEF]">
+            {Object.keys(SPLIT_DEFAULTS).map((type) => <option key={type}>{type}</option>)}
+          </select>
         </div>
-        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-3">
-          <span className="text-[var(--page-text)]/60 text-xs">Volume Distribution</span>
-          <div className="flex flex-wrap gap-1 mt-1">
-            {Object.entries(volumeDist).map(([k, v]) => <Badge key={k} variant="outline" className="text-[10px] border-[var(--card-border)] text-[var(--page-text)]/60">{k}: {v}</Badge>)}
-          </div>
+
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4">
+          {data.split.map((day, idx) => {
+            const active = day.active;
+            const tags = active ? muscleTagsFor(day.workout) : [];
+            return (
+              <motion.div
+                key={day.day}
+                layout
+                className={cn('rounded-xl border overflow-hidden transition-all',
+                  active
+                    ? 'border-l-4 border-l-[#00AEEF] border-[var(--card-border)] bg-[var(--card-bg)]'
+                    : 'border-[var(--card-border)] bg-[var(--page-bg)] opacity-60')}
+              >
+                <div className="flex items-center justify-between px-3 pt-3">
+                  <span className={cn('text-sm font-bold', active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40')}>{day.day.toUpperCase()}</span>
+                  <input type="checkbox" checked={day.active} onChange={() => toggleDay(idx)} className="w-4 h-4 rounded accent-[#00AEEF]" />
+                </div>
+                {active ? (
+                  <div className="px-3 pb-3 pt-1">
+                    <textarea
+                      value={day.workout}
+                      onChange={(e) => updateDayWorkout(idx, e.target.value)}
+                      rows={1}
+                      className="w-full bg-transparent border-none outline-none resize-none text-xs font-semibold text-[#00AEEF]"
+                    />
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                      <span className="rounded-md bg-[var(--page-bg)] border border-[var(--card-border)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--page-text)]/70">{perDayExercises} exercises</span>
+                      {tags.map((t) => (
+                        <span key={t} className="rounded-md bg-[#00AEEF]/10 px-1.5 py-0.5 text-[9px] font-medium text-[#00AEEF]">{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="px-3 pb-3 pt-1">
+                    <p className="text-xs text-[var(--page-text)]/40">Rest Day</p>
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
+        </div>
+
+        <Button variant="outline" size="sm" onClick={() => applySplit('Upper/Lower')} className="border-[#8B5CF6] text-[#8B5CF6] hover:bg-[#8B5CF6]/10 text-xs"><Bot className="w-3.5 h-3.5 mr-1" />Recommend Split</Button>
+      </div>
+
+      {/* Right: Split Summary panel (below grid on mobile) */}
+      <div className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 h-fit lg:sticky lg:top-4">
+        <h4 className="text-[var(--page-text)] text-sm font-bold mb-3">Split Summary</h4>
+        <p className="text-xs text-[var(--page-text)]/70">{activeDays} Training Days / {restDays} Rest Days</p>
+        <p className="text-xs text-[var(--page-text)]/70 mt-0.5">Weekly Volume: <span className="text-[#00AEEF] font-bold">{weeklyVolume} exercises</span></p>
+        {/* Mini bar chart of exercises per day (styled divs) */}
+        <div className="mt-4 flex h-24 items-end gap-1.5">
+          {data.split.map((day) => {
+            const count = day.active ? perDayExercises : 0;
+            const max = Math.max(perDayExercises, 1);
+            const pct = day.active ? (count / max) * 100 : 0;
+            return (
+              <div key={day.day} className="flex flex-1 flex-col items-center gap-1">
+                <div className="flex h-full w-full items-end">
+                  <motion.div
+                    initial={{ height: 0 }}
+                    animate={{ height: `${Math.max(pct, day.active ? 12 : 0)}%` }}
+                    transition={{ duration: 0.4 }}
+                    className={cn('w-full rounded-t', day.active ? 'bg-[#00AEEF]' : 'bg-[var(--card-border)]')}
+                    style={{ height: day.active ? undefined : '6%' }}
+                  />
+                </div>
+                <span className="text-[9px] text-[var(--page-text)]/50">{day.day}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
-      <Button variant="outline" size="sm" onClick={() => applySplit('Upper/Lower')} className="border-[#8B5CF6] text-[#8B5CF6] hover:bg-[#8B5CF6]/10 text-xs"><Bot className="w-3.5 h-3.5 mr-1" />Recommend Split</Button>
     </div>
   );
 }
@@ -724,11 +799,86 @@ function Step7Preview({ data, program, clientName }: StepProps) {
   );
 }
 
-function Step8Save({ data, updateData, onSave, onSaveAndAssign, clients }: StepProps) {
+function Step8Save({ data, updateData, onSave, clients }: StepProps) {
+  const [showDetails, setShowDetails] = useState(true);
   const toggleTag = useCallback((tag: string) => updateData((prev) => { const next = prev.tags.includes(tag) ? prev.tags.filter((t) => t !== tag) : [...prev.tags, tag]; return { tags: next }; }), [updateData]);
   const selectedClient = clients?.find((c) => c.id === data.assignedClient);
+
+  const totalWeeks = useMemo(() => data.phases.filter((p) => p.active).reduce((s, p) => s + p.weeks, 0), [data.phases]);
+  const activeDays = useMemo(() => data.split.filter((d) => d.active).length, [data.split]);
+  const totalExercises = data.exercises.length;
+  const goalName = GOALS.find((g) => g.id === data.goal)?.name || '—';
+  const methodName = METHODS.find((m) => m.id === data.method)?.name || '—';
+  const clientName = selectedClient?.full_name || data.clientContext.experience || 'Unassigned';
+  const activePhases = data.phases.filter((p) => p.active);
+  const splitSummary = data.split
+    .map((d) => `${d.day} ${d.active ? (d.workout.split('—')[0].trim() || 'Workout') : 'Rest'}`)
+    .join(' • ');
+
   return (
     <div className="space-y-5">
+      {/* Final Review */}
+      <div>
+        <h3 className="text-[var(--page-text)] text-base font-bold mb-3 flex items-center gap-2"><Sparkles className="w-4 h-4 text-[#00AEEF]" />Final Review</h3>
+
+        {/* Program Details collapsible */}
+        <div className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] overflow-hidden mb-3">
+          <button onClick={() => setShowDetails((s) => !s)} className="flex w-full items-center justify-between px-4 py-3 text-left">
+            <span className="text-sm font-semibold text-[var(--page-text)]">Program Details</span>
+            <ChevronDownLocal open={showDetails} />
+          </button>
+          {showDetails && (
+            <div className="border-t border-[var(--card-border)] px-4 py-2">
+              {[
+                { k: 'Goal', v: goalName },
+                { k: 'Method', v: methodName },
+                { k: 'Client', v: clientName },
+                { k: 'Duration', v: `${totalWeeks} Weeks` },
+              ].map((r) => (
+                <div key={r.k} className="flex items-center justify-between py-2 border-b border-[var(--card-border)]/50 last:border-0">
+                  <span className="text-xs text-[var(--page-text)]/60">{r.k}</span>
+                  <span className="text-xs font-medium text-[#00AEEF]">{r.v}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Phase Overview */}
+        <div className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-3 mb-3">
+          <span className="text-xs text-[var(--page-text)]/60 block mb-1.5">Phase Overview</span>
+          <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium">
+            {activePhases.map((p, i) => (
+              <span key={p.id} className="flex items-center gap-1.5">
+                <span style={{ color: p.color }}>{p.name}</span>
+                {i < activePhases.length - 1 && <span className="text-[var(--page-text)]/40">→</span>}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Weekly Split summary */}
+        <div className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-3 mb-4">
+          <span className="text-xs text-[var(--page-text)]/60 block mb-1.5">Weekly Split</span>
+          <p className="text-xs text-[var(--page-text)]/80 leading-relaxed">{splitSummary}</p>
+        </div>
+
+        {/* Stat tiles */}
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          {[
+            { v: totalExercises, l: 'Exercises' },
+            { v: activeDays, l: 'Days/Week' },
+            { v: totalWeeks, l: 'Weeks Total' },
+          ].map((s) => (
+            <div key={s.l} className="rounded-xl border border-[var(--card-border)] bg-[var(--page-bg)] p-3 text-center">
+              <div className="text-xl font-bold font-mono text-[#00AEEF]">{s.v}</div>
+              <div className="text-[10px] text-[var(--page-text)]/60 mt-0.5">{s.l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Editable fields (kept) */}
       <div>
         <label className="text-[var(--page-text)] text-sm font-semibold mb-1.5 block">Program Name</label>
         <Input value={data.programName} onChange={(e) => updateData({ programName: e.target.value })} placeholder="e.g., 12-Week Hypertrophy Block" className="bg-[var(--card-bg)] border-[var(--card-border)] text-[var(--page-text)]" />
@@ -771,44 +921,33 @@ function Step8Save({ data, updateData, onSave, onSaveAndAssign, clients }: StepP
           <p className="text-[var(--page-text)]/60 text-xs mt-2">Selected client: <span className="text-[var(--page-text)] font-medium">{selectedClient.full_name}</span></p>
         )}
       </div>
-      <div className="flex flex-col sm:flex-row gap-3 pt-2">
-        <Button onClick={onSave} className="bg-[#00AEEF] hover:bg-[#0099D1] text-white font-semibold px-6"><Save className="w-4 h-4 mr-2" />Save Program</Button>
-        <Button onClick={onSaveAndAssign} className="bg-[#22C55E] hover:bg-[#1EAD4E] text-white font-semibold px-6"><Check className="w-4 h-4 mr-2" />Save & Assign</Button>
-        <Button variant="outline" onClick={onSaveAndAssign} className="border-[#00AEEF] text-[#00AEEF] hover:bg-[#00AEEF]/10 font-semibold px-6"><Play className="w-4 h-4 mr-2" />Open in Session</Button>
-        <Button variant="ghost" className="text-[#EF4444] hover:text-[#EF4444] hover:bg-[#EF4444]/10"><X className="w-4 h-4 mr-2" />Cancel</Button>
+
+      {/* Secondary draft save (Save & Assign is the wizard's primary action) */}
+      <div className="pt-2">
+        <Button variant="outline" onClick={onSave} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] font-semibold"><Save className="w-4 h-4 mr-2" />Save Program (draft)</Button>
       </div>
     </div>
   );
 }
 
-function FloatingSummary({ data, clientName }: { data: ProgramData; clientName?: string }) {
-  const totalWeeks = data.phases.filter((p) => p.active).reduce((s, p) => s + p.weeks, 0);
-  const activeDays = data.split.filter((d) => d.active).length;
-  const goalName = GOALS.find((g) => g.id === data.goal)?.name || '—';
-  const methodName = METHODS.find((m) => m.id === data.method)?.name || '—';
+function ChevronDownLocal({ open }: { open: boolean }) {
   return (
-    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 space-y-3 sticky top-4">
-      <h4 className="text-[var(--page-text)] text-sm font-bold flex items-center gap-2"><Target className="w-4 h-4 text-[#00AEEF]" />Current Selections</h4>
-      <div className="space-y-2 text-xs">
-        {[{ k: 'Goal', v: goalName }, { k: 'Method', v: methodName }, { k: 'Duration', v: `${totalWeeks} weeks` }, { k: 'Frequency', v: `${activeDays} days/wk` }, { k: 'Exercises', v: data.exercises.length }, { k: 'Weekly Hours', v: `${data.weeklyHours}h` }, { k: 'Client', v: clientName || data.clientContext.ageRange || '—' }].map((r) => (
-          <div key={r.k} className="flex justify-between"><span className="text-[var(--page-text)]/60">{r.k}</span><span className="text-[var(--page-text)] font-medium">{r.v}</span></div>
-        ))}
-      </div>
-    </motion.div>
+    <svg className={cn('w-4 h-4 text-[var(--page-text)]/60 transition-transform', open ? 'rotate-180' : '')} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
   );
 }
 
 export default function AIProgramBuilderPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const profile = useMemo(() => loadClientProfile(), []);
   const [data, setData] = useState<ProgramData>(defaultData);
-  const [openSteps, setOpenSteps] = useState<Record<number, boolean>>({ 0: true });
+  const [currentStep, setCurrentStep] = useState(0);
+  const [maxStep, setMaxStep] = useState(0);
   const [savedList, setSavedList] = useState<SavedProgram[]>([]);
   const [saveFlash, setSaveFlash] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [program, setProgram] = useState<GeneratedProgram | null>(null);
   const [clients, setClients] = useState<ClientRow[]>([]);
+  const [buildForClient, setBuildForClient] = useState('');
   const [legacySaved, setLegacySaved] = useState<LegacySavedProgram[]>(() => {
     try {
       const raw = localStorage.getItem(PROGRAMS_STORAGE_KEY);
@@ -825,6 +964,7 @@ export default function AIProgramBuilderPage() {
   const updateData = useCallback((partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => setData((prev) => ({ ...prev, ...(typeof partial === 'function' ? partial(prev) : partial) })), []);
   const selectedClient = useMemo(() => clients.find((c) => c.id === data.assignedClient), [clients, data.assignedClient]);
   const selectedClientName = selectedClient?.full_name || 'Unassigned';
+  const buildForClientRow = useMemo(() => clients.find((c) => c.id === buildForClient), [clients, buildForClient]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -832,13 +972,11 @@ export default function AIProgramBuilderPage() {
     const load = async () => {
       const { data: rows, error } = await supabase
         .from('clients')
-        .select('id, full_name, email, date_of_birth, experience_level')
+        .select('id, full_name, email, date_of_birth, experience_level, fitness_goal, intake_profile')
         .eq('trainer_id', user.id)
         .neq('status', 'archived')
         .order('full_name', { ascending: true });
-      if (!cancelled) {
-        if (!error && rows) setClients(rows as ClientRow[]);
-      }
+      if (!cancelled && !error && rows) setClients(rows as unknown as ClientRow[]);
     };
     load();
     return () => { cancelled = true; };
@@ -849,9 +987,26 @@ export default function AIProgramBuilderPage() {
     loadSavedPrograms(user.id).then(setSavedList).catch((err) => console.error('Failed to load saved programs:', err));
   }, [user]);
 
-  const handleAutoGenerate = useCallback(() => { setGenerating(true); const p = profile || { trainingFrequency: 3, trainingExperience: 'intermediate', primaryGoal: 'build_muscle', availableEquipment: ['Full Gym'], preferredStyle: ['Free Weights'] }; setTimeout(() => { const generated = generateProgram(p); setProgram(generated); setData(mapGeneratedToProgramData(generated, profile)); setGenerating(false); setOpenSteps({ 6: true }); saveGeneratedProgram(generated); }, 1500); }, [profile, setData]);
-  const handleReset = useCallback(() => { setData(defaultData); setProgram(null); setOpenSteps({ 0: true }); }, []);
-  const toggleStep = useCallback((idx: number) => setOpenSteps((prev) => ({ ...prev, [idx]: !prev[idx] })), []);
+  const generationProfile = useMemo<ClientProfile>(() => {
+    if (buildForClientRow) return profileFromClient(buildForClientRow);
+    return loadClientProfile() || DEFAULT_PROFILE;
+  }, [buildForClientRow]);
+
+  const handleAutoGenerate = useCallback(() => {
+    setGenerating(true);
+    const p = generationProfile;
+    setTimeout(() => {
+      const generated = generateProgram(p);
+      setProgram(generated);
+      setData(mapGeneratedToProgramData(generated, p));
+      setGenerating(false);
+      setCurrentStep(6);
+      setMaxStep((s) => Math.max(s, 6));
+      saveGeneratedProgram(generated);
+    }, 1500);
+  }, [generationProfile]);
+
+  const handleReset = useCallback(() => { setData(defaultData); setProgram(null); setCurrentStep(0); setMaxStep(0); }, []);
   const handleSave = useCallback(async () => {
     if (!user?.id) return;
     const assignedClientId = data.assignedClient || null;
@@ -911,31 +1066,48 @@ export default function AIProgramBuilderPage() {
     toast.success(`Imported ${imported} of ${legacySaved.length} legacy programs${failed > 0 ? ` (${failed} failed)` : ''}`);
   }, [legacySaved, user]);
   const dismissLegacy = useCallback(() => { localStorage.removeItem(PROGRAMS_STORAGE_KEY); setLegacySaved([]); }, []);
+  const loadSavedProgram = useCallback((saved: SavedProgram) => { setData(saved.data); setCurrentStep(6); setMaxStep((s) => Math.max(s, 6)); }, []);
+
   const stepComplete = useMemo(() => [!!data.goal, !!data.method, !!(data.clientContext.ageRange && data.clientContext.experience), data.phases.some((p) => p.active), data.split.some((d) => d.active), data.exercises.length > 0, !!(data.goal && data.method), !!data.programName], [data]);
   const completionPercent = useMemo(() => Math.round((stepComplete.filter(Boolean).length / stepComplete.length) * 100), [stepComplete]);
-  const loadSavedProgram = useCallback((saved: SavedProgram) => { setData(saved.data); setOpenSteps({ 6: true }); }, []);
+
+  const CurrentComponent = STEPS[currentStep].component;
+  const isFinalStep = currentStep === STEPS.length - 1;
+  const generateHint = buildForClientRow ? `Tailored to ${buildForClientRow.full_name}'s intake profile` : 'Generic template';
+
+  const goNext = () => {
+    if (isFinalStep) { handleSaveAndAssign(); return; }
+    if (!stepComplete[currentStep]) return;
+    setCurrentStep((s) => {
+      const n = Math.min(STEPS.length - 1, s + 1);
+      setMaxStep((m) => Math.max(m, n));
+      return n;
+    });
+  };
+  const goBack = () => setCurrentStep((s) => Math.max(0, s - 1));
+
   return (
-    <div className="min-h-screen bg-[var(--page-bg)] text-[var(--page-text)]">
+    // Dark-mode-only page: the data-theme="dark" wrapper forces the app's
+    // dark CSS vars (page/card/border + shadcn tokens) for the whole subtree.
+    <div data-theme="dark" className="min-h-screen bg-[var(--page-bg)] text-[var(--page-text)]">
+      {/* Header */}
       <div className="border-b border-[var(--card-border)] bg-[var(--card-bg)] sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <button onClick={() => navigate('/dashboard')} className="p-2 rounded-lg hover:bg-[var(--page-bg)] transition-colors"><ArrowLeft className="w-5 h-5 text-[var(--page-text)]/60" /></button>
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#8B5CF6] to-[#00AEEF] flex items-center justify-center"><Zap className="w-4 h-4 text-white" /></div>
-                  <h1 className="text-xl font-bold text-[var(--page-text)]">All-in-One Program Creator</h1>
-                </div>
-                <p className="text-[var(--page-text)]/60 text-sm">Design complete training programs with AI-powered recommendations</p>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#8B5CF6] to-[#00AEEF] flex items-center justify-center"><Zap className="w-4 h-4 text-white" /></div>
+                <h1 className="text-lg sm:text-xl font-bold">All-in-One Program Creator</h1>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={handleAutoGenerate} disabled={generating} className="bg-gradient-to-r from-[#8B5CF6] to-[#00AEEF] hover:from-[#7C4FE4] hover:to-[#0099D1] text-white text-xs font-semibold px-4">
-                {generating ? <span className="flex items-center gap-2"><span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Generating...</span> : <><Bot className="w-4 h-4 mr-1.5" />Auto-Generate Full Program</>}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={handleAutoGenerate} disabled={generating} className="bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] text-xs font-bold px-4">
+                {generating ? <span className="flex items-center gap-2"><span className="w-3.5 h-3.5 border-2 border-[#0B1120]/30 border-t-[#0B1120] rounded-full animate-spin" />Generating...</span> : <><Bot className="w-4 h-4 mr-1.5" />Auto-Generate Program</>}
               </Button>
               <Button variant="outline" size="sm" onClick={handleSave} className={`border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs transition-all ${saveFlash ? 'border-[#22C55E] text-[#22C55E]' : ''}`}><Save className="w-3.5 h-3.5 mr-1" />{saveFlash ? 'Saved!' : 'Save Program'}</Button>
               {savedList.length > 0 && (
-                <select value="" onChange={(e) => { const saved = savedList.find((p) => p.id === e.target.value); if (saved) loadSavedProgram(saved); }} className="h-9 bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--page-text)] text-xs rounded-lg px-3 focus:outline-none focus:border-[#00AEEF]">
+                <select value="" onChange={(e) => { const saved = savedList.find((p) => p.id === e.target.value); if (saved) loadSavedProgram(saved); }} className="h-9 bg-[var(--page-bg)] border border-[var(--card-border)] text-[var(--page-text)] text-xs rounded-lg px-3 focus:outline-none focus:border-[#00AEEF]">
                   <option value="">Load Saved...</option>
                   {savedList.map((p) => <option key={p.id} value={p.id}>{p.data.programName || 'Untitled'}</option>)}
                 </select>
@@ -943,15 +1115,27 @@ export default function AIProgramBuilderPage() {
               <Button variant="ghost" size="sm" onClick={handleReset} className="text-[var(--page-text)]/60 hover:text-[#EF4444] hover:bg-[#EF4444]/10 text-xs"><RotateCcw className="w-3.5 h-3.5 mr-1" />Reset</Button>
             </div>
           </div>
+
+          {/* Build for client selector + hint */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Users className="w-4 h-4 text-[#00AEEF]" />
+            <span className="text-xs text-[var(--page-text)]/60">Build for client:</span>
+            <select value={buildForClient} onChange={(e) => setBuildForClient(e.target.value)} className="bg-[var(--page-bg)] border border-[var(--card-border)] text-[var(--page-text)] text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#00AEEF]">
+              <option value="">Generic template</option>
+              {clients.map((c) => <option key={c.id} value={c.id}>{c.full_name}</option>)}
+            </select>
+            <span className="text-[11px] text-[#00AEEF]">{generateHint}</span>
+          </div>
         </div>
       </div>
 
-      <div className="border-b border-[var(--card-border)] bg-[var(--card-bg)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          {legacySaved.length > 0 && (
-            <div className="mb-4 flex flex-col items-start justify-between gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center" style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }}>
+      {/* Legacy import banner */}
+      {legacySaved.length > 0 && (
+        <div className="border-b border-[var(--card-border)] bg-[var(--card-bg)]">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3">
+            <div className="flex flex-col items-start justify-between gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center" style={{ backgroundColor: 'var(--page-bg)', borderColor: 'var(--card-border)' }}>
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: 'var(--page-bg)' }}>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: 'var(--card-bg)' }}>
                   <Upload className="h-5 w-5 text-[#00AEEF]" />
                 </div>
                 <div>
@@ -964,48 +1148,69 @@ export default function AIProgramBuilderPage() {
                 <Button variant="outline" size="sm" onClick={dismissLegacy} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs">Dismiss</Button>
               </div>
             </div>
-          )}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            <Sparkles className="w-4 h-4 text-[#8B5CF6] shrink-0" />
-            <span className="text-[var(--page-text)]/60 text-xs font-medium mr-2 shrink-0">AI Quick Actions:</span>
-            {STEPS.map((step, idx) => <button key={idx} onClick={() => setOpenSteps({ [idx]: true })} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--page-bg)] border border-[var(--card-border)] hover:border-[#8B5CF6] hover:text-[#8B5CF6] transition-colors text-[var(--page-text)]/60 text-[10px] whitespace-nowrap"><Bot className="w-3 h-3" />{step.title.split(' ')[0]}</button>)}
           </div>
         </div>
-      </div>
+      )}
 
+      {/* Progress bar + step dots */}
       <div className="border-b border-[var(--card-border)] bg-[var(--card-bg)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center gap-3">
-            <span className="text-[var(--page-text)]/60 text-xs font-medium whitespace-nowrap">Completion: <span className="text-[var(--page-text)] font-mono font-bold">{completionPercent}%</span></span>
-            <div className="flex-1 bg-[var(--page-bg)] rounded-full h-2.5 border border-[var(--card-border)]"><motion.div initial={{ width: 0 }} animate={{ width: `${completionPercent}%` }} transition={{ duration: 0.5 }} className="h-full rounded-full bg-gradient-to-r from-[#00AEEF] via-[#8B5CF6] to-[#22C55E]" /></div>
-            <span className="text-[var(--page-text)]/60 text-[10px] font-mono">{stepComplete.filter(Boolean).length}/{stepComplete.length}</span>
+            <span className="text-sm font-bold whitespace-nowrap">{STEPS[currentStep].title}</span>
+            <div className="flex-1 bg-[var(--page-bg)] rounded-full h-2 border border-[var(--card-border)]"><motion.div initial={{ width: 0 }} animate={{ width: `${completionPercent}%` }} transition={{ duration: 0.4 }} className="h-full rounded-full bg-[#00AEEF]" /></div>
+            <span className="text-xs font-mono text-[var(--page-text)]/60">{completionPercent}%</span>
+          </div>
+          <div className="mt-3 flex items-center gap-1 overflow-x-auto pb-1">
+            {STEPS.map((s, idx) => {
+              const complete = stepComplete[idx];
+              const reached = idx <= maxStep;
+              const isCurrent = idx === currentStep;
+              return (
+                <div key={idx} className="flex items-center">
+                  <button
+                    onClick={() => reached && setCurrentStep(idx)}
+                    disabled={!reached}
+                    aria-label={s.title}
+                    className={cn('w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold border transition-all shrink-0',
+                      isCurrent ? 'border-[#00AEEF] text-[#00AEEF] bg-[#00AEEF]/10' :
+                      complete ? 'bg-[#00AEEF] border-[#00AEEF] text-[#0B1120]' :
+                      'border-[var(--card-border)] text-[var(--page-text)]/40',
+                      reached && !isCurrent ? 'cursor-pointer hover:border-[#00AEEF]/60' : 'cursor-default opacity-70')}
+                  >
+                    {complete && !isCurrent ? <Check className="w-3.5 h-3.5" /> : idx + 1}
+                  </button>
+                  {idx < STEPS.length - 1 && <div className="w-3 h-px bg-[var(--card-border)]" />}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex flex-col lg:flex-row gap-6">
-          <div className="flex-1 space-y-3">
-            {STEPS.map((step, idx) => { const Component = step.component; const isOpen = !!openSteps[idx]; const isComplete = stepComplete[idx]; return (
-              <div key={idx} className="rounded-xl overflow-hidden">
-                <StepHeader step={idx + 1} title={step.title} isOpen={isOpen} isComplete={isComplete} onToggle={() => toggleStep(idx)} />
-                <AnimatePresence>
-                  {isOpen && (
-                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }} className="overflow-hidden">
-                      <div className="bg-[var(--card-bg)] border border-t-0 border-[var(--card-border)] rounded-b-xl p-4 sm:p-5">
-                        <Component data={data} updateData={updateData} program={program} onSave={handleSave} onSaveAndAssign={handleSaveAndAssign} clientName={selectedClientName} clients={clients} />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ); })}
-          </div>
-          <div className="w-full lg:w-64 shrink-0"><FloatingSummary data={data} clientName={selectedClientName} /></div>
+      {/* Current step */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+        <AnimatePresence mode="wait">
+          <motion.div key={currentStep} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.2 }}>
+            <CurrentComponent data={data} updateData={updateData} program={program} onSave={handleSave} onSaveAndAssign={handleSaveAndAssign} clientName={selectedClientName} clients={clients} />
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Back / Next */}
+        <div className="mt-6 flex items-center justify-end gap-3">
+          <Button variant="outline" onClick={goBack} disabled={currentStep === 0} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] disabled:opacity-50">
+            Back
+          </Button>
+          {isFinalStep ? (
+            <Button onClick={goNext} className="bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] font-bold px-6">
+              <Check className="w-4 h-4 mr-1.5" />Save &amp; Assign Program
+            </Button>
+          ) : (
+            <Button onClick={goNext} disabled={!stepComplete[currentStep]} className="bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] font-bold px-6 disabled:opacity-50">
+              Next: {STEPS[currentStep + 1]?.title}
+            </Button>
+          )}
         </div>
       </div>
     </div>
   );
 }
-
-
