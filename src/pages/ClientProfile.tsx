@@ -28,9 +28,6 @@ import {
 import type { Client, ClientNote, ClientGeneratedProgram } from "@/types/client";
 import {
   getClientNutritionPlan,
-  getClientBioHistory,
-  getClientWorkoutLogs,
-  getClientScheduleEvents,
   getClientNotes,
   saveClientNotes,
 } from "@/lib/client-demo";
@@ -331,9 +328,6 @@ export default function ClientProfile() {
   }
 
   const nutritionPlan = getClientNutritionPlan(client.id);
-  const bioHistory = getClientBioHistory(client.id);
-  const workoutLogs = getClientWorkoutLogs(client.id);
-  const scheduleEvents = getClientScheduleEvents(client.id);
 
   return (
     <div
@@ -394,14 +388,12 @@ export default function ClientProfile() {
             {activeTab === "overview" && (
               <OverviewTab client={client} clientId={clientId!} nutritionPlan={nutritionPlan} />
             )}
-            {activeTab === "bio" && <BioHistoryTab entries={bioHistory} />}
+            {activeTab === "bio" && <BioHistoryTab clientId={client.id} />}
             {activeTab === "nutrition" && (
               <NutritionTab clientId={client.id} clientEmail={client.email} />
             )}
-            {activeTab === "workouts" && <WorkoutLogsTab logs={workoutLogs} />}
-            {activeTab === "schedule" && (
-              <ScheduleTab events={scheduleEvents} />
-            )}
+            {activeTab === "workouts" && <WorkoutLogsTab clientId={client.id} />}
+            {activeTab === "schedule" && <ScheduleTab clientEmail={client.email} />}
             {activeTab === "programs" && (
               <ProgramsTab programs={programs} onStartWorkout={handleStartWorkout} />
             )}

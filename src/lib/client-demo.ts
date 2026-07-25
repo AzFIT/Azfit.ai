@@ -2,9 +2,6 @@ import type {
   Client,
   ClientNote,
   ClientNutritionPlan,
-  ClientBioEntry,
-  ClientWorkoutLog,
-  ClientScheduleEvent,
   ClientGeneratedProgram,
 } from "@/types/client";
 import { getClientAssignedPrograms } from "@/lib/storage";
@@ -52,136 +49,6 @@ const demoNutritionPlan: ClientNutritionPlan = {
   mealCount: 4,
   createdAt: Date.now(),
 };
-
-const demoBioHistory: ClientBioEntry[] = [
-  {
-    id: "bio-1",
-    date: "2025-03-15",
-    weight: 86.2,
-    bodyFatPercentage: 16.5,
-    bmi: 26.7,
-    waistCm: 86,
-    measurements: { chest: 102, waist: 86, hips: 98, arms: 36, thighs: 58 },
-    notes: "Starting point",
-  },
-  {
-    id: "bio-2",
-    date: "2025-04-01",
-    weight: 85.1,
-    bodyFatPercentage: 15.8,
-    bmi: 26.3,
-    waistCm: 85,
-  },
-  {
-    id: "bio-3",
-    date: "2025-04-15",
-    weight: 84.3,
-    bodyFatPercentage: 15.2,
-    bmi: 26.0,
-    waistCm: 84,
-  },
-  {
-    id: "bio-4",
-    date: "2025-05-01",
-    weight: 83.5,
-    bodyFatPercentage: 14.8,
-    bmi: 25.7,
-    waistCm: 83,
-    notes: "Feeling strong, good recovery",
-  },
-  {
-    id: "bio-5",
-    date: "2025-05-15",
-    weight: 82.9,
-    bodyFatPercentage: 14.5,
-    bmi: 25.5,
-    waistCm: 82.5,
-  },
-  {
-    id: "bio-6",
-    date: "2025-06-01",
-    weight: 82.5,
-    bodyFatPercentage: 14.2,
-    bmi: 25.4,
-    waistCm: 82,
-    notes: "Feeling strong, good recovery",
-  },
-];
-
-const demoWorkoutLogs: ClientWorkoutLog[] = [
-  {
-    id: "log-1",
-    programId: "prog-1",
-    clientId: DEMO_CLIENT_ID,
-    clientName: "Alex Chen",
-    workoutName: "FULL BODY 1",
-    phaseName: "Phase 1: GBC Accumulation",
-    weekNumber: 1,
-    dayNumber: 1,
-    date: "2025-06-10",
-    exercises: [
-      {
-        order: "A1",
-        name: "Chin up - Semi supinated",
-        category: "PULLING",
-        muscleGroup: "Back",
-        targetSets: 2,
-        targetReps: "10",
-        targetLoad: 0,
-        tempo: "3-2-1-2",
-        sets: [
-          {
-            setNumber: 1,
-            load: 0,
-            weight: 0,
-            reps: 10,
-            rpe: 8,
-            done: true,
-            restSeconds: 45,
-            type: "Normal",
-          },
-          {
-            setNumber: 2,
-            load: 0,
-            weight: 0,
-            reps: 9,
-            rpe: 9,
-            done: true,
-            restSeconds: 45,
-            type: "Normal",
-          },
-        ],
-      },
-    ],
-    startTime: "2025-06-10T07:30:00Z",
-    endTime: "2025-06-10T08:20:00Z",
-    durationSeconds: 3000,
-    durationMinutes: 50,
-    caloriesBurned: 450,
-    totalVolume: 2840,
-    totalSets: 8,
-    completedSets: 8,
-    completed: true,
-    avgRpe: 7.8,
-    status: "completed",
-    notes: "Felt strong throughout the session.",
-    createdAt: "2025-06-10T07:30:00Z",
-  },
-];
-
-const demoScheduleEvents: ClientScheduleEvent[] = [
-  {
-    id: "evt-1",
-    title: "PT with Alex Chen",
-    date: "2025-06-11",
-    startTime: "07:00",
-    endTime: "08:00",
-    type: "session",
-    clientId: DEMO_CLIENT_ID,
-    clientName: "Alex Chen",
-    description: "Leg day focus",
-  },
-];
 
 const demoGeneratedProgram: ClientGeneratedProgram = {
   id: "ai-prog-1",
@@ -285,44 +152,6 @@ export function getClientNutritionPlan(
     // ignore
   }
   return null;
-}
-
-export function getClientBioHistory(clientId: string): ClientBioEntry[] {
-  if (clientId === DEMO_CLIENT_ID) return demoBioHistory;
-  try {
-    const raw = localStorage.getItem("azfit_bio_history");
-    if (raw) return JSON.parse(raw) as ClientBioEntry[];
-  } catch {
-    // ignore
-  }
-  return [];
-}
-
-export function getClientWorkoutLogs(clientId: string): ClientWorkoutLog[] {
-  if (clientId === DEMO_CLIENT_ID) return demoWorkoutLogs;
-  try {
-    const raw = localStorage.getItem("azfit_workout_logs");
-    if (raw) return JSON.parse(raw) as ClientWorkoutLog[];
-  } catch {
-    // ignore
-  }
-  return [];
-}
-
-export function getClientScheduleEvents(
-  clientId: string,
-): ClientScheduleEvent[] {
-  if (clientId === DEMO_CLIENT_ID) return demoScheduleEvents;
-  try {
-    const raw = localStorage.getItem("azfit_schedule_events");
-    if (raw) {
-      const events = JSON.parse(raw) as ClientScheduleEvent[];
-      return events.filter((event) => event.clientId === clientId);
-    }
-  } catch {
-    // ignore
-  }
-  return [];
 }
 
 export function getClientPrograms(clientId: string): ClientGeneratedProgram[] {

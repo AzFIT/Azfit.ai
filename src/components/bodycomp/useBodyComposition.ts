@@ -83,11 +83,12 @@ function useResolvedClientId(propClientId?: string) {
   return { clientId, hasRecord, resolving: resolving || authLoading };
 }
 
-export function useBodyComposition(propClientId?: string) {
+export function useBodyComposition(propClientId?: string, options?: { skipLegacyMigration?: boolean }) {
   const { user } = useAuth();
   const userId = user?.id || null;
   const { clientId, hasRecord: hasClientRecord, resolving } = useResolvedClientId(propClientId);
-  const [loading, setLoading] = useState(false);
+  const skipLegacyMigration = options?.skipLegacyMigration ?? false;
+  const [loading, setLoading] = useState(!!propClientId);
   const [bodyComposition, setBodyComposition] = useState<BodyCompositionRow[]>([]);
   const [assessments, setAssessments] = useState<SkinfoldAssessmentRow[]>([]);
   const [migrated, setMigrated] = useState(false);
@@ -125,9 +126,9 @@ export function useBodyComposition(propClientId?: string) {
     }
   }, [clientId]);
 
-  /* ── One-time migration from localStorage ──────────────────────────── */
+  /* ── One-time migration from localStorage (own record only) ────────── */
   useEffect(() => {
-    if (!clientId || migrated) return;
+    if (!clientId || migrated || skipLegacyMigration) return;
 
     const flag = localStorage.getItem(MIGRATION_FLAG);
     if (flag === "1") {
@@ -187,7 +188,7 @@ export function useBodyComposition(propClientId?: string) {
     return () => {
       cancelled = true;
     };
-  }, [clientId, migrated, fetchData]);
+  }, [clientId, migrated, fetchData, skipLegacyMigration]);
 
   /* ── Initial fetch ───────────────────────────────────────────────── */
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   TrendingUp,
@@ -9,7 +9,7 @@ import {
   Percent,
   Calendar,
 } from "lucide-react";
-import type { ClientBioEntry } from "@/types/client";
+import { useBodyComposition } from "@/components/bodycomp/useBodyComposition";
 import {
   LineChart,
   Line,
@@ -21,13 +21,104 @@ import {
 } from "recharts";
 
 interface BioHistoryTabProps {
-  entries: ClientBioEntry[];
+  clientId: string; // clients.id — body_composition / skinfold_assessments key on it
 }
 
-export default function BioHistoryTab({ entries }: BioHistoryTabProps) {
-  const [activeMetric, setActiveMetric] = useState<
-    "weight" | "bodyFat" | "bmi" | "waist"
-  >("weight");
+interface DisplayEntry {
+  id: string;
+  date: string;
+  weight: number | null;
+  bodyFatPercentage: number | null;
+  bmi: number | null;
+  waistCm: number | null;
+}
+
+type MetricKey = "weight" | "bodyFat" | "bmi" | "waist";
+
+function metricValue(e: DisplayEntry, key: MetricKey): number | null {
+  switch (key) {
+    case "weight":
+      return e.weight;
+    case "bodyFat":
+      return e.bodyFatPercentage;
+    case "bmi":
+      return e.bmi;
+    case "waist":
+      return e.waistCm;
+  }
+}
+
+export default function BioHistoryTab({ clientId }: BioHistoryTabProps) {
+  const [activeMetric, setActiveMetric] = useState<MetricKey>("weight");
+  // skipLegacyMigration: this view opens OTHER clients' records — a legacy
+  // localStorage import must never write into the viewed client's rows.
+  const { history, loading } = useBodyComposition(clientId, {
+    skipLegacyMigration: true,
+  });
+
+  // Show the spinner until the first fetch completes — the hook reports
+  // loading=true from mount when a clientId is provided.
+  const showSpinner = loading;
+
+  const entries = useMemo<DisplayEntry[]>(
+    () =>
+      history
+        .map((item): DisplayEntry => {
+          if (item.kind === "body_composition") {
+            const d = item.data;
+            return {
+              id: item.id,
+              date: item.date,
+              weight: d.weight_kg,
+              bodyFatPercentage: d.body_fat_percentage,
+              bmi: d.bmi,
+              waistCm: d.waist_cm,
+            };
+          }
+          const d = item.data;
+          return {
+            id: item.id,
+            date: item.date,
+            weight: d.weight_kg,
+            bodyFatPercentage: d.body_fat_pct,
+            bmi: null,
+            waistCm: null,
+          };
+        })
+        .filter(
+          (e) =>
+            e.weight != null ||
+            e.bodyFatPercentage != null ||
+            e.bmi != null ||
+            e.waistCm != null,
+        ),
+    [history],
+  );
+
+  const sorted = useMemo(
+    () =>
+      [...entries].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+      ),
+    [entries],
+  );
+
+  if (showSpinner) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div
+            key={i}
+            className="h-20 animate-pulse rounded-2xl border"
+            style={{
+              backgroundColor: "var(--card-bg)",
+              borderColor: "var(--card-border)",
+            }}
+          />
+        ))}
+      </div>
+    );
+  }
 
   if (entries.length === 0) {
     return (
@@ -49,11 +140,12 @@ export default function BioHistoryTab({ entries }: BioHistoryTabProps) {
     );
   }
 
-  const sorted = [...entries].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-  );
-  const latest = sorted[sorted.length - 1];
-  const previous = sorted.length > 1 ? sorted[sorted.length - 2] : null;
+  const latestWithMetric = [...sorted]
+    .reverse()
+    .find((e) => metricValue(e, activeMetric) != null);
+  const previousWithMetric = [...sorted]
+    .reverse()
+    .filter((e) => metricValue(e, activeMetric) != null)[1];
 
   const chartData = sorted.map((e) => ({
     date: new Date(e.date).toLocaleDateString("en-US", {
@@ -73,24 +165,15 @@ export default function BioHistoryTab({ entries }: BioHistoryTabProps) {
     waist: { label: "Waist", unit: "cm", color: "#F59E0B", icon: Ruler },
   };
 
+  const latestValue = latestWithMetric
+    ? metricValue(latestWithMetric, activeMetric)
+    : null;
+  const previousValue = previousWithMetric
+    ? metricValue(previousWithMetric, activeMetric)
+    : null;
   const change =
-    previous && latest
-      ? +(
-          latest[
-            activeMetric === "bodyFat"
-              ? "bodyFatPercentage"
-              : activeMetric === "waist"
-                ? "waistCm"
-                : activeMetric
-          ]! -
-          previous[
-            activeMetric === "bodyFat"
-              ? "bodyFatPercentage"
-              : activeMetric === "waist"
-                ? "waistCm"
-                : activeMetric
-          ]!
-        ).toFixed(1)
+    latestValue != null && previousValue != null
+      ? +(latestValue - previousValue).toFixed(1)
       : 0;
 
   return (
@@ -150,15 +233,7 @@ export default function BioHistoryTab({ entries }: BioHistoryTabProps) {
               className="text-2xl font-bold"
               style={{ color: metricConfig[activeMetric].color }}
             >
-              {
-                latest[
-                  activeMetric === "bodyFat"
-                    ? "bodyFatPercentage"
-                    : activeMetric === "waist"
-                      ? "waistCm"
-                      : activeMetric
-                ]
-              }
+              {latestValue != null ? latestValue : "—"}
               <span
                 className="text-sm font-normal ml-1"
                 style={{ color: "var(--light-text-muted)" }}
@@ -235,6 +310,7 @@ export default function BioHistoryTab({ entries }: BioHistoryTabProps) {
                 strokeWidth={2}
                 dot={{ fill: metricConfig[activeMetric].color, r: 3 }}
                 activeDot={{ r: 5 }}
+                connectNulls
               />
             </LineChart>
           </ResponsiveContainer>
@@ -312,25 +388,27 @@ export default function BioHistoryTab({ entries }: BioHistoryTabProps) {
                     className="px-3 py-2 font-medium"
                     style={{ color: "#0D9488" }}
                   >
-                    {entry.weight} kg
+                    {entry.weight != null ? `${entry.weight} kg` : "—"}
                   </td>
                   <td
                     className="px-3 py-2 font-medium"
                     style={{ color: "#8B5CF6" }}
                   >
-                    {entry.bodyFatPercentage}%
+                    {entry.bodyFatPercentage != null
+                      ? `${entry.bodyFatPercentage}%`
+                      : "—"}
                   </td>
                   <td
                     className="px-3 py-2 font-medium"
                     style={{ color: "#06B6D4" }}
                   >
-                    {entry.bmi}
+                    {entry.bmi != null ? entry.bmi : "—"}
                   </td>
                   <td
                     className="px-3 py-2 font-medium"
                     style={{ color: "#F59E0B" }}
                   >
-                    {entry.waistCm} cm
+                    {entry.waistCm != null ? `${entry.waistCm} cm` : "—"}
                   </td>
                 </tr>
               ))}

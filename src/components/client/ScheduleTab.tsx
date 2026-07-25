@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { ElementType } from "react";
 import { motion } from "framer-motion";
 import {
@@ -12,14 +12,77 @@ import {
   Video,
   MessageSquare,
 } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
 import type { ClientScheduleEvent } from "@/types/client";
+import type { Database } from "@/types/supabase";
+
+type SessionRow = Database["public"]["Tables"]["sessions"]["Row"];
 
 interface ScheduleTabProps {
-  events: ClientScheduleEvent[];
+  clientEmail: string; // sessions.client_id references profiles(id) — resolved via email
 }
 
-export default function ScheduleTab({ events }: ScheduleTabProps) {
+export default function ScheduleTab({ clientEmail }: ScheduleTabProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [events, setEvents] = useState<ClientScheduleEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [noProfile, setNoProfile] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!clientEmail) return;
+    setLoading(true);
+    try {
+      const { data: prof, error: profErr } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("email", clientEmail)
+        .maybeSingle();
+      if (profErr) throw profErr;
+      if (!prof) {
+        setNoProfile(true);
+        setEvents([]);
+        return;
+      }
+
+      const { data: rows, error } = await supabase
+        .from("sessions")
+        .select("*")
+        .eq("client_id", prof.id)
+        .neq("status", "cancelled")
+        .order("starts_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+
+      const mapped: ClientScheduleEvent[] = ((rows as SessionRow[]) || []).map(
+        (s) => ({
+          id: s.id,
+          title: s.title,
+          date: s.starts_at.split("T")[0],
+          startTime: s.starts_at,
+          endTime: s.ends_at,
+          type: "session",
+          clientId: prof.id,
+          clientName: (prof as { full_name?: string | null }).full_name || "",
+          location: s.location ?? undefined,
+          description: s.notes ?? undefined,
+        }),
+      );
+      setEvents(mapped);
+    } catch (err) {
+      toast.error(
+        "Failed to load schedule: " +
+          (err instanceof Error ? err.message : "Unknown error"),
+      );
+      setEvents([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [clientEmail]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -44,6 +107,7 @@ export default function ScheduleTab({ events }: ScheduleTabProps) {
     string,
     { icon: ElementType; color: string; bg: string }
   > = {
+    session: { icon: Calendar, color: "#00AEEF", bg: "rgba(0,174,239,0.1)" },
     workout: { icon: Dumbbell, color: "#0D9488", bg: "rgba(13,148,136,0.1)" },
     checkin: { icon: User, color: "#8B5CF6", bg: "rgba(139,92,246,0.1)" },
     call: { icon: Video, color: "#06B6D4", bg: "rgba(6,182,212,0.1)" },
@@ -53,6 +117,43 @@ export default function ScheduleTab({ events }: ScheduleTabProps) {
       bg: "rgba(245,158,11,0.1)",
     },
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div
+            key={i}
+            className="h-20 animate-pulse rounded-2xl border"
+            style={{
+              backgroundColor: "var(--card-bg)",
+              borderColor: "var(--card-border)",
+            }}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (noProfile) {
+    return (
+      <div
+        className="flex flex-col items-center justify-center rounded-2xl border py-12"
+        style={{
+          backgroundColor: "var(--card-bg)",
+          borderColor: "var(--card-border)",
+        }}
+      >
+        <Calendar size={32} style={{ color: "var(--light-text-muted)" }} />
+        <p
+          className="mt-2 text-sm font-medium"
+          style={{ color: "var(--light-text-muted)" }}
+        >
+          No linked app account for this client yet
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -148,7 +249,7 @@ export default function ScheduleTab({ events }: ScheduleTabProps) {
                 </div>
                 <div className="mt-1 space-y-0.5">
                   {dayEvents.slice(0, 2).map((e) => {
-                    const cfg = typeConfig[e.type] || typeConfig.workout;
+                    const cfg = typeConfig[e.type] || typeConfig.session;
                     return (
                       <div
                         key={e.id}
@@ -200,7 +301,7 @@ export default function ScheduleTab({ events }: ScheduleTabProps) {
             )
             .slice(0, 5)
             .map((event) => {
-              const cfg = typeConfig[event.type] || typeConfig.workout;
+              const cfg = typeConfig[event.type] || typeConfig.session;
               const Icon = cfg.icon;
               return (
                 <div
