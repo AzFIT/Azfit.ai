@@ -438,7 +438,12 @@ function getAllExercisesFlat(): string[] {
 
 export function saveGeneratedProgram(program: GeneratedProgram): void {
   const key = 'azfit_generated_programs';
-  const existing = JSON.parse(localStorage.getItem(key) || '[]') as GeneratedProgram[];
+  let existing: GeneratedProgram[] = [];
+  try {
+    existing = JSON.parse(localStorage.getItem(key) || '[]') as GeneratedProgram[];
+  } catch {
+    existing = [];
+  }
   existing.push(program);
   localStorage.setItem(key, JSON.stringify(existing));
 }
