@@ -42,7 +42,7 @@ export interface UploadMeta {
 function rowToPhoto(
   row: OwnerRow | MetadataRow,
   url: string,
-  isTrainer: boolean
+  trainerNotes?: string | null
 ): ProgressPhoto {
   return {
     id: row.id,
@@ -53,7 +53,7 @@ function rowToPhoto(
     weightKg: row.weight_kg,
     bodyFatPct: row.body_fat_pct,
     notes: row.notes,
-    trainerNotes: isTrainer ? (row as MetadataRow).trainer_notes : undefined,
+    trainerNotes: trainerNotes ?? undefined,
     isMilestone: row.is_milestone ?? false,
     createdAt: row.created_at,
   };
@@ -105,10 +105,24 @@ export async function getPhotos(opts: {
       .order("taken_on", { ascending: false });
     if (error) throw new Error(error.message);
     const rows = (data as MetadataRow[]) || [];
+
+    // Trainer-private notes live in photo_trainer_notes (trainer-only table)
+    const photoIds = rows.map((r) => r.id);
+    const notesByPhotoId = new Map<string, string>();
+    if (photoIds.length > 0) {
+      const { data: noteRows } = await supabase
+        .from("photo_trainer_notes")
+        .select("photo_id, notes")
+        .in("photo_id", photoIds);
+      for (const n of (noteRows as { photo_id: string; notes: string }[]) || []) {
+        notesByPhotoId.set(n.photo_id, n.notes);
+      }
+    }
+
     const out: ProgressPhoto[] = [];
     for (const row of rows) {
       const url = await signUrl(row.storage_path);
-      if (url) out.push(rowToPhoto(row, url, true));
+      if (url) out.push(rowToPhoto(row, url, notesByPhotoId.get(row.id) ?? null));
     }
     return out;
   }
@@ -123,7 +137,7 @@ export async function getPhotos(opts: {
   const out: ProgressPhoto[] = [];
   for (const row of rows) {
     const url = await signUrl(row.storage_path);
-    if (url) out.push(rowToPhoto(row, url, false));
+    if (url) out.push(rowToPhoto(row, url, null));
   }
   return out;
 }
@@ -140,9 +154,15 @@ export async function updateNote(id: string, notes: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-/** Trainer updates trainer_notes on a client's photo. */
-export async function updateTrainerNotes(id: string, trainerNotes: string): Promise<void> {
-  const { error } = await supabase.from("photo_metadata").update({ trainer_notes: trainerNotes }).eq("id", id);
+/** Trainer upserts a private note on a client's photo (trainer-only table). */
+export async function updateTrainerNotes(photoId: string, trainerNotes: string): Promise<void> {
+  const { data: userData } = await supabase.auth.getUser();
+  const trainerId = userData.user?.id;
+  if (!trainerId) throw new Error("Not authenticated");
+  const { error } = await supabase.from("photo_trainer_notes").upsert(
+    { photo_id: photoId, trainer_id: trainerId, notes: trainerNotes },
+    { onConflict: "photo_id" }
+  );
   if (error) throw new Error(error.message);
 }
 

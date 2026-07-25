@@ -1040,5 +1040,63 @@ CREATE POLICY "Trainers can read client progress photos"
   );
 
 -- ============================================================
+-- PHOTO TRAINER NOTES: trainer-only annotations (Phase 18B)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.photo_trainer_notes (
+  photo_id UUID PRIMARY KEY REFERENCES public.photo_metadata(id) ON DELETE CASCADE,
+  trainer_id UUID NOT NULL REFERENCES profiles(id),
+  notes TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.photo_trainer_notes ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Trainers can read their client photo notes"
+  ON public.photo_trainer_notes FOR SELECT TO authenticated
+  USING (
+    public.is_trainer() AND EXISTS (
+      SELECT 1 FROM public.photo_metadata pm
+      WHERE pm.id = photo_id AND public.is_my_client(pm.owner_id)
+    )
+  );
+
+CREATE POLICY "Trainers can insert their client photo notes"
+  ON public.photo_trainer_notes FOR INSERT TO authenticated
+  WITH CHECK (
+    trainer_id = auth.uid()
+    AND public.is_trainer() AND EXISTS (
+      SELECT 1 FROM public.photo_metadata pm
+      WHERE pm.id = photo_id AND public.is_my_client(pm.owner_id)
+    )
+  );
+
+CREATE POLICY "Trainers can update their client photo notes"
+  ON public.photo_trainer_notes FOR UPDATE TO authenticated
+  USING (
+    public.is_trainer() AND EXISTS (
+      SELECT 1 FROM public.photo_metadata pm
+      WHERE pm.id = photo_id AND public.is_my_client(pm.owner_id)
+    )
+  )
+  WITH CHECK (
+    trainer_id = auth.uid()
+    AND public.is_trainer() AND EXISTS (
+      SELECT 1 FROM public.photo_metadata pm
+      WHERE pm.id = photo_id AND public.is_my_client(pm.owner_id)
+    )
+  );
+
+CREATE POLICY "Trainers can delete their client photo notes"
+  ON public.photo_trainer_notes FOR DELETE TO authenticated
+  USING (
+    public.is_trainer() AND EXISTS (
+      SELECT 1 FROM public.photo_metadata pm
+      WHERE pm.id = photo_id AND public.is_my_client(pm.owner_id)
+    )
+  );
+
+-- photo_metadata.trainer_notes was migrated here and the column dropped.
+
+-- ============================================================
 -- DONE! Your AzFIT database is ready.
 -- ============================================================

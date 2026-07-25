@@ -1481,7 +1481,6 @@ export type Database = {
           weight_kg: number | null;
           body_fat_pct: number | null;
           notes: string | null;
-          trainer_notes: string | null;
           is_milestone: boolean | null;
           created_at: string;
         };
@@ -1494,7 +1493,6 @@ export type Database = {
           weight_kg?: number | null;
           body_fat_pct?: number | null;
           notes?: string | null;
-          trainer_notes?: string | null;
           is_milestone?: boolean | null;
           created_at?: string;
         };
@@ -1507,7 +1505,6 @@ export type Database = {
           weight_kg?: number | null;
           body_fat_pct?: number | null;
           notes?: string | null;
-          trainer_notes?: string | null;
           is_milestone?: boolean | null;
           created_at?: string;
         };
@@ -1515,6 +1512,42 @@ export type Database = {
           {
             foreignKeyName: "photo_metadata_owner_id_fkey";
             columns: ["owner_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      photo_trainer_notes: {
+        Row: {
+          photo_id: string;
+          trainer_id: string;
+          notes: string;
+          updated_at: string;
+        };
+        Insert: {
+          photo_id: string;
+          trainer_id: string;
+          notes: string;
+          updated_at?: string;
+        };
+        Update: {
+          photo_id?: string;
+          trainer_id?: string;
+          notes?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "photo_trainer_notes_photo_id_fkey";
+            columns: ["photo_id"];
+            isOneToOne: true;
+            referencedRelation: "photo_metadata";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "photo_trainer_notes_trainer_id_fkey";
+            columns: ["trainer_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
