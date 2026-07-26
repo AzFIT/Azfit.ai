@@ -29,6 +29,9 @@ interface BookSessionDialogProps {
   isTrainer?: boolean;
   clients: { id: string; name: string; avatar?: string }[];
   initialDate?: string;
+  /** When provided, the client is preselected and locked (booking from a
+   * client's profile is always for that client). Default unchanged. */
+  initialClientId?: string;
 }
 
 const SESSION_TYPES = [
@@ -51,9 +54,10 @@ export function BookSessionDialog({
   isTrainer = false,
   clients,
   initialDate,
+  initialClientId,
 }: BookSessionDialogProps) {
   const [step, setStep] = useState(1);
-  const [clientId, setClientId] = useState('');
+  const [clientId, setClientId] = useState(initialClientId || '');
   const [date, setDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('10:00');
@@ -141,17 +145,20 @@ export function BookSessionDialog({
               transition={{ duration: 0.2 }}
               className="space-y-4"
             >
-              <div className="text-sm text-[#94A3B8]">Select a client for this session</div>
+              <div className="text-sm text-[#94A3B8]">
+                {initialClientId ? 'Booking for this client' : 'Select a client for this session'}
+              </div>
               <div className="max-h-64 space-y-1 overflow-y-auto">
                 {clients.map((client) => (
                   <button
                     key={client.id}
-                    onClick={() => setClientId(client.id)}
+                    onClick={() => { if (!initialClientId) setClientId(client.id); }}
+                    disabled={!!initialClientId}
                     className={`flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition-all ${
                       clientId === client.id
                         ? 'border-[#00AEEF40] bg-[#00AEEF15]'
                         : 'border-[#2A3447] bg-[#111827] hover:border-[#00AEEF20]'
-                    }`}
+                    } ${initialClientId ? 'cursor-default opacity-90' : ''}`}
                   >
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#00AEEF20]">
                       <User className="h-4 w-4 text-[#00AEEF]" />
