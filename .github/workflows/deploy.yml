@@ -35,6 +35,8 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          # VAPID public key — public by design, safe to hardcode (Phase 24A)
+          VITE_VAPID_PUBLIC_KEY: BNsM4mJsBn93S3XntG3QAsCl5NTWlP4HPY0DfSiAsaLMa4BlXr8tZjwKPJx8w6Y-6YB9bMscyDSuBZNl2Ac2AFo
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

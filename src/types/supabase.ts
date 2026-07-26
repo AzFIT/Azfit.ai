@@ -1576,6 +1576,44 @@ export type Database = {
           }
         ];
       };
+      push_subscriptions: {
+        Row: {
+          id: string;
+          user_id: string;
+          endpoint: string;
+          subscription: Json;
+          user_agent: string | null;
+          created_at: string;
+          last_seen_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          endpoint: string;
+          subscription: Json;
+          user_agent?: string | null;
+          created_at?: string;
+          last_seen_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          endpoint?: string;
+          subscription?: Json;
+          user_agent?: string | null;
+          created_at?: string;
+          last_seen_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       photo_metadata_owner: {

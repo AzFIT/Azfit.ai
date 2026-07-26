@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router';
 import {
@@ -22,11 +22,19 @@ import {
   Scale,
   Dumbbell,
   Apple,
+  Send,
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import {
+  getPushState,
+  subscribePush,
+  unsubscribePush,
+  sendTestPush,
+  type PushState,
+} from '@/lib/push';
 
 /* ------------------------------------------------------------------ */
 /*  Animation helpers                                                  */
@@ -216,7 +224,7 @@ function DeviceRow({ device }: { device: DeviceItem }) {
 
 export default function Settings() {
   const { theme, toggleTheme } = useTheme();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
   const isDark = theme === 'dark';
 
@@ -226,7 +234,14 @@ export default function Settings() {
   const [tempUnit, setTempUnit] = useState('\u00B0C');
 
   /* ---- notifications state ---- */
-  const [pushEnabled, setPushEnabled] = useState(true);
+  const [pushState, setPushState] = useState<PushState>({
+    supported: false,
+    permission: 'unsupported',
+    subscribed: false,
+  });
+  const [pushBusy, setPushBusy] = useState(false);
+  const [testSending, setTestSending] = useState(false);
+  const pushEnabled = pushState.subscribed;
   const [emailEnabled, setEmailEnabled] = useState(true);
   const [workoutReminders, setWorkoutReminders] = useState(true);
   const [weeklySummary, setWeeklySummary] = useState(true);
@@ -235,6 +250,58 @@ export default function Settings() {
   const [streakAlerts, setStreakAlerts] = useState(true);
   const [mealReminders, setMealReminders] = useState(false);
   const [appUpdates, setAppUpdates] = useState(false);
+
+  /* ---- push state load ---- */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const state = await getPushState();
+      if (!cancelled) setPushState(state);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handlePushToggle = useCallback(
+    async (enabled: boolean) => {
+      if (pushBusy) return;
+      setPushBusy(true);
+      try {
+        if (enabled) {
+          const res = await subscribePush();
+          if (res.ok) {
+            toast.success('Push notifications enabled on this device');
+          } else if (res.error === 'denied') {
+            toast.error('Notifications are blocked — reset the permission in your browser site settings');
+          } else {
+            toast.error(res.error || 'Could not enable push notifications');
+          }
+        } else {
+          const res = await unsubscribePush();
+          if (res.ok) toast.success('Push notifications disabled');
+          else toast.error(res.error || 'Could not disable push notifications');
+        }
+      } finally {
+        setPushState(await getPushState());
+        setPushBusy(false);
+      }
+    },
+    [pushBusy],
+  );
+
+  const handleTestPush = useCallback(async () => {
+    if (!user?.id || testSending) return;
+    setTestSending(true);
+    try {
+      const result = await sendTestPush(user.id);
+      toast.success(`Test push sent (delivered: ${result.sent}, failed: ${result.failed}, pruned: ${result.pruned})`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Test push failed — is the send-push function deployed?');
+    } finally {
+      setTestSending(false);
+    }
+  }, [user?.id, testSending]);
 
   /* ---- connected devices ---- */
   const devices: DeviceItem[] = [
@@ -603,10 +670,56 @@ export default function Settings() {
           {/* Master toggles */}
           <ToggleRow
             label="Push Notifications"
-            description="Enable push notifications on this device"
+            description={
+              !pushState.supported
+                ? 'Push is not supported in this browser'
+                : pushState.permission === 'granted'
+                  ? 'Permission: granted'
+                  : pushState.permission === 'denied'
+                    ? 'Permission: blocked by browser'
+                    : 'Permission: not asked yet'
+            }
             checked={pushEnabled}
-            onCheckedChange={setPushEnabled}
+            onCheckedChange={handlePushToggle}
+            disabled={!pushState.supported || pushBusy || pushState.permission === 'denied'}
           />
+          {pushState.permission === 'denied' && (
+            <p className="py-2 text-xs" style={{ color: 'var(--warning)' }}>
+              Notifications are blocked for this site. To enable them, reset the
+              permission in your browser&apos;s site settings, then toggle again.
+            </p>
+          )}
+          {pushEnabled && (
+            <div className="flex items-center justify-between py-3" style={{ borderBottom: '1px solid var(--light-border)' }}>
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ color: 'var(--azfit-primary)' }}>
+                  <Send size={16} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium" style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}>
+                    Send test notification
+                  </p>
+                  <p className="mt-0.5 text-xs" style={{ color: 'var(--light-text-muted)' }}>
+                    Delivered via the send-push edge function
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleTestPush}
+                disabled={testSending}
+                className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-mono text-xs font-semibold transition-all duration-200 hover:bg-[var(--azfit-primary)] hover:text-white active:scale-[0.97] disabled:opacity-50"
+                style={{
+                  borderColor: 'var(--azfit-primary)',
+                  color: 'var(--azfit-primary)',
+                  textShadow: 'var(--text-shadow-dark)',
+                }}
+                type="button"
+              >
+                <Send size={12} />
+                {testSending ? 'Sending…' : 'Send test'}
+              </button>
+            </div>
+          )}
           <ToggleRow
             label="Email Notifications"
             description="Receive email updates and summaries"

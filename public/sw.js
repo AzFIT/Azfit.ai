@@ -157,25 +157,54 @@ async function syncPendingData() {
   });
 }
 
-// Push notifications (future Phase expansion)
+// Push notifications (Phase 24A)
+// registration.scope ends with the deployed base path (e.g. /Azfit.ai/),
+// so all asset/page URLs derived from it work on GitHub Pages subpaths.
 self.addEventListener('push', (event) => {
-  if (event.data) {
-    const data = event.data.json();
-    event.waitUntil(
-      self.registration.showNotification(data.title || 'AzFIT', {
-        body: data.body || 'You have a new notification',
-        icon: '/azfit-logo.png',
-        badge: '/azfit-logo.png',
-        data: data,
-      })
-    );
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (err) {
+    console.warn('[SW] Malformed push payload:', err);
+    data = {};
   }
+
+  const title = typeof data.title === 'string' && data.title ? data.title : 'AzFIT';
+  const body = typeof data.body === 'string' && data.body ? data.body : 'You have a new notification';
+  const icon = self.registration.scope + 'azfit-logo.png';
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon,
+      badge: icon,
+      data: { url: typeof data.url === 'string' ? data.url : null },
+    })
+  );
 });
 
-// Notification click handler
+// Notification click handler: focus an existing app window if one is
+// open (navigating it to the target), otherwise open a new window.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const scope = self.registration.scope; // e.g. https://azfit.github.io/Azfit.ai/
+  const raw = event.notification.data && event.notification.data.url
+    ? String(event.notification.data.url)
+    : '#/dashboard';
+  // Strip any leading '/' so relative targets resolve UNDER the base path.
+  const target = new URL(raw.replace(/^\/+/, ''), scope).href;
+
   event.waitUntil(
-    self.clients.openWindow('/#/dashboard')
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.startsWith(scope) && 'focus' in client) {
+          if ('navigate' in client) {
+            return client.navigate(target).then((c) => (c ? c.focus() : client.focus()));
+          }
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(target);
+    })
   );
 });
