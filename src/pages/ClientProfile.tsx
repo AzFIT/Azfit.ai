@@ -123,10 +123,14 @@ async function fetchClientPrograms(clientId: string): Promise<ClientGeneratedPro
       totalWeeks: p.duration_weeks || 4,
       goal: p.description || "",
       frequency: p.frequency_per_week || 1,
+      status: p.status,
+      createdAt: p.created_at,
+      startDate: p.start_date,
+      endDate: p.end_date,
       phases: [
         {
           id: `phase-${p.id}`,
-          name: "Program Phase",
+          name: p.phase_name || "Program Phase",
           block: "Block 1",
           durationWeeks: p.duration_weeks || 4,
           goal: p.description || "",
@@ -208,18 +212,15 @@ export default function ClientProfile() {
     load();
   }, [clientId, hasValidId, user?.id]);
 
+  const clientDbId = client?.id;
+  const reloadPrograms = useCallback(() => {
+    if (!clientDbId) return Promise.resolve();
+    return fetchClientPrograms(clientDbId).then(setPrograms);
+  }, [clientDbId]);
+
   useEffect(() => {
-    if (!client?.id) return;
-
-    let cancelled = false;
-    fetchClientPrograms(client.id).then((result) => {
-      if (!cancelled) setPrograms(result);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [client?.id]);
+    reloadPrograms();
+  }, [reloadPrograms]);
 
   const handleBuildProgram = useCallback(() => {
     if (!client) return;
@@ -370,7 +371,7 @@ export default function ClientProfile() {
             {activeTab === "workouts" && <WorkoutLogsTab clientId={client.id} />}
             {activeTab === "schedule" && <ScheduleTab clientEmail={client.email} />}
             {activeTab === "programs" && (
-              <ProgramsTab programs={programs} onStartWorkout={handleStartWorkout} />
+              <ProgramsTab programs={programs} onStartWorkout={handleStartWorkout} onChanged={reloadPrograms} />
             )}
             {activeTab === "photos" && <ClientPhotosTab clientEmail={client.email} />}
             {activeTab === "formchecks" && <ClientFormChecksTab clientEmail={client.email} />}

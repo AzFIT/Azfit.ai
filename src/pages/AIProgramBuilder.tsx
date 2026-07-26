@@ -4,7 +4,7 @@
 // Wired to current generateProgram() backend.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -45,7 +45,7 @@ export interface ProgramSplit { day: string; active: boolean; workout: string; d
 export interface ProgramExercise { code: string; name: string; sets: number; reps: string; pct1RM: string; tempo: string; rest: string; dbId?: string; }
 export interface ProgramData { id?: string; goal: string; method: string; clientContext: ClientContext; phases: ProgramPhase[]; weeklyHours: number; split: ProgramSplit[]; exercises: ProgramExercise[]; workoutExercises?: Record<number, ProgramExercise[]>; programName: string; description: string; tags: string[]; isPublic: boolean; assignedClient: string; }
 export interface SavedProgram { id: string; createdAt: string; updatedAt: string; data: ProgramData; }
-interface StepProps { data: ProgramData; updateData: (partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => void; onSave?: () => void; onSaveAndAssign?: () => void; program?: GeneratedProgram | null; clientName?: string; clients?: ClientRow[]; }
+interface StepProps { data: ProgramData; updateData: (partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => void; onSave?: () => void; onSaveAndAssign?: () => void; program?: GeneratedProgram | null; clientName?: string; clients?: ClientRow[]; saving?: boolean; }
 
 type ClientRow = Database['public']['Tables']['clients']['Row'];
 type ProgramRow = Database['public']['Tables']['programs']['Row'];
@@ -975,7 +975,7 @@ function Step7Preview({ data, program, clientName }: StepProps) {
   );
 }
 
-function Step8Save({ data, updateData, onSave, clients }: StepProps) {
+function Step8Save({ data, updateData, onSave, clients, saving }: StepProps) {
   const [showDetails, setShowDetails] = useState(true);
   const toggleTag = useCallback((tag: string) => updateData((prev) => { const next = prev.tags.includes(tag) ? prev.tags.filter((t) => t !== tag) : [...prev.tags, tag]; return { tags: next }; }), [updateData]);
   const selectedClient = clients?.find((c) => c.id === data.assignedClient);
@@ -1102,7 +1102,7 @@ function Step8Save({ data, updateData, onSave, clients }: StepProps) {
 
       {/* Secondary draft save (Save & Assign is the wizard's primary action) */}
       <div className="pt-2">
-        <Button variant="outline" onClick={onSave} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] font-semibold"><Save className="w-4 h-4 mr-2" />Save Program (draft)</Button>
+        <Button variant="outline" onClick={onSave} disabled={saving} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] font-semibold disabled:opacity-50"><Save className="w-4 h-4 mr-2" />{saving ? 'Saving…' : 'Save Program (draft)'}</Button>
       </div>
     </div>
   );
@@ -1122,6 +1122,7 @@ export default function AIProgramBuilderPage() {
   const [maxStep, setMaxStep] = useState(0);
   const [savedList, setSavedList] = useState<SavedProgram[]>([]);
   const [saveFlash, setSaveFlash] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [program, setProgram] = useState<GeneratedProgram | null>(null);
   const [clients, setClients] = useState<ClientRow[]>([]);
@@ -1214,8 +1215,9 @@ export default function AIProgramBuilderPage() {
 
   const handleReset = useCallback(() => { setData(defaultData); setProgram(null); setCurrentStep(0); setMaxStep(0); }, []);
   const handleSave = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id || saving) return;
     const assignedClientId = data.assignedClient || null;
+    setSaving(true);
     try {
       const saved = await saveProgramToSupabase(data, user.id, assignedClientId);
       if (saved) {
@@ -1230,15 +1232,18 @@ export default function AIProgramBuilderPage() {
     } catch (err) {
       console.error('Save program failed:', err);
       toast.error('Failed to save program');
+    } finally {
+      setSaving(false);
     }
-  }, [data, user]);
+  }, [data, user, saving]);
   const handleSaveAndAssign = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id || saving) return;
     const assignedClientId = data.assignedClient || null;
     if (!assignedClientId) {
       toast.error('Please select a client before assigning');
       return;
     }
+    setSaving(true);
     try {
       const saved = await saveProgramToSupabase(data, user.id, assignedClientId);
       if (saved) {
@@ -1252,8 +1257,10 @@ export default function AIProgramBuilderPage() {
     } catch (err) {
       console.error('Assign program failed:', err);
       toast.error('Failed to assign program');
+    } finally {
+      setSaving(false);
     }
-  }, [data, user, navigate]);
+  }, [data, user, navigate, saving]);
   const handleImportLegacy = useCallback(async () => {
     if (!user?.id || legacySaved.length === 0) return;
     let imported = 0;
@@ -1273,6 +1280,26 @@ export default function AIProgramBuilderPage() {
   }, [legacySaved, user]);
   const dismissLegacy = useCallback(() => { localStorage.removeItem(PROGRAMS_STORAGE_KEY); setLegacySaved([]); }, []);
   const loadSavedProgram = useCallback((saved: SavedProgram) => { setData(saved.data); setCurrentStep(6); setMaxStep((s) => Math.max(s, 6)); }, []);
+
+  // Open a specific program in the editor via /ai-program-builder?load=<id>
+  const loadId = searchParams.get('load');
+  const loadHandled = useRef(false);
+  useEffect(() => {
+    if (!loadId || !user?.id || loadHandled.current) return;
+    let cancelled = false;
+    (async () => {
+      const list = await loadSavedPrograms(user.id);
+      if (cancelled) return;
+      const found = list.find((p) => p.id === loadId);
+      if (found) {
+        loadSavedProgram(found);
+      } else {
+        toast.error('Program not found — starting a new wizard');
+      }
+      loadHandled.current = true;
+    })();
+    return () => { cancelled = true; };
+  }, [loadId, user, loadSavedProgram]);
 
   const stepComplete = useMemo(() => {
     const exerciseCount = data.workoutExercises
@@ -1316,7 +1343,7 @@ export default function AIProgramBuilderPage() {
               <Button onClick={handleAutoGenerate} disabled={generating} className="bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] text-xs font-bold px-4">
                 {generating ? <span className="flex items-center gap-2"><span className="w-3.5 h-3.5 border-2 border-[#0B1120]/30 border-t-[#0B1120] rounded-full animate-spin" />Generating...</span> : <><Bot className="w-4 h-4 mr-1.5" />Auto-Generate Program</>}
               </Button>
-              <Button variant="outline" size="sm" onClick={handleSave} className={`border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs transition-all ${saveFlash ? 'border-[#22C55E] text-[#22C55E]' : ''}`}><Save className="w-3.5 h-3.5 mr-1" />{saveFlash ? 'Saved!' : 'Save Program'}</Button>
+              <Button variant="outline" size="sm" onClick={handleSave} disabled={saving} className={`border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs transition-all disabled:opacity-50 ${saveFlash ? 'border-[#22C55E] text-[#22C55E]' : ''}`}><Save className="w-3.5 h-3.5 mr-1" />{saving ? 'Saving…' : saveFlash ? 'Saved!' : 'Save Program'}</Button>
               {savedList.length > 0 && (
                 <select value="" onChange={(e) => { const saved = savedList.find((p) => p.id === e.target.value); if (saved) loadSavedProgram(saved); }} className="h-9 bg-[var(--page-bg)] border border-[var(--card-border)] text-[var(--page-text)] text-xs rounded-lg px-3 focus:outline-none focus:border-[#00AEEF]">
                   <option value="">Load Saved...</option>
@@ -1402,7 +1429,7 @@ export default function AIProgramBuilderPage() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
         <AnimatePresence mode="wait">
           <motion.div key={currentStep} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.2 }}>
-            <CurrentComponent data={data} updateData={updateData} program={program} onSave={handleSave} onSaveAndAssign={handleSaveAndAssign} clientName={selectedClientName} clients={clients} />
+            <CurrentComponent data={data} updateData={updateData} program={program} onSave={handleSave} onSaveAndAssign={handleSaveAndAssign} clientName={selectedClientName} clients={clients} saving={saving} />
           </motion.div>
         </AnimatePresence>
 
@@ -1412,8 +1439,8 @@ export default function AIProgramBuilderPage() {
             Back
           </Button>
           {isFinalStep ? (
-            <Button onClick={goNext} className="bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] font-bold px-6">
-              <Check className="w-4 h-4 mr-1.5" />Save &amp; Assign Program
+            <Button onClick={goNext} disabled={saving} className="bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] font-bold px-6 disabled:opacity-50">
+              <Check className="w-4 h-4 mr-1.5" />{saving ? 'Saving…' : 'Save & Assign Program'}
             </Button>
           ) : (
             <Button onClick={goNext} disabled={!stepComplete[currentStep]} className="bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] font-bold px-6 disabled:opacity-50">

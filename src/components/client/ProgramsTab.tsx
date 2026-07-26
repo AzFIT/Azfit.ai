@@ -1,17 +1,130 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Dumbbell, Clock, ChevronDown, ChevronUp, Play } from "lucide-react";
+import { useNavigate } from "react-router";
+import {
+  Dumbbell,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  Play,
+  Pencil,
+  Archive,
+  ArchiveRestore,
+  SquarePen,
+} from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+import { formatDate } from "@/lib/utils";
 import type { ClientGeneratedProgram } from "@/types/client";
 
 interface ProgramsTabProps {
   programs: ClientGeneratedProgram[];
   onStartWorkout?: (workoutId: string, clientId: string) => void;
+  onChanged?: () => void;
 }
 
-export default function ProgramsTab({ programs, onStartWorkout }: ProgramsTabProps) {
+export default function ProgramsTab({ programs, onStartWorkout, onChanged }: ProgramsTabProps) {
+  const navigate = useNavigate();
   const [expandedProgram, setExpandedProgram] = useState<string | null>(null);
   const [expandedPhase, setExpandedPhase] = useState<string | null>(null);
   const [expandedWorkout, setExpandedWorkout] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [phaseEditId, setPhaseEditId] = useState<string | null>(null);
+  const [phaseDraft, setPhaseDraft] = useState("");
+  const [confirmArchiveId, setConfirmArchiveId] = useState<string | null>(null);
+  const [busyIds, setBusyIds] = useState<Record<string, boolean>>({});
+  // Optimistic display overrides (reverted on error)
+  const [nameOverrides, setNameOverrides] = useState<Record<string, string>>({});
+  const [phaseOverrides, setPhaseOverrides] = useState<Record<string, string>>({});
+
+  const visible = showArchived
+    ? programs
+    : programs.filter((p) => p.status !== "archived");
+
+  const setBusy = (id: string, v: boolean) =>
+    setBusyIds((prev) => ({ ...prev, [id]: v }));
+
+  const handleRenameSave = async (program: ClientGeneratedProgram) => {
+    const next = renameDraft.trim();
+    if (!next || next === program.name) {
+      setRenamingId(null);
+      return;
+    }
+    if (busyIds[program.id]) return;
+    setBusy(program.id, true);
+    setNameOverrides((prev) => ({ ...prev, [program.id]: next }));
+    setRenamingId(null);
+    try {
+      const { error } = await supabase
+        .from("programs")
+        .update({ name: next })
+        .eq("id", program.id);
+      if (error) throw error;
+      toast.success("Program renamed");
+      onChanged?.();
+    } catch (err) {
+      setNameOverrides((prev) => {
+        const copy = { ...prev };
+        delete copy[program.id];
+        return copy;
+      });
+      toast.error("Failed to rename: " + (err instanceof Error ? err.message : "Unknown error"));
+    } finally {
+      setBusy(program.id, false);
+    }
+  };
+
+  const handlePhaseSave = async (program: ClientGeneratedProgram) => {
+    const next = phaseDraft.trim();
+    const current = program.phases[0]?.name || "Program Phase";
+    if (!next || next === current) {
+      setPhaseEditId(null);
+      return;
+    }
+    if (busyIds[program.id]) return;
+    setBusy(program.id, true);
+    setPhaseOverrides((prev) => ({ ...prev, [program.id]: next }));
+    setPhaseEditId(null);
+    try {
+      const { error } = await supabase
+        .from("programs")
+        .update({ phase_name: next })
+        .eq("id", program.id);
+      if (error) throw error;
+      toast.success("Phase name updated");
+      onChanged?.();
+    } catch (err) {
+      setPhaseOverrides((prev) => {
+        const copy = { ...prev };
+        delete copy[program.id];
+        return copy;
+      });
+      toast.error("Failed to update: " + (err instanceof Error ? err.message : "Unknown error"));
+    } finally {
+      setBusy(program.id, false);
+    }
+  };
+
+  const handleSetStatus = async (program: ClientGeneratedProgram, status: "active" | "archived") => {
+    if (busyIds[program.id]) return;
+    setBusy(program.id, true);
+    setConfirmArchiveId(null);
+    try {
+      const { error } = await supabase
+        .from("programs")
+        .update({ status })
+        .eq("id", program.id);
+      if (error) throw error;
+      toast.success(status === "archived" ? "Program archived" : "Program restored");
+      onChanged?.();
+    } catch (err) {
+      toast.error("Failed: " + (err instanceof Error ? err.message : "Unknown error"));
+    } finally {
+      setBusy(program.id, false);
+    }
+  };
 
   if (programs.length === 0) {
     return (
@@ -33,275 +146,458 @@ export default function ProgramsTab({ programs, onStartWorkout }: ProgramsTabPro
     );
   }
 
+  const hasArchived = programs.some((p) => p.status === "archived");
+
   return (
     <div className="space-y-3">
-      {programs.map((program) => (
-        <motion.div
-          key={program.id}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl border overflow-hidden"
-          style={{
-            backgroundColor: "var(--card-bg)",
-            borderColor: "var(--card-border)",
-          }}
-        >
-          {/* Program Header */}
+      {/* Show archived toggle */}
+      {hasArchived && (
+        <div className="flex justify-end">
           <button
-            onClick={() =>
-              setExpandedProgram(
-                expandedProgram === program.id ? null : program.id,
-              )
-            }
-            className="w-full flex items-center justify-between p-4 text-left"
+            onClick={() => setShowArchived((s) => !s)}
+            className="text-[11px] font-medium px-2.5 py-1 rounded-lg transition hover:opacity-80"
+            style={{ color: "var(--azfit-primary)" }}
           >
-            <div className="flex items-center gap-3">
-              <div
-                className="flex h-10 w-10 items-center justify-center rounded-xl"
-                style={{ backgroundColor: "rgba(13,148,136,0.15)" }}
-              >
-                <Dumbbell size={20} style={{ color: "#0D9488" }} />
-              </div>
-              <div>
-                <h3
-                  className="text-sm font-semibold"
-                  style={{ color: "var(--page-text)" }}
-                >
-                  {program.name}
-                </h3>
-                <p
-                  className="text-xs"
-                  style={{ color: "var(--light-text-muted)" }}
-                >
-                  {program.category} • {program.level} • {program.totalWeeks}{" "}
-                  weeks
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span
-                className="text-[11px] font-medium px-2 py-0.5 rounded-full"
-                style={{
-                  backgroundColor: "rgba(13,148,136,0.1)",
-                  color: "#0D9488",
-                }}
-              >
-                {program.frequency}x/week
-              </span>
-              {expandedProgram === program.id ? (
-                <ChevronUp
-                  size={16}
-                  style={{ color: "var(--light-text-muted)" }}
-                />
-              ) : (
-                <ChevronDown
-                  size={16}
-                  style={{ color: "var(--light-text-muted)" }}
-                />
-              )}
-            </div>
+            {showArchived ? "Hide archived" : "Show archived"}
           </button>
+        </div>
+      )}
 
-          {/* Expanded Content */}
-          <AnimatePresence>
-            {expandedProgram === program.id && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="px-4 pb-4 space-y-3">
-                  <p
-                    className="text-xs"
-                    style={{ color: "var(--light-text-secondary)" }}
-                  >
-                    {program.description}
-                  </p>
-
-                  {/* Phases */}
-                  {program.phases.map((phase) => (
-                    <div
-                      key={phase.id}
-                      className="rounded-xl border"
+      {visible.map((program) => {
+        const isArchived = program.status === "archived";
+        const displayName = nameOverrides[program.id] ?? program.name;
+        const displayPhase = phaseOverrides[program.id] ?? program.phases[0]?.name;
+        return (
+          <motion.div
+            key={program.id}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-2xl border overflow-hidden"
+            style={{
+              backgroundColor: "var(--card-bg)",
+              borderColor: "var(--card-border)",
+              opacity: isArchived ? 0.65 : 1,
+            }}
+          >
+            {/* Program Header */}
+            <div className="w-full flex items-center justify-between p-4">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div
+                  className="flex h-10 w-10 items-center justify-center rounded-xl shrink-0"
+                  style={{ backgroundColor: "rgba(13,148,136,0.15)" }}
+                >
+                  <Dumbbell size={20} style={{ color: "#0D9488" }} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  {renamingId === program.id ? (
+                    <input
+                      autoFocus
+                      value={renameDraft}
+                      onChange={(e) => setRenameDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleRenameSave(program);
+                        if (e.key === "Escape") setRenamingId(null);
+                      }}
+                      onBlur={() => handleRenameSave(program)}
+                      className="w-full rounded-lg border px-2 py-1 text-sm"
                       style={{
                         backgroundColor: "var(--light-elevated)",
-                        borderColor: "var(--card-border)",
+                        borderColor: "var(--azfit-primary)",
+                        color: "var(--page-text)",
                       }}
-                    >
+                    />
+                  ) : (
+                    <div className="flex items-center gap-1.5">
                       <button
                         onClick={() =>
-                          setExpandedPhase(
-                            expandedPhase === phase.id ? null : phase.id,
+                          setExpandedProgram(
+                            expandedProgram === program.id ? null : program.id,
                           )
                         }
-                        className="w-full flex items-center justify-between p-3 text-left"
+                        className="text-left"
                       >
-                        <div>
-                          <span
-                            className="text-xs font-semibold"
-                            style={{ color: "var(--page-text)" }}
-                          >
-                            {phase.name}
-                          </span>
-                          <span
-                            className="text-[10px] ml-2"
-                            style={{ color: "var(--light-text-muted)" }}
-                          >
-                            {phase.durationWeeks} weeks
-                          </span>
-                        </div>
-                        {expandedPhase === phase.id ? (
-                          <ChevronUp
-                            size={14}
-                            style={{ color: "var(--light-text-muted)" }}
-                          />
-                        ) : (
-                          <ChevronDown
-                            size={14}
-                            style={{ color: "var(--light-text-muted)" }}
-                          />
-                        )}
+                        <h3
+                          className="text-sm font-semibold"
+                          style={{ color: "var(--page-text)" }}
+                        >
+                          {displayName}
+                        </h3>
                       </button>
+                      {!isArchived && (
+                        <button
+                          onClick={() => {
+                            setRenamingId(program.id);
+                            setRenameDraft(displayName);
+                          }}
+                          className="p-1 rounded hover:opacity-80 shrink-0"
+                          title="Rename program"
+                        >
+                          <Pencil size={11} style={{ color: "var(--light-text-muted)" }} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <p
+                    className="text-xs"
+                    style={{ color: "var(--light-text-muted)" }}
+                  >
+                    {program.category} • {program.level} • {program.totalWeeks}{" "}
+                    weeks
+                    {program.createdAt && ` • Created ${formatDate(program.createdAt)}`}
+                    {program.startDate &&
+                      ` • ${formatDate(program.startDate)}${program.endDate ? ` → ${formatDate(program.endDate)}` : ""}`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {isArchived && (
+                  <span
+                    className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                    style={{
+                      backgroundColor: "rgba(148,163,184,0.15)",
+                      color: "var(--light-text-muted)",
+                    }}
+                  >
+                    Archived
+                  </span>
+                )}
+                <span
+                  className="text-[11px] font-medium px-2 py-0.5 rounded-full"
+                  style={{
+                    backgroundColor: "rgba(13,148,136,0.1)",
+                    color: "#0D9488",
+                  }}
+                >
+                  {program.frequency}x/week
+                </span>
+                <button
+                  onClick={() =>
+                    setExpandedProgram(
+                      expandedProgram === program.id ? null : program.id,
+                    )
+                  }
+                  className="p-1 rounded hover:opacity-80"
+                >
+                  {expandedProgram === program.id ? (
+                    <ChevronUp
+                      size={16}
+                      style={{ color: "var(--light-text-muted)" }}
+                    />
+                  ) : (
+                    <ChevronDown
+                      size={16}
+                      style={{ color: "var(--light-text-muted)" }}
+                    />
+                  )}
+                </button>
+              </div>
+            </div>
 
-                      <AnimatePresence>
-                        {expandedPhase === phase.id && (
-                          <motion.div
-                            initial={{ height: 0 }}
-                            animate={{ height: "auto" }}
-                            exit={{ height: 0 }}
-                            className="overflow-hidden"
-                          >
-                            <div className="px-3 pb-3 space-y-2">
-                              {phase.workouts.map((workout) => (
-                                <div
-                                  key={workout.id}
-                                  className="rounded-lg"
-                                  style={{ backgroundColor: "var(--card-bg)" }}
+            {/* Action row */}
+            <div
+              className="flex items-center gap-2 px-4 pb-3 border-b"
+              style={{ borderColor: "var(--card-border)" }}
+            >
+              {isArchived ? (
+                <button
+                  onClick={() => handleSetStatus(program, "active")}
+                  disabled={!!busyIds[program.id]}
+                  className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition hover:opacity-90 disabled:opacity-50"
+                  style={{ backgroundColor: "rgba(13,148,136,0.12)", color: "#0D9488" }}
+                >
+                  <ArchiveRestore size={12} />
+                  Restore
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => navigate(`/ai-program-builder?load=${program.id}`)}
+                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition hover:opacity-90"
+                    style={{ backgroundColor: "rgba(0,174,239,0.12)", color: "var(--azfit-primary)" }}
+                  >
+                    <SquarePen size={12} />
+                    Edit
+                  </button>
+                  {confirmArchiveId === program.id ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>
+                        Archive? Client won&apos;t see it.
+                      </span>
+                      <button
+                        onClick={() => handleSetStatus(program, "archived")}
+                        disabled={!!busyIds[program.id]}
+                        className="rounded-lg px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
+                        style={{ backgroundColor: "var(--danger)" }}
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => setConfirmArchiveId(null)}
+                        className="rounded-lg px-2 py-1 text-[11px]"
+                        style={{ color: "var(--light-text-muted)" }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmArchiveId(program.id)}
+                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition hover:opacity-90"
+                      style={{ backgroundColor: "rgba(239,68,68,0.1)", color: "var(--danger)" }}
+                    >
+                      <Archive size={12} />
+                      Archive
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Expanded Content */}
+            <AnimatePresence>
+              {expandedProgram === program.id && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-4 py-4 space-y-3">
+                    <p
+                      className="text-xs"
+                      style={{ color: "var(--light-text-secondary)" }}
+                    >
+                      {program.description}
+                    </p>
+
+                    {/* Phases */}
+                    {program.phases.map((phase) => (
+                      <div
+                        key={phase.id}
+                        className="rounded-xl border"
+                        style={{
+                          backgroundColor: "var(--light-elevated)",
+                          borderColor: "var(--card-border)",
+                        }}
+                      >
+                        <div className="w-full flex items-center justify-between p-3">
+                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                            {phaseEditId === program.id ? (
+                              <input
+                                autoFocus
+                                value={phaseDraft}
+                                onChange={(e) => setPhaseDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handlePhaseSave(program);
+                                  if (e.key === "Escape") setPhaseEditId(null);
+                                }}
+                                onBlur={() => handlePhaseSave(program)}
+                                className="rounded-lg border px-2 py-0.5 text-xs"
+                                style={{
+                                  backgroundColor: "var(--card-bg)",
+                                  borderColor: "var(--azfit-primary)",
+                                  color: "var(--page-text)",
+                                }}
+                              />
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    setExpandedPhase(
+                                      expandedPhase === phase.id ? null : phase.id,
+                                    )
+                                  }
+                                  className="text-left"
                                 >
-                                  <button
-                                    onClick={() =>
-                                      setExpandedWorkout(
-                                        expandedWorkout === workout.id ? null : workout.id,
-                                      )
-                                    }
-                                    className="w-full flex items-center justify-between p-2.5 text-left"
+                                  <span
+                                    className="text-xs font-semibold"
+                                    style={{ color: "var(--page-text)" }}
                                   >
-                                    <div className="flex items-center gap-2">
-                                      <span
-                                        className="flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold"
-                                        style={{
-                                          backgroundColor:
-                                            "rgba(13,148,136,0.15)",
-                                          color: "#0D9488",
-                                        }}
-                                      >
-                                        {workout.dayNumber}
-                                      </span>
-                                      <div>
-                                        <p
-                                          className="text-xs font-medium"
-                                          style={{ color: "var(--page-text)" }}
-                                        >
-                                          {workout.name}
-                                        </p>
-                                        <p
-                                          className="text-[10px]"
+                                    {displayPhase}
+                                  </span>
+                                </button>
+                                {!isArchived && (
+                                  <button
+                                    onClick={() => {
+                                      setPhaseEditId(program.id);
+                                      setPhaseDraft(displayPhase || "");
+                                    }}
+                                    className="p-1 rounded hover:opacity-80 shrink-0"
+                                    title="Edit phase name"
+                                  >
+                                    <Pencil size={10} style={{ color: "var(--light-text-muted)" }} />
+                                  </button>
+                                )}
+                              </>
+                            )}
+                            <span
+                              className="text-[10px] ml-1 shrink-0"
+                              style={{ color: "var(--light-text-muted)" }}
+                            >
+                              {phase.durationWeeks} weeks
+                            </span>
+                          </div>
+                          <button
+                            onClick={() =>
+                              setExpandedPhase(
+                                expandedPhase === phase.id ? null : phase.id,
+                              )
+                            }
+                            className="p-1 rounded hover:opacity-80"
+                          >
+                            {expandedPhase === phase.id ? (
+                              <ChevronUp
+                                size={14}
+                                style={{ color: "var(--light-text-muted)" }}
+                              />
+                            ) : (
+                              <ChevronDown
+                                size={14}
+                                style={{ color: "var(--light-text-muted)" }}
+                              />
+                            )}
+                          </button>
+                        </div>
+
+                        <AnimatePresence>
+                          {expandedPhase === phase.id && (
+                            <motion.div
+                              initial={{ height: 0 }}
+                              animate={{ height: "auto" }}
+                              exit={{ height: 0 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="px-3 pb-3 space-y-2">
+                                {phase.workouts.map((workout) => (
+                                  <div
+                                    key={workout.id}
+                                    className="rounded-lg"
+                                    style={{ backgroundColor: "var(--card-bg)" }}
+                                  >
+                                    <button
+                                      onClick={() =>
+                                        setExpandedWorkout(
+                                          expandedWorkout === workout.id ? null : workout.id,
+                                        )
+                                      }
+                                      className="w-full flex items-center justify-between p-2.5 text-left"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <span
+                                          className="flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold"
                                           style={{
-                                            color: "var(--light-text-muted)",
+                                            backgroundColor:
+                                              "rgba(13,148,136,0.15)",
+                                            color: "#0D9488",
                                           }}
                                         >
-                                          Day {workout.dayNumber} •{" "}
-                                          {workout.exercises.length} exercises
-                                        </p>
+                                          {workout.dayNumber}
+                                        </span>
+                                        <div>
+                                          <p
+                                            className="text-xs font-medium"
+                                            style={{ color: "var(--page-text)" }}
+                                          >
+                                            {workout.name}
+                                          </p>
+                                          <p
+                                            className="text-[10px]"
+                                            style={{
+                                              color: "var(--light-text-muted)",
+                                            }}
+                                          >
+                                            Day {workout.dayNumber} •{" "}
+                                            {workout.exercises.length} exercises
+                                          </p>
+                                        </div>
                                       </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <span
-                                        className="flex items-center gap-1 text-[10px]"
-                                        style={{ color: "var(--light-text-muted)" }}
-                                      >
-                                        <Clock size={10} />
-                                        {workout.estimatedMinutes}m
-                                      </span>
-                                      {expandedWorkout === workout.id ? (
-                                        <ChevronUp size={14} style={{ color: "var(--light-text-muted)" }} />
-                                      ) : (
-                                        <ChevronDown size={14} style={{ color: "var(--light-text-muted)" }} />
-                                      )}
-                                    </div>
-                                  </button>
+                                      <div className="flex items-center gap-2">
+                                        <span
+                                          className="flex items-center gap-1 text-[10px]"
+                                          style={{ color: "var(--light-text-muted)" }}
+                                        >
+                                          <Clock size={10} />
+                                          {workout.estimatedMinutes}m
+                                        </span>
+                                        {expandedWorkout === workout.id ? (
+                                          <ChevronUp size={14} style={{ color: "var(--light-text-muted)" }} />
+                                        ) : (
+                                          <ChevronDown size={14} style={{ color: "var(--light-text-muted)" }} />
+                                        )}
+                                      </div>
+                                    </button>
 
-                                  <AnimatePresence>
-                                    {expandedWorkout === workout.id && (
-                                      <motion.div
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: "auto", opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        className="overflow-hidden"
-                                      >
-                                        <div className="px-3 pb-3 space-y-1">
-                                          {workout.exercises.map((ex) => (
-                                            <div
-                                              key={ex.order + ex.name}
-                                              className="flex items-center justify-between rounded-md px-2 py-1.5"
-                                              style={{ backgroundColor: "var(--light-elevated)" }}
-                                            >
-                                              <div className="flex items-center gap-2 min-w-0">
+                                    <AnimatePresence>
+                                      {expandedWorkout === workout.id && (
+                                        <motion.div
+                                          initial={{ height: 0, opacity: 0 }}
+                                          animate={{ height: "auto", opacity: 1 }}
+                                          exit={{ height: 0, opacity: 0 }}
+                                          className="overflow-hidden"
+                                        >
+                                          <div className="px-3 pb-3 space-y-1">
+                                            {workout.exercises.map((ex) => (
+                                              <div
+                                                key={ex.order + ex.name}
+                                                className="flex items-center justify-between rounded-md px-2 py-1.5"
+                                                style={{ backgroundColor: "var(--light-elevated)" }}
+                                              >
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                  <span
+                                                    className="text-[10px] font-bold font-mono shrink-0"
+                                                    style={{ color: "#0D9488" }}
+                                                  >
+                                                    {ex.order}
+                                                  </span>
+                                                  <span
+                                                    className="text-xs truncate"
+                                                    style={{ color: "var(--page-text)" }}
+                                                  >
+                                                    {ex.name}
+                                                  </span>
+                                                </div>
                                                 <span
-                                                  className="text-[10px] font-bold font-mono shrink-0"
-                                                  style={{ color: "#0D9488" }}
+                                                  className="text-[10px] shrink-0"
+                                                  style={{ color: "var(--light-text-muted)" }}
                                                 >
-                                                  {ex.order}
-                                                </span>
-                                                <span
-                                                  className="text-xs truncate"
-                                                  style={{ color: "var(--page-text)" }}
-                                                >
-                                                  {ex.name}
+                                                  {ex.sets} × {ex.reps}
+                                                  {ex.load ? ` @ ${ex.load}kg` : ""}
                                                 </span>
                                               </div>
-                                              <span
-                                                className="text-[10px] shrink-0"
-                                                style={{ color: "var(--light-text-muted)" }}
-                                              >
-                                                {ex.sets} × {ex.reps}
-                                                {ex.load ? ` @ ${ex.load}kg` : ""}
-                                              </span>
-                                            </div>
-                                          ))}
+                                            ))}
 
-                                          {onStartWorkout && program.clientId && (
-                                            <button
-                                              onClick={() =>
-                                                onStartWorkout(workout.id, program.clientId!)
-                                              }
-                                              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold text-white transition hover:opacity-90"
-                                              style={{ backgroundColor: "var(--azfit-primary)" }}
-                                            >
-                                              <Play size={12} />
-                                              Start Workout
-                                            </button>
-                                          )}
-                                        </div>
-                                      </motion.div>
-                                    )}
-                                  </AnimatePresence>
-                                </div>
-                              ))}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-      ))}
+                                            {onStartWorkout && program.clientId && (
+                                              <button
+                                                onClick={() =>
+                                                  onStartWorkout(workout.id, program.clientId!)
+                                                }
+                                                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold text-white transition hover:opacity-90"
+                                                style={{ backgroundColor: "var(--azfit-primary)" }}
+                                              >
+                                                <Play size={12} />
+                                                Start Workout
+                                              </button>
+                                            )}
+                                          </div>
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
+                                  </div>
+                                ))}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        );
+      })}
     </div>
   );
 }

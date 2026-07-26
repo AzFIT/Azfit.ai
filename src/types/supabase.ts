@@ -112,6 +112,7 @@ export type Database = {
           status: "draft" | "active" | "completed" | "archived";
           start_date: string | null;
           end_date: string | null;
+          phase_name: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -126,6 +127,7 @@ export type Database = {
           status?: "draft" | "active" | "completed" | "archived";
           start_date?: string | null;
           end_date?: string | null;
+          phase_name?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -140,6 +142,7 @@ export type Database = {
           status?: "draft" | "active" | "completed" | "archived";
           start_date?: string | null;
           end_date?: string | null;
+          phase_name?: string | null;
           created_at?: string;
           updated_at?: string;
         };

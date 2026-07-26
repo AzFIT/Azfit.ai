@@ -62,6 +62,10 @@ export interface ClientGeneratedProgram {
   totalWeeks: number;
   goal: string;
   frequency: number;
+  status?: string;
+  createdAt?: string;
+  startDate?: string | null;
+  endDate?: string | null;
   phases: Array<{
     id: string;
     name: string;

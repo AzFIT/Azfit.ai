@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS programs (
   status TEXT NOT NULL CHECK (status IN ('draft', 'active', 'completed', 'archived')) DEFAULT 'draft',
   start_date DATE,
   end_date DATE,
+  phase_name TEXT, -- Phase 26E: editable phase label (cards fall back to "Program Phase")
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
