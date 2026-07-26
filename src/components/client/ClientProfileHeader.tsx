@@ -23,11 +23,13 @@ import {
 interface ClientProfileHeaderProps {
   client: Client;
   onBuildProgram?: () => void;
+  onEdit?: () => void;
 }
 
 export default function ClientProfileHeader({
   client,
   onBuildProgram,
+  onEdit,
 }: ClientProfileHeaderProps) {
   const navigate = useNavigate();
 
@@ -179,6 +181,8 @@ export default function ClientProfileHeader({
             size="sm"
             className="gap-1.5 rounded-xl hidden sm:flex"
             style={{ backgroundColor: "var(--azfit-primary)", color: "#fff" }}
+            onClick={onEdit}
+            disabled={!onEdit}
           >
             <Edit3 size={13} />
             Edit

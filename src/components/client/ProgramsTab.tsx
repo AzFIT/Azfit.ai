@@ -11,6 +11,7 @@ import {
   Archive,
   ArchiveRestore,
   SquarePen,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
@@ -21,9 +22,10 @@ interface ProgramsTabProps {
   programs: ClientGeneratedProgram[];
   onStartWorkout?: (workoutId: string, clientId: string) => void;
   onChanged?: () => void;
+  clientId?: string; // clients.id — for the empty-state Build Program link
 }
 
-export default function ProgramsTab({ programs, onStartWorkout, onChanged }: ProgramsTabProps) {
+export default function ProgramsTab({ programs, onStartWorkout, onChanged, clientId }: ProgramsTabProps) {
   const navigate = useNavigate();
   const [expandedProgram, setExpandedProgram] = useState<string | null>(null);
   const [expandedPhase, setExpandedPhase] = useState<string | null>(null);
@@ -42,6 +44,52 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged }: Pro
   const visible = showArchived
     ? programs
     : programs.filter((p) => p.status !== "archived");
+
+  const hasArchived = programs.some((p) => p.status === "archived");
+
+  // Empty state: no ACTIVE programs (archived-only clients see it under the toggle)
+  if (visible.length === 0) {
+    return (
+      <div className="space-y-3">
+        {hasArchived && (
+          <div className="flex justify-end">
+            <button
+              onClick={() => setShowArchived((s) => !s)}
+              className="text-[11px] font-medium px-2.5 py-1 rounded-lg transition hover:opacity-80"
+              style={{ color: "var(--azfit-primary)" }}
+            >
+              {showArchived ? "Hide archived" : "Show archived"}
+            </button>
+          </div>
+        )}
+        <div
+          className="flex flex-col items-center justify-center rounded-2xl border py-12"
+          style={{
+            backgroundColor: "var(--card-bg)",
+            borderColor: "var(--card-border)",
+          }}
+        >
+          <Dumbbell size={32} style={{ color: "var(--light-text-muted)" }} />
+          <p
+            className="mt-2 text-sm font-medium"
+            style={{ color: "var(--light-text-muted)" }}
+          >
+            No programs yet — build one tailored to this client.
+          </p>
+          {clientId && (
+            <button
+              onClick={() => navigate(`/ai-program-builder?clientId=${clientId}`)}
+              className="mt-4 flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90"
+              style={{ backgroundColor: "var(--azfit-primary)" }}
+            >
+              <Plus size={14} />
+              Build Program
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const setBusy = (id: string, v: boolean) =>
     setBusyIds((prev) => ({ ...prev, [id]: v }));
@@ -125,28 +173,6 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged }: Pro
       setBusy(program.id, false);
     }
   };
-
-  if (programs.length === 0) {
-    return (
-      <div
-        className="flex flex-col items-center justify-center rounded-2xl border py-12"
-        style={{
-          backgroundColor: "var(--card-bg)",
-          borderColor: "var(--card-border)",
-        }}
-      >
-        <Dumbbell size={32} style={{ color: "var(--light-text-muted)" }} />
-        <p
-          className="mt-2 text-sm font-medium"
-          style={{ color: "var(--light-text-muted)" }}
-        >
-          No programs assigned
-        </p>
-      </div>
-    );
-  }
-
-  const hasArchived = programs.some((p) => p.status === "archived");
 
   return (
     <div className="space-y-3">

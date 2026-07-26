@@ -14,6 +14,7 @@ import {
   Video,
 } from "lucide-react";
 import ClientProfileHeader from "@/components/client/ClientProfileHeader";
+import QuickAddClientModal from "@/components/QuickAddClientModal";
 import {
   OverviewTab,
   BioHistoryTab,
@@ -31,6 +32,8 @@ import { codeFromOrderIndex, parseExerciseNotes } from "@/lib/aiProgramMapper";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import type { Database } from "@/types/supabase";
+
+type DbClientRow = Database["public"]["Tables"]["clients"]["Row"];
 
 const tabs = [
   { id: "overview", label: "Overview", icon: User },
@@ -172,6 +175,8 @@ export default function ClientProfile() {
     (tabs.find((t) => t.id === urlTab)?.id as TabId) || "overview"
   );
   const [client, setClient] = useState<Client | null>(null);
+  const [clientRow, setClientRow] = useState<DbClientRow | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const [programs, setPrograms] = useState<ClientGeneratedProgram[]>([]);
   const [bioAddHint, setBioAddHint] = useState<"weight" | "bodyFat" | null>(null);
   const [loading, setLoading] = useState(hasValidId);
@@ -189,28 +194,41 @@ export default function ClientProfile() {
     [setSearchParams],
   );
 
+  const loadClient = useCallback(async () => {
+    if (!clientId) {
+      setLoading(false);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("clients")
+      .select("*")
+      .eq("id", clientId)
+      .maybeSingle();
+
+    if (error || !data) {
+      setClient(null);
+      setClientRow(null);
+    } else {
+      setClient(mapDbClientToClient(data));
+      setClientRow(data);
+    }
+    setLoading(false);
+  }, [clientId]);
+
   useEffect(() => {
     if (!hasValidId) return;
 
+    let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
-    const load = async () => {
-      const { data, error } = await supabase
-        .from("clients")
-        .select("*")
-        .eq("id", clientId)
-        .maybeSingle();
-
-      if (error || !data) {
-        setClient(null);
-      } else {
-        setClient(mapDbClientToClient(data));
-      }
-      setLoading(false);
+    (async () => {
+      await loadClient();
+      if (cancelled) return;
+    })();
+    return () => {
+      cancelled = true;
     };
-
-    load();
-  }, [clientId, hasValidId, user?.id]);
+  }, [clientId, hasValidId, user?.id, loadClient]);
 
   const clientDbId = client?.id;
   const reloadPrograms = useCallback(() => {
@@ -315,6 +333,7 @@ export default function ClientProfile() {
         <ClientProfileHeader
           client={client}
           onBuildProgram={handleBuildProgram}
+          onEdit={() => setEditOpen(true)}
         />
 
         {/* Tabs */}
@@ -362,7 +381,7 @@ export default function ClientProfile() {
             transition={{ duration: 0.2 }}
           >
             {activeTab === "overview" && (
-              <OverviewTab client={client} clientId={clientId!} onNavigate={handleNavigateTab} />
+              <OverviewTab client={client} clientId={clientId!} onNavigate={handleNavigateTab} onEditClient={() => setEditOpen(true)} />
             )}
             {activeTab === "bio" && <BioHistoryTab clientId={client.id} openAdd={bioAddHint} />}
             {activeTab === "nutrition" && (
@@ -371,7 +390,7 @@ export default function ClientProfile() {
             {activeTab === "workouts" && <WorkoutLogsTab clientId={client.id} />}
             {activeTab === "schedule" && <ScheduleTab clientEmail={client.email} />}
             {activeTab === "programs" && (
-              <ProgramsTab programs={programs} onStartWorkout={handleStartWorkout} onChanged={reloadPrograms} />
+              <ProgramsTab programs={programs} onStartWorkout={handleStartWorkout} onChanged={reloadPrograms} clientId={client.id} />
             )}
             {activeTab === "photos" && <ClientPhotosTab clientEmail={client.email} />}
             {activeTab === "formchecks" && <ClientFormChecksTab clientEmail={client.email} />}
@@ -379,6 +398,17 @@ export default function ClientProfile() {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {/* Shared client edit modal (one instance — header Edit + Profile Details pencil) */}
+      <QuickAddClientModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSuccess={() => {
+          setEditOpen(false);
+          loadClient();
+        }}
+        clientToEdit={clientRow}
+      />
     </div>
   );
 }

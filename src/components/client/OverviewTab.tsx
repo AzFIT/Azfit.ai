@@ -36,6 +36,7 @@ interface OverviewTabProps {
   client: Client;
   clientId: string;
   onNavigate: (tab: "bio" | "nutrition", hint?: "weight" | "bodyFat") => void;
+  onEditClient?: () => void;
 }
 
 const fadeUp = {
@@ -48,6 +49,7 @@ export default function OverviewTab({
   client,
   clientId,
   onNavigate,
+  onEditClient,
 }: OverviewTabProps) {
   const [showWizard, setShowWizard] = useState(false);
   const [goals, setGoals] = useState<ClientGoalRow[]>([]);
@@ -324,12 +326,24 @@ export default function OverviewTab({
             borderColor: "var(--card-border)",
           }}
         >
-          <h3
-            className="text-sm font-semibold mb-3"
-            style={{ color: "var(--page-text)" }}
-          >
-            Profile Details
-          </h3>
+          <div className="mb-3 flex items-center justify-between">
+            <h3
+              className="text-sm font-semibold"
+              style={{ color: "var(--page-text)" }}
+            >
+              Profile Details
+            </h3>
+            {onEditClient && (
+              <button
+                onClick={onEditClient}
+                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition hover:opacity-80"
+                style={{ color: "var(--azfit-primary)" }}
+              >
+                <Pencil size={12} />
+                Edit
+              </button>
+            )}
+          </div>
           <div className="space-y-2.5">
             <InfoRow icon={User} label="Name" value={client.name} />
             <InfoRow icon={Mail} label="Email" value={client.email} />
