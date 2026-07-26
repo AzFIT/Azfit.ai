@@ -25,6 +25,7 @@ import { AssessmentWizard } from "@/components/bodycomp/AssessmentWizard";
 interface OverviewTabProps {
   client: Client;
   clientId: string;
+  onNavigate: (tab: "bio" | "nutrition", hint?: "weight" | "bodyFat") => void;
 }
 
 const fadeUp = {
@@ -36,6 +37,7 @@ const fadeUp = {
 export default function OverviewTab({
   client,
   clientId,
+  onNavigate,
 }: OverviewTabProps) {
   const [showWizard, setShowWizard] = useState(false);
   const {
@@ -43,15 +45,25 @@ export default function OverviewTab({
     latestBodyComposition,
     latestAssessment,
     assessments,
-  } = useBodyComposition(clientId);
+  } = useBodyComposition(clientId, { skipLegacyMigration: true });
+
+  // Live values: prefer the newest body-composition data over the static
+  // clients-row snapshot so quick-add entries show up on the tiles.
+  const currentWeight =
+    latestBodyComposition?.weight_kg ?? latestAssessment?.weight_kg ?? client.weight;
+  const currentBodyFat =
+    latestAssessment?.body_fat_pct ??
+    latestBodyComposition?.body_fat_percentage ??
+    client.bodyFatPercentage ??
+    null;
 
   const bmi =
-    client.height && client.weight
-      ? +(client.weight / (client.height / 100) ** 2).toFixed(1)
+    client.height && currentWeight
+      ? +(currentWeight / (client.height / 100) ** 2).toFixed(1)
       : 0;
 
   const weightChange = client.goalWeight
-    ? +(client.weight - client.goalWeight).toFixed(1)
+    ? +(currentWeight - client.goalWeight).toFixed(1)
     : 0;
 
   return (
@@ -61,9 +73,10 @@ export default function OverviewTab({
         <StatCard
           icon={Weight}
           label="Current Weight"
-          value={`${client.weight} kg`}
+          value={`${currentWeight} kg`}
           sub={client.goalWeight ? `Goal: ${client.goalWeight} kg` : undefined}
           color="#0D9488"
+          onClick={() => onNavigate("bio", "weight")}
         />
         <StatCard
           icon={Activity}
@@ -81,25 +94,25 @@ export default function OverviewTab({
               : undefined
           }
           color="#06B6D4"
+          onClick={() => onNavigate("bio")}
         />
         <StatCard
           icon={Target}
           label="Body Fat"
-          value={
-            client.bodyFatPercentage ? `${client.bodyFatPercentage}%` : "—"
-          }
+          value={currentBodyFat != null ? `${currentBodyFat}%` : "—"}
           sub={
-            client.bodyFatPercentage
+            currentBodyFat != null
               ? client.gender === "female"
-                ? client.bodyFatPercentage < 25
+                ? currentBodyFat < 25
                   ? "Athletic"
                   : "Average"
-                : client.bodyFatPercentage < 15
+                : currentBodyFat < 15
                   ? "Athletic"
                   : "Average"
               : undefined
           }
           color="#8B5CF6"
+          onClick={() => onNavigate("bio", "bodyFat")}
         />
         <StatCard
           icon={Flame}
@@ -150,7 +163,7 @@ export default function OverviewTab({
                       100,
                       Math.max(
                         0,
-                        100 - (Math.abs(weightChange) / client.weight) * 100,
+                        100 - (Math.abs(weightChange) / currentWeight) * 100,
                       ),
                     )
                   : 0
@@ -258,7 +271,7 @@ export default function OverviewTab({
         </motion.div>
 
         {/* Nutrition Targets */}
-        <NutritionCard clientEmail={client.email} />
+        <NutritionCard clientEmail={client.email} onClick={() => onNavigate("nutrition")} />
       </div>
 
       {/* Body Composition */}
@@ -280,7 +293,7 @@ export default function OverviewTab({
   );
 }
 
-function NutritionCard({ clientEmail }: { clientEmail: string }) {
+function NutritionCard({ clientEmail, onClick }: { clientEmail: string; onClick?: () => void }) {
   const [loading, setLoading] = useState(true);
   const [noProfile, setNoProfile] = useState(false);
   const [targets, setTargets] = useState<{
@@ -344,7 +357,11 @@ function NutritionCard({ clientEmail }: { clientEmail: string }) {
   return (
     <motion.div
       {...fadeUp}
-      className="rounded-2xl border p-4"
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") onClick(); } : undefined}
+      className={`rounded-2xl border p-4 transition-all ${onClick ? "cursor-pointer hover:border-[var(--azfit-primary)]/60 hover:shadow-md" : ""}`}
       style={{
         backgroundColor: "var(--card-bg)",
         borderColor: "var(--card-border)",
@@ -558,16 +575,22 @@ function StatCard({
   value,
   sub,
   color,
+  onClick,
 }: {
   icon: React.ElementType;
   label: string;
   value: string;
   sub?: string;
   color: string;
+  onClick?: () => void;
 }) {
   return (
     <div
-      className="rounded-2xl border p-3"
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") onClick(); } : undefined}
+      className={`rounded-2xl border p-3 transition-all ${onClick ? "cursor-pointer hover:border-[var(--azfit-primary)]/60 hover:shadow-md" : ""}`}
       style={{
         backgroundColor: "var(--card-bg)",
         borderColor: "var(--card-border)",

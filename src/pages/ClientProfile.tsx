@@ -169,9 +169,21 @@ export default function ClientProfile() {
   );
   const [client, setClient] = useState<Client | null>(null);
   const [programs, setPrograms] = useState<ClientGeneratedProgram[]>([]);
+  const [bioAddHint, setBioAddHint] = useState<"weight" | "bodyFat" | null>(null);
   const [loading, setLoading] = useState(hasValidId);
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  // In-page tab navigation for clickable tiles (tabs are state, not routes).
+  // `hint` optionally pre-opens the Bio History quick-add dialog.
+  const handleNavigateTab = useCallback(
+    (tab: TabId, hint?: "weight" | "bodyFat") => {
+      setBioAddHint(hint ?? null);
+      setActiveTab(tab);
+      setSearchParams({ tab });
+    },
+    [setSearchParams],
+  );
 
   useEffect(() => {
     if (!hasValidId) return;
@@ -349,9 +361,9 @@ export default function ClientProfile() {
             transition={{ duration: 0.2 }}
           >
             {activeTab === "overview" && (
-              <OverviewTab client={client} clientId={clientId!} />
+              <OverviewTab client={client} clientId={clientId!} onNavigate={handleNavigateTab} />
             )}
-            {activeTab === "bio" && <BioHistoryTab clientId={client.id} />}
+            {activeTab === "bio" && <BioHistoryTab clientId={client.id} openAdd={bioAddHint} />}
             {activeTab === "nutrition" && (
               <NutritionTab clientId={client.id} clientEmail={client.email} />
             )}
