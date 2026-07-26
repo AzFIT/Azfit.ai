@@ -388,7 +388,7 @@ export default function ClientProfile() {
               <NutritionTab clientId={client.id} clientEmail={client.email} />
             )}
             {activeTab === "workouts" && <WorkoutLogsTab clientId={client.id} />}
-            {activeTab === "schedule" && <ScheduleTab clientEmail={client.email} />}
+            {activeTab === "schedule" && <ScheduleTab clientEmail={client.email} clientsId={client.id} />}
             {activeTab === "programs" && (
               <ProgramsTab programs={programs} onStartWorkout={handleStartWorkout} onChanged={reloadPrograms} clientId={client.id} />
             )}

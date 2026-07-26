@@ -13,21 +13,36 @@ import {
   MessageSquare,
   CalendarPlus,
   X,
+  Sun,
+  Bell,
+  Ruler,
+  Camera,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { generateWeeklyOccurrences } from "@/lib/sessionConflicts";
 import { BookSessionDialog } from "@/components/schedule/BookSessionDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { ClientScheduleEvent } from "@/types/client";
 import type { CalendarEvent } from "@/types";
 import type { Database } from "@/types/supabase";
 
 type SessionRow = Database["public"]["Tables"]["sessions"]["Row"];
-type TabEvent = ClientScheduleEvent & { status?: string };
+type TabEvent = Omit<ClientScheduleEvent, "type"> & { type: string; status?: string };
 
 interface ScheduleTabProps {
   clientEmail: string; // sessions.client_id references profiles(id) — resolved via email
+  clientsId?: string; // clients.id — for the holiday status update
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -37,7 +52,7 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "#94A3B8",
 };
 
-export default function ScheduleTab({ clientEmail }: ScheduleTabProps) {
+export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps) {
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<TabEvent[]>([]);
@@ -48,6 +63,10 @@ export default function ScheduleTab({ clientEmail }: ScheduleTabProps) {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [bookOpen, setBookOpen] = useState(false);
   const [booking, setBooking] = useState(false);
+  const [holidayOpen, setHolidayOpen] = useState(false);
+  const [reminderPreset, setReminderPreset] = useState<string | null>(null); // null = closed
+  const [reminderIsCustom, setReminderIsCustom] = useState(false);
+  const [actionSaving, setActionSaving] = useState(false);
 
   const load = useCallback(async () => {
     if (!clientEmail) return;
@@ -83,7 +102,10 @@ export default function ScheduleTab({ clientEmail }: ScheduleTabProps) {
         date: s.starts_at.split("T")[0],
         startTime: s.starts_at,
         endTime: s.ends_at,
-        type: "session",
+        type:
+          s.type === "holiday" || s.type === "reminder"
+            ? s.type
+            : "session",
         clientId: prof.id,
         clientName: (prof as { full_name?: string | null }).full_name || "",
         location: s.location ?? undefined,
@@ -113,13 +135,15 @@ export default function ScheduleTab({ clientEmail }: ScheduleTabProps) {
   const daysInMonth = lastDay.getDate();
   const startDayOfWeek = firstDay.getDay();
 
-  const monthEvents = events.filter((e) => {
-    const d = new Date(e.startTime);
-    return d.getFullYear() === year && d.getMonth() === month;
-  });
-
+  // A day cell shows events whose [start, end] range COVERS that day —
+  // multi-day holidays appear on every covered day, not just their start.
   const getEventsForDay = (day: number) => {
-    return monthEvents.filter((e) => new Date(e.startTime).getDate() === day);
+    const dayStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return events.filter((e) => {
+      const startDay = e.startTime.split("T")[0];
+      const endDay = e.endTime.split("T")[0];
+      return dayStr >= startDay && dayStr <= endDay;
+    });
   };
 
   const prevMonth = () => {
@@ -188,11 +212,86 @@ export default function ScheduleTab({ clientEmail }: ScheduleTabProps) {
     }
   };
 
+  /* ── Holiday: one sessions row (type='holiday') + clients.status='on_holiday' ── */
+  const handleSaveHoliday = async (start: string, end: string, note: string) => {
+    if (!profileId || !user?.id || actionSaving) return;
+    setActionSaving(true);
+    try {
+      const { error } = await supabase.from("sessions").insert({
+        trainer_id: user.id,
+        client_id: profileId,
+        title: "Holiday",
+        type: "holiday",
+        status: "scheduled",
+        starts_at: new Date(`${start}T00:00:00`).toISOString(),
+        ends_at: new Date(`${end}T23:59:00`).toISOString(),
+        location: null,
+        notes: note || null,
+      });
+      if (error) throw error;
+
+      if (clientsId) {
+        const { error: statusError } = await supabase
+          .from("clients")
+          .update({ status: "on_holiday", updated_at: new Date().toISOString() })
+          .eq("id", clientsId);
+        if (statusError) throw statusError;
+        toast.success("Client marked On Holiday — remember to set them Active when they're back");
+      } else {
+        toast.success("Holiday added");
+      }
+
+      setHolidayOpen(false);
+      await load();
+    } catch (err) {
+      toast.error(
+        "Failed to add holiday: " +
+          (err instanceof Error ? err.message : "Unknown error"),
+      );
+    } finally {
+      setActionSaving(false);
+    }
+  };
+
+  /* ── Reminder: one sessions row (type='reminder', 30 min at 09:00 local) ── */
+  const handleSaveReminder = async (title: string, date: string, note: string) => {
+    if (!profileId || !user?.id || actionSaving) return;
+    setActionSaving(true);
+    try {
+      const startsAt = new Date(`${date}T09:00:00`);
+      const endsAt = new Date(startsAt.getTime() + 30 * 60 * 1000);
+      const { error } = await supabase.from("sessions").insert({
+        trainer_id: user.id,
+        client_id: profileId,
+        title,
+        type: "reminder",
+        status: "scheduled",
+        starts_at: startsAt.toISOString(),
+        ends_at: endsAt.toISOString(),
+        location: null,
+        notes: note || null,
+      });
+      if (error) throw error;
+      toast.success("Reminder added");
+      setReminderPreset(null);
+      await load();
+    } catch (err) {
+      toast.error(
+        "Failed to add reminder: " +
+          (err instanceof Error ? err.message : "Unknown error"),
+      );
+    } finally {
+      setActionSaving(false);
+    }
+  };
+
   const typeConfig: Record<
     string,
     { icon: ElementType; color: string; bg: string }
   > = {
     session: { icon: Calendar, color: "#00AEEF", bg: "rgba(0,174,239,0.1)" },
+    holiday: { icon: Sun, color: "#F59E0B", bg: "rgba(245,158,11,0.12)" },
+    reminder: { icon: Bell, color: "#00AEEF", bg: "rgba(0,174,239,0.1)" },
     workout: { icon: Dumbbell, color: "#0D9488", bg: "rgba(13,148,136,0.1)" },
     checkin: { icon: User, color: "#8B5CF6", bg: "rgba(139,92,246,0.1)" },
     call: { icon: Video, color: "#06B6D4", bg: "rgba(6,182,212,0.1)" },
@@ -389,7 +488,10 @@ export default function ScheduleTab({ clientEmail }: ScheduleTabProps) {
             </p>
           ) : (
             <div className="space-y-2 mb-3">
-              {getEventsForDay(selectedDay).map((e) => (
+              {getEventsForDay(selectedDay).map((e) => {
+                const evCfg = typeConfig[e.type] || typeConfig.session;
+                const EvIcon = evCfg.icon;
+                return (
                 <div
                   key={e.id}
                   className="flex items-center justify-between rounded-xl px-3 py-2"
@@ -397,9 +499,10 @@ export default function ScheduleTab({ clientEmail }: ScheduleTabProps) {
                 >
                   <div className="flex-1 min-w-0">
                     <p
-                      className="text-xs font-medium truncate"
+                      className="flex items-center gap-1.5 text-xs font-medium truncate"
                       style={{ color: "var(--page-text)" }}
                     >
+                      <EvIcon size={12} style={{ color: evCfg.color }} className="shrink-0" />
                       {e.title}
                     </p>
                     <div className="flex items-center gap-2 mt-0.5">
@@ -441,7 +544,8 @@ export default function ScheduleTab({ clientEmail }: ScheduleTabProps) {
                     </span>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -453,14 +557,32 @@ export default function ScheduleTab({ clientEmail }: ScheduleTabProps) {
               Scheduling activates when this client creates an app account.
             </p>
           ) : (
-            <button
-              onClick={() => setBookOpen(true)}
-              className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90"
-              style={{ backgroundColor: "var(--azfit-primary)" }}
-            >
-              <CalendarPlus size={14} />
-              Book a session
-            </button>
+            <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {[
+                { icon: CalendarPlus, label: "Book a session", onClick: () => setBookOpen(true), primary: true },
+                { icon: Sun, label: "Add holiday", onClick: () => setHolidayOpen(true) },
+                { icon: Bell, label: "Add reminder", onClick: () => { setReminderPreset(""); setReminderIsCustom(true); } },
+                { icon: Ruler, label: "Request measurements", onClick: () => { setReminderPreset("Measure weight + body fat"); setReminderIsCustom(false); } },
+                { icon: Camera, label: "Request photos", onClick: () => { setReminderPreset("Progress photos due"); setReminderIsCustom(false); } },
+              ].map((a) => {
+                const Icon = a.icon;
+                return (
+                  <button
+                    key={a.label}
+                    onClick={a.onClick}
+                    className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold transition hover:opacity-90"
+                    style={
+                      a.primary
+                        ? { backgroundColor: "var(--azfit-primary)", color: "#fff" }
+                        : { backgroundColor: "var(--light-elevated)", color: "var(--page-text)", border: "1px solid var(--card-border)" }
+                    }
+                  >
+                    <Icon size={14} style={a.primary ? undefined : { color: "var(--azfit-primary)" }} />
+                    {a.label}
+                  </button>
+                );
+              })}
+            </div>
           )}
         </motion.div>
       )}
@@ -571,6 +693,196 @@ export default function ScheduleTab({ clientEmail }: ScheduleTabProps) {
           initialClientId={profileId}
         />
       )}
+
+      {profileId && selectedDateStr && (
+        <>
+          <HolidayDialog
+            key={`holiday-${selectedDateStr}`}
+            open={holidayOpen}
+            onOpenChange={setHolidayOpen}
+            initialDate={selectedDateStr}
+            saving={actionSaving}
+            onSave={handleSaveHoliday}
+          />
+          <ReminderDialog
+            key={`reminder-${selectedDateStr}-${reminderPreset ?? "x"}`}
+            open={reminderPreset !== null}
+            onOpenChange={(v) => { if (!v) setReminderPreset(null); }}
+            initialDate={selectedDateStr}
+            initialTitle={reminderIsCustom ? "" : (reminderPreset ?? "")}
+            saving={actionSaving}
+            onSave={handleSaveReminder}
+          />
+        </>
+      )}
     </div>
+  );
+}
+
+/* ── Holiday dialog (start → end range + optional note) ──────────────── */
+
+function HolidayDialog({
+  open,
+  onOpenChange,
+  initialDate,
+  saving,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initialDate: string;
+  saving: boolean;
+  onSave: (start: string, end: string, note: string) => void;
+}) {
+  const [start, setStart] = useState(initialDate);
+  const [end, setEnd] = useState(initialDate);
+  const [note, setNote] = useState("");
+  const valid = !!start && !!end && end >= start;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm border-[#2A3447] bg-[#1A2235] text-[#F0F0F0]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-[#F0F0F0]">
+            <Sun className="h-5 w-5 text-[#F59E0B]" />
+            Add holiday
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-sm text-[#94A3B8]">Start</Label>
+              <Input
+                type="date"
+                value={start}
+                onChange={(e) => setStart(e.target.value)}
+                className="mt-1 border-[#2A3447] bg-[#111827] text-[#F0F0F0]"
+              />
+            </div>
+            <div>
+              <Label className="text-sm text-[#94A3B8]">End</Label>
+              <Input
+                type="date"
+                value={end}
+                min={start}
+                onChange={(e) => setEnd(e.target.value)}
+                className="mt-1 border-[#2A3447] bg-[#111827] text-[#F0F0F0]"
+              />
+            </div>
+          </div>
+          <div>
+            <Label className="text-sm text-[#94A3B8]">Note (optional)</Label>
+            <Input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. Bali trip"
+              className="mt-1 border-[#2A3447] bg-[#111827] text-[#F0F0F0]"
+            />
+          </div>
+          <p className="text-[11px] text-[#64748B]">
+            The client will also be marked On Holiday (set them Active again when
+            they're back — from the client list).
+          </p>
+        </div>
+        <DialogFooter className="gap-2">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            className="border-[#2A3447] text-[#94A3B8]"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => onSave(start, end, note.trim())}
+            disabled={!valid || saving}
+            className="bg-[#F59E0B] text-white hover:bg-[#F59E0B]/90 disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Save holiday"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ── Reminder dialog (preset or custom title + date + note) ──────────── */
+
+function ReminderDialog({
+  open,
+  onOpenChange,
+  initialDate,
+  initialTitle,
+  saving,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initialDate: string;
+  initialTitle: string;
+  saving: boolean;
+  onSave: (title: string, date: string, note: string) => void;
+}) {
+  const [title, setTitle] = useState(initialTitle);
+  const [date, setDate] = useState(initialDate);
+  const [note, setNote] = useState("");
+  const valid = title.trim() !== "" && !!date;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm border-[#2A3447] bg-[#1A2235] text-[#F0F0F0]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-[#F0F0F0]">
+            <Bell className="h-5 w-5 text-[#00AEEF]" />
+            Add reminder
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label className="text-sm text-[#94A3B8]">Title</Label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Check in about sleep"
+              className="mt-1 border-[#2A3447] bg-[#111827] text-[#F0F0F0]"
+              autoFocus={initialTitle === ""}
+            />
+          </div>
+          <div>
+            <Label className="text-sm text-[#94A3B8]">Date</Label>
+            <Input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="mt-1 border-[#2A3447] bg-[#111827] text-[#F0F0F0]"
+            />
+          </div>
+          <div>
+            <Label className="text-sm text-[#94A3B8]">Note (optional)</Label>
+            <Input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Any detail…"
+              className="mt-1 border-[#2A3447] bg-[#111827] text-[#F0F0F0]"
+            />
+          </div>
+        </div>
+        <DialogFooter className="gap-2">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            className="border-[#2A3447] text-[#94A3B8]"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => onSave(title.trim(), date, note.trim())}
+            disabled={!valid || saving}
+            className="bg-[#00AEEF] text-white hover:bg-[#00AEEF]/90 disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Save reminder"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
