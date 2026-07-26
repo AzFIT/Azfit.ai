@@ -127,7 +127,9 @@ function useClientProfile(clientId: string | null) {
 export function AssessmentWizard({ clientId: propClientId, isOpen, onClose, onSaved }: AssessmentWizardProps) {
   const { clientId, resolving } = useResolvedClientId(propClientId);
   const { profile: clientProfile, loading: profileLoading } = useClientProfile(clientId);
-  const { saveAssessment } = useBodyComposition(clientId || undefined);
+  // skipLegacyMigration: the wizard opens OTHER clients' records — a legacy
+  // localStorage import must never write into the viewed client's rows.
+  const { saveAssessment } = useBodyComposition(clientId || undefined, { skipLegacyMigration: true });
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [protocol, setProtocol] = useState<SkinfoldProtocol>("jp7");
@@ -149,6 +151,11 @@ export function AssessmentWizard({ clientId: propClientId, isOpen, onClose, onSa
   const [gender, setGender] = useState<Gender | "">("");
   const [weightKg, setWeightKg] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
+  const [measuredDate, setMeasuredDate] = useState<string>(() => new Date().toISOString().split("T")[0]);
+  const [measuredTime, setMeasuredTime] = useState<string>(() => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  });
   const [saving, setSaving] = useState(false);
 
   /* ── Load defaults from localStorage onboarding data ─────────────── */
@@ -207,6 +214,10 @@ export function AssessmentWizard({ clientId: propClientId, isOpen, onClose, onSa
     setSaving(true);
 
     try {
+      const recordedAt =
+        measuredDate && measuredTime
+          ? new Date(`${measuredDate}T${measuredTime}:00`).toISOString()
+          : undefined;
       const success = await saveAssessment({
         protocol,
         sites: Object.fromEntries(requiredSites.map((site) => [site, sites[site]])) as Record<SkinfoldSite, number>,
@@ -215,6 +226,7 @@ export function AssessmentWizard({ clientId: propClientId, isOpen, onClose, onSa
         weight_kg: Number(weightKg) || null,
         age_years: Number(age) || null,
         notes: notes || null,
+        recorded_at: recordedAt,
       });
 
       if (success) {
@@ -470,6 +482,29 @@ export function AssessmentWizard({ clientId: propClientId, isOpen, onClose, onSa
                         </span>{" "}
                         {age} yrs / {gender} / {weightKg} kg
                       </p>
+                    </div>
+
+                    {/* Measured date + time (defaults to now, backdateable) */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <FieldLabel icon={Calendar}>Measured date</FieldLabel>
+                        <Input
+                          type="date"
+                          value={measuredDate}
+                          max={new Date().toISOString().split("T")[0]}
+                          onChange={(e) => setMeasuredDate(e.target.value)}
+                          className="w-full"
+                        />
+                      </div>
+                      <div>
+                        <FieldLabel icon={Calendar}>Time</FieldLabel>
+                        <Input
+                          type="time"
+                          value={measuredTime}
+                          onChange={(e) => setMeasuredTime(e.target.value)}
+                          className="w-full"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}

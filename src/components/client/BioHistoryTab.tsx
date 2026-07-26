@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { motion } from "framer-motion";
 import {
   TrendingUp,
@@ -9,9 +9,13 @@ import {
   Percent,
   Calendar,
   Plus,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useBodyComposition } from "@/components/bodycomp/useBodyComposition";
+import { AssessmentWizard } from "@/components/bodycomp/AssessmentWizard";
+import type { SkinfoldProtocol, SkinfoldSite } from "@/lib/bodyfat";
 import {
   Dialog,
   DialogContent,
@@ -39,11 +43,28 @@ interface BioHistoryTabProps {
 
 interface DisplayEntry {
   id: string;
+  kind: "body_composition" | "assessment";
   date: string;
   weight: number | null;
   bodyFatPercentage: number | null;
   bmi: number | null;
   waistCm: number | null;
+  // assessment-only detail
+  protocol?: SkinfoldProtocol;
+  sumMm?: number | null;
+  ageYears?: number | null;
+  sites?: Partial<Record<SkinfoldSite, number>>;
+  notes?: string | null;
+}
+
+const PROTOCOL_LABELS: Record<SkinfoldProtocol, string> = {
+  jp3: "JP-3",
+  jp7: "JP-7",
+  poliquin12: "Poliquin 12-site",
+};
+
+function formatSiteName(site: string): string {
+  return site.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
 }
 
 type MetricKey = "weight" | "bodyFat" | "bmi" | "waist";
@@ -66,9 +87,11 @@ export default function BioHistoryTab({ clientId, openAdd = null }: BioHistoryTa
   // The tab remounts on every tab switch, so this initial state applies
   // exactly when arriving via a tile hint.
   const [addOpen, setAddOpen] = useState<"weight" | "bodyFat" | null>(openAdd);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   // skipLegacyMigration: this view opens OTHER clients' records — a legacy
   // localStorage import must never write into the viewed client's rows.
-  const { history, loading, saveBodyComposition } = useBodyComposition(clientId, {
+  const { history, loading, saveBodyComposition, fetchData } = useBodyComposition(clientId, {
     skipLegacyMigration: true,
   });
 
@@ -84,6 +107,7 @@ export default function BioHistoryTab({ clientId, openAdd = null }: BioHistoryTa
             const d = item.data;
             return {
               id: item.id,
+              kind: "body_composition",
               date: item.date,
               weight: d.weight_kg,
               bodyFatPercentage: d.body_fat_percentage,
@@ -94,15 +118,22 @@ export default function BioHistoryTab({ clientId, openAdd = null }: BioHistoryTa
           const d = item.data;
           return {
             id: item.id,
+            kind: "assessment",
             date: item.date,
             weight: d.weight_kg,
             bodyFatPercentage: d.body_fat_pct,
             bmi: null,
             waistCm: null,
+            protocol: d.protocol,
+            sumMm: d.sum_mm,
+            ageYears: d.age_years,
+            sites: (d.sites as Partial<Record<SkinfoldSite, number>>) || {},
+            notes: d.notes,
           };
         })
         .filter(
           (e) =>
+            e.kind === "assessment" ||
             e.weight != null ||
             e.bodyFatPercentage != null ||
             e.bmi != null ||
@@ -162,6 +193,13 @@ export default function BioHistoryTab({ clientId, openAdd = null }: BioHistoryTa
           open={addOpen}
           onOpenChange={setAddOpen}
           onSave={saveBodyComposition}
+          onOpenWizard={() => { setAddOpen(null); setWizardOpen(true); }}
+        />
+        <AssessmentWizard
+          clientId={clientId}
+          isOpen={wizardOpen}
+          onClose={() => setWizardOpen(false)}
+          onSaved={() => { fetchData(); }}
         />
       </div>
     );
@@ -394,61 +432,137 @@ export default function BioHistoryTab({ clientId, openAdd = null }: BioHistoryTa
               </tr>
             </thead>
             <tbody>
-              {[...sorted].reverse().map((entry) => (
-                <tr
-                  key={entry.id}
-                  className="border-t"
-                  style={{ borderColor: "var(--card-border)" }}
-                >
-                  <td
-                    className="px-3 py-2"
-                    style={{ color: "var(--page-text)" }}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <Calendar
-                        size={10}
-                        style={{ color: "var(--light-text-muted)" }}
-                      />
-                      {new Date(entry.date).toLocaleDateString("en-GB", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                      ,{" "}
-                      {new Date(entry.date).toLocaleTimeString("en-GB", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </div>
-                  </td>
-                  <td
-                    className="px-3 py-2 font-medium"
-                    style={{ color: "#0D9488" }}
-                  >
-                    {entry.weight != null ? `${entry.weight} kg` : "—"}
-                  </td>
-                  <td
-                    className="px-3 py-2 font-medium"
-                    style={{ color: "#8B5CF6" }}
-                  >
-                    {entry.bodyFatPercentage != null
-                      ? `${entry.bodyFatPercentage}%`
-                      : "—"}
-                  </td>
-                  <td
-                    className="px-3 py-2 font-medium"
-                    style={{ color: "#06B6D4" }}
-                  >
-                    {entry.bmi != null ? entry.bmi : "—"}
-                  </td>
-                  <td
-                    className="px-3 py-2 font-medium"
-                    style={{ color: "#F59E0B" }}
-                  >
-                    {entry.waistCm != null ? `${entry.waistCm} cm` : "—"}
-                  </td>
-                </tr>
-              ))}
+              {[...sorted].reverse().map((entry) => {
+                const isAssessment = entry.kind === "assessment";
+                const expanded = !!expandedRows[entry.id];
+                return (
+                  <Fragment key={entry.id}>
+                    <tr
+                      className="border-t"
+                      style={{ borderColor: "var(--card-border)" }}
+                    >
+                      <td
+                        className="px-3 py-2"
+                        style={{ color: "var(--page-text)" }}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          {isAssessment ? (
+                            <button
+                              onClick={() =>
+                                setExpandedRows((prev) => ({
+                                  ...prev,
+                                  [entry.id]: !prev[entry.id],
+                                }))
+                              }
+                              className="p-0.5 rounded hover:opacity-80"
+                              title="Show skinfold detail"
+                            >
+                              {expanded ? (
+                                <ChevronUp size={12} style={{ color: "var(--azfit-primary)" }} />
+                              ) : (
+                                <ChevronDown size={12} style={{ color: "var(--azfit-primary)" }} />
+                              )}
+                            </button>
+                          ) : (
+                            <Calendar
+                              size={10}
+                              style={{ color: "var(--light-text-muted)" }}
+                            />
+                          )}
+                          <span>
+                            {new Date(entry.date).toLocaleDateString("en-GB", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                            ,{" "}
+                            {new Date(entry.date).toLocaleTimeString("en-GB", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                            {isAssessment && entry.protocol && (
+                              <span
+                                className="ml-1.5 rounded px-1 py-0.5 text-[9px] font-semibold"
+                                style={{ background: "rgba(139,92,246,0.15)", color: "#8B5CF6" }}
+                              >
+                                {PROTOCOL_LABELS[entry.protocol]}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      </td>
+                      <td
+                        className="px-3 py-2 font-medium"
+                        style={{ color: "#0D9488" }}
+                      >
+                        {entry.weight != null ? `${entry.weight} kg` : "—"}
+                      </td>
+                      <td
+                        className="px-3 py-2 font-medium"
+                        style={{ color: "#8B5CF6" }}
+                      >
+                        {entry.bodyFatPercentage != null
+                          ? `${entry.bodyFatPercentage}%`
+                          : "—"}
+                      </td>
+                      <td
+                        className="px-3 py-2 font-medium"
+                        style={{ color: "#06B6D4" }}
+                      >
+                        {entry.bmi != null ? entry.bmi : "—"}
+                      </td>
+                      <td
+                        className="px-3 py-2 font-medium"
+                        style={{ color: "#F59E0B" }}
+                      >
+                        {entry.waistCm != null ? `${entry.waistCm} cm` : "—"}
+                      </td>
+                    </tr>
+                    {isAssessment && expanded && (
+                      <tr
+                        className="border-t"
+                        style={{ borderColor: "var(--card-border)", backgroundColor: "var(--light-elevated)" }}
+                      >
+                        <td colSpan={5} className="px-3 py-3">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-2 text-[11px]">
+                            <span style={{ color: "var(--page-text)" }}>
+                              <span style={{ color: "var(--light-text-muted)" }}>Protocol: </span>
+                              {entry.protocol ? PROTOCOL_LABELS[entry.protocol] : "—"}
+                            </span>
+                            <span style={{ color: "var(--page-text)" }}>
+                              <span style={{ color: "var(--light-text-muted)" }}>Sum: </span>
+                              {entry.sumMm != null ? `${entry.sumMm} mm` : "—"}
+                            </span>
+                            <span style={{ color: "var(--page-text)" }}>
+                              <span style={{ color: "var(--light-text-muted)" }}>Age: </span>
+                              {entry.ageYears != null ? `${entry.ageYears} yrs` : "—"}
+                            </span>
+                          </div>
+                          {entry.sites && Object.keys(entry.sites).length > 0 && (
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2">
+                              {Object.entries(entry.sites).map(([site, mm]) => (
+                                <div
+                                  key={site}
+                                  className="rounded-lg border px-2 py-1 text-[10px]"
+                                  style={{ borderColor: "var(--card-border)", backgroundColor: "var(--card-bg)" }}
+                                >
+                                  <span style={{ color: "var(--light-text-muted)" }}>{formatSiteName(site)}: </span>
+                                  <span className="font-semibold" style={{ color: "var(--page-text)" }}>{mm} mm</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {entry.notes && (
+                            <p className="text-[11px] italic" style={{ color: "var(--light-text-muted)" }}>
+                              "{entry.notes}"
+                            </p>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -459,6 +573,13 @@ export default function BioHistoryTab({ clientId, openAdd = null }: BioHistoryTa
         open={addOpen}
         onOpenChange={setAddOpen}
         onSave={saveBodyComposition}
+        onOpenWizard={() => { setAddOpen(null); setWizardOpen(true); }}
+      />
+      <AssessmentWizard
+        clientId={clientId}
+        isOpen={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        onSaved={() => { fetchData(); }}
       />
     </div>
   );
@@ -481,6 +602,7 @@ function AddEntryDialog({
   open,
   onOpenChange,
   onSave,
+  onOpenWizard,
 }: {
   open: "weight" | "bodyFat" | null;
   onOpenChange: (v: "weight" | "bodyFat" | null) => void;
@@ -489,6 +611,7 @@ function AddEntryDialog({
     weight_kg: number | null;
     body_fat_percentage: number | null;
   }) => Promise<boolean>;
+  onOpenWizard: () => void;
 }) {
   const [type, setType] = useState<"weight" | "bodyFat">(open ?? "weight");
   const [value, setValue] = useState("");
@@ -571,6 +694,26 @@ function AddEntryDialog({
               </p>
             )}
           </div>
+
+          {!isWeight && (
+            <div>
+              <div className="flex items-center gap-2 my-1">
+                <div className="h-px flex-1" style={{ backgroundColor: "#2A3447" }} />
+                <span className="text-[10px] uppercase tracking-wide text-[#64748B]">or</span>
+                <div className="h-px flex-1" style={{ backgroundColor: "#2A3447" }} />
+              </div>
+              <button
+                onClick={onOpenWizard}
+                className="w-full rounded-lg border px-3 py-2.5 text-sm font-medium transition-all hover:opacity-90"
+                style={{ borderColor: "#8B5CF6", color: "#8B5CF6", backgroundColor: "rgba(139,92,246,0.08)" }}
+              >
+                Skinfold caliper assessment →
+              </button>
+              <p className="mt-1 text-center text-[10px] text-[#64748B]">
+                JP-3 / JP-7 / Poliquin 12-site with live body-fat calculation
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
