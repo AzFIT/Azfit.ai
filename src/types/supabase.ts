@@ -1617,6 +1617,59 @@ export type Database = {
           }
         ];
       };
+      client_goals: {
+        Row: {
+          id: string;
+          client_id: string;
+          goal_type: "lose_weight" | "build_muscle" | "reduce_body_fat" | "increase_strength" | "improve_fitness" | "custom";
+          custom_label: string | null;
+          target_weight_kg: number | null;
+          target_body_fat_pct: number | null;
+          start_date: string;
+          target_date: string | null;
+          is_achieved: boolean;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          goal_type: "lose_weight" | "build_muscle" | "reduce_body_fat" | "increase_strength" | "improve_fitness" | "custom";
+          custom_label?: string | null;
+          target_weight_kg?: number | null;
+          target_body_fat_pct?: number | null;
+          start_date?: string;
+          target_date?: string | null;
+          is_achieved?: boolean;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          client_id?: string;
+          goal_type?: "lose_weight" | "build_muscle" | "reduce_body_fat" | "increase_strength" | "improve_fitness" | "custom";
+          custom_label?: string | null;
+          target_weight_kg?: number | null;
+          target_body_fat_pct?: number | null;
+          start_date?: string;
+          target_date?: string | null;
+          is_achieved?: boolean;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "client_goals_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       photo_metadata_owner: {

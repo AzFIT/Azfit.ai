@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   User,
@@ -13,12 +13,22 @@ import {
   Activity,
   Utensils,
   Plus,
+  Pencil,
+  Check,
 } from "lucide-react";
 import type { Client } from "@/types/client";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { getDayTotals, type MacroTotals } from "@/lib/foodApi";
+import { formatDate } from "@/lib/utils";
+import {
+  goalLabel,
+  nearestToDate,
+  progressPercent,
+  type ClientGoalRow,
+} from "@/lib/clientGoals";
+import ClientGoalsDialog from "@/components/client/ClientGoalsDialog";
 import { useBodyComposition } from "@/components/bodycomp/useBodyComposition";
 import { AssessmentWizard } from "@/components/bodycomp/AssessmentWizard";
 
@@ -40,12 +50,36 @@ export default function OverviewTab({
   onNavigate,
 }: OverviewTabProps) {
   const [showWizard, setShowWizard] = useState(false);
+  const [goals, setGoals] = useState<ClientGoalRow[]>([]);
+  const [goalsOpen, setGoalsOpen] = useState(false);
   const {
     loading,
     latestBodyComposition,
     latestAssessment,
     assessments,
+    bodyComposition,
   } = useBodyComposition(clientId, { skipLegacyMigration: true });
+
+  const fetchGoals = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("client_goals")
+      .select("*")
+      .eq("client_id", clientId)
+      .order("is_achieved", { ascending: true })
+      .order("created_at", { ascending: false });
+    if (!error && data) setGoals(data as ClientGoalRow[]);
+  }, [clientId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await fetchGoals();
+      if (cancelled) return;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchGoals]);
 
   // Live values: prefer the newest body-composition data over the static
   // clients-row snapshot so quick-add entries show up on the tiles.
@@ -132,45 +166,128 @@ export default function OverviewTab({
           borderColor: "var(--card-border)",
         }}
       >
-        <h3
-          className="text-sm font-semibold mb-3"
-          style={{ color: "var(--page-text)" }}
-        >
-          Progress to Goal
-        </h3>
+        <div className="mb-3 flex items-center justify-between">
+          <h3
+            className="text-sm font-semibold"
+            style={{ color: "var(--page-text)" }}
+          >
+            Progress to Goal
+          </h3>
+          <button
+            onClick={() => setGoalsOpen(true)}
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition hover:opacity-80"
+            style={{ color: "var(--azfit-primary)" }}
+          >
+            <Pencil size={12} />
+            Edit goals
+          </button>
+        </div>
         <div className="space-y-3">
-          <div>
-            <div className="flex justify-between text-xs mb-1">
-              <span style={{ color: "var(--light-text-secondary)" }}>
-                Weight Goal
-              </span>
-              <span
-                style={{
-                  color: weightChange <= 0 ? "var(--success)" : "var(--danger)",
-                }}
-              >
-                {weightChange > 0
-                  ? `+${weightChange} kg to lose`
-                  : weightChange < 0
-                    ? `${Math.abs(weightChange)} kg to gain`
-                    : "At goal"}
-              </span>
-            </div>
-            <Progress
-              value={
-                client.goalWeight
-                  ? Math.min(
-                      100,
-                      Math.max(
-                        0,
-                        100 - (Math.abs(weightChange) / currentWeight) * 100,
-                      ),
-                    )
-                  : 0
-              }
-              className="h-2"
-            />
-          </div>
+          {goals.length > 0 ? (
+            <>
+              {goals.map((goal) => {
+                const targetBits = [
+                  goal.target_weight_kg != null && `Target: ${goal.target_weight_kg} kg`,
+                  goal.target_body_fat_pct != null && `Target: ${goal.target_body_fat_pct}%`,
+                  goal.target_date && `by ${formatDate(goal.target_date)}`,
+                ].filter(Boolean);
+
+                let pct: number | null = null;
+                if (goal.goal_type === "lose_weight" && goal.target_weight_kg != null) {
+                  pct = progressPercent(
+                    nearestToDate(bodyComposition, goal.start_date, (r) => r.weight_kg),
+                    currentWeight,
+                    goal.target_weight_kg,
+                  );
+                } else if (goal.goal_type === "reduce_body_fat" && goal.target_body_fat_pct != null) {
+                  pct = progressPercent(
+                    nearestToDate(bodyComposition, goal.start_date, (r) => r.body_fat_percentage),
+                    currentBodyFat,
+                    goal.target_body_fat_pct,
+                  );
+                }
+
+                return (
+                  <div key={goal.id} style={{ opacity: goal.is_achieved ? 0.6 : 1 }}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span
+                        className="flex items-center gap-1.5"
+                        style={{ color: "var(--light-text-secondary)" }}
+                      >
+                        {goalLabel(goal)}
+                        {goal.is_achieved && (
+                          <span
+                            className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
+                            style={{ backgroundColor: "rgba(34,197,94,0.15)", color: "#22C55E" }}
+                          >
+                            <Check size={9} />
+                            Achieved
+                          </span>
+                        )}
+                      </span>
+                      <span style={{ color: "var(--light-text-muted)" }}>
+                        {targetBits.length > 0 ? targetBits.join(" • ") : "No target set"}
+                      </span>
+                    </div>
+                    {pct != null && (
+                      <div className="flex items-center gap-2">
+                        <Progress value={pct} className="h-2 flex-1" />
+                        <span
+                          className="text-[10px] font-medium shrink-0"
+                          style={{ color: "var(--azfit-primary)" }}
+                        >
+                          {pct}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </>
+          ) : (
+            <>
+              {/* Fallback: clients-row snapshot goal (pre-goals-system clients) */}
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span style={{ color: "var(--light-text-secondary)" }}>
+                    Weight Goal
+                  </span>
+                  <span
+                    style={{
+                      color: weightChange <= 0 ? "var(--success)" : "var(--danger)",
+                    }}
+                  >
+                    {weightChange > 0
+                      ? `+${weightChange} kg to lose`
+                      : weightChange < 0
+                        ? `${Math.abs(weightChange)} kg to gain`
+                        : "At goal"}
+                  </span>
+                </div>
+                <Progress
+                  value={
+                    client.goalWeight
+                      ? Math.min(
+                          100,
+                          Math.max(
+                            0,
+                            100 - (Math.abs(weightChange) / currentWeight) * 100,
+                          ),
+                        )
+                      : 0
+                  }
+                  className="h-2"
+                />
+                <button
+                  onClick={() => setGoalsOpen(true)}
+                  className="mt-1.5 text-[10px] font-medium transition hover:opacity-80"
+                  style={{ color: "var(--azfit-primary)" }}
+                >
+                  + Set goals to track progress
+                </button>
+              </div>
+            </>
+          )}
           <div>
             <div className="flex justify-between text-xs mb-1">
               <span style={{ color: "var(--light-text-secondary)" }}>
@@ -288,6 +405,14 @@ export default function OverviewTab({
         isOpen={showWizard}
         onClose={() => setShowWizard(false)}
         onSaved={() => setShowWizard(false)}
+      />
+
+      <ClientGoalsDialog
+        open={goalsOpen}
+        onOpenChange={setGoalsOpen}
+        clientId={clientId}
+        goals={goals}
+        onChanged={fetchGoals}
       />
     </div>
   );
