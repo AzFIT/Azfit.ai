@@ -21,6 +21,14 @@ interface TdeeCalculatorProps {
   clientId: string;
   /** profiles.id to write nutrition_targets for. Omit = current user. */
   targetProfileId?: string | null;
+  /** When provided, Apply calls this INSTEAD of writing nutrition_targets
+   * (used for account-less clients — targets go to intake_profile). */
+  onApplyTargets?: (t: {
+    calories: number;
+    protein_g: number;
+    carbs_g: number;
+    fats_g: number;
+  }) => Promise<void>;
   onApplied?: () => void;
 }
 
@@ -48,6 +56,7 @@ function ageFromDob(dob: string | null): number {
 export default function TdeeCalculator({
   clientId,
   targetProfileId,
+  onApplyTargets,
   onApplied,
 }: TdeeCalculatorProps) {
   const [open, setOpen] = useState(false);
@@ -107,15 +116,24 @@ export default function TdeeCalculator({
     if (!result) return;
     setSaving(true);
     try {
-      await saveNutritionTargets(
-        {
+      if (onApplyTargets) {
+        await onApplyTargets({
           calories: result.calories,
-          protein: result.macros.protein,
-          carbs: result.macros.carbs,
-          fats: result.macros.fats,
-        },
-        targetProfileId ?? undefined
-      );
+          protein_g: result.macros.protein,
+          carbs_g: result.macros.carbs,
+          fats_g: result.macros.fats,
+        });
+      } else {
+        await saveNutritionTargets(
+          {
+            calories: result.calories,
+            protein: result.macros.protein,
+            carbs: result.macros.carbs,
+            fats: result.macros.fats,
+          },
+          targetProfileId ?? undefined
+        );
+      }
       toast.success("Targets updated from TDEE");
       onApplied?.();
     } catch (err) {
