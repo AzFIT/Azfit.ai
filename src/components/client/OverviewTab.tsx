@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   User,
@@ -11,19 +11,20 @@ import {
   Dumbbell,
   Flame,
   Activity,
-  Droplets,
+  Utensils,
   Plus,
 } from "lucide-react";
-import type { Client, ClientNutritionPlan } from "@/types/client";
+import type { Client } from "@/types/client";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabase";
+import { getDayTotals, type MacroTotals } from "@/lib/foodApi";
 import { useBodyComposition } from "@/components/bodycomp/useBodyComposition";
 import { AssessmentWizard } from "@/components/bodycomp/AssessmentWizard";
 
 interface OverviewTabProps {
   client: Client;
   clientId: string;
-  nutritionPlan: ClientNutritionPlan | null;
 }
 
 const fadeUp = {
@@ -35,7 +36,6 @@ const fadeUp = {
 export default function OverviewTab({
   client,
   clientId,
-  nutritionPlan,
 }: OverviewTabProps) {
   const [showWizard, setShowWizard] = useState(false);
   const {
@@ -258,73 +258,7 @@ export default function OverviewTab({
         </motion.div>
 
         {/* Nutrition Targets */}
-        <motion.div
-          {...fadeUp}
-          className="rounded-2xl border p-4"
-          style={{
-            backgroundColor: "var(--card-bg)",
-            borderColor: "var(--card-border)",
-          }}
-        >
-          <h3
-            className="text-sm font-semibold mb-3"
-            style={{ color: "var(--page-text)" }}
-          >
-            Nutrition Targets
-          </h3>
-          {nutritionPlan ? (
-            <div className="space-y-3">
-              <MacroRow
-                label="Calories"
-                value={`${nutritionPlan.calorieGoal}`}
-                color="#F59E0B"
-                percent={100}
-              />
-              <MacroRow
-                label="Protein"
-                value={`${nutritionPlan.proteinGrams}g`}
-                color="#0D9488"
-                percent={Math.round(
-                  ((nutritionPlan.proteinGrams * 4) /
-                    nutritionPlan.calorieGoal) *
-                    100,
-                )}
-              />
-              <MacroRow
-                label="Carbs"
-                value={`${nutritionPlan.carbsGrams}g`}
-                color="#06B6D4"
-                percent={Math.round(
-                  ((nutritionPlan.carbsGrams * 4) / nutritionPlan.calorieGoal) *
-                    100,
-                )}
-              />
-              <MacroRow
-                label="Fats"
-                value={`${nutritionPlan.fatsGrams}g`}
-                color="#8B5CF6"
-                percent={Math.round(
-                  ((nutritionPlan.fatsGrams * 9) / nutritionPlan.calorieGoal) *
-                    100,
-                )}
-              />
-              <div
-                className="pt-2 border-t"
-                style={{ borderColor: "var(--card-border)" }}
-              >
-                <InfoRow
-                  icon={Droplets}
-                  label="Water Goal"
-                  value={`${nutritionPlan.waterGoal} ml`}
-                />
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm" style={{ color: "var(--light-text-muted)" }}>
-              No nutrition plan set.
-            </p>
-          )}
-        </motion.div>
+        <NutritionCard clientEmail={client.email} />
       </div>
 
       {/* Body Composition */}
@@ -343,6 +277,170 @@ export default function OverviewTab({
         onSaved={() => setShowWizard(false)}
       />
     </div>
+  );
+}
+
+function NutritionCard({ clientEmail }: { clientEmail: string }) {
+  const [loading, setLoading] = useState(true);
+  const [noProfile, setNoProfile] = useState(false);
+  const [targets, setTargets] = useState<{
+    calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+  } | null>(null);
+  const [totals, setTotals] = useState<MacroTotals>({
+    calories: 0,
+    protein: 0,
+    carbs: 0,
+    fats: 0,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      // nutrition_targets keys on profiles.id — resolve via the client's email
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("email", clientEmail)
+        .maybeSingle();
+      if (cancelled) return;
+      if (!prof) {
+        setNoProfile(true);
+        setLoading(false);
+        return;
+      }
+
+      const today = new Date().toISOString().split("T")[0];
+      const [{ data: t }, dayTotals] = await Promise.all([
+        supabase
+          .from("nutrition_targets")
+          .select("*")
+          .eq("user_id", prof.id)
+          .maybeSingle(),
+        getDayTotals(today, prof.id),
+      ]);
+      if (cancelled) return;
+      setTargets(
+        t
+          ? {
+              calories: t.calories ?? 0,
+              protein: t.protein_g ?? 0,
+              carbs: t.carbs_g ?? 0,
+              fats: t.fats_g ?? 0,
+            }
+          : null,
+      );
+      setTotals(dayTotals);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientEmail]);
+
+  return (
+    <motion.div
+      {...fadeUp}
+      className="rounded-2xl border p-4"
+      style={{
+        backgroundColor: "var(--card-bg)",
+        borderColor: "var(--card-border)",
+      }}
+    >
+      <div className="mb-3 flex items-center gap-2">
+        <Utensils size={14} style={{ color: "var(--azfit-primary)" }} />
+        <h3
+          className="text-sm font-semibold"
+          style={{ color: "var(--page-text)" }}
+        >
+          Nutrition Targets
+        </h3>
+        {!loading && targets && (
+          <span
+            className="text-[10px]"
+            style={{ color: "var(--light-text-muted)" }}
+          >
+            today / target
+          </span>
+        )}
+      </div>
+      {loading ? (
+        <div className="h-24 animate-pulse rounded-xl bg-slate-800" />
+      ) : noProfile ? (
+        <p className="text-sm" style={{ color: "var(--light-text-muted)" }}>
+          No linked app account for this client yet
+        </p>
+      ) : targets ? (
+        <div className="space-y-3">
+          <MacroRow
+            label="Calories"
+            value={`${totals.calories} / ${targets.calories}`}
+            color="#F59E0B"
+            percent={
+              targets.calories > 0
+                ? Math.min(100, Math.round((totals.calories / targets.calories) * 100))
+                : 0
+            }
+          />
+          <MacroRow
+            label="Protein"
+            value={`${totals.protein} / ${targets.protein}g`}
+            color="#0D9488"
+            percent={
+              targets.protein > 0
+                ? Math.min(100, Math.round((totals.protein / targets.protein) * 100))
+                : 0
+            }
+          />
+          <MacroRow
+            label="Carbs"
+            value={`${totals.carbs} / ${targets.carbs}g`}
+            color="#06B6D4"
+            percent={
+              targets.carbs > 0
+                ? Math.min(100, Math.round((totals.carbs / targets.carbs) * 100))
+                : 0
+            }
+          />
+          <MacroRow
+            label="Fats"
+            value={`${totals.fats} / ${targets.fats}g`}
+            color="#8B5CF6"
+            percent={
+              targets.fats > 0
+                ? Math.min(100, Math.round((totals.fats / targets.fats) * 100))
+                : 0
+            }
+          />
+          {totals.calories === 0 &&
+            totals.protein === 0 &&
+            totals.carbs === 0 &&
+            totals.fats === 0 && (
+              <p
+                className="text-[10px] text-center"
+                style={{ color: "var(--light-text-muted)" }}
+              >
+                Nothing logged today
+              </p>
+            )}
+        </div>
+      ) : (
+        <div>
+          <p className="text-sm" style={{ color: "var(--light-text-muted)" }}>
+            No nutrition targets set
+          </p>
+          <p
+            className="text-[10px] mt-1"
+            style={{ color: "var(--light-text-muted)" }}
+          >
+            Set them in the Nutrition tab.
+          </p>
+        </div>
+      )}
+    </motion.div>
   );
 }
 

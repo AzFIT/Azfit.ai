@@ -25,12 +25,7 @@ import {
   ClientPhotosTab,
   ClientFormChecksTab,
 } from "@/components/client";
-import type { Client, ClientNote, ClientGeneratedProgram } from "@/types/client";
-import {
-  getClientNutritionPlan,
-  getClientNotes,
-  saveClientNotes,
-} from "@/lib/client-demo";
+import type { Client, ClientGeneratedProgram } from "@/types/client";
 import { supabase } from "@/lib/supabase";
 import { codeFromOrderIndex, parseExerciseNotes } from "@/lib/aiProgramMapper";
 import { toast } from "sonner";
@@ -173,7 +168,6 @@ export default function ClientProfile() {
     (tabs.find((t) => t.id === urlTab)?.id as TabId) || "overview"
   );
   const [client, setClient] = useState<Client | null>(null);
-  const [notes, setNotes] = useState<ClientNote[]>([]);
   const [programs, setPrograms] = useState<ClientGeneratedProgram[]>([]);
   const [loading, setLoading] = useState(hasValidId);
   const navigate = useNavigate();
@@ -193,10 +187,8 @@ export default function ClientProfile() {
 
       if (error || !data) {
         setClient(null);
-        setNotes([]);
       } else {
         setClient(mapDbClientToClient(data));
-        setNotes(getClientNotes(data.id));
       }
       setLoading(false);
     };
@@ -216,33 +208,6 @@ export default function ClientProfile() {
       cancelled = true;
     };
   }, [client?.id]);
-
-  const handleAddNote = useCallback(
-    (content: string) => {
-      if (!clientId) return;
-      const newNote: ClientNote = {
-        id: `note_${Date.now()}`,
-        clientId,
-        content,
-        createdAt: new Date().toISOString(),
-        createdBy: "Coach",
-      };
-      const updated = [newNote, ...notes];
-      setNotes(updated);
-      saveClientNotes(clientId, updated);
-    },
-    [clientId, notes]
-  );
-
-  const handleDeleteNote = useCallback(
-    (noteId: string) => {
-      if (!clientId) return;
-      const updated = notes.filter((n) => n.id !== noteId);
-      setNotes(updated);
-      saveClientNotes(clientId, updated);
-    },
-    [clientId, notes]
-  );
 
   const handleBuildProgram = useCallback(() => {
     if (!client) return;
@@ -327,8 +292,6 @@ export default function ClientProfile() {
     );
   }
 
-  const nutritionPlan = getClientNutritionPlan(client.id);
-
   return (
     <div
       className="min-h-screen pb-8"
@@ -386,7 +349,7 @@ export default function ClientProfile() {
             transition={{ duration: 0.2 }}
           >
             {activeTab === "overview" && (
-              <OverviewTab client={client} clientId={clientId!} nutritionPlan={nutritionPlan} />
+              <OverviewTab client={client} clientId={clientId!} />
             )}
             {activeTab === "bio" && <BioHistoryTab clientId={client.id} />}
             {activeTab === "nutrition" && (
@@ -399,13 +362,7 @@ export default function ClientProfile() {
             )}
             {activeTab === "photos" && <ClientPhotosTab clientEmail={client.email} />}
             {activeTab === "formchecks" && <ClientFormChecksTab clientEmail={client.email} />}
-            {activeTab === "notes" && (
-              <NotesTab
-                notes={notes}
-                onAddNote={handleAddNote}
-                onDeleteNote={handleDeleteNote}
-              />
-            )}
+            {activeTab === "notes" && <NotesTab clientId={client.id} />}
           </motion.div>
         </AnimatePresence>
       </div>

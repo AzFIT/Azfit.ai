@@ -1780,5 +1780,44 @@ CREATE POLICY "Public read method_program_template_scores"
   USING (true);
 
 -- ============================================================
+-- Phase 23: trainer-private client notes (trainer-only RLS; no
+-- client policies at all). Keys on clients(id) via is_my_client_id.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.client_notes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  trainer_id UUID NOT NULL REFERENCES profiles(id),
+  note TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.client_notes ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Trainers can read their client notes"
+  ON public.client_notes FOR SELECT TO authenticated
+  USING (public.is_trainer() AND public.is_my_client_id(client_id));
+
+CREATE POLICY "Trainers can add notes to their clients"
+  ON public.client_notes FOR INSERT TO authenticated
+  WITH CHECK (
+    trainer_id = auth.uid()
+    AND public.is_trainer() AND public.is_my_client_id(client_id)
+  );
+
+CREATE POLICY "Trainers can update their client notes"
+  ON public.client_notes FOR UPDATE TO authenticated
+  USING (public.is_trainer() AND public.is_my_client_id(client_id))
+  WITH CHECK (
+    trainer_id = auth.uid()
+    AND public.is_trainer() AND public.is_my_client_id(client_id)
+  );
+
+CREATE POLICY "Trainers can delete their client notes"
+  ON public.client_notes FOR DELETE TO authenticated
+  USING (public.is_trainer() AND public.is_my_client_id(client_id));
+
+-- ============================================================
 -- DONE! Your AzFIT database is ready.
 -- ============================================================
