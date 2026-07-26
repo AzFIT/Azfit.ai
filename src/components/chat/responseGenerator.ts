@@ -215,7 +215,7 @@ function faqPathForAnswer(answer: string): string {
   if (answer.includes('/messages')) return '/messages';
   if (answer.includes('/check-ins')) return '/check-ins';
   if (answer.includes('/clients')) return '/clients';
-  if (answer.includes('/program-builder')) return '/program-builder';
+  if (answer.includes('/program-builder')) return '/ai-program-builder';
   if (answer.includes('/nutrition')) return '/nutrition';
   if (answer.includes('/progress-photos')) return '/progress-photos';
   return '/dashboard';
@@ -279,10 +279,9 @@ function handleGenerateProgram(input: string): ResponseResult {
   };
 
   return {
-    text: `Here's a ${weeks}-week ${daysPerWeek}-day ${goal} STARTING TEMPLATE. You can customize it in the Program Builder or use the AI Program Builder for more options.`,
+    text: `Here's a ${weeks}-week ${daysPerWeek}-day ${goal} STARTING TEMPLATE. You can customize it in the Program Builder.`,
     actions: [
-      { label: 'Open in Program Builder', type: 'navigate', payload: '/program-builder' },
-      { label: 'AI Program Builder', type: 'navigate', payload: '/ai-program-builder' },
+      { label: 'Open in Program Builder', type: 'navigate', payload: '/ai-program-builder' },
     ],
     content: programContent,
   };
@@ -326,7 +325,7 @@ function handleExerciseSubstitute(input: string): ResponseResult {
     return {
       text: `Got it! Replaced ${matchedExercise} with ${sub.replacement} to reduce ${reason}. Open the Program Builder to apply this to a workout.`,
       actions: [
-        { label: 'Open Program Builder', type: 'navigate', payload: '/program-builder' },
+        { label: 'Open Program Builder', type: 'navigate', payload: '/ai-program-builder' },
         { label: 'Explain Choice', type: 'suggest', payload: 'why this substitution?' },
       ],
       content: swapContent,
@@ -345,7 +344,7 @@ function handleExerciseSubstitute(input: string): ResponseResult {
             type: 'suggest' as const,
             payload: `swap ${s.name}`,
           })),
-          { label: 'Open Program Builder', type: 'navigate', payload: '/program-builder' },
+          { label: 'Open Program Builder', type: 'navigate', payload: '/ai-program-builder' },
         ],
       };
     }
@@ -557,7 +556,7 @@ function handleWorkoutIntent(input: string, _currentPage?: PageContext, userRole
       text: "Ready to crush a workout? 💪 You can start a session or view your program.",
       actions: [
         { label: 'Start Workout', type: 'navigate', payload: '/sheets' },
-        ...(userRole === 'trainer' ? [{ label: 'Program Builder', type: 'navigate', payload: '/program-builder' } as ChatAction] : []),
+        ...(userRole === 'trainer' ? [{ label: 'Program Builder', type: 'navigate', payload: '/ai-program-builder' } as ChatAction] : []),
       ],
     };
   }
@@ -570,7 +569,7 @@ function handleWorkoutIntent(input: string, _currentPage?: PageContext, userRole
           : "Your trainer will assign programs. You can view them in your dashboard.",
       actions:
         userRole === 'trainer'
-          ? [{ label: 'Program Builder', type: 'navigate', payload: '/program-builder' }]
+          ? [{ label: 'Program Builder', type: 'navigate', payload: '/ai-program-builder' }]
           : [{ label: 'View Dashboard', type: 'navigate', payload: '/dashboard' }],
     };
   }
@@ -701,7 +700,7 @@ function handleNavigationIntent(input: string, _currentPage?: PageContext): Resp
     { name: 'workout', path: '/sheets' },
     { name: 'nutrition', path: '/nutrition' },
     { name: 'bioprint', path: '/bioprint' },
-    { name: 'program', path: '/program-builder' },
+    { name: 'program', path: '/ai-program-builder' },
     { name: 'ai coach', path: '/coach-ai' },
   ]) {
     if (lower.includes(page.name)) {

@@ -142,7 +142,7 @@ export default function Coach() {
                   e.currentTarget.style.backgroundColor = '#0D9488';
                   e.currentTarget.style.boxShadow = 'none';
                 }}
-                onClick={() => navigate('/program-builder')}
+                onClick={() => navigate('/ai-program-builder')}
               >
                 <Plus size={16} />
                 New Program
@@ -160,7 +160,7 @@ export default function Coach() {
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'var(--card-bg)';
                 }}
-                onClick={() => navigate('/program-builder')}
+                onClick={() => navigate('/ai-program-builder')}
               >
                 <ClipboardList size={16} />
                 Program Builder

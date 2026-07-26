@@ -145,10 +145,11 @@ export function buildProgramInsert(
   };
 }
 
-export function buildWorkoutRows(data: ProgramData): Omit<DbWorkoutInsert, "program_id">[] {
+export function buildWorkoutRows(data: ProgramData): (Omit<DbWorkoutInsert, "program_id"> & { id?: string })[] {
   return data.split
     .filter((d) => d.active)
     .map((d) => ({
+      ...(d.dbId ? { id: d.dbId } : {}),
       name: d.workout || "Workout",
       day_of_week: DAY_TO_INDEX[d.day] || 1,
       week_number: 1,
@@ -158,8 +159,9 @@ export function buildWorkoutRows(data: ProgramData): Omit<DbWorkoutInsert, "prog
 
 export function buildExerciseRows(
   exercises: ProgramExercise[]
-): Omit<DbExerciseInsert, "workout_id">[] {
+): (Omit<DbExerciseInsert, "workout_id"> & { id?: string })[] {
   return exercises.map((ex) => ({
+    ...(ex.dbId ? { id: ex.dbId } : {}),
     name: ex.name,
     sets: ex.sets || 0,
     reps: ex.reps || "",
@@ -253,30 +255,40 @@ export function programDataFromDb(
       day,
       active: !!workout,
       workout: workout?.name || "Rest Day",
+      ...(workout ? { dbId: workout.id } : {}),
     };
   });
 
-  const firstWorkout = workouts[0];
-  let programExercises: ProgramExercise[] = defaultData.exercises;
-  if (firstWorkout) {
-    const workoutExercises = exercises
-      .filter((e) => e.workout_id === firstWorkout.id)
-      .sort((a, b) => a.order_index - b.order_index);
-    if (workoutExercises.length > 0) {
-      programExercises = workoutExercises.map((ex) => {
-        const extra = parseExerciseNotes(ex.notes);
-        return {
-          code: codeFromOrderIndex(ex.order_index),
-          name: ex.name,
-          sets: ex.sets || 0,
-          reps: ex.reps || "",
-          pct1RM: extra.pct1RM,
-          tempo: extra.tempo,
-          rest: restStringFromSeconds(ex.rest_seconds || 60),
-        };
-      });
-    }
+  // Lossless: every workout day keeps its own exercise list (keyed by
+  // day_of_week), each exercise carrying its DB id for diff-based saves.
+  const toProgramExercise = (ex: ExerciseRow): ProgramExercise => {
+    const extra = parseExerciseNotes(ex.notes);
+    return {
+      code: codeFromOrderIndex(ex.order_index),
+      name: ex.name,
+      sets: ex.sets || 0,
+      reps: ex.reps || "",
+      pct1RM: extra.pct1RM,
+      tempo: extra.tempo,
+      rest: restStringFromSeconds(ex.rest_seconds || 60),
+      dbId: ex.id,
+    };
+  };
+
+  const workoutExercises: Record<number, ProgramExercise[]> = {};
+  for (const w of workouts) {
+    const dayIdx = w.day_of_week ?? 1;
+    const list = exercises
+      .filter((e) => e.workout_id === w.id)
+      .sort((a, b) => a.order_index - b.order_index)
+      .map(toProgramExercise);
+    if (list.length > 0) workoutExercises[dayIdx] = list;
   }
+
+  // `exercises` mirrors the first non-empty day's list (kept for shared-list
+  // consumers like summary stats); per-day lists are the source of truth.
+  const programExercises: ProgramExercise[] =
+    Object.values(workoutExercises)[0] || defaultData.exercises;
 
   return {
     ...defaultData,
@@ -298,6 +310,7 @@ export function programDataFromDb(
     ],
     split,
     exercises: programExercises,
+    workoutExercises,
   };
 }
 

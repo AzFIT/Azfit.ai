@@ -20,7 +20,6 @@ import {
   Mail,
   FileSpreadsheet,
   Megaphone,
-  Wand2,
   Dumbbell,
   Scale,
 } from "lucide-react";
@@ -781,12 +780,6 @@ export default function TrainerDashboard() {
               label: "Build Program",
               icon: Dumbbell,
               color: "#8B5CF6",
-              onClick: () => navigate("/program-builder"),
-            },
-            {
-              label: "AI Builder",
-              icon: Wand2,
-              color: "#06B6D4",
               onClick: () => navigate("/ai-program-builder"),
             },
             {

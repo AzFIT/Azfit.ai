@@ -5,12 +5,12 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Zap, Bot, Save, RotateCcw, Check,
   Dumbbell, TrendingUp, Flame, Wind, HeartPulse, Pencil, Trash2,
-  Plus, Eye, BarChart3, Download, X, Search, Target, Award, Sparkles,
+  Plus, Eye, BarChart3, Download, X, Target, Award, Sparkles,
   AlertTriangle, Layers, Calendar, Users, Play, ArrowLeft, Upload,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -41,9 +41,9 @@ import { Textarea } from '@/components/ui/textarea';
 // TYPES
 export interface ClientContext { ageRange: string; experience: string; bodyType: string; availability: string; limitations: string[]; otherLimitation: string; }
 export interface ProgramPhase { id: string; name: string; weeks: number; focus: string; color: string; active: boolean; }
-export interface ProgramSplit { day: string; active: boolean; workout: string; }
-export interface ProgramExercise { code: string; name: string; sets: number; reps: string; pct1RM: string; tempo: string; rest: string; }
-export interface ProgramData { id?: string; goal: string; method: string; clientContext: ClientContext; phases: ProgramPhase[]; weeklyHours: number; split: ProgramSplit[]; exercises: ProgramExercise[]; programName: string; description: string; tags: string[]; isPublic: boolean; assignedClient: string; }
+export interface ProgramSplit { day: string; active: boolean; workout: string; dbId?: string; }
+export interface ProgramExercise { code: string; name: string; sets: number; reps: string; pct1RM: string; tempo: string; rest: string; dbId?: string; }
+export interface ProgramData { id?: string; goal: string; method: string; clientContext: ClientContext; phases: ProgramPhase[]; weeklyHours: number; split: ProgramSplit[]; exercises: ProgramExercise[]; workoutExercises?: Record<number, ProgramExercise[]>; programName: string; description: string; tags: string[]; isPublic: boolean; assignedClient: string; }
 export interface SavedProgram { id: string; createdAt: string; updatedAt: string; data: ProgramData; }
 interface StepProps { data: ProgramData; updateData: (partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => void; onSave?: () => void; onSaveAndAssign?: () => void; program?: GeneratedProgram | null; clientName?: string; clients?: ClientRow[]; }
 
@@ -121,6 +121,28 @@ async function saveProgramToSupabase(
   let programId = data.id;
 
   if (programId) {
+    // Editing an existing program: preserve start_date/status/assignment,
+    // recompute end_date from the preserved start if the duration changed.
+    const { data: existing } = await supabase
+      .from('programs')
+      .select('start_date, status, client_id')
+      .eq('id', programId)
+      .single();
+    if (existing) {
+      programPayload.start_date = existing.start_date;
+      programPayload.end_date = existing.start_date
+        ? new Date(
+            new Date(existing.start_date).getTime() +
+              programPayload.duration_weeks * 7 * 24 * 60 * 60 * 1000
+          )
+            .toISOString()
+            .split('T')[0]
+        : null;
+      if (!assignedClientId) {
+        programPayload.status = existing.status as 'draft' | 'active';
+        programPayload.client_id = existing.client_id;
+      }
+    }
     const { error } = await supabase
       .from('programs')
       .update(programPayload)
@@ -136,33 +158,97 @@ async function saveProgramToSupabase(
     programId = inserted.id;
   }
 
-  await supabase.from('workouts').delete().eq('program_id', programId);
-
-  const workoutRows = buildWorkoutRows(data).map((w) => ({ ...w, program_id: programId! }));
-  if (workoutRows.length === 0) {
-    workoutRows.push({
-      program_id: programId!,
-      name: 'Workout',
-      day_of_week: 1,
-      week_number: 1,
-      notes: null,
-    });
-  }
-
-  const { data: insertedWorkouts, error: wError } = await supabase
+  // ── Workouts: diff by id (keeps workout_logs.workout_id links intact) ──
+  const { data: existingWorkouts, error: ewError } = await supabase
     .from('workouts')
-    .insert(workoutRows)
-    .select('id, day_of_week');
-  if (wError || !insertedWorkouts) throw wError;
+    .select('id')
+    .eq('program_id', programId);
+  if (ewError) throw ewError;
 
-  const exerciseRows = buildExerciseRows(data.exercises);
-  const allExercises: DbExerciseInsert[] = [];
-  for (const w of insertedWorkouts as WorkoutRow[]) {
-    allExercises.push(...exerciseRows.map((e) => ({ ...e, workout_id: w.id })));
+  const desiredWorkouts = buildWorkoutRows(data);
+  if (desiredWorkouts.length === 0) {
+    desiredWorkouts.push({ name: 'Workout', day_of_week: 1, week_number: 1, notes: null });
   }
-  if (allExercises.length > 0) {
-    const { error: eError } = await supabase.from('exercises').insert(allExercises);
-    if (eError) throw eError;
+
+  const keepWorkoutIds = new Set(desiredWorkouts.filter((w) => w.id).map((w) => w.id));
+  const deleteWorkoutIds = ((existingWorkouts as { id: string }[]) || [])
+    .filter((w) => !keepWorkoutIds.has(w.id))
+    .map((w) => w.id);
+  if (deleteWorkoutIds.length > 0) {
+    const { error } = await supabase.from('workouts').delete().in('id', deleteWorkoutIds);
+    if (error) throw error;
+  }
+
+  const dayToWorkoutId = new Map<number, string>();
+  for (const w of desiredWorkouts) {
+    if (w.id) {
+      const { error } = await supabase
+        .from('workouts')
+        .update({ name: w.name, day_of_week: w.day_of_week, week_number: w.week_number, notes: w.notes })
+        .eq('id', w.id);
+      if (error) throw error;
+      dayToWorkoutId.set(w.day_of_week, w.id);
+    } else {
+      const insertRow = { ...w };
+      delete insertRow.id;
+      const { data: insertedW, error } = await supabase
+        .from('workouts')
+        .insert({ ...insertRow, program_id: programId! })
+        .select('id')
+        .single();
+      if (error || !insertedW) throw error;
+      dayToWorkoutId.set(w.day_of_week, insertedW.id);
+    }
+  }
+
+  // ── Exercises: diff by id across all workouts (per-day lists win) ──
+  const allWorkoutIds = [...dayToWorkoutId.values()];
+  let existingExercises: { id: string; workout_id: string }[] = [];
+  if (allWorkoutIds.length > 0) {
+    const { data: exRows, error: eeError } = await supabase
+      .from('exercises')
+      .select('id, workout_id')
+      .in('workout_id', allWorkoutIds);
+    if (eeError) throw eeError;
+    existingExercises = (exRows as { id: string; workout_id: string }[]) || [];
+  }
+
+  const desiredByWorkout = new Map<string, (Omit<DbExerciseInsert, 'workout_id'> & { id?: string })[]>();
+  const keepExerciseIds = new Set<string>();
+  for (const [dayIdx, workoutId] of dayToWorkoutId) {
+    const list = data.workoutExercises?.[dayIdx] ?? data.exercises;
+    const rows = buildExerciseRows(list);
+    desiredByWorkout.set(workoutId, rows);
+    for (const r of rows) if (r.id) keepExerciseIds.add(r.id);
+  }
+
+  const deleteExerciseIds = existingExercises
+    .filter((e) => !keepExerciseIds.has(e.id))
+    .map((e) => e.id);
+  if (deleteExerciseIds.length > 0) {
+    const { error } = await supabase.from('exercises').delete().in('id', deleteExerciseIds);
+    if (error) throw error;
+  }
+
+  for (const [workoutId, rows] of desiredByWorkout) {
+    for (const r of rows) {
+      if (r.id) {
+        const updateRow = { ...r };
+        delete updateRow.id;
+        const { error } = await supabase
+          .from('exercises')
+          .update({ ...updateRow, workout_id: workoutId })
+          .eq('id', r.id);
+        if (error) throw error;
+      } else {
+        const insertRow = { ...r };
+        delete insertRow.id;
+        const { error } = await supabase
+          .from('exercises')
+          .insert({ ...insertRow, workout_id: workoutId });
+        if (error) throw error;
+      }
+    }
   }
 
   const { data: programRow, error: fetchError } = await supabase
@@ -566,26 +652,91 @@ function Step5Split({ data, updateData }: StepProps) {
   );
 }
 
+const SPLIT_DAY_INDEX: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+
 function Step6Exercises({ data, updateData }: StepProps) {
   const [openRows, setOpenRows] = useState<Record<number, boolean>>({});
-  const updateExercise = useCallback((idx: number, field: keyof ProgramExercise, value: string | number) => updateData((prev) => ({ exercises: prev.exercises.map((e, i) => (i === idx ? { ...e, [field]: value } : e)) })), [updateData]);
-  const deleteExercise = useCallback((idx: number) => updateData((prev) => ({ exercises: prev.exercises.filter((_, i) => i !== idx) })), [updateData]);
-  const addExercise = useCallback(() => updateData((prev) => ({ exercises: [...prev.exercises, { code: `B${prev.exercises.length + 1}`, name: 'New Exercise', sets: 3, reps: '10', pct1RM: 'N/A', tempo: '2-0-1-0', rest: '2:00' }] })), [updateData]);
-  const handleAutoFill = useCallback(() => updateData({ exercises: DEFAULT_EXERCISES.map((e) => ({ ...e })) }), [updateData]);
+  const perDay = data.workoutExercises != null;
+  const activeDays = data.split.filter((d) => d.active);
+  const [selectedDay, setSelectedDay] = useState<number>(() =>
+    activeDays[0] ? SPLIT_DAY_INDEX[activeDays[0].day] || 1 : 1
+  );
+
+  // In per-day mode (loaded from DB) each active day owns its exercise list;
+  // a day without a list yet falls back to the shared `exercises` template.
+  const list = perDay
+    ? (data.workoutExercises![selectedDay] ?? data.exercises)
+    : data.exercises;
+
+  const setList = useCallback(
+    (fn: (prev: ProgramExercise[]) => ProgramExercise[]) =>
+      updateData((prev) =>
+        perDay
+          ? {
+              workoutExercises: {
+                ...(prev.workoutExercises || {}),
+                [selectedDay]: fn(prev.workoutExercises?.[selectedDay] ?? prev.exercises),
+              },
+            }
+          : { exercises: fn(prev.exercises) }
+      ),
+    [updateData, perDay, selectedDay]
+  );
+
+  const updateExercise = useCallback(
+    (idx: number, field: keyof ProgramExercise, value: string | number) =>
+      setList((prev) => prev.map((e, i) => (i === idx ? { ...e, [field]: value } : e))),
+    [setList]
+  );
+  const deleteExercise = useCallback(
+    (idx: number) => setList((prev) => prev.filter((_, i) => i !== idx)),
+    [setList]
+  );
+  const addExercise = useCallback(
+    () =>
+      setList((prev) => [
+        ...prev,
+        { code: `B${prev.length + 1}`, name: 'New Exercise', sets: 3, reps: '10', pct1RM: 'N/A', tempo: '2-0-1-0', rest: '2:00' },
+      ]),
+    [setList]
+  );
+  const handleAutoFill = useCallback(() => setList(() => DEFAULT_EXERCISES.map((e) => ({ ...e }))), [setList]);
   const toggleRow = useCallback((idx: number) => setOpenRows((prev) => ({ ...prev, [idx]: !prev[idx] })), []);
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={handleAutoFill} className="border-[#8B5CF6] text-[#8B5CF6] hover:bg-[#8B5CF6]/10 text-xs"><Sparkles className="w-3.5 h-3.5 mr-1" />AI Auto-Fill</Button>
         <Button variant="outline" size="sm" onClick={addExercise} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs"><Plus className="w-3.5 h-3.5 mr-1" />Add Exercise</Button>
-        <Button variant="outline" size="sm" className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs"><Search className="w-3.5 h-3.5 mr-1" />Load from Library</Button>
       </div>
+
+      {perDay && activeDays.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {activeDays.map((d) => {
+            const idx = SPLIT_DAY_INDEX[d.day] || 1;
+            const isSelected = idx === selectedDay;
+            return (
+              <button
+                key={d.day}
+                onClick={() => setSelectedDay(idx)}
+                className={cn(
+                  'px-2.5 py-1.5 rounded-lg border text-[11px] font-medium transition-all',
+                  isSelected
+                    ? 'border-[#00AEEF] text-[#00AEEF] bg-[#00AEEF]/10'
+                    : 'border-[var(--card-border)] text-[var(--page-text)]/60 hover:border-[#00AEEF]/50'
+                )}
+              >
+                {d.day} · {d.workout.split('—')[0].trim() || 'Workout'}
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl overflow-hidden">
         <div className="grid grid-cols-9 gap-1 px-3 py-2 bg-[var(--page-bg)] border-b border-[var(--card-border)] text-[10px] text-[var(--page-text)]/60 font-semibold uppercase tracking-wider">
           <span>Code</span><span className="col-span-2">Exercise</span><span>Sets</span><span>Reps</span><span>%1RM</span><span>Tempo</span><span>Rest</span><span className="text-right">Actions</span>
         </div>
         <AnimatePresence>
-          {data.exercises.map((exercise, idx) => (
+          {list.map((exercise, idx) => (
             <motion.div key={`${exercise.code}-${idx}`} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="border-b border-[var(--card-border)] last:border-b-0">
               <div className="grid grid-cols-9 gap-1 px-3 py-2 items-center text-xs">
                 <span className="text-[#00AEEF] font-mono font-bold">{exercise.code}</span>
@@ -603,12 +754,14 @@ function Step6Exercises({ data, updateData }: StepProps) {
               <AnimatePresence>
                 {openRows[idx] && (
                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-3 pb-3 bg-[var(--page-bg)]">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 px-3 pb-3 bg-[var(--page-bg)]">
                       {[
+                        { label: 'Exercise Name', field: 'name' as const, type: 'text' },
                         { label: 'Sets', field: 'sets' as const, type: 'number' },
                         { label: 'Reps', field: 'reps' as const, type: 'text' },
                         { label: '%1RM', field: 'pct1RM' as const, type: 'text' },
                         { label: 'Tempo', field: 'tempo' as const, type: 'text' },
+                        { label: 'Rest', field: 'rest' as const, type: 'text' },
                       ].map((f) => (
                         <div key={f.field}>
                           <label className="text-[10px] text-[var(--page-text)]/60">{f.label}</label>
@@ -622,6 +775,11 @@ function Step6Exercises({ data, updateData }: StepProps) {
             </motion.div>
           ))}
         </AnimatePresence>
+        {list.length === 0 && (
+          <p className="px-3 py-6 text-center text-xs text-[var(--page-text)]/50">
+            No exercises on this day yet — use Add Exercise.
+          </p>
+        )}
       </div>
       <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-3">
         <h5 className="text-[var(--page-text)] text-xs font-semibold mb-1.5">Tempo Legend (Poliquin Notation)</h5>
@@ -640,12 +798,17 @@ function Step6Exercises({ data, updateData }: StepProps) {
 function Step7Preview({ data, program, clientName }: StepProps) {
   const navigate = useNavigate();
   const totalWeeks = useMemo(() => data.phases.filter((p) => p.active).reduce((s, p) => s + p.weeks, 0), [data.phases]);
-  const totalExercises = data.exercises.length;
-  const totalSets = data.exercises.reduce((sum, e) => sum + (e.sets || 0), 0);
+  // Per-day lists (loaded programs) are the source of truth when present.
+  const allExercises = useMemo(
+    () => (data.workoutExercises ? Object.values(data.workoutExercises).flat() : data.exercises),
+    [data.workoutExercises, data.exercises]
+  );
+  const totalExercises = allExercises.length;
+  const totalSets = allExercises.reduce((sum, e) => sum + (e.sets || 0), 0);
   const activeDays = data.split.filter((d) => d.active).length;
   const restDays = data.split.filter((d) => !d.active).length;
-  const intensity = useMemo(() => { const avgPct = data.exercises.reduce((sum, e) => { const num = parseFloat(e.pct1RM); return sum + (isNaN(num) ? 70 : num); }, 0) / totalExercises || 70; return Math.round(avgPct); }, [data.exercises, totalExercises]);
-  const avgRest = useMemo(() => { const rests = data.exercises.map((e) => parseInt(e.rest) || 90); return Math.round(rests.reduce((a, b) => a + b, 0) / rests.length); }, [data.exercises]);
+  const intensity = useMemo(() => { const avgPct = allExercises.reduce((sum, e) => { const num = parseFloat(e.pct1RM); return sum + (isNaN(num) ? 70 : num); }, 0) / totalExercises || 70; return Math.round(avgPct); }, [allExercises, totalExercises]);
+  const avgRest = useMemo(() => { const rests = allExercises.map((e) => parseInt(e.rest) || 90); return Math.round(rests.reduce((a, b) => a + b, 0) / rests.length); }, [allExercises]);
   const aiConfidence = useMemo(() => { let score = 70; if (data.goal) score += 10; if (data.method) score += 10; if (data.clientContext.ageRange) score += 5; if (data.phases.length > 0) score += 5; return Math.min(score, 98); }, [data]);
   const goalName = GOALS.find((g) => g.id === data.goal)?.name || '—';
   const methodName = METHODS.find((m) => m.id === data.method)?.name || '—';
@@ -751,22 +914,35 @@ function Step7Preview({ data, program, clientName }: StepProps) {
       <Card className="bg-[var(--card-bg)] border-[var(--card-border)] p-5">
         <h4 className="text-[var(--page-text)] text-sm font-bold mb-3 flex items-center gap-2"><Dumbbell className="w-4 h-4 text-[#8B5CF6]" />Exercise Breakdown — {totalExercises} exercises, {totalSets} sets/week</h4>
         <div className="grid grid-cols-12 gap-2 text-[10px] text-[var(--page-text)]/60 font-semibold border-b border-[var(--card-border)] pb-2 mb-2">
-          <div className="col-span-1">Code</div><div className="col-span-4">Exercise</div><div className="col-span-1 text-center">Sets</div><div className="col-span-1 text-center">Reps</div><div className="col-span-2 text-center">%1RM</div><div className="col-span-1 text-center">Tempo</div><div className="col-span-1 text-center">Rest</div><div className="col-span-1 text-center">Sets/Wk</div>
+          <div className="col-span-1">Code</div><div className="col-span-4">Exercise</div><div className="col-span-1 text-center">Sets</div><div className="col-span-1 text-center">Reps</div><div className="col-span-2 text-center">%1RM</div><div className="col-span-1 text-center">Tempo</div><div className="col-span-1 text-center">Rest</div>{!data.workoutExercises && <div className="col-span-1 text-center">Sets/Wk</div>}
         </div>
-        <div className="space-y-1.5">
-          {data.exercises.map((ex) => (
-            <div key={ex.code} className="grid grid-cols-12 gap-2 text-xs items-center py-1.5 border-b border-[var(--card-border)]/50 last:border-0">
-              <div className="col-span-1 text-[var(--page-text)] font-mono font-bold">{ex.code}</div>
-              <div className="col-span-4 text-[var(--page-text)]">{ex.name}</div>
-              <div className="col-span-1 text-center text-[var(--page-text)]/60">{ex.sets}</div>
-              <div className="col-span-1 text-center text-[var(--page-text)]/60">{ex.reps}</div>
-              <div className="col-span-2 text-center text-[#EF4444] font-mono">{ex.pct1RM}</div>
-              <div className="col-span-1 text-center text-[#8B5CF6] font-mono text-[10px]">{ex.tempo}</div>
-              <div className="col-span-1 text-center text-[var(--page-text)]/60">{ex.rest}s</div>
-              <div className="col-span-1 text-center text-[#00AEEF] font-mono">{ex.sets * activeDays}</div>
+        {(data.workoutExercises ? data.split.filter((d) => d.active) : [null]).map((dayEntry) => {
+          const dayList = dayEntry
+            ? (data.workoutExercises![SPLIT_DAY_INDEX[dayEntry.day] || 1] ?? [])
+            : data.exercises;
+          if (dayList.length === 0 && dayEntry) return null;
+          return (
+            <div key={dayEntry ? dayEntry.day : 'shared'} className="space-y-1.5 mb-3 last:mb-0">
+              {dayEntry && (
+                <p className="text-[11px] font-semibold text-[#00AEEF] mt-2">
+                  {dayEntry.day} — {dayEntry.workout || 'Workout'}
+                </p>
+              )}
+              {dayList.map((ex) => (
+                <div key={`${dayEntry?.day || 'shared'}-${ex.code}`} className="grid grid-cols-12 gap-2 text-xs items-center py-1.5 border-b border-[var(--card-border)]/50 last:border-0">
+                  <div className="col-span-1 text-[var(--page-text)] font-mono font-bold">{ex.code}</div>
+                  <div className="col-span-4 text-[var(--page-text)]">{ex.name}</div>
+                  <div className="col-span-1 text-center text-[var(--page-text)]/60">{ex.sets}</div>
+                  <div className="col-span-1 text-center text-[var(--page-text)]/60">{ex.reps}</div>
+                  <div className="col-span-2 text-center text-[#EF4444] font-mono">{ex.pct1RM}</div>
+                  <div className="col-span-1 text-center text-[#8B5CF6] font-mono text-[10px]">{ex.tempo}</div>
+                  <div className="col-span-1 text-center text-[var(--page-text)]/60">{ex.rest}s</div>
+                  {!data.workoutExercises && <div className="col-span-1 text-center text-[#00AEEF] font-mono">{ex.sets * activeDays}</div>}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          );
+        })}
       </Card>
 
       <Card className="bg-[var(--card-bg)] border-[var(--card-border)] p-5">
@@ -806,7 +982,9 @@ function Step8Save({ data, updateData, onSave, clients }: StepProps) {
 
   const totalWeeks = useMemo(() => data.phases.filter((p) => p.active).reduce((s, p) => s + p.weeks, 0), [data.phases]);
   const activeDays = useMemo(() => data.split.filter((d) => d.active).length, [data.split]);
-  const totalExercises = data.exercises.length;
+  const totalExercises = data.workoutExercises
+    ? Object.values(data.workoutExercises).flat().length
+    : data.exercises.length;
   const goalName = GOALS.find((g) => g.id === data.goal)?.name || '—';
   const methodName = METHODS.find((m) => m.id === data.method)?.name || '—';
   const clientName = selectedClient?.full_name || data.clientContext.experience || 'Unassigned';
@@ -987,6 +1165,34 @@ export default function AIProgramBuilderPage() {
     loadSavedPrograms(user.id).then(setSavedList).catch((err) => console.error('Failed to load saved programs:', err));
   }, [user]);
 
+  // Pre-select a client when arriving via /ai-program-builder?clientId=…
+  const [searchParams] = useSearchParams();
+  const presetClientId = searchParams.get('clientId');
+  useEffect(() => {
+    if (!presetClientId) return;
+    let cancelled = false;
+    (async () => {
+      const client = clients.find((c) => c.id === presetClientId);
+      if (!client || cancelled) return;
+      setBuildForClient(presetClientId);
+      updateData((prev) =>
+        prev.assignedClient
+          ? {}
+          : {
+              assignedClient: presetClientId,
+              clientContext: {
+                ...prev.clientContext,
+                ...clientContextFromClientFields({
+                  date_of_birth: client.date_of_birth,
+                  experience_level: client.experience_level,
+                }),
+              },
+            }
+      );
+    })();
+    return () => { cancelled = true; };
+  }, [presetClientId, clients, updateData]);
+
   const generationProfile = useMemo<ClientProfile>(() => {
     if (buildForClientRow) return profileFromClient(buildForClientRow);
     return loadClientProfile() || DEFAULT_PROFILE;
@@ -1068,7 +1274,12 @@ export default function AIProgramBuilderPage() {
   const dismissLegacy = useCallback(() => { localStorage.removeItem(PROGRAMS_STORAGE_KEY); setLegacySaved([]); }, []);
   const loadSavedProgram = useCallback((saved: SavedProgram) => { setData(saved.data); setCurrentStep(6); setMaxStep((s) => Math.max(s, 6)); }, []);
 
-  const stepComplete = useMemo(() => [!!data.goal, !!data.method, !!(data.clientContext.ageRange && data.clientContext.experience), data.phases.some((p) => p.active), data.split.some((d) => d.active), data.exercises.length > 0, !!(data.goal && data.method), !!data.programName], [data]);
+  const stepComplete = useMemo(() => {
+    const exerciseCount = data.workoutExercises
+      ? Object.values(data.workoutExercises).flat().length
+      : data.exercises.length;
+    return [!!data.goal, !!data.method, !!(data.clientContext.ageRange && data.clientContext.experience), data.phases.some((p) => p.active), data.split.some((d) => d.active), exerciseCount > 0, !!(data.goal && data.method), !!data.programName];
+  }, [data]);
   const completionPercent = useMemo(() => Math.round((stepComplete.filter(Boolean).length / stepComplete.length) * 100), [stepComplete]);
 
   const CurrentComponent = STEPS[currentStep].component;

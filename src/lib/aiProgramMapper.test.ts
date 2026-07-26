@@ -115,5 +115,34 @@ describe("aiProgramMapper", () => {
     expect(rehydrated.exercises[0].tempo).toBe("2-1-1-0");
     expect(rehydrated.exercises[0].pct1RM).toBe("82.5%");
     expect(rehydrated.exercises[0].rest).toBe("3:00");
+
+    // Lossless: DB ids survive the round-trip for diff-based saves
+    expect(rehydrated.split.find((d) => d.day === "Mon")?.dbId).toBe("w1");
+    expect(rehydrated.split.find((d) => d.day === "Wed")?.dbId).toBe("w2");
+    expect(rehydrated.exercises[0].dbId).toBe("e1");
+    expect(rehydrated.exercises[1].dbId).toBe("e2");
+
+    // Per-day lists: every workout keeps its own exercises, keyed by day_of_week
+    expect(Object.keys(rehydrated.workoutExercises || {})).toEqual(["1"]);
+    expect(rehydrated.workoutExercises?.[1]).toHaveLength(2);
+    expect(rehydrated.workoutExercises?.[1][1].name).toBe("Press");
+    expect(rehydrated.workoutExercises?.[3]).toBeUndefined();
+  });
+
+  it("carries dbId through to workout/exercise rows for diff-based saves", () => {
+    const data = defaultProgramData({
+      exercises: [
+        { code: "A1", name: "Squat", sets: 4, reps: "5", pct1RM: "80%", tempo: "2-0-1-0", rest: "2:00", dbId: "ex-uuid" },
+      ],
+    });
+    data.split = data.split.map((d, i) => (i === 0 ? { ...d, dbId: "w-uuid" } : d));
+
+    const workoutRows = buildWorkoutRows(data);
+    expect(workoutRows[0].id).toBe("w-uuid");
+    expect(workoutRows[1].id).toBeUndefined();
+
+    const exerciseRows = buildExerciseRows(data.exercises);
+    expect(exerciseRows[0].id).toBe("ex-uuid");
+    expect(exerciseRows[0].rest_seconds).toBe(120);
   });
 });

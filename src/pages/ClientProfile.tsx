@@ -211,7 +211,7 @@ export default function ClientProfile() {
 
   const handleBuildProgram = useCallback(() => {
     if (!client) return;
-    navigate(`/program-builder?clientId=${client.id}`);
+    navigate(`/ai-program-builder?clientId=${client.id}`);
   }, [client, navigate]);
 
   const handleStartWorkout = useCallback(

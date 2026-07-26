@@ -173,7 +173,7 @@ export default function QuickAddClientModal({
           icon: Dumbbell,
           title: 'Assign Workout Program',
           description: 'Routes to program builder for this client',
-          route: `/program-builder?clientId=${createdClient.id}`,
+          route: `/ai-program-builder?clientId=${createdClient.id}`,
         },
         {
           id: 'nutrition',

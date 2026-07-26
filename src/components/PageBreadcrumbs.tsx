@@ -42,7 +42,7 @@ export default function PageBreadcrumbs() {
   // Determine if we should show breadcrumbs
   const isClientProfile = pathname.startsWith("/client/");
   const isCoachPage = pathname === "/coach";
-  const isProgramBuilder = pathname === "/program-builder";
+  const isProgramBuilder = pathname === "/ai-program-builder";
 
   const isMobile = useIsMobile();
 

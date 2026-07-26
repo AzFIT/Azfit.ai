@@ -1,4 +1,3 @@
-import type { ClientGeneratedProgram } from "@/types/client";
 // ═══════════════════════════════════════════════════════════════
 // AzFIT LocalStorage Layer
 // ALL storage access goes through here — no direct localStorage elsewhere
@@ -9,9 +8,7 @@ const PREFIX = "azfit_";
 const KEYS = {
   THEME: `${PREFIX}theme`,
   CLIENTS: `${PREFIX}clients`,
-  PROGRAMS: `${PREFIX}programs`,
   CLIENT_PROGRAMS: `${PREFIX}client_programs`,
-  CLIENT_ASSIGNED_PROGRAMS: `${PREFIX}client_assigned_programs`,
   SESSIONS: `${PREFIX}sessions`,
   ACTIVE_SESSION: `${PREFIX}active_session`,
   SETTINGS: `${PREFIX}settings`,
@@ -87,75 +84,6 @@ export function saveClient(client: StoredClient): void {
     clients.push(client);
   }
   set(KEYS.CLIENTS, clients);
-}
-
-// ─── Program Templates (builder) ───
-
-export interface ProgramTemplate {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-  weeks: number;
-  days: ProgramTemplateDay[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ProgramTemplateDay {
-  id: string;
-  name: string;
-  dayNumber: number;
-  slots: ProgramTemplateSlot[];
-}
-
-export interface ProgramTemplateSlot {
-  order: string;
-  exercise: string;
-  categoryId: string;
-  sets: number;
-  reps: string;
-  tempo: string;
-  restSeconds: number;
-}
-
-export function getProgramTemplates(): ProgramTemplate[] {
-  return get<ProgramTemplate[]>(KEYS.PROGRAMS, []);
-}
-
-export function saveProgramTemplate(template: ProgramTemplate): void {
-  const templates = getProgramTemplates();
-  const idx = templates.findIndex((p) => p.id === template.id);
-  if (idx >= 0) {
-    templates[idx] = template;
-  } else {
-    templates.push(template);
-  }
-  set(KEYS.PROGRAMS, templates);
-}
-
-export interface AssignedProgram extends ClientGeneratedProgram {
-  clientId: string;
-  clientName: string;
-}
-
-export function getClientAssignedPrograms(clientId: string): AssignedProgram[] {
-  return get<AssignedProgram[]>(KEYS.CLIENT_ASSIGNED_PROGRAMS, []).filter(
-    (program) => program.clientId === clientId,
-  );
-}
-
-export function saveClientAssignedProgram(program: AssignedProgram): void {
-  const programs = get<AssignedProgram[]>(KEYS.CLIENT_ASSIGNED_PROGRAMS, []);
-  const idx = programs.findIndex(
-    (p) => p.id === program.id && p.clientId === program.clientId,
-  );
-  if (idx >= 0) {
-    programs[idx] = program;
-  } else {
-    programs.push(program);
-  }
-  set(KEYS.CLIENT_ASSIGNED_PROGRAMS, programs);
 }
 
 // ─── Programs (assigned to clients) ───

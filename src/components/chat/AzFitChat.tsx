@@ -26,7 +26,7 @@ const CLIENT_CHIPS: ChipDef[] = [
 const TRAINER_CHIPS: ChipDef[] = [
   { label: "⚠️ Who needs attention", type: "navigate", payload: "/coach" },
   { label: "➕ Add client", type: "navigate", payload: "/clients" },
-  { label: "🏗️ Build program", type: "navigate", payload: "/program-builder" },
+  { label: "🏗️ Build program", type: "navigate", payload: "/ai-program-builder" },
   { label: "💬 Unread messages", type: "navigate", payload: "/messages" },
 ];
 

@@ -1170,7 +1170,7 @@ function Step9Complete({ data, navigate }: { data: OnboardingData; navigate: (pa
           Explore Dashboard
         </button>
         <button
-          onClick={() => navigate('/program-builder')}
+          onClick={() => navigate('/ai-program-builder')}
           className="w-full rounded-xl border-2 py-3 text-sm font-bold transition-all"
           style={{ borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
         >

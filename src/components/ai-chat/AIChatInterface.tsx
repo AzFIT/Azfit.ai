@@ -107,16 +107,16 @@ function MessageBubble({
         {message.content?.type === "program" && (
           <ProgramCard
             content={message.content}
-            onApply={() => navigate("/program-builder")}
-            onModify={() => navigate("/program-builder")}
+            onApply={() => navigate("/ai-program-builder")}
+            onModify={() => navigate("/ai-program-builder")}
             onExport={() => {}}
           />
         )}
         {message.content?.type === "exercise_swap" && (
           <ExerciseSwapCard
             content={message.content}
-            onApply={() => navigate("/program-builder")}
-            onUndo={() => navigate("/program-builder")}
+            onApply={() => navigate("/ai-program-builder")}
+            onUndo={() => navigate("/ai-program-builder")}
             onExplain={() => {}}
           />
         )}
