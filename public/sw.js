@@ -4,28 +4,44 @@
  * Optimized for gym floor with spotty Wi-Fi
  */
 
-const CACHE_NAME = 'azfit-v1';
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/azfit-logo.png',
-  '/azfit-logo-transparent-1.png',
-  '/azfit-logo-text.png',
-  '/azfit-hero-bg.png',
-  '/azfit-bg-2.png',
+const CACHE_NAME = 'azfit-v2';
+// Scope-relative paths: resolve against registration.scope (the SW script
+// location), so they work under the GitHub Pages subpath (/Azfit.ai/).
+// Root-absolute paths 404 there and used to kill install via addAll rejection.
+const CRITICAL_ASSETS = [
+  './',
+  './index.html',
+  './manifest.json',
+];
+const OPTIONAL_ASSETS = [
+  './azfit-logo.png',
+  './azfit-logo-transparent-1.png',
+  './azfit-logo-text.png',
+  './azfit-hero-bg.png',
+  './azfit-bg-2.png',
 ];
 
 // Supabase API cache (short TTL for fresh data)
-const API_CACHE_NAME = 'azfit-api-v1';
+const API_CACHE_NAME = 'azfit-api-v2';
 const API_TTL = 5 * 60 * 1000; // 5 minutes
 
-// Install: Precache static assets
+// Install: precache assets — failure-tolerant so one missing file can never
+// abort install again (criticals as a group with catch, optionals individually)
 self.addEventListener('install', (event) => {
   console.log('[SW] Installing AzFIT service worker...');
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
+      const criticals = cache.addAll(CRITICAL_ASSETS).catch((err) => {
+        console.warn('[SW] Critical precache failed (continuing install):', err);
+      });
+      const optionals = Promise.all(
+        OPTIONAL_ASSETS.map((asset) =>
+          cache.add(asset).catch((err) => {
+            console.warn('[SW] Optional precache skipped:', asset, err);
+          })
+        )
+      );
+      return Promise.all([criticals, optionals]);
     }).then(() => {
       return self.skipWaiting();
     })
@@ -130,9 +146,9 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          // Complete offline fallback
+          // Complete offline fallback (scope-relative — see install note)
           if (request.mode === 'navigate') {
-            return caches.match('/index.html');
+            return caches.match('./index.html');
           }
           return new Response('Offline', { status: 503 });
         });
