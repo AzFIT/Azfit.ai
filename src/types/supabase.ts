@@ -54,7 +54,7 @@ export type Database = {
           body_fat_percentage: number | null;
           fitness_goal: string | null;
           experience_level: "beginner" | "intermediate" | "advanced" | null;
-          status: "active" | "inactive" | "on_hold" | "archived";
+          status: "active" | "inactive" | "paused" | "on_holiday" | "on_break" | "pending_start" | "trial" | "cancelled" | "unavailable" | "transferred" | "archived";
           notes: string | null;
           intake_profile: Json | null;
           created_at: string;
@@ -73,7 +73,7 @@ export type Database = {
           body_fat_percentage?: number | null;
           fitness_goal?: string | null;
           experience_level?: "beginner" | "intermediate" | "advanced" | null;
-          status?: "active" | "inactive" | "on_hold" | "archived";
+          status?: "active" | "inactive" | "paused" | "on_holiday" | "on_break" | "pending_start" | "trial" | "cancelled" | "unavailable" | "transferred" | "archived";
           notes?: string | null;
           intake_profile?: Json | null;
           created_at?: string;
@@ -92,7 +92,7 @@ export type Database = {
           body_fat_percentage?: number | null;
           fitness_goal?: string | null;
           experience_level?: "beginner" | "intermediate" | "advanced" | null;
-          status?: "active" | "inactive" | "on_hold" | "archived";
+          status?: "active" | "inactive" | "paused" | "on_holiday" | "on_break" | "pending_start" | "trial" | "cancelled" | "unavailable" | "transferred" | "archived";
           notes?: string | null;
           intake_profile?: Json | null;
           created_at?: string;

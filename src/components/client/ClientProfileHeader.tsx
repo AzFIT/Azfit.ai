@@ -11,6 +11,7 @@ import {
   Dumbbell,
 } from "lucide-react";
 import type { Client } from "@/types/client";
+import { clientStatusMeta } from "@/lib/clientStatus";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -30,16 +31,7 @@ export default function ClientProfileHeader({
 }: ClientProfileHeaderProps) {
   const navigate = useNavigate();
 
-  const statusColors: Record<string, { bg: string; text: string }> = {
-    active: { bg: "rgba(13,148,136,0.15)", text: "#0D9488" },
-    paused: { bg: "rgba(245,158,11,0.15)", text: "#F59E0B" },
-    archived: { bg: "rgba(107,114,128,0.15)", text: "#6B7280" },
-    away: { bg: "rgba(59,130,246,0.15)", text: "#3B82F6" },
-    new: { bg: "rgba(139,92,246,0.15)", text: "#8B5CF6" },
-  };
-
-  const status = client.status ?? "active";
-  const statusStyle = statusColors[status] || statusColors.active;
+  const statusMeta = clientStatusMeta(client.status);
 
   return (
     <motion.div
@@ -98,13 +90,13 @@ export default function ClientProfileHeader({
               {client.name}
             </h1>
             <span
-              className="text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize"
+              className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
               style={{
-                backgroundColor: statusStyle.bg,
-                color: statusStyle.text,
+                backgroundColor: statusMeta.bg,
+                color: statusMeta.color,
               }}
             >
-              {client.status}
+              {statusMeta.label}
             </span>
           </div>
 

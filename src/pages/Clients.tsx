@@ -2,11 +2,17 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
-import { Search, Plus, Edit3, Upload, X, User } from "lucide-react";
+import { Search, Plus, Edit3, Upload, X, User, ChevronDown } from "lucide-react";
 import Layout from "@/components/Layout";
 import QuickAddClientModal from "@/components/QuickAddClientModal";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  CLIENT_STATUSES,
+  CLIENT_STATUS_VALUES,
+  clientStatusMeta,
+  type ClientStatus,
+} from "@/lib/clientStatus";
 import type { Database } from "@/types/supabase";
 
 type DbClient = Database["public"]["Tables"]["clients"]["Row"];
@@ -31,21 +37,24 @@ type LegacyClient = {
 
 function mapLegacyStatus(status: string): DbClient["status"] {
   if (status === "active") return "active";
-  if (status === "paused") return "on_hold";
+  if (status === "paused" || status === "on_hold") return "paused";
   if (status === "archived") return "archived";
   return "active";
 }
 
-function statusLabel(status: DbClient["status"]) {
-  if (status === "on_hold") return "Paused";
-  if (status === "archived") return "Archived";
-  return status.charAt(0).toUpperCase() + status.slice(1);
-}
+/** Filter: a chip name, or `other:<status>` for the long tail via the Other menu. */
+type StatusFilter = "All" | "Active" | "Paused" | "Archived" | `other:${ClientStatus}`;
+
+const OTHER_STATUSES = CLIENT_STATUS_VALUES.filter(
+  (v) => v !== "active" && v !== "paused" && v !== "archived",
+);
 
 export default function ClientsPage() {
   const [mode, setMode] = useState<"dashboard" | "sheets">("dashboard");
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"All" | "Active" | "Paused" | "Archived">("Active");
+  const [filter, setFilter] = useState<StatusFilter>("Active");
+  const [otherMenuOpen, setOtherMenuOpen] = useState(false);
+  const [statusMenuFor, setStatusMenuFor] = useState<string | null>(null);
   const [clients, setClients] = useState<DbClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
@@ -102,13 +111,36 @@ export default function ClientsPage() {
         filter === "Active"
           ? client.status === "active"
           : filter === "Paused"
-            ? client.status === "on_hold" || client.status === "inactive"
+            ? client.status === "paused"
             : filter === "Archived"
               ? client.status === "archived"
-              : client.status !== "archived";
+              : filter === "All"
+                ? client.status !== "archived"
+                : client.status === filter.slice(6); // other:<status>
       return matchesSearch && matchesFilter;
     });
   }, [clients, search, filter]);
+
+  const handleStatusChange = useCallback(
+    async (client: DbClient, next: ClientStatus) => {
+      setStatusMenuFor(null);
+      if (next === client.status) return;
+      const prev = client.status;
+      // Optimistic update; revert on error
+      setClients((cs) => cs.map((c) => (c.id === client.id ? { ...c, status: next } : c)));
+      const { error } = await supabase
+        .from("clients")
+        .update({ status: next, updated_at: new Date().toISOString() })
+        .eq("id", client.id);
+      if (error) {
+        setClients((cs) => cs.map((c) => (c.id === client.id ? { ...c, status: prev } : c)));
+        toast.error("Failed to update status: " + error.message);
+      } else {
+        toast.success(`${client.full_name} → ${clientStatusMeta(next).label}`);
+      }
+    },
+    [],
+  );
 
   const selectedClient = selectedClientId
     ? (clients.find((client) => client.id === selectedClientId) ?? null)
@@ -326,7 +358,7 @@ export default function ClientsPage() {
                     <button
                       key={option}
                       type="button"
-                      onClick={() => setFilter(option)}
+                      onClick={() => { setFilter(option); setOtherMenuOpen(false); }}
                       className="rounded-full px-3 py-2 text-xs font-semibold transition"
                       style={{
                         backgroundColor:
@@ -344,6 +376,56 @@ export default function ClientsPage() {
                     </button>
                   )
                 )}
+                {/* Other statuses menu */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setOtherMenuOpen((o) => !o)}
+                    className="inline-flex items-center gap-1 rounded-full px-3 py-2 text-xs font-semibold transition"
+                    style={{
+                      backgroundColor: filter.startsWith("other:")
+                        ? "var(--azfit-primary)"
+                        : "transparent",
+                      color: filter.startsWith("other:")
+                        ? "#fff"
+                        : "var(--light-text-muted)",
+                      border: `1px solid var(--card-border)`,
+                    }}
+                  >
+                    {filter.startsWith("other:")
+                      ? clientStatusMeta(filter.slice(6)).label
+                      : "Other"}
+                    <ChevronDown size={11} />
+                  </button>
+                  {otherMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setOtherMenuOpen(false)} />
+                      <div
+                        className="absolute right-0 z-20 mt-1 w-56 rounded-xl border shadow-lg overflow-hidden"
+                        style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}
+                      >
+                        {OTHER_STATUSES.map((v) => {
+                          const m = CLIENT_STATUSES[v];
+                          return (
+                            <button
+                              key={v}
+                              type="button"
+                              onClick={() => { setFilter(`other:${v}`); setOtherMenuOpen(false); }}
+                              className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-[var(--light-elevated)]"
+                            >
+                              <span className="text-xs font-semibold" style={{ color: m.color }}>
+                                {m.label}{filter === `other:${v}` && " ✓"}
+                              </span>
+                              <span className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+                                {m.description}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -394,8 +476,72 @@ export default function ClientsPage() {
                               {client.email}
                             </p>
                           </div>
-                          <div className="w-1/4 text-sm text-[var(--light-text-muted)]">
-                            {statusLabel(client.status)}
+                          <div
+                            className="w-1/4 relative"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {(() => {
+                              const meta = clientStatusMeta(client.status);
+                              return (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setStatusMenuFor(
+                                        statusMenuFor === client.id ? null : client.id,
+                                      )
+                                    }
+                                    className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition hover:opacity-80"
+                                    style={{ backgroundColor: meta.bg, color: meta.color }}
+                                    title="Change status"
+                                  >
+                                    {meta.label}
+                                    <ChevronDown size={11} />
+                                  </button>
+                                  {statusMenuFor === client.id && (
+                                    <>
+                                      <div
+                                        className="fixed inset-0 z-10"
+                                        onClick={() => setStatusMenuFor(null)}
+                                      />
+                                      <div
+                                        className="absolute left-0 z-20 mt-1 w-60 rounded-xl border shadow-lg overflow-hidden"
+                                        style={{
+                                          backgroundColor: "var(--card-bg)",
+                                          borderColor: "var(--card-border)",
+                                        }}
+                                      >
+                                        {CLIENT_STATUS_VALUES.map((v) => {
+                                          const m = CLIENT_STATUSES[v];
+                                          return (
+                                            <button
+                                              key={v}
+                                              type="button"
+                                              onClick={() => handleStatusChange(client, v)}
+                                              className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-[var(--light-elevated)]"
+                                            >
+                                              <span
+                                                className="text-xs font-semibold"
+                                                style={{ color: m.color }}
+                                              >
+                                                {m.label}
+                                                {v === client.status && " ✓"}
+                                              </span>
+                                              <span
+                                                className="text-[10px]"
+                                                style={{ color: "var(--light-text-muted)" }}
+                                              >
+                                                {m.description}
+                                              </span>
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                           <div className="ml-auto flex items-center gap-2">
                             <button

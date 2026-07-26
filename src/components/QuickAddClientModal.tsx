@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import ClientIntakeWizard from '@/components/ClientIntakeWizard';
 import type { Database } from '@/types/supabase';
+import { CLIENT_STATUSES, CLIENT_STATUS_VALUES } from '@/lib/clientStatus';
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -27,14 +28,10 @@ export interface QuickAddClientModalProps {
 type DbClient = Database["public"]["Tables"]["clients"]["Row"];
 type DbClientStatus = DbClient["status"];
 
-/* ─── Status options ─── */
+/* ─── Status options (fed from shared client status metadata) ─── */
 
-const STATUS_OPTIONS: { value: DbClientStatus; label: string }[] = [
-  { value: 'active', label: 'Active' },
-  { value: 'on_hold', label: 'Paused' },
-  { value: 'archived', label: 'Archived' },
-  { value: 'inactive', label: 'Inactive' },
-];
+const STATUS_OPTIONS: { value: DbClientStatus; label: string }[] =
+  CLIENT_STATUS_VALUES.map((v) => ({ value: v, label: CLIENT_STATUSES[v].label }));
 
 /* ─── Main Component ─── */
 

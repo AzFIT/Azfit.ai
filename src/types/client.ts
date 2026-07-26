@@ -19,13 +19,16 @@ export interface Client {
   injuries?: string | null;
   status?:
     | "active"
-    | "paused"
-    | "archived"
-    | "away"
-    | "new"
     | "inactive"
-    | "on_hold"
-    | "cancelled";
+    | "paused"
+    | "on_holiday"
+    | "on_break"
+    | "pending_start"
+    | "trial"
+    | "cancelled"
+    | "unavailable"
+    | "transferred"
+    | "archived";
   avatar?: string | null;
   location?: string | null;
   age?: number;
