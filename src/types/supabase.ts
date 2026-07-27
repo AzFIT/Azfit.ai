@@ -1734,6 +1734,10 @@ export type Database = {
         Args: { tags_a: string[]; tags_b: string[] };
         Returns: number;
       };
+      get_trainer_display_name: {
+        Args: { p_trainer_id: string };
+        Returns: string;
+      };
       get_goal_methods: {
         Args: { p_goal_id: string; p_limit?: number };
         Returns: { method_id: string; method_name: string; score: number }[];

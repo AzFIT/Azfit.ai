@@ -1927,5 +1927,43 @@ CREATE POLICY "Clients can read own meal plans"
   );
 
 -- ============================================================
+-- Phase 28A: client invite flow
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.get_trainer_display_name(p_trainer_id uuid)
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+  SELECT full_name FROM public.profiles WHERE id = p_trainer_id;
+$function$;
+
+REVOKE ALL ON FUNCTION public.get_trainer_display_name(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_trainer_display_name(uuid) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_trainer_display_name(uuid) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.current_user_email()
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+  SELECT email FROM auth.users WHERE id = auth.uid();
+$function$;
+
+REVOKE ALL ON FUNCTION public.current_user_email() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.current_user_email() TO authenticated;
+
+CREATE POLICY "Invited clients can create own record"
+  ON public.clients FOR INSERT TO authenticated
+  WITH CHECK (
+    email = public.current_user_email()
+    AND trainer_id IS NOT NULL
+  );
+
+-- ============================================================
 -- DONE! Your AzFIT database is ready.
 -- ============================================================

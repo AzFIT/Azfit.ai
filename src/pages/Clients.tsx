@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
-import { Search, Plus, Edit3, Upload, X, User, ChevronDown } from "lucide-react";
+import { Search, Plus, Edit3, Upload, X, User, ChevronDown, Link2 } from "lucide-react";
 import Layout from "@/components/Layout";
 import QuickAddClientModal from "@/components/QuickAddClientModal";
 import { supabase } from "@/lib/supabase";
@@ -320,6 +320,23 @@ export default function ClientsPage() {
             >
               <Plus size={16} />
               Add New Client
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                if (!user) return;
+                const link = `https://azfit.github.io/Azfit.ai/#/invite/${user.id}`;
+                try {
+                  await navigator.clipboard.writeText(link);
+                  toast.success("Invite link copied — send it to your client");
+                } catch {
+                  toast.error("Could not copy the link: " + link);
+                }
+              }}
+              className="inline-flex items-center gap-2 rounded-full border border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-2 text-sm font-semibold transition hover:bg-[var(--light-elevated)]"
+            >
+              <Link2 size={16} />
+              Invite link
             </button>
             <button
               type="button"
