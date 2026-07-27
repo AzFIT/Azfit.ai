@@ -4,6 +4,9 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { EXERCISE_CATEGORIES } from '@/data/exerciseDatabase';
+import { findContraindications } from '@/data/exerciseSafety';
+import { findExerciseSubstitutions } from '@/lib/exerciseSwap';
+import { GENERIC_WARN, normalizeLimitation } from '@/lib/programSafety';
 
 /* ── Types ─────────────────────────────────────────────── */
 
@@ -163,24 +166,33 @@ function filterExercisesByEquipment(exercises: string[], equipment: string[]): s
   return exercises;
 }
 
-function filterByInjuries(exercises: string[], injuries?: string): string[] {
+/**
+ * Phase 28D safety pass: swap 'exclude'-severity contraindicated exercises
+ * for their top substitution; drop them when no candidate exists.
+ * 'warn'-severity exercises stay (reviewed at wizard Step 6).
+ * Deterministic, pure; no-op when injuries is empty.
+ */
+export function applySafetyFilter(exercises: string[], injuries?: string): string[] {
   if (!injuries) return exercises;
-  const lower = injuries.toLowerCase();
-  const excludePatterns: string[] = [];
-  if (lower.includes('shoulder') || lower.includes('rotator')) {
-    excludePatterns.push('overhead press', 'military press', 'shoulder press', 'landmine press');
-  }
-  if (lower.includes('knee') || lower.includes('acl') || lower.includes('meniscus')) {
-    excludePatterns.push('squat', 'lunge', 'split squat', 'leg press', 'step up');
-  }
-  if (lower.includes('back') || lower.includes('spine') || lower.includes('disc')) {
-    excludePatterns.push('deadlift', 'good morning', 'romanian deadlift', 'rdl', 'back extension');
-  }
-  if (lower.includes('wrist') || lower.includes('elbow')) {
-    excludePatterns.push('bench press', 'curl', 'extension', 'skull');
-  }
-  if (excludePatterns.length === 0) return exercises;
-  return exercises.filter((e) => !excludePatterns.some((p) => e.toLowerCase().includes(p)));
+  const limitations = injuries
+    .split(/[,;\n]/)
+    .flatMap((s) => normalizeLimitation(s))
+    .filter((l) => l !== GENERIC_WARN);
+  if (limitations.length === 0) return exercises;
+  const swapped = new Set<string>();
+  return exercises.map((e) => {
+    const hits = findContraindications(e, limitations);
+    if (!hits.some((h) => h.severity === 'exclude')) return e;
+    const alt = findExerciseSubstitutions(e, {
+      reason: hits.map((h) => h.limitation).join(' '),
+      excluded: exercises,
+    })[0];
+    if (alt && !swapped.has(alt.name)) {
+      swapped.add(alt.name);
+      return alt.name;
+    }
+    return null; // no safe candidate — drop
+  }).filter((e): e is string => e !== null);
 }
 
 function filterByExperience(exercises: string[], experience: string): string[] {
@@ -203,7 +215,7 @@ function buildExercisePool(profile: ClientProfile): Record<string, string[]> {
   EXERCISE_CATEGORIES.forEach((cat) => {
     let exercises = [...cat.exercises, ...cat.alternatives];
     exercises = filterExercisesByEquipment(exercises, profile.availableEquipment);
-    exercises = filterByInjuries(exercises, profile.injuries);
+    exercises = applySafetyFilter(exercises, profile.injuries);
     exercises = filterByExperience(exercises, profile.trainingExperience);
     pool[cat.id] = exercises;
   });

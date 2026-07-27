@@ -11,13 +11,16 @@ import {
   Zap, Bot, Save, RotateCcw, Check,
   Dumbbell, TrendingUp, Flame, Wind, HeartPulse, Pencil, Trash2,
   Plus, Eye, BarChart3, Download, X, Target, Award, Sparkles,
-  AlertTriangle, Layers, Calendar, Users, Play, ArrowLeft, Upload,
+  AlertTriangle, Layers, Calendar, Users, Play, ArrowLeft, Upload, ShieldAlert,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   generateProgram, saveGeneratedProgram,
   type GeneratedProgram, type GeneratedWorkout, type ClientProfile,
 } from '@/lib/aiProgramGenerator';
+import {
+  collectClientLimitations, evaluateProgramSafety, type SafetyFlag,
+} from '@/lib/programSafety';
 import { setActiveSession, type WorkoutLog, type LoggedExercise, type LoggedSet } from '@/lib/storage';
 import {
   buildProgramInsert,
@@ -42,10 +45,10 @@ import { Textarea } from '@/components/ui/textarea';
 export interface ClientContext { ageRange: string; experience: string; bodyType: string; availability: string; limitations: string[]; otherLimitation: string; }
 export interface ProgramPhase { id: string; name: string; weeks: number; focus: string; color: string; active: boolean; }
 export interface ProgramSplit { day: string; active: boolean; workout: string; dbId?: string; }
-export interface ProgramExercise { code: string; name: string; sets: number; reps: string; pct1RM: string; tempo: string; rest: string; dbId?: string; }
+export interface ProgramExercise { code: string; name: string; sets: number; reps: string; pct1RM: string; tempo: string; rest: string; dbId?: string; isSubstituted?: boolean; safetyNote?: string; }
 export interface ProgramData { id?: string; goal: string; method: string; clientContext: ClientContext; phases: ProgramPhase[]; weeklyHours: number; split: ProgramSplit[]; exercises: ProgramExercise[]; workoutExercises?: Record<number, ProgramExercise[]>; programName: string; description: string; tags: string[]; isPublic: boolean; assignedClient: string; }
 export interface SavedProgram { id: string; createdAt: string; updatedAt: string; data: ProgramData; }
-interface StepProps { data: ProgramData; updateData: (partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => void; onSave?: () => void; onSaveAndAssign?: () => void; program?: GeneratedProgram | null; clientName?: string; clients?: ClientRow[]; saving?: boolean; }
+interface StepProps { data: ProgramData; updateData: (partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => void; onSave?: () => void; onSaveAndAssign?: () => void; program?: GeneratedProgram | null; clientName?: string; clients?: ClientRow[]; saving?: boolean; limitations?: string[]; }
 
 type ClientRow = Database['public']['Tables']['clients']['Row'];
 type ProgramRow = Database['public']['Tables']['programs']['Row'];
@@ -654,7 +657,7 @@ function Step5Split({ data, updateData }: StepProps) {
 
 const SPLIT_DAY_INDEX: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
 
-function Step6Exercises({ data, updateData }: StepProps) {
+function Step6Exercises({ data, updateData, limitations }: StepProps) {
   const [openRows, setOpenRows] = useState<Record<number, boolean>>({});
   const perDay = data.workoutExercises != null;
   const activeDays = data.split.filter((d) => d.active);
@@ -702,6 +705,42 @@ function Step6Exercises({ data, updateData }: StepProps) {
   );
   const handleAutoFill = useCallback(() => setList(() => DEFAULT_EXERCISES.map((e) => ({ ...e }))), [setList]);
   const toggleRow = useCallback((idx: number) => setOpenRows((prev) => ({ ...prev, [idx]: !prev[idx] })), []);
+
+  // Phase 28D — safety flags for the current day list
+  const flagsByIdx = useMemo(() => {
+    const m = new Map<number, SafetyFlag>();
+    for (const f of evaluateProgramSafety(list, limitations ?? [])) m.set(f.exerciseIndex, f);
+    return m;
+  }, [list, limitations]);
+  const [resolvedFlags, setResolvedFlags] = useState<Record<string, 'swap' | 'keep'>>({});
+  const flagKey = useCallback((idx: number) => `${selectedDay}:${idx}`, [selectedDay]);
+  const unresolved = useMemo(
+    () => [...flagsByIdx.values()].filter((f) => !resolvedFlags[flagKey(f.exerciseIndex)]),
+    [flagsByIdx, resolvedFlags, flagKey]
+  );
+  const handleSwap = useCallback(
+    (idx: number, flag: SafetyFlag, altName: string) => {
+      setList((prev) => prev.map((e, i) => (i === idx ? {
+        ...e,
+        name: altName,
+        isSubstituted: true,
+        safetyNote: `Swapped from ${flag.exerciseName} — ${flag.limitation}`,
+      } : e)));
+      setResolvedFlags((prev) => ({ ...prev, [flagKey(idx)]: 'swap' }));
+      toast.success('Swapped for safety');
+    },
+    [setList, flagKey]
+  );
+  const handleKeepOriginal = useCallback(
+    (idx: number, flag: SafetyFlag) => {
+      setList((prev) => prev.map((e, i) => (i === idx ? {
+        ...e,
+        safetyNote: `Trainer override: kept despite ${flag.limitation}`,
+      } : e)));
+      setResolvedFlags((prev) => ({ ...prev, [flagKey(idx)]: 'keep' }));
+    },
+    [setList, flagKey]
+  );
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
@@ -731,16 +770,36 @@ function Step6Exercises({ data, updateData }: StepProps) {
           })}
         </div>
       )}
+      {unresolved.length > 0 && (
+        <div className={cn(
+          'flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium',
+          unresolved.some((f) => f.severity === 'exclude')
+            ? 'border-[#EF4444]/40 bg-[#EF4444]/15 text-[#EF4444]'
+            : 'border-[#F59E0B]/40 bg-[#F59E0B]/15 text-[#F59E0B]'
+        )}>
+          <ShieldAlert className="w-4 h-4 shrink-0" />
+          {unresolved.length} exercise{unresolved.length > 1 ? 's' : ''} conflict{unresolved.length > 1 ? '' : 's'} with client limitations — expand a flagged row to review.
+        </div>
+      )}
       <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl overflow-hidden">
         <div className="grid grid-cols-9 gap-1 px-3 py-2 bg-[var(--page-bg)] border-b border-[var(--card-border)] text-[10px] text-[var(--page-text)]/60 font-semibold uppercase tracking-wider">
           <span>Code</span><span className="col-span-2">Exercise</span><span>Sets</span><span>Reps</span><span>%1RM</span><span>Tempo</span><span>Rest</span><span className="text-right">Actions</span>
         </div>
         <AnimatePresence>
-          {list.map((exercise, idx) => (
-            <motion.div key={`${exercise.code}-${idx}`} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="border-b border-[var(--card-border)] last:border-b-0">
+          {list.map((exercise, idx) => {
+            const flag = flagsByIdx.get(idx);
+            const activeFlag = flag && !resolvedFlags[flagKey(idx)] ? flag : null;
+            return (
+            <motion.div key={`${exercise.code}-${idx}`} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className={cn(
+              "border-b border-[var(--card-border)] last:border-b-0",
+              activeFlag && (activeFlag.severity === 'exclude' ? 'border-l-2 border-l-[#EF4444]' : 'border-l-2 border-l-[#F59E0B]')
+            )}>
               <div className="grid grid-cols-9 gap-1 px-3 py-2 items-center text-xs">
                 <span className="text-[#00AEEF] font-mono font-bold">{exercise.code}</span>
-                <span className="col-span-2 text-[var(--page-text)] font-medium truncate">{exercise.name}</span>
+                <span className="col-span-2 text-[var(--page-text)] font-medium truncate flex items-center gap-1">
+                  {activeFlag && <ShieldAlert className={cn('w-3 h-3 shrink-0', activeFlag.severity === 'exclude' ? 'text-[#EF4444]' : 'text-[#F59E0B]')} />}
+                  <span className="truncate">{exercise.name}</span>
+                </span>
                 <span className="text-[var(--page-text)]/60">{exercise.sets}</span>
                 <span className="text-[var(--page-text)]/60">{exercise.reps}</span>
                 <span className="text-[var(--page-text)]/60 font-mono">{exercise.pct1RM}</span>
@@ -754,6 +813,35 @@ function Step6Exercises({ data, updateData }: StepProps) {
               <AnimatePresence>
                 {openRows[idx] && (
                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                    {activeFlag && (
+                      <div className={cn(
+                        'mx-3 mt-1 mb-2 rounded-lg border px-3 py-2 text-xs space-y-2',
+                        activeFlag.severity === 'exclude' ? 'border-[#EF4444]/40 bg-[#EF4444]/10' : 'border-[#F59E0B]/40 bg-[#F59E0B]/10'
+                      )}>
+                        <p className="flex items-center gap-1.5 font-semibold text-[var(--page-text)]">
+                          <ShieldAlert className={cn('w-3.5 h-3.5 shrink-0', activeFlag.severity === 'exclude' ? 'text-[#EF4444]' : 'text-[#F59E0B]')} />
+                          {activeFlag.limitation}
+                          <span className="font-normal text-[var(--page-text)]/60">— {activeFlag.note}</span>
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {activeFlag.alternatives.map((alt) => (
+                            <button
+                              key={alt.name}
+                              onClick={() => handleSwap(idx, activeFlag, alt.name)}
+                              className="px-2 py-1 rounded-lg border border-[#00AEEF]/50 text-[#00AEEF] hover:bg-[#00AEEF]/10 text-[11px] font-medium transition-colors"
+                            >
+                              Swap → {alt.name}
+                            </button>
+                          ))}
+                          <button
+                            onClick={() => handleKeepOriginal(idx, activeFlag)}
+                            className="px-2 py-1 rounded-lg border border-[var(--card-border)] text-[var(--page-text)]/60 hover:text-[var(--page-text)] text-[11px] font-medium transition-colors"
+                          >
+                            Keep Original
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 px-3 pb-3 bg-[var(--page-bg)]">
                       {[
                         { label: 'Exercise Name', field: 'name' as const, type: 'text' },
@@ -773,7 +861,8 @@ function Step6Exercises({ data, updateData }: StepProps) {
                 )}
               </AnimatePresence>
             </motion.div>
-          ))}
+            );
+          })}
         </AnimatePresence>
         {list.length === 0 && (
           <p className="px-3 py-6 text-center text-xs text-[var(--page-text)]/50">
@@ -804,6 +893,7 @@ function Step7Preview({ data, program, clientName }: StepProps) {
     [data.workoutExercises, data.exercises]
   );
   const totalExercises = allExercises.length;
+  const substitutionCount = useMemo(() => allExercises.filter((e) => e.isSubstituted).length, [allExercises]);
   const totalSets = allExercises.reduce((sum, e) => sum + (e.sets || 0), 0);
   const activeDays = data.split.filter((d) => d.active).length;
   const restDays = data.split.filter((d) => !d.active).length;
@@ -823,6 +913,11 @@ function Step7Preview({ data, program, clientName }: StepProps) {
             <h3 className="text-[var(--page-text)] text-xl font-bold">{data.programName || 'Untitled Program'}</h3>
             <p className="text-[var(--page-text)]/60 text-sm mt-1">{goalName} — {methodName} — {totalWeeks} weeks — {activeDays} days/week</p>
             <p className="text-[var(--page-text)]/80 text-sm mt-1 font-medium">Built for: {clientName || 'Unassigned'}</p>
+            {substitutionCount > 0 && (
+              <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] px-2 py-0.5 rounded-full border border-[#F59E0B]/40 bg-[#F59E0B]/10 text-[#F59E0B] font-medium">
+                <ShieldAlert className="w-3 h-3" />{substitutionCount} safety substitution{substitutionCount > 1 ? 's' : ''}
+              </span>
+            )}
           </div>
           <div className="text-right">
             <div className="text-[var(--page-text)]/60 text-[10px]">AI Confidence</div>
@@ -985,6 +1080,10 @@ function Step8Save({ data, updateData, onSave, clients, saving }: StepProps) {
   const totalExercises = data.workoutExercises
     ? Object.values(data.workoutExercises).flat().length
     : data.exercises.length;
+  const substitutionCount = useMemo(() => {
+    const lists = data.workoutExercises ? Object.values(data.workoutExercises) : [data.exercises];
+    return lists.flat().filter((e) => e.isSubstituted).length;
+  }, [data.workoutExercises, data.exercises]);
   const goalName = GOALS.find((g) => g.id === data.goal)?.name || '—';
   const methodName = METHODS.find((m) => m.id === data.method)?.name || '—';
   const clientName = selectedClient?.full_name || data.clientContext.experience || 'Unassigned';
@@ -1040,6 +1139,15 @@ function Step8Save({ data, updateData, onSave, clients, saving }: StepProps) {
           <span className="text-xs text-[var(--page-text)]/60 block mb-1.5">Weekly Split</span>
           <p className="text-xs text-[var(--page-text)]/80 leading-relaxed">{splitSummary}</p>
         </div>
+
+        {substitutionCount > 0 && (
+          <div className="rounded-xl border border-[#F59E0B]/40 bg-[#F59E0B]/10 px-4 py-2.5 mb-4 flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-[#F59E0B] shrink-0" />
+            <span className="text-xs font-medium text-[#F59E0B]">
+              {substitutionCount} safety substitution{substitutionCount > 1 ? 's' : ''} — exercises swapped to respect client limitations
+            </span>
+          </div>
+        )}
 
         {/* Stat tiles */}
         <div className="grid grid-cols-3 gap-3 mb-4">
@@ -1198,6 +1306,13 @@ export default function AIProgramBuilderPage() {
     if (buildForClientRow) return profileFromClient(buildForClientRow);
     return loadClientProfile() || DEFAULT_PROFILE;
   }, [buildForClientRow]);
+
+  // Phase 28D — merged wizard + intake limitations for the Step 6 safety engine
+  const clientContext = data.clientContext;
+  const wizardLimitations = useMemo(
+    () => collectClientLimitations({ clientContext }, generationProfile),
+    [clientContext, generationProfile]
+  );
 
   const handleAutoGenerate = useCallback(() => {
     setGenerating(true);
@@ -1429,7 +1544,7 @@ export default function AIProgramBuilderPage() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
         <AnimatePresence mode="wait">
           <motion.div key={currentStep} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.2 }}>
-            <CurrentComponent data={data} updateData={updateData} program={program} onSave={handleSave} onSaveAndAssign={handleSaveAndAssign} clientName={selectedClientName} clients={clients} saving={saving} />
+            <CurrentComponent data={data} updateData={updateData} program={program} onSave={handleSave} onSaveAndAssign={handleSaveAndAssign} clientName={selectedClientName} clients={clients} saving={saving} limitations={wizardLimitations} />
           </motion.div>
         </AnimatePresence>
 

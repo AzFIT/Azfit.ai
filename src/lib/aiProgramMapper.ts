@@ -97,18 +97,31 @@ export function codeFromOrderIndex(index: number): string {
 }
 
 export function exerciseNotes(ex: ProgramExercise): string {
-  return JSON.stringify({ tempo: ex.tempo, pct1RM: ex.pct1RM });
+  return JSON.stringify({
+    tempo: ex.tempo,
+    pct1RM: ex.pct1RM,
+    // Phase 28D safety markers (optional — omitted unless set)
+    ...(ex.isSubstituted ? { isSubstituted: true } : {}),
+    ...(ex.safetyNote ? { safetyNote: ex.safetyNote } : {}),
+  });
 }
 
 export function parseExerciseNotes(
   notes: string | null
-): { tempo: string; pct1RM: string } {
+): { tempo: string; pct1RM: string; isSubstituted?: boolean; safetyNote?: string } {
   try {
     if (notes) {
-      const parsed = JSON.parse(notes) as { tempo?: string; pct1RM?: string };
+      const parsed = JSON.parse(notes) as {
+        tempo?: string;
+        pct1RM?: string;
+        isSubstituted?: boolean;
+        safetyNote?: string;
+      };
       return {
         tempo: parsed.tempo || "2-0-1-0",
         pct1RM: parsed.pct1RM || "N/A",
+        ...(parsed.isSubstituted ? { isSubstituted: true } : {}),
+        ...(parsed.safetyNote ? { safetyNote: parsed.safetyNote } : {}),
       };
     }
   } catch {
@@ -272,6 +285,8 @@ export function programDataFromDb(
       tempo: extra.tempo,
       rest: restStringFromSeconds(ex.rest_seconds || 60),
       dbId: ex.id,
+      ...(extra.isSubstituted ? { isSubstituted: true } : {}),
+      ...(extra.safetyNote ? { safetyNote: extra.safetyNote } : {}),
     };
   };
 
