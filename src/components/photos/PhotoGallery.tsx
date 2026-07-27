@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   ChevronRight,
   SplitSquareHorizontal,
-  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -51,6 +50,7 @@ export default function PhotoGallery({
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [compareMode, setCompareMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [comparisonOpen, setComparisonOpen] = useState(false);
 
   const filtered = useMemo(() => {
     let list = photos;
@@ -76,7 +76,12 @@ export default function PhotoGallery({
     });
   };
 
-  const comparePhotos = filtered.filter((p) => selected.has(p.path));
+  // Selection order (Set iterates insertion-ordered) → numbered badges 1/2
+  const selectedOrder = [...selected];
+  // Chronological order for the comparison modal (older first → newer second)
+  const comparePhotos = filtered
+    .filter((p) => selected.has(p.path))
+    .sort((a, b) => (a.takenOn || "").localeCompare(b.takenOn || ""));
 
   return (
     <div>
@@ -126,37 +131,28 @@ export default function PhotoGallery({
 
       {compareMode && (
         <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/50 px-4 py-3">
-          <p className="text-sm text-slate-300">Select 2 photos to compare. ({selected.size}/2)</p>
-          {selected.size > 0 && (
-            <button onClick={() => setSelected(new Set())} className="flex items-center gap-1 text-xs text-slate-400 hover:text-white">
-              <X className="h-3.5 w-3.5" /> Clear
-            </button>
-          )}
+          <p className="text-sm text-slate-300">
+            Pick two photos to compare — same category works best. ({selected.size}/2)
+          </p>
+          <div className="flex items-center gap-2">
+            {selected.size === 2 && (
+              <button
+                onClick={() => setComparisonOpen(true)}
+                className="rounded-lg bg-[#00AEEF] px-3 py-1.5 text-xs font-semibold text-[#0B1120] transition hover:opacity-90"
+              >
+                View comparison
+              </button>
+            )}
+            {selected.size > 0 && (
+              <button onClick={() => setSelected(new Set())} className="flex items-center gap-1 text-xs text-slate-400 hover:text-white">
+                <X className="h-3.5 w-3.5" /> Clear
+              </button>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Compare view */}
-      {compareMode && selected.size === 2 ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {comparePhotos.map((photo) => (
-            <div key={photo.path} className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50">
-              <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-                <span className="rounded-md bg-[#00AEEF]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#00AEEF]">
-                  {photo.category}
-                </span>
-                <span className="text-xs text-slate-400">{formatDate(photo.takenOn)}</span>
-              </div>
-              <div className="relative aspect-[3/4] overflow-hidden bg-slate-950">
-                <img src={photo.url} alt={photo.category} className="h-full w-full object-contain" />
-              </div>
-              <div className="px-4 py-2 text-[11px] text-slate-400">
-                {photo.weightKg != null && <span>{photo.weightKg} kg</span>}
-                {photo.bodyFatPct != null && <span className="ml-2">{photo.bodyFatPct}% BF</span>}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : loading ? (
+      {loading ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="aspect-[3/4] animate-pulse rounded-2xl border border-slate-800 bg-slate-900/50" />
@@ -192,11 +188,11 @@ export default function PhotoGallery({
 
                 {compareMode && (
                   <span
-                    className={`absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-md border transition ${
+                    className={`absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-md border text-[11px] font-bold transition ${
                       isSel ? "border-[#00AEEF] bg-[#00AEEF] text-[#0B1120]" : "border-white/40 bg-black/40 text-white"
                     }`}
                   >
-                    {isSel && <Check className="h-3.5 w-3.5" />}
+                    {isSel ? selectedOrder.indexOf(photo.path) + 1 : ""}
                   </span>
                 )}
 
@@ -231,6 +227,13 @@ export default function PhotoGallery({
             onUpdateTrainerNotes={onUpdateTrainerNotes}
             onSetMilestone={onSetMilestone}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Comparison view (close returns to compare-mode selection) */}
+      <AnimatePresence>
+        {comparisonOpen && comparePhotos.length === 2 && (
+          <ComparisonModal photos={comparePhotos} onClose={() => setComparisonOpen(false)} />
         )}
       </AnimatePresence>
     </div>
@@ -388,6 +391,89 @@ function Lightbox({
             )}
           </div>
         </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/* ── Comparison modal (side-by-side, stacked on mobile) ──────────────── */
+
+function ComparisonModal({
+  photos,
+  onClose,
+}: {
+  photos: ProgressPhoto[]; // already chronological (older first)
+  onClose: () => void;
+}) {
+  const [a, b] = photos;
+
+  const delta =
+    a.weightKg != null && b.weightKg != null
+      ? Math.round((b.weightKg - a.weightKg) * 10) / 10
+      : null;
+  const days =
+    a.takenOn && b.takenOn
+      ? Math.max(
+          0,
+          Math.round(
+            (new Date(b.takenOn).getTime() - new Date(a.takenOn).getTime()) / 86400000,
+          ),
+        )
+      : null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95 }}
+        animate={{ scale: 1 }}
+        className="relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+          <span className="text-sm font-semibold text-white">Compare photos</span>
+          <button onClick={onClose} className="rounded-lg p-2 hover:bg-slate-800" aria-label="Close">
+            <X className="h-5 w-5 text-slate-300" />
+          </button>
+        </div>
+
+        <div className="grid flex-1 grid-cols-1 gap-4 overflow-y-auto p-4 md:grid-cols-2">
+          {photos.map((photo, i) => (
+            <div key={photo.path} className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50">
+              <div className="relative aspect-[3/4] overflow-hidden bg-slate-950">
+                <img src={photo.url} alt={photo.category} className="h-full w-full object-contain" />
+              </div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-800 px-3 py-2 text-[11px] text-slate-400">
+                <span className="rounded-md bg-[#00AEEF]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#00AEEF]">
+                  {photo.category}
+                </span>
+                <span>{formatDate(photo.takenOn)}</span>
+                {photo.weightKg != null && <span>{photo.weightKg} kg</span>}
+                {photo.bodyFatPct != null && <span>{photo.bodyFatPct}% BF</span>}
+                {i === 0 && days != null && days > 0 && <span className="ml-auto text-slate-500">before</span>}
+                {i === 1 && days != null && days > 0 && <span className="ml-auto text-slate-500">after</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {delta != null && (
+          <div className="border-t border-slate-800 px-4 py-2.5 text-center text-xs">
+            <span
+              className="font-semibold"
+              style={{ color: delta < 0 ? "#22C55E" : delta > 0 ? "#F59E0B" : "#94A3B8" }}
+            >
+              {delta > 0 ? "+" : ""}
+              {delta} kg
+            </span>
+            {days != null && <span className="text-slate-400"> · {days} day{days === 1 ? "" : "s"}</span>}
+          </div>
+        )}
       </motion.div>
     </motion.div>
   );

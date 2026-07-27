@@ -87,6 +87,19 @@ export default function ClientsPage() {
     loadClients();
   }, [loadClients]);
 
+  // Escape closes any open status/filter menu
+  useEffect(() => {
+    if (!statusMenuFor && !otherMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setStatusMenuFor(null);
+        setOtherMenuOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [statusMenuFor, otherMenuOpen]);
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem("azfit_clients");
@@ -401,8 +414,13 @@ export default function ClientsPage() {
                     <>
                       <div className="fixed inset-0 z-10" onClick={() => setOtherMenuOpen(false)} />
                       <div
-                        className="absolute right-0 z-20 mt-1 w-56 rounded-xl border shadow-lg overflow-hidden"
-                        style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}
+                        className="absolute right-0 z-50 mt-1 w-56 rounded-xl border overflow-y-auto shadow-xl"
+                        style={{
+                          backgroundColor: "var(--card-bg)",
+                          borderColor: "var(--card-border)",
+                          maxHeight: 320,
+                          boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+                        }}
                       >
                         {OTHER_STATUSES.map((v) => {
                           const m = CLIENT_STATUSES[v];
@@ -461,6 +479,13 @@ export default function ClientsPage() {
                               navigate(`/client/${client.id}`);
                             }
                           }}
+                          style={{
+                            // The open status dropdown must paint ABOVE later
+                            // (transformed) rows — give this row its own
+                            // stacking context while its menu is open.
+                            position: "relative",
+                            zIndex: statusMenuFor === client.id ? 30 : 0,
+                          }}
                           className={`flex w-full cursor-pointer items-center gap-4 px-4 py-4 transition ${
                             isSelected
                               ? "bg-[var(--light-elevated)] shadow-sm"
@@ -505,10 +530,12 @@ export default function ClientsPage() {
                                         onClick={() => setStatusMenuFor(null)}
                                       />
                                       <div
-                                        className="absolute left-0 z-20 mt-1 w-60 rounded-xl border shadow-lg overflow-hidden"
+                                        className="absolute left-0 z-50 mt-1 w-60 rounded-xl border overflow-y-auto shadow-xl"
                                         style={{
                                           backgroundColor: "var(--card-bg)",
                                           borderColor: "var(--card-border)",
+                                          maxHeight: 320,
+                                          boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
                                         }}
                                       >
                                         {CLIENT_STATUS_VALUES.map((v) => {
