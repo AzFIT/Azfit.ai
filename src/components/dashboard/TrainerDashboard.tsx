@@ -22,19 +22,33 @@ import {
   Megaphone,
   Dumbbell,
   Scale,
+  Sun,
+  PartyPopper,
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
 import { GlassCard } from "./shared/GlassCard";
 import { ProgressRing } from "./shared/ProgressRing";
 import { CollapsibleSection } from "./shared/CollapsibleSection";
 import { ClientHealthGrid } from "./ClientHealthGrid";
+import FollowUpsWidget from "./FollowUpsWidget";
 import { AIInsightsPanel } from "./AIInsightsPanel";
 import { RevenueSnapshot } from "./RevenueSnapshot";
 import { useClientHealth } from "./useClientHealth";
 import { useSessions } from "@/hooks/useSessions";
 import QuickAddClientModal from "@/components/QuickAddClientModal";
 import type { AIInsight, RevenueSnapshotData } from "./types";
+
+function formatDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function addDays(d: Date, n: number): Date {
+  const out = new Date(d);
+  out.setDate(out.getDate() + n);
+  return out;
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    Trainer Dashboard — Restructured (Phase 2)
@@ -143,7 +157,7 @@ function greeting(): string {
 export default function TrainerDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { todaySessions, loading: sessionsLoading } = useSessions();
+  const { todaySessions, loading: sessionsLoading, sessions: allSessions } = useSessions();
   const [mounted, setMounted] = useState(false);
   const [showAddClientModal, setShowAddClientModal] = useState(false);
 
@@ -162,6 +176,107 @@ export default function TrainerDashboard() {
 
   // Real today's sessions from useSessions
   const todaysSessionList = todaySessions();
+
+  /* ── Today at a Glance extras: holidays covering today, today's
+        reminders, and on-holiday clients returning within 7 days ──── */
+  const [returning, setReturning] = useState<{ id: string; name: string; endDate: string }[]>([]);
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data: hc } = await supabase
+        .from("clients")
+        .select("id, full_name, email")
+        .eq("trainer_id", user.id)
+        .eq("status", "on_holiday");
+      const out: { id: string; name: string; endDate: string }[] = [];
+      const todayStr = formatDateKey(new Date());
+      const in7 = formatDateKey(addDays(new Date(), 7));
+      for (const c of hc || []) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("email", c.email)
+          .maybeSingle();
+        if (!prof) continue;
+        const latestEnd = allSessions
+          .filter((s) => s.type === "holiday" && s.clientId === prof.id && s.status !== "cancelled")
+          .map((s) => s.endsAt.split("T")[0])
+          .sort()
+          .pop();
+        if (latestEnd && latestEnd >= todayStr && latestEnd <= in7) {
+          out.push({ id: c.id, name: c.full_name, endDate: latestEnd });
+        }
+      }
+      if (!cancelled) setReturning(out);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, allSessions]);
+
+  const todayStr = formatDateKey(new Date());
+  const holidaysToday = allSessions.filter(
+    (s) =>
+      s.type === "holiday" &&
+      s.status !== "cancelled" &&
+      todayStr >= s.startsAt.split("T")[0] &&
+      todayStr <= s.endsAt.split("T")[0],
+  );
+  const remindersToday = allSessions.filter(
+    (s) => s.type === "reminder" && s.status !== "cancelled" && s.startsAt.split("T")[0] === todayStr,
+  );
+
+  // Mixed glance items, sorted by time
+  type GlanceItem = {
+    kind: "session" | "holiday" | "reminder" | "returning";
+    id: string;
+    title: string;
+    clientName: string;
+    clientId: string | null;
+    timeLabel: string;
+    sortKey: string;
+    session?: (typeof todaysSessionList)[number];
+  };
+  const glanceItems: GlanceItem[] = [
+    ...todaysSessionList.map((s) => ({
+      kind: "session" as const,
+      id: s.id,
+      title: s.title,
+      clientName: s.clientName || "Unknown",
+      clientId: null,
+      timeLabel: new Date(s.startsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      sortKey: s.startsAt,
+      session: s,
+    })),
+    ...holidaysToday.map((s) => ({
+      kind: "holiday" as const,
+      id: s.id,
+      title: "Holiday",
+      clientName: s.clientName || "Unknown",
+      clientId: null,
+      timeLabel: "all day",
+      sortKey: s.startsAt,
+    })),
+    ...remindersToday.map((s) => ({
+      kind: "reminder" as const,
+      id: s.id,
+      title: s.title,
+      clientName: s.clientName || "Unknown",
+      clientId: null,
+      timeLabel: new Date(s.startsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      sortKey: s.startsAt,
+    })),
+    ...returning.map((r) => ({
+      kind: "returning" as const,
+      id: r.id,
+      title: "Returning from holiday",
+      clientName: r.name,
+      clientId: r.id,
+      timeLabel: r.endDate === todayStr ? "today" : `by ${r.endDate.slice(5).replace("-", "/")}`,
+      sortKey: r.endDate,
+    })),
+  ].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 pt-4 pb-20 lg:px-6 lg:pb-8">
@@ -322,7 +437,7 @@ export default function TrainerDashboard() {
       )}
 
       {/* ═══════════════════════════════════════════════════════════
-          TODAY'S SESSIONS
+          TODAY AT A GLANCE (sessions + holidays + reminders + returning)
           ═══════════════════════════════════════════════════════════ */}
       <motion.div
         variants={fadeInUp}
@@ -331,7 +446,7 @@ export default function TrainerDashboard() {
         className="mb-6"
       >
         <CollapsibleSection
-          title="Today's Sessions"
+          title="Today at a Glance"
           icon={<Calendar className="h-4 w-4" />}
           defaultExpanded
           accentColor="#0D9488"
@@ -340,7 +455,7 @@ export default function TrainerDashboard() {
               className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
               style={{ backgroundColor: "#0D9488" }}
             >
-              {todaysSessionList.length}
+              {glanceItems.length}
             </span>
           }
           headerAction={
@@ -349,13 +464,13 @@ export default function TrainerDashboard() {
               className="flex items-center gap-0.5 text-[11px] font-medium transition-opacity hover:opacity-70"
               style={{ color: "var(--azfit-primary)" }}
             >
-              Full Schedule
+              Open Full Calendar
               <ChevronRight className="h-3 w-3" />
             </button>
           }
         >
           <div className="space-y-3">
-            {sessionsLoading && todaysSessionList.length === 0 ? (
+            {sessionsLoading && glanceItems.length === 0 ? (
               <div className="space-y-3">
                 {[1, 2, 3].map((i) => (
                   <div
@@ -374,102 +489,152 @@ export default function TrainerDashboard() {
                   </div>
                 ))}
               </div>
-            ) : todaysSessionList.length === 0 ? (
+            ) : glanceItems.length === 0 ? (
               <div className="py-6 text-center">
                 <p className="text-sm" style={{ color: "var(--light-text-muted)" }}>
-                  No sessions scheduled today
+                  Nothing scheduled today — enjoy the calm.
                 </p>
                 <button
                   onClick={() => navigate("/schedule")}
                   className="mt-2 text-[11px] font-medium"
                   style={{ color: "var(--azfit-primary)" }}
                 >
-                  Go to Schedule →
+                  Open Full Calendar →
                 </button>
               </div>
             ) : (
-              todaysSessionList.map((session, i) => {
-                const start = new Date(session.startsAt);
-                const end = new Date(session.endsAt);
-                const timeStr = start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-                const durationMin = (end.getTime() - start.getTime()) / 60000;
-                const durationStr = durationMin >= 60
-                  ? `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`
-                  : `${durationMin}m`;
-                const statusColor =
-                  session.status === "completed"
-                    ? "#84CC16"
-                    : session.status === "scheduled"
-                      ? "#0D9488"
-                      : session.status === "cancelled"
-                        ? "#F87171"
-                        : "#64748B";
+              glanceItems.map((item, i) => {
+                if (item.kind === "session" && item.session) {
+                  const session = item.session;
+                  const start = new Date(session.startsAt);
+                  const end = new Date(session.endsAt);
+                  const timeStr = start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+                  const durationMin = (end.getTime() - start.getTime()) / 60000;
+                  const durationStr = durationMin >= 60
+                    ? `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`
+                    : `${durationMin}m`;
+                  const statusColor =
+                    session.status === "completed"
+                      ? "#84CC16"
+                      : session.status === "scheduled"
+                        ? "#0D9488"
+                        : session.status === "cancelled"
+                          ? "#F87171"
+                          : "#64748B";
+
+                  return (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.08, duration: 0.3 }}
+                      className="group flex items-center gap-3 rounded-xl border p-3 transition-all hover:-translate-y-0.5"
+                      style={{
+                        backgroundColor: "var(--card-bg)",
+                        borderColor: "var(--card-border)",
+                      }}
+                    >
+                      {/* Status + Time */}
+                      <div className="flex flex-col items-center gap-1">
+                        <span
+                          className="inline-block h-2.5 w-2.5 rounded-full"
+                          style={{
+                            backgroundColor: statusColor,
+                            boxShadow: session.status === "scheduled" ? `0 0 8px ${statusColor}` : "none",
+                          }}
+                        />
+                        <span
+                          className="text-[10px] font-mono font-medium"
+                          style={{ color: "var(--light-text-muted)" }}
+                        >
+                          {timeStr}
+                        </span>
+                      </div>
+
+                      {/* Client Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p
+                            className="text-sm font-semibold truncate"
+                            style={{ color: "var(--page-text)" }}
+                          >
+                            {session.clientName || "Unknown"}
+                          </p>
+                          <span
+                            className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                            style={{
+                              backgroundColor: "rgba(13,148,136,0.15)",
+                              color: "#0D9488",
+                            }}
+                          >
+                            {session.type}
+                          </span>
+                        </div>
+                        <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>
+                          {durationStr} • {session.title}
+                        </p>
+                      </div>
+
+                      {/* Status label */}
+                      <span
+                        className="text-[10px] font-semibold uppercase tracking-wide"
+                        style={{ color: statusColor }}
+                      >
+                        {session.status}
+                      </span>
+
+                      <ChevronRight
+                        className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100"
+                        style={{ color: "var(--light-text-muted)" }}
+                      />
+                    </motion.div>
+                  );
+                }
+
+                // holiday / reminder / returning — left color-bar style
+                const cfg =
+                  item.kind === "holiday"
+                    ? { color: "#F59E0B", Icon: Sun, action: null as string | null, actionLabel: "View" }
+                    : item.kind === "reminder"
+                      ? { color: "#00AEEF", Icon: Bell, action: null as string | null, actionLabel: "View" }
+                      : { color: "#22C55E", Icon: PartyPopper, action: "welcome", actionLabel: "Welcome back" };
 
                 return (
                   <motion.div
-                    key={session.id}
+                    key={`${item.kind}-${item.id}`}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.08, duration: 0.3 }}
-                    className="group flex items-center gap-3 rounded-xl border p-3 transition-all hover:-translate-y-0.5"
+                    className="flex items-center gap-3 rounded-xl border p-3"
                     style={{
                       backgroundColor: "var(--card-bg)",
                       borderColor: "var(--card-border)",
+                      borderLeft: `3px solid ${cfg.color}`,
                     }}
                   >
-                    {/* Status + Time */}
-                    <div className="flex flex-col items-center gap-1">
-                      <span
-                        className="inline-block h-2.5 w-2.5 rounded-full"
-                        style={{
-                          backgroundColor: statusColor,
-                          boxShadow: session.status === "scheduled" ? `0 0 8px ${statusColor}` : "none",
-                        }}
-                      />
-                      <span
-                        className="text-[10px] font-mono font-medium"
-                        style={{ color: "var(--light-text-muted)" }}
-                      >
-                        {timeStr}
-                      </span>
+                    <div
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                      style={{ backgroundColor: `${cfg.color}20` }}
+                    >
+                      <cfg.Icon size={15} style={{ color: cfg.color }} />
                     </div>
-
-                    {/* Client Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p
-                          className="text-sm font-semibold truncate"
-                          style={{ color: "var(--page-text)" }}
-                        >
-                          {session.clientName || "Unknown"}
-                        </p>
-                        <span
-                          className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                          style={{
-                            backgroundColor: "rgba(13,148,136,0.15)",
-                            color: "#0D9488",
-                          }}
-                        >
-                          {session.type}
-                        </span>
-                      </div>
+                      <p className="text-sm font-semibold truncate" style={{ color: "var(--page-text)" }}>
+                        {item.title}
+                      </p>
                       <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>
-                        {durationStr} • {session.title}
+                        {item.clientName} • {item.timeLabel}
                       </p>
                     </div>
-
-                    {/* Status label */}
-                    <span
-                      className="text-[10px] font-semibold uppercase tracking-wide"
-                      style={{ color: statusColor }}
-                    >
-                      {session.status}
-                    </span>
-
-                    <ChevronRight
-                      className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100"
-                      style={{ color: "var(--light-text-muted)" }}
-                    />
+                    {item.clientId && (
+                      <button
+                        onClick={() => navigate(`/client/${item.clientId}`)}
+                        className="rounded-lg px-2.5 py-1 text-[11px] font-semibold transition hover:opacity-90"
+                        style={{ backgroundColor: `${cfg.color}20`, color: cfg.color }}
+                      >
+                        {cfg.actionLabel}
+                      </button>
+                    )}
                   </motion.div>
                 );
               })
@@ -725,6 +890,9 @@ export default function TrainerDashboard() {
           onSendMessage={() => navigate("/messages")}
         />
       </motion.section>
+
+      {/* FOLLOW-UPS (no session 5d+, BioPrint overdue, no active program) */}
+      <FollowUpsWidget />
 
       {/* ═══════════════════════════════════════════════════════════
           AI INSIGHTS + REVENUE SNAPSHOT
