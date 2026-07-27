@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -53,8 +54,8 @@ export default function ClientsPage() {
   const [mode, setMode] = useState<"dashboard" | "sheets">("dashboard");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("Active");
-  const [otherMenuOpen, setOtherMenuOpen] = useState(false);
-  const [statusMenuFor, setStatusMenuFor] = useState<string | null>(null);
+  const [otherMenu, setOtherMenu] = useState<{ rect: DOMRect } | null>(null);
+  const [statusMenu, setStatusMenu] = useState<{ clientId: string; rect: DOMRect } | null>(null);
   const [clients, setClients] = useState<DbClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
@@ -89,16 +90,16 @@ export default function ClientsPage() {
 
   // Escape closes any open status/filter menu
   useEffect(() => {
-    if (!statusMenuFor && !otherMenuOpen) return;
+    if (!statusMenu && !otherMenu) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setStatusMenuFor(null);
-        setOtherMenuOpen(false);
+        setStatusMenu(null);
+        setOtherMenu(null);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [statusMenuFor, otherMenuOpen]);
+  }, [statusMenu, otherMenu]);
 
   useEffect(() => {
     try {
@@ -136,7 +137,7 @@ export default function ClientsPage() {
 
   const handleStatusChange = useCallback(
     async (client: DbClient, next: ClientStatus) => {
-      setStatusMenuFor(null);
+      setStatusMenu(null);
       if (next === client.status) return;
       const prev = client.status;
       // Optimistic update; revert on error
@@ -371,7 +372,7 @@ export default function ClientsPage() {
                     <button
                       key={option}
                       type="button"
-                      onClick={() => { setFilter(option); setOtherMenuOpen(false); }}
+                      onClick={() => { setFilter(option); setOtherMenu(null); }}
                       className="rounded-full px-3 py-2 text-xs font-semibold transition"
                       style={{
                         backgroundColor:
@@ -393,7 +394,12 @@ export default function ClientsPage() {
                 <div className="relative">
                   <button
                     type="button"
-                    onClick={() => setOtherMenuOpen((o) => !o)}
+                    onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setOtherMenu((m) =>
+                        m ? null : { rect },
+                      )
+                    }}
                     className="inline-flex items-center gap-1 rounded-full px-3 py-2 text-xs font-semibold transition"
                     style={{
                       backgroundColor: filter.startsWith("other:")
@@ -410,38 +416,27 @@ export default function ClientsPage() {
                       : "Other"}
                     <ChevronDown size={11} />
                   </button>
-                  {otherMenuOpen && (
-                    <>
-                      <div className="fixed inset-0 z-10" onClick={() => setOtherMenuOpen(false)} />
-                      <div
-                        className="absolute right-0 z-50 mt-1 w-56 rounded-xl border overflow-y-auto shadow-xl"
-                        style={{
-                          backgroundColor: "var(--card-bg)",
-                          borderColor: "var(--card-border)",
-                          maxHeight: 320,
-                          boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-                        }}
-                      >
-                        {OTHER_STATUSES.map((v) => {
-                          const m = CLIENT_STATUSES[v];
-                          return (
-                            <button
-                              key={v}
-                              type="button"
-                              onClick={() => { setFilter(`other:${v}`); setOtherMenuOpen(false); }}
-                              className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-[var(--light-elevated)]"
-                            >
-                              <span className="text-xs font-semibold" style={{ color: m.color }}>
-                                {m.label}{filter === `other:${v}` && " ✓"}
-                              </span>
-                              <span className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
-                                {m.description}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </>
+                  {otherMenu && (
+                    <PortalMenu anchor={otherMenu.rect} onClose={() => setOtherMenu(null)} width={224}>
+                      {OTHER_STATUSES.map((v) => {
+                        const m = CLIENT_STATUSES[v];
+                        return (
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => { setFilter(`other:${v}`); setOtherMenu(null); }}
+                            className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-[var(--light-elevated)]"
+                          >
+                            <span className="text-xs font-semibold" style={{ color: m.color }}>
+                              {m.label}{filter === `other:${v}` && " ✓"}
+                            </span>
+                            <span className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+                              {m.description}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </PortalMenu>
                   )}
                 </div>
               </div>
@@ -484,7 +479,7 @@ export default function ClientsPage() {
                             // (transformed) rows — give this row its own
                             // stacking context while its menu is open.
                             position: "relative",
-                            zIndex: statusMenuFor === client.id ? 30 : 0,
+                            zIndex: statusMenu?.clientId === client.id ? 30 : 0,
                           }}
                           className={`flex w-full cursor-pointer items-center gap-4 px-4 py-4 transition ${
                             isSelected
@@ -511,11 +506,14 @@ export default function ClientsPage() {
                                 <>
                                   <button
                                     type="button"
-                                    onClick={() =>
-                                      setStatusMenuFor(
-                                        statusMenuFor === client.id ? null : client.id,
+                                    onClick={(e) => {
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      setStatusMenu((m) =>
+                                        m?.clientId === client.id
+                                          ? null
+                                          : { clientId: client.id, rect },
                                       )
-                                    }
+                                    }}
                                     className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition hover:opacity-80"
                                     style={{ backgroundColor: meta.bg, color: meta.color }}
                                     title="Change status"
@@ -523,48 +521,34 @@ export default function ClientsPage() {
                                     {meta.label}
                                     <ChevronDown size={11} />
                                   </button>
-                                  {statusMenuFor === client.id && (
-                                    <>
-                                      <div
-                                        className="fixed inset-0 z-10"
-                                        onClick={() => setStatusMenuFor(null)}
-                                      />
-                                      <div
-                                        className="absolute left-0 z-50 mt-1 w-60 rounded-xl border overflow-y-auto shadow-xl"
-                                        style={{
-                                          backgroundColor: "var(--card-bg)",
-                                          borderColor: "var(--card-border)",
-                                          maxHeight: 320,
-                                          boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-                                        }}
-                                      >
-                                        {CLIENT_STATUS_VALUES.map((v) => {
-                                          const m = CLIENT_STATUSES[v];
-                                          return (
-                                            <button
-                                              key={v}
-                                              type="button"
-                                              onClick={() => handleStatusChange(client, v)}
-                                              className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-[var(--light-elevated)]"
+                                  {statusMenu?.clientId === client.id && (
+                                    <PortalMenu anchor={statusMenu.rect} onClose={() => setStatusMenu(null)} width={240}>
+                                      {CLIENT_STATUS_VALUES.map((v) => {
+                                        const m = CLIENT_STATUSES[v];
+                                        return (
+                                          <button
+                                            key={v}
+                                            type="button"
+                                            onClick={() => handleStatusChange(client, v)}
+                                            className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-[var(--light-elevated)]"
+                                          >
+                                            <span
+                                              className="text-xs font-semibold"
+                                              style={{ color: m.color }}
                                             >
-                                              <span
-                                                className="text-xs font-semibold"
-                                                style={{ color: m.color }}
-                                              >
-                                                {m.label}
-                                                {v === client.status && " ✓"}
-                                              </span>
-                                              <span
-                                                className="text-[10px]"
-                                                style={{ color: "var(--light-text-muted)" }}
-                                              >
-                                                {m.description}
-                                              </span>
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
-                                    </>
+                                              {m.label}
+                                              {v === client.status && " ✓"}
+                                            </span>
+                                            <span
+                                              className="text-[10px]"
+                                              style={{ color: "var(--light-text-muted)" }}
+                                            >
+                                              {m.description}
+                                            </span>
+                                          </button>
+                                        );
+                                      })}
+                                    </PortalMenu>
                                   )}
                                 </>
                               );
@@ -648,5 +632,68 @@ export default function ClientsPage() {
         clientToEdit={editingClient}
       />
     </Layout>
+  );
+}
+
+/* ── PortalMenu: dropdown rendered in a body portal so it can never be
+     clipped by the table card's overflow boundary. Anchored to the
+     clicked badge's viewport rect; flips upward when there isn't room
+     below; horizontal position clamped to the viewport; repositions on
+     scroll/resize while open. Closes on outside click or Escape. ────── */
+
+function PortalMenu({
+  anchor,
+  onClose,
+  width,
+  children,
+}: {
+  anchor: DOMRect;
+  onClose: () => void;
+  width: number;
+  children: React.ReactNode;
+}) {
+  const computePos = useCallback(() => {
+    const MENU_EST_H = 340;
+    const spaceBelow = window.innerHeight - anchor.bottom;
+    const spaceAbove = anchor.top;
+    const openUp = spaceBelow < MENU_EST_H && spaceAbove > spaceBelow;
+    const left = Math.max(8, Math.min(anchor.left, window.innerWidth - width - 8));
+    return openUp
+      ? { left, top: undefined as number | undefined, bottom: window.innerHeight - anchor.top + 8 }
+      : { left, top: anchor.bottom + 8, bottom: undefined as number | undefined };
+  }, [anchor, width]);
+
+  const [pos, setPos] = useState(computePos);
+
+  useEffect(() => {
+    const recompute = () => setPos(computePos());
+    window.addEventListener("scroll", recompute, true);
+    window.addEventListener("resize", recompute);
+    return () => {
+      window.removeEventListener("scroll", recompute, true);
+      window.removeEventListener("resize", recompute);
+    };
+  }, [computePos]);
+
+  return createPortal(
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div
+        className="fixed z-50 rounded-xl border overflow-y-auto shadow-xl"
+        style={{
+          left: pos.left,
+          top: pos.top,
+          bottom: pos.bottom,
+          width,
+          maxHeight: 320,
+          backgroundColor: "var(--card-bg)",
+          borderColor: "var(--card-border)",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+        }}
+      >
+        {children}
+      </div>
+    </>,
+    document.body,
   );
 }
