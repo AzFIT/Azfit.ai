@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarPlus } from 'lucide-react';
+import { CalendarPlus, Check, CheckCheck } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -27,6 +27,10 @@ interface EditSessionDialogProps {
   event: CalendarEvent | null;
   onSave: (id: string, updates: Partial<CalendarEvent>) => void;
   onCancelSession: (id: string) => void;
+  /** scheduled/requested + past → mark completed */
+  onMarkCompleted?: (id: string) => void;
+  /** requested → accept (status='scheduled') */
+  onAccept?: (id: string) => void;
 }
 
 const SESSION_TYPES = [
@@ -48,6 +52,8 @@ export function EditSessionDialog({
   event,
   onSave,
   onCancelSession,
+  onMarkCompleted,
+  onAccept,
 }: EditSessionDialogProps) {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
@@ -60,6 +66,13 @@ export function EditSessionDialog({
   const [notes, setNotes] = useState(event?.description || '');
 
   if (!event) return null;
+
+  const isPast = new Date(`${event.date}T${event.endTime}`) < new Date();
+  const canComplete =
+    !!onMarkCompleted &&
+    isPast &&
+    (event.status === 'scheduled' || event.status === 'requested');
+  const canAccept = !!onAccept && event.status === 'requested';
 
   const handleSave = () => {
     onSave(event.id, { title, date, startTime, endTime, type: type as CalendarEvent['type'], description: notes });
@@ -207,6 +220,24 @@ export function EditSessionDialog({
               >
                 Cancel Session
               </Button>
+              {canAccept && (
+                <Button
+                  onClick={() => { onAccept!(event.id); onOpenChange(false); }}
+                  className="bg-emerald-500 text-white hover:bg-emerald-500/80"
+                >
+                  <Check className="mr-1 h-4 w-4" />
+                  Accept
+                </Button>
+              )}
+              {canComplete && (
+                <Button
+                  onClick={() => { onMarkCompleted!(event.id); onOpenChange(false); }}
+                  className="bg-emerald-600 text-white hover:bg-emerald-600/80"
+                >
+                  <CheckCheck className="mr-1 h-4 w-4" />
+                  Mark completed
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={() => onOpenChange(false)}

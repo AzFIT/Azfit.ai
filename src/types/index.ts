@@ -14,4 +14,5 @@ export interface CalendarEvent {
   location?: string | null;
   recurring?: boolean;
   color?: string;
+  status?: string; // sessions.status — requested/scheduled/completed/cancelled
 }

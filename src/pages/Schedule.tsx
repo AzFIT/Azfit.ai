@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import {
   ChevronLeft, ChevronRight, Calendar as CalendarIcon,
-  Users, Timer, Dumbbell, Download,
+  Users, Timer, Dumbbell, Download, Check,
 } from 'lucide-react';
 import {
   Dialog,
@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
 import { useSessions } from '@/hooks/useSessions';
 import type { Session } from '@/hooks/useSessions';
 import { findSessionConflicts, generateWeeklyOccurrences, formatConflictList } from '@/lib/sessionConflicts';
@@ -93,6 +94,7 @@ function sessionToEvent(session: ReturnType<typeof useSessions>['sessions'][numb
     clientName: session.clientName,
     description: session.notes || undefined,
     location: session.location,
+    status: session.status,
   };
 }
 
@@ -106,6 +108,37 @@ export default function SchedulePage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
   const [selectedDay, setSelectedDay] = useState(0); // 0-6 for day view
+  // Clients for the booking picker: resolved to profiles.id via email —
+  // sessions.client_id references profiles(id), so clients WITHOUT a linked
+  // app account are omitted (they cannot have sessions).
+  const [bookableClients, setBookableClients] = useState<{ id: string; name: string; avatar?: string }[]>([]);
+
+  useEffect(() => {
+    if (!user?.id || !isTrainer) return;
+    let cancelled = false;
+    (async () => {
+      const { data: rows } = await supabase
+        .from('clients')
+        .select('full_name, email')
+        .eq('trainer_id', user.id)
+        .neq('status', 'archived')
+        .order('full_name', { ascending: true });
+      if (!rows) return;
+      const out: { id: string; name: string }[] = [];
+      for (const c of rows) {
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', c.email)
+          .maybeSingle();
+        if (prof) out.push({ id: prof.id, name: c.full_name });
+      }
+      if (!cancelled) setBookableClients(out);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, isTrainer]);
 
   // Context menu
   const [contextMenu, setContextMenu] = useState<{
@@ -431,6 +464,18 @@ export default function SchedulePage() {
     setCancelOpen(false);
   };
 
+  const handleMarkCompleted = async (id: string) => {
+    const ok = await updateSession(id, { status: 'completed' });
+    if (ok) toast.success('Session marked completed');
+    setEditOpen(false);
+  };
+
+  const handleAcceptSession = async (id: string) => {
+    const ok = await updateSession(id, { status: 'scheduled' });
+    if (ok) toast.success('Session accepted');
+    setEditOpen(false);
+  };
+
   const handleRepeatWeekly = () => {
     const { date, time } = contextMenu;
     for (let i = 1; i <= 4; i++) {
@@ -634,7 +679,7 @@ export default function SchedulePage() {
         onOpenChange={setBookOpen}
         onBook={handleBook}
         isTrainer={isTrainer}
-        clients={[]}
+        clients={bookableClients}
         initialDate={contextMenu.date}
       />
       <BlockTimeDialog
@@ -648,6 +693,8 @@ export default function SchedulePage() {
         event={selectedEvent}
         onSave={handleSaveEdit}
         onCancelSession={(id) => { setSelectedEvent(events.find((e) => e.id === id) || null); setCancelOpen(true); }}
+        onMarkCompleted={isTrainer ? handleMarkCompleted : undefined}
+        onAccept={isTrainer ? handleAcceptSession : undefined}
       />
       <CancelConfirmDialog
         open={cancelOpen}
@@ -829,24 +876,29 @@ function EventCard({ event, compact }: { event: CalendarEvent; compact?: boolean
   const end = timeToMinutes(event.endTime);
   const duration = end - start;
   const height = Math.max((duration / 60) * SLOT_HEIGHT, 24);
+  const isCompleted = event.status === 'completed';
 
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className={`absolute left-1 right-1 rounded-lg px-2 py-1 text-xs overflow-hidden cursor-pointer
-        ${getEventColor(event.type)} ${event.type === 'blocked' ? 'border' : ''}`}
+        ${isCompleted ? 'bg-slate-700/80 border border-slate-600 opacity-70' : `${getEventColor(event.type)} ${event.type === 'blocked' ? 'border' : ''}`}`}
       style={{
         top: '2px',
         height: compact ? Math.min(height, SLOT_HEIGHT - 4) : height - 4,
         zIndex: 5,
       }}
     >
-      <div className="font-medium text-white truncate">{event.title}</div>
+      <div className="flex items-center gap-1 font-medium text-white truncate">
+        {isCompleted && <Check size={11} className="shrink-0 text-emerald-400" />}
+        <span className="truncate">{event.title}</span>
+      </div>
       {!compact && (
         <div className="text-[10px] text-white/70">
           {event.startTime} – {event.endTime}
           {event.clientName && ` • ${event.clientName}`}
+          {isCompleted && ' • completed'}
         </div>
       )}
     </motion.div>
