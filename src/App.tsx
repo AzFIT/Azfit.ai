@@ -31,6 +31,7 @@ if (sentryDsn) {
 const Home = lazy(() => import("@/pages/Home"));
 const Login = lazy(() => import("@/pages/Login"));
 const Signup = lazy(() => import("@/pages/Signup"));
+const Invite = lazy(() => import("@/pages/Invite"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
 const Coach = lazy(() => import("@/pages/Coach"));
@@ -126,6 +127,7 @@ export default function App() {
                   <Route path="/" element={<Home />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/signup" element={<Signup />} />
+                  <Route path="/invite/:trainerId" element={<Invite />} />
                   <Route
                     path="/dashboard"
                     element={

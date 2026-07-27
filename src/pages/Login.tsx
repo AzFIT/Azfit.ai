@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useLocation } from 'react-router';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, Dumbbell, ArrowLeft, Shield } from 'lucide-react';
 import { signIn, isAdminCredentials, isAdminQuickLoginAvailable } from '@/services/auth';
 import { useAuth } from '@/hooks/useAuth';
+import { captureInviteTrainer, getInviteTrainer, linkInvitedClient } from '@/lib/inviteLink';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, loginAsAdmin } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -14,6 +16,11 @@ export default function Login() {
   const [error, setError] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Persist ?trainer=<id> from the invite link through the auth flow
+  useEffect(() => {
+    captureInviteTrainer(location.search);
+  }, [location.search]);
 
   // Once the auth context finishes the async profile fetch after sign-in, redirect.
   useEffect(() => {
@@ -36,6 +43,8 @@ export default function Login() {
       }
 
       await signIn(email, password);
+      // Auto-link to the inviting trainer (no-op without ?trainer=; never blocks sign-in)
+      await linkInvitedClient(getInviteTrainer());
       // Auth context updates user asynchronously via onAuthStateChange; useEffect handles redirect.
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Invalid email or password');

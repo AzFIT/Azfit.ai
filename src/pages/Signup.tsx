@@ -1,12 +1,14 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, Dumbbell, ArrowLeft, User, UserCog } from 'lucide-react';
 import { signUp } from '@/services/auth';
 import type { UserRole } from '@/services/auth';
+import { captureInviteTrainer, getInviteTrainer, linkInvitedClient } from '@/lib/inviteLink';
 
 export default function Signup() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,6 +19,11 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
+
+  // Persist ?trainer=<id> from the invite link through the auth flow
+  useEffect(() => {
+    captureInviteTrainer(location.search);
+  }, [location.search]);
 
   const checkPasswordStrength = (pwd: string) => {
     let score = 0;
@@ -56,7 +63,12 @@ export default function Signup() {
     setLoading(true);
 
     try {
-      await signUp(email, password, fullName, role);
+      const data = await signUp(email, password, fullName, role);
+      // Auto-link to the inviting trainer when signup yields an immediate
+      // session (otherwise the param persists and links at first login).
+      if (data.session) {
+        await linkInvitedClient(getInviteTrainer());
+      }
       setSuccess(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to create account');
