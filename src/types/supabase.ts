@@ -1670,6 +1670,47 @@ export type Database = {
           }
         ];
       };
+      meal_plans: {
+        Row: {
+          id: string;
+          client_id: string;
+          name: string;
+          targets: Json | null;
+          items: Json;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          name?: string;
+          targets?: Json | null;
+          items: Json;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          client_id?: string;
+          name?: string;
+          targets?: Json | null;
+          items?: Json;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "meal_plans_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       photo_metadata_owner: {

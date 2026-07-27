@@ -14,6 +14,7 @@ import {
 import { activityLabel, DIET_PRESETS } from "@/lib/tdee";
 import { toast } from "sonner";
 import TdeeCalculator from "@/components/nutrition/TdeeCalculator";
+import MealPlanCard from "@/components/client/MealPlanCard";
 import type { Json } from "@/types/supabase";
 
 interface NutritionTabProps {
@@ -37,6 +38,8 @@ interface IntakeProfile {
   sessions_per_week?: number;
   session_duration_minutes?: number;
   diet?: string;
+  restrictions?: string[] | string | null;
+  allergies?: string[] | string | null;
   equipment?: string[];
   computed_targets?: IntakeTargets | null;
 }
@@ -63,6 +66,17 @@ function normalizeTargets(t: IntakeTargets | null | undefined): NutritionTargets
 function humanize(slug: string | null | undefined): string {
   if (!slug) return "";
   return slug.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** Restrictions/allergies may be an array or a comma-separated string. */
+function parseTerms(v: unknown): string[] {
+  if (Array.isArray(v)) {
+    return v.filter((x): x is string => typeof x === "string" && x.trim() !== "");
+  }
+  if (typeof v === "string" && v.trim() !== "") {
+    return v.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  return [];
 }
 
 const MEAL_ORDER = ["breakfast", "lunch", "dinner", "snacks"] as const;
@@ -248,6 +262,10 @@ export default function NutritionTab({ clientId, clientEmail }: NutritionTabProp
   ];
 
   const hasTargets = profileId != null || normalizeTargets(intake?.computed_targets) != null;
+  const restrictionTerms = [
+    ...parseTerms(intake?.restrictions),
+    ...parseTerms(intake?.allergies),
+  ];
 
   return (
     <div className="space-y-4">
@@ -373,6 +391,14 @@ export default function NutritionTab({ clientId, clientEmail }: NutritionTabProp
           />
         )}
       </motion.div>
+
+      {/* Meal Plan (both profile modes — targets normalized above) */}
+      <MealPlanCard
+        clientId={clientId}
+        targets={targets}
+        restrictions={restrictionTerms}
+        diet={intake?.diet}
+      />
 
       {!profileId && (
         <p
