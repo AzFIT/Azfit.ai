@@ -21,6 +21,13 @@ import {
 import {
   collectClientLimitations, evaluateProgramSafety, type SafetyFlag,
 } from '@/lib/programSafety';
+import {
+  bestMappedId,
+  parseTemplateTags,
+  templateTagLabels,
+  TEMPLATE_GOAL_MAP,
+  TEMPLATE_METHOD_MAP,
+} from '@/lib/programTemplates';
 import { setActiveSession, type WorkoutLog, type LoggedExercise, type LoggedSet } from '@/lib/storage';
 import {
   buildProgramInsert,
@@ -1417,6 +1424,66 @@ export default function AIProgramBuilderPage() {
     })();
     return () => { cancelled = true; };
   }, [loadId, user, loadSavedProgram]);
+
+  // Open a library template via /ai-program-builder?template=<id> (Phase 28F).
+  // Templates carry no exercise content — prefill name/description/tags and
+  // best-effort goal/method from the pre-computed score tables; the trainer
+  // then generates/edits/assigns via the existing flow.
+  const templateId = searchParams.get('template');
+  const templateHandled = useRef(false);
+  useEffect(() => {
+    if (!templateId || templateHandled.current) return;
+    let cancelled = false;
+    (async () => {
+      const { data: tpl } = await supabase
+        .from('program_templates')
+        .select('id, name, tags')
+        .eq('id', templateId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (!tpl) {
+        toast.error('Template not found — starting a new wizard');
+        templateHandled.current = true;
+        return;
+      }
+      const [{ data: gs }, { data: ms }] = await Promise.all([
+        supabase
+          .from('goal_program_template_scores')
+          .select('score, goals(name)')
+          .eq('program_template_id', templateId)
+          .order('score', { ascending: false })
+          .limit(3),
+        supabase
+          .from('method_program_template_scores')
+          .select('score, methods(name)')
+          .eq('program_template_id', templateId)
+          .order('score', { ascending: false })
+          .limit(3),
+      ]);
+      if (cancelled) return;
+      const toScored = (rows: unknown): { name: string; score: number }[] =>
+        ((rows as { score: number; methods?: { name: string } | null; goals?: { name: string } | null }[] | null) ?? [])
+          .map((r) => ({ name: r.methods?.name ?? r.goals?.name ?? '', score: r.score }))
+          .filter((r) => r.name);
+      // Best-effort preselect: first scored name with a clean mapping wins;
+      // when nothing maps, wizard defaults stay (mapping documented in
+      // src/lib/programTemplates.ts).
+      const goalId = bestMappedId(toScored(gs), TEMPLATE_GOAL_MAP);
+      const methodId = bestMappedId(toScored(ms), TEMPLATE_METHOD_MAP);
+      const rawTags = parseTemplateTags(tpl.tags);
+      const labels = templateTagLabels(tpl.tags);
+      updateData({
+        programName: tpl.name,
+        description: labels.slice(0, 3).join(' · '),
+        tags: rawTags.slice(0, 5),
+        ...(goalId ? { goal: goalId } : {}),
+        ...(methodId ? { method: methodId } : {}),
+      });
+      toast.success(`Template "${tpl.name}" loaded`);
+      templateHandled.current = true;
+    })();
+    return () => { cancelled = true; };
+  }, [templateId, updateData]);
 
   const stepComplete = useMemo(() => {
     const exerciseCount = data.workoutExercises

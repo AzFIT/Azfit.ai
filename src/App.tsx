@@ -59,6 +59,7 @@ const Messages = lazy(() => import("@/pages/Messages"));
 const ExercisesPage = lazy(() => import("@/pages/ExercisesPage"));
 const CheckInsPage = lazy(() => import("@/pages/CheckInsPage"));
 const FormChecksPage = lazy(() => import("@/pages/FormChecks"));
+const LibraryPage = lazy(() => import("@/pages/Library"));
 
 // Loading fallback
 function PageLoader() {
@@ -317,6 +318,14 @@ export default function App() {
                     element={
                       <ProtectedRoute>
                         <FormChecksPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/library"
+                    element={
+                      <ProtectedRoute requireTrainer>
+                        <LibraryPage />
                       </ProtectedRoute>
                     }
                   />

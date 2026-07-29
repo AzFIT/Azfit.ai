@@ -642,27 +642,57 @@ export type Database = {
       program_templates: {
         Row: {
           id: string;
+          step_number: number;
+          step_name: string;
+          category: string;
           name: string;
           slug: string;
           description: string | null;
-          category_id: string;
+          duration_weeks: number | null;
+          sessions_per_week: number | null;
+          icon_url: string | null;
+          is_active: boolean;
+          display_order: number;
           created_at: string;
+          updated_at: string;
+          category_id: number | null;
+          tags: string | null;
         };
         Insert: {
           id?: string;
+          step_number: number;
+          step_name: string;
+          category: string;
           name: string;
           slug: string;
           description?: string | null;
-          category_id: string;
+          duration_weeks?: number | null;
+          sessions_per_week?: number | null;
+          icon_url?: string | null;
+          is_active?: boolean;
+          display_order?: number;
           created_at?: string;
+          updated_at?: string;
+          category_id?: number | null;
+          tags?: string | null;
         };
         Update: {
           id?: string;
+          step_number?: number;
+          step_name?: string;
+          category?: string;
           name?: string;
           slug?: string;
           description?: string | null;
-          category_id?: string;
+          duration_weeks?: number | null;
+          sessions_per_week?: number | null;
+          icon_url?: string | null;
+          is_active?: boolean;
+          display_order?: number;
           created_at?: string;
+          updated_at?: string;
+          category_id?: number | null;
+          tags?: string | null;
         };
         Relationships: [
           {
@@ -931,6 +961,51 @@ export type Database = {
           },
           {
             foreignKeyName: "method_program_template_scores_program_template_id_fkey";
+            columns: ["program_template_id"];
+            isOneToOne: false;
+            referencedRelation: "program_templates";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      goal_program_template_scores: {
+        Row: {
+          goal_id: string;
+          program_template_id: string;
+          overlap_count: number | null;
+          jaccard_index: number | null;
+          score: number;
+          shared_tag_ids: number[] | null;
+          computed_at: string | null;
+        };
+        Insert: {
+          goal_id: string;
+          program_template_id: string;
+          overlap_count?: number | null;
+          jaccard_index?: number | null;
+          score?: number;
+          shared_tag_ids?: number[] | null;
+          computed_at?: string | null;
+        };
+        Update: {
+          goal_id?: string;
+          program_template_id?: string;
+          overlap_count?: number | null;
+          jaccard_index?: number | null;
+          score?: number;
+          shared_tag_ids?: number[] | null;
+          computed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "goal_program_template_scores_goal_id_fkey";
+            columns: ["goal_id"];
+            isOneToOne: false;
+            referencedRelation: "goals";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "goal_program_template_scores_program_template_id_fkey";
             columns: ["program_template_id"];
             isOneToOne: false;
             referencedRelation: "program_templates";

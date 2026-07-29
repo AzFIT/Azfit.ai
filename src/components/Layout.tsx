@@ -28,6 +28,7 @@ import {
   MessageSquare,
   ChevronDown,
   BookOpen,
+  Library,
   ClipboardCheck,
   Video,
 } from "lucide-react";
@@ -88,9 +89,9 @@ export default function Layout({
     { icon: BarChart3, label: "Analytics", path: "/analytics" },
   ];
 
-  // Secondary nav: add Coach only for trainers/admins, Messages for both
+  // Secondary nav: add Coach + Library only for trainers/admins, Messages for both
   const secondaryNavItems = isTrainer
-    ? [...baseSecondaryNavItems, messagesNavItem, { icon: UserCircle, label: "Coach", path: "/coach" }]
+    ? [...baseSecondaryNavItems, messagesNavItem, { icon: Library, label: "Library", path: "/library" }, { icon: UserCircle, label: "Coach", path: "/coach" }]
     : [...baseSecondaryNavItems, messagesNavItem];
 
   // Mobile tabs: clients see Schedule instead of Clients, no Coach
