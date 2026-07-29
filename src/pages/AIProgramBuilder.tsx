@@ -39,6 +39,7 @@ import {
 } from '@/lib/methodCatalog';
 import { suggestPhasesForMethod } from '@/lib/phaseSuggestions';
 import { pairingStyleForMethod, assignPairGroups } from '@/lib/supersets';
+import ExercisePickerDialog, { type LibraryExercise } from '@/components/exercise/ExercisePickerDialog';
 import {
   PROGRESSION_PRESETS,
   progressionNoteForWeek,
@@ -889,14 +890,25 @@ function Step6Exercises({ data, updateData, limitations }: StepProps) {
     (idx: number) => setList((prev) => prev.filter((_, i) => i !== idx)),
     [setList]
   );
-  const addExercise = useCallback(
-    () =>
-      setList((prev) => [
-        ...prev,
-        { code: `B${prev.length + 1}`, name: 'New Exercise', sets: 3, reps: '10', pct1RM: 'N/A', tempo: '2-0-1-0', rest: '2:00' },
-      ]),
-    [setList]
+  // Phase 31B — library picker for add + manual swap (28D guided swaps stay as-is)
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [swapIdx, setSwapIdx] = useState<number | null>(null);
+  const handlePicked = useCallback(
+    (ex: LibraryExercise) => {
+      if (swapIdx != null) {
+        setList((prev) => prev.map((e, i) => (i === swapIdx ? { ...e, name: ex.name } : e)));
+        setSwapIdx(null);
+      } else {
+        setList((prev) => [
+          ...prev,
+          { code: `B${prev.length + 1}`, name: ex.name, sets: 3, reps: '10', pct1RM: 'N/A', tempo: '2-0-1-0', rest: '2:00' },
+        ]);
+      }
+    },
+    [setList, swapIdx]
   );
+  const openAddPicker = () => { setSwapIdx(null); setPickerOpen(true); };
+  const openSwapPicker = (idx: number) => { setSwapIdx(idx); setPickerOpen(true); };
   const handleAutoFill = useCallback(() => setList(() => DEFAULT_EXERCISES.map((e) => ({ ...e }))), [setList]);
   const toggleRow = useCallback((idx: number) => setOpenRows((prev) => ({ ...prev, [idx]: !prev[idx] })), []);
 
@@ -955,7 +967,7 @@ function Step6Exercises({ data, updateData, limitations }: StepProps) {
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={handleAutoFill} className="border-[#8B5CF6] text-[#8B5CF6] hover:bg-[#8B5CF6]/10 text-xs"><Sparkles className="w-3.5 h-3.5 mr-1" />AI Auto-Fill</Button>
-        <Button variant="outline" size="sm" onClick={addExercise} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs"><Plus className="w-3.5 h-3.5 mr-1" />Add Exercise</Button>
+        <Button variant="outline" size="sm" onClick={openAddPicker} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs"><Plus className="w-3.5 h-3.5 mr-1" />Add Exercise</Button>
       </div>
 
       {perDay && activeDays.length > 0 && (
@@ -1089,6 +1101,14 @@ function Step6Exercises({ data, updateData, limitations }: StepProps) {
                           ))}
                         </select>
                       </div>
+                      <div className="flex items-end">
+                        <button
+                          onClick={() => openSwapPicker(idx)}
+                          className="h-7 px-2 rounded-md border border-[#00AEEF]/50 text-[#00AEEF] hover:bg-[#00AEEF]/10 text-[11px] font-medium transition-colors"
+                        >
+                          Swap via library…
+                        </button>
+                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -1180,6 +1200,13 @@ function Step6Exercises({ data, updateData, limitations }: StepProps) {
           + Add custom rule
         </button>
       </div>
+
+      <ExercisePickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onSelect={handlePicked}
+        limitations={limitations ?? []}
+      />
     </div>
   );
 }

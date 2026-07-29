@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Play, X, Dumbbell, ChevronDown, AlertTriangle, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
 import { Input } from '@/components/ui/input';
 
 interface Exercise {
@@ -11,8 +12,9 @@ interface Exercise {
   Equipment: string;
   Difficulty: string;
   Type: string;
-  VideoURL: string;
-  Description: string;
+  VideoURL: string; // '' when the library has none
+  Description: string; // '' when the library has none
+  SafetyNotes: string; // '' when the library has none
 }
 
 function extractYouTubeId(url: string): string | null {
@@ -31,20 +33,8 @@ function getYouTubeEmbed(url: string): string {
 }
 
 function generateSafetyNotes(exercise: Exercise): string {
-  const notes: Record<string, string> = {
-    'Barbell Back Squat': 'Keep core braced throughout. Do not round lower back. Use safety bars when training heavy.',
-    'Romanian Deadlift': 'Maintain neutral spine. Do not hyperextend at lockout. Stop if hamstring strain is felt.',
-    'Bench Press': 'Use spotter for heavy sets. Keep feet planted. Do not bounce bar off chest.',
-    'Overhead Press': 'Avoid excessive lumbar arch. Brace abs. Do not use leg drive unless specified.',
-    'Pull-Up': 'Full range of motion. Control descent. Avoid swinging or kipping unless specified.',
-    'Barbell Row': 'Keep back flat. Pull to lower chest/upper abs. Avoid excessive momentum.',
-    'Front Squat': 'Elbows must stay high. Core tight. Stop if wrist/elbow pain occurs.',
-    'Incline Dumbbell Press': 'Control dumbbells on descent. Do not drop from top position.',
-  };
-  return (
-    notes[exercise.Name] ||
-    `Perform with controlled tempo. Use appropriate weight for ${exercise.Difficulty} level. Ensure proper warm-up before attempting.`
-  );
+  // Phase 31B: real safety notes from the library (no fabricated fallbacks)
+  return exercise.SafetyNotes;
 }
 
 function getDifficultyColor(difficulty: string) {
@@ -192,7 +182,10 @@ function ExerciseCard({
       )}
     >
       {/* Video Thumbnail */}
-      <div className="relative aspect-video bg-[#0A0A0A] group cursor-pointer" onClick={() => onPlay(exercise)}>
+      <div
+        className={cn('relative aspect-video bg-[#0A0A0A] group', exercise.VideoURL && 'cursor-pointer')}
+        onClick={() => exercise.VideoURL && onPlay(exercise)}
+      >
         {thumb ? (
           <img
             src={thumb}
@@ -205,11 +198,13 @@ function ExerciseCard({
             <Dumbbell size={32} className="text-[var(--text-muted)]" />
           </div>
         )}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-12 h-12 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center border border-white/20 group-hover:scale-110 group-hover:bg-[#00AEEF]/80 transition-all duration-200">
-            <Play size={20} className="text-white ml-0.5" fill="white" />
+        {exercise.VideoURL && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center border border-white/20 group-hover:scale-110 group-hover:bg-[#00AEEF]/80 transition-all duration-200">
+              <Play size={20} className="text-white ml-0.5" fill="white" />
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Content */}
@@ -256,46 +251,54 @@ function ExerciseCard({
           <span className="text-[11px]">{exercise.Equipment}</span>
         </div>
 
-        {/* Description */}
-        <p className="text-[var(--text-muted)] text-xs leading-relaxed mb-2 flex-1">
-          {showFullDesc ? exercise.Description : exercise.Description.slice(0, 80)}
-          {descTooLong && !showFullDesc && '...'}
-        </p>
-        {descTooLong && (
-          <button
-            onClick={() => setShowFullDesc(!showFullDesc)}
-            className="text-[#00AEEF] text-xs font-medium hover:underline mb-2 text-left"
-          >
-            {showFullDesc ? 'Show less' : 'Read more'}
-          </button>
+        {/* Description (only when the library has one) */}
+        {exercise.Description && (
+          <>
+            <p className="text-[var(--text-muted)] text-xs leading-relaxed mb-2 flex-1">
+              {showFullDesc ? exercise.Description : exercise.Description.slice(0, 80)}
+              {descTooLong && !showFullDesc && '...'}
+            </p>
+            {descTooLong && (
+              <button
+                onClick={() => setShowFullDesc(!showFullDesc)}
+                className="text-[#00AEEF] text-xs font-medium hover:underline mb-2 text-left"
+              >
+                {showFullDesc ? 'Show less' : 'Read more'}
+              </button>
+            )}
+          </>
         )}
 
-        {/* Safety Notes Toggle */}
-        <button
-          onClick={() => setShowSafety(!showSafety)}
-          className={cn(
-            'flex items-center gap-1.5 text-xs font-medium transition-colors mt-auto',
-            showSafety ? 'text-amber-500' : 'text-[var(--text-muted)] hover:text-amber-500'
-          )}
-        >
-          <AlertTriangle size={12} />
-          {showSafety ? 'Hide safety notes' : 'Show safety notes'}
-        </button>
-        <AnimatePresence>
-          {showSafety && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden"
+        {/* Safety Notes Toggle (only when the library has real notes) */}
+        {safetyNotes && (
+          <>
+            <button
+              onClick={() => setShowSafety(!showSafety)}
+              className={cn(
+                'flex items-center gap-1.5 text-xs font-medium transition-colors mt-auto',
+                showSafety ? 'text-amber-500' : 'text-[var(--text-muted)] hover:text-amber-500'
+              )}
             >
-              <div className="mt-2 p-2.5 bg-amber-500/5 border border-amber-500/15 rounded-lg">
-                <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">{safetyNotes}</p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              <AlertTriangle size={12} />
+              {showSafety ? 'Hide safety notes' : 'Show safety notes'}
+            </button>
+            <AnimatePresence>
+              {showSafety && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="mt-2 p-2.5 bg-amber-500/5 border border-amber-500/15 rounded-lg">
+                    <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">{safetyNotes}</p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>
+        )}
       </div>
     </motion.div>
   );
@@ -381,15 +384,36 @@ export default function ExercisesPage() {
   const [typeFilter, setTypeFilter] = useState('All');
   const [playingExercise, setPlayingExercise] = useState<Exercise | null>(null);
 
-  // Fetch data
+  // Fetch data — live exercise_library catalog (Phase 31B)
   useEffect(() => {
-    fetch('./exercises_db.json')
-      .then((r) => r.json())
-      .then((data: Exercise[]) => {
-        setExercises(data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('exercise_library')
+        .select('code, name, equipment, primary_muscle, secondary_muscle, difficulty, exercise_type, safety_notes, description, youtube_url')
+        .eq('is_active', true)
+        .order('name');
+      if (cancelled) return;
+      if (!error && data) {
+        setExercises(
+          data.map((r) => ({
+            ExerciseID: r.code,
+            Name: r.name,
+            MuscleGroup: r.primary_muscle,
+            Equipment: r.equipment,
+            Difficulty: r.difficulty,
+            Type: r.exercise_type,
+            VideoURL: r.youtube_url ?? '',
+            Description: r.description ?? '',
+            SafetyNotes: r.safety_notes ?? '',
+          }))
+        );
+      }
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Derive filter options
