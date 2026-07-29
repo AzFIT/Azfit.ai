@@ -11,7 +11,7 @@ import {
   Zap, Bot, Save, RotateCcw, Check,
   Dumbbell, TrendingUp, Flame, Wind, HeartPulse, Pencil, Trash2,
   Plus, Eye, BarChart3, Download, X, Target, Award, Sparkles,
-  AlertTriangle, Layers, Calendar, Users, Play, ArrowLeft, Upload, ShieldAlert, Loader2,
+  AlertTriangle, Layers, Calendar, Users, Play, ArrowLeft, Upload, ShieldAlert, Loader2, Copy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -37,6 +37,7 @@ import {
   type DbMethodCategory,
   type RankedMethod,
 } from '@/lib/methodCatalog';
+import { suggestPhasesForMethod } from '@/lib/phaseSuggestions';
 import { setActiveSession, type WorkoutLog, type LoggedExercise, type LoggedSet } from '@/lib/storage';
 import {
   buildProgramInsert,
@@ -59,7 +60,7 @@ import { Textarea } from '@/components/ui/textarea';
 
 // TYPES
 export interface ClientContext { ageRange: string; experience: string; bodyType: string; availability: string; limitations: string[]; otherLimitation: string; }
-export interface ProgramPhase { id: string; name: string; weeks: number; focus: string; color: string; active: boolean; }
+export interface ProgramPhase { id: string; name: string; weeks: number; focus: string; color: string; active: boolean; intensityTarget?: string; volumeTarget?: string; }
 export interface ProgramSplit { day: string; active: boolean; workout: string; dbId?: string; }
 export interface ProgramExercise { code: string; name: string; sets: number; reps: string; pct1RM: string; tempo: string; rest: string; dbId?: string; isSubstituted?: boolean; safetyNote?: string; }
 export interface ProgramData { id?: string; goal: string; method: string; clientContext: ClientContext; phases: ProgramPhase[]; weeklyHours: number; split: ProgramSplit[]; exercises: ProgramExercise[]; workoutExercises?: Record<number, ProgramExercise[]>; programName: string; description: string; tags: string[]; isPublic: boolean; assignedClient: string; }
@@ -584,13 +585,47 @@ function Step3Context({ data, updateData }: StepProps) {
   );
 }
 
+const PHASE_COLORS = ['#F59E0B', '#EF4444', '#22C55E', '#00AEEF', '#8B5CF6', '#EAB308'];
+
 function Step4Phases({ data, updateData }: StepProps) {
+  const [editingPhase, setEditingPhase] = useState<ProgramPhase | null>(null);
+  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
   const togglePhase = useCallback((phaseId: string) => updateData((prev) => ({ phases: prev.phases.map((p) => (p.id === phaseId ? { ...p, active: !p.active } : p)) })), [updateData]);
   const removePhase = useCallback((phaseId: string) => updateData((prev) => ({ phases: prev.phases.filter((p) => p.id !== phaseId) })), [updateData]);
   const addPhase = useCallback(() => updateData((prev) => ({ phases: [...prev.phases, { id: `p${Date.now()}`, name: 'New Phase', weeks: 3, focus: 'Custom focus', color: '#00AEEF', active: true }] })), [updateData]);
+  const duplicatePhase = useCallback((phase: ProgramPhase) => updateData((prev) => {
+    const idx = prev.phases.findIndex((p) => p.id === phase.id);
+    const copy: ProgramPhase = { ...phase, id: `p${Date.now()}`, name: `${phase.name} (copy)` };
+    const phases = [...prev.phases];
+    phases.splice(idx + 1, 0, copy);
+    return { phases };
+  }), [updateData]);
+  const saveEditedPhase = useCallback(() => {
+    if (!editingPhase) return;
+    const trimmed = { ...editingPhase, name: editingPhase.name.trim() || 'Phase', weeks: Math.min(16, Math.max(1, editingPhase.weeks || 1)) };
+    updateData((prev) => ({ phases: prev.phases.map((p) => (p.id === trimmed.id ? trimmed : p)) }));
+    setEditingPhase(null);
+  }, [editingPhase, updateData]);
+  // Method-aware phase suggestion (Phase 30B) — null when the method has no map
+  const suggestion = useMemo(() => suggestPhasesForMethod(data.method), [data.method]);
+  const acceptSuggestion = useCallback(() => {
+    if (!suggestion) return;
+    updateData({ phases: suggestion.map((s, i) => ({ ...s, id: `p${Date.now()}-${i}`, active: true })) });
+    setSuggestionDismissed(true);
+  }, [suggestion, updateData]);
   const totalWeeks = useMemo(() => data.phases.filter((p) => p.active).reduce((sum, p) => sum + p.weeks, 0), [data.phases]);
   return (
     <div className="space-y-5">
+      {suggestion && !suggestionDismissed && (
+        <div className="rounded-xl border border-[#00AEEF]/40 bg-[#00AEEF]/10 px-4 py-3 flex flex-wrap items-center gap-3">
+          <Sparkles className="w-4 h-4 text-[#00AEEF] shrink-0" />
+          <p className="flex-1 min-w-0 text-xs text-[var(--page-text)]">
+            Suggested for this method: <span className="font-semibold text-[#00AEEF]">{suggestion.map((s) => `${s.name} (${s.weeks}w)`).join(' → ')}</span>
+          </p>
+          <Button size="sm" onClick={acceptSuggestion} className="bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] text-xs font-bold">Accept</Button>
+          <button onClick={() => setSuggestionDismissed(true)} className="p-1 rounded-lg text-[var(--page-text)]/50 hover:text-[var(--page-text)]"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      )}
       <div className="space-y-3">
         {data.phases.map((phase) => (
           <motion.div key={phase.id} layout className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4">
@@ -598,12 +633,16 @@ function Step4Phases({ data, updateData }: StepProps) {
               <input type="checkbox" checked={phase.active} onChange={() => togglePhase(phase.id)} className="w-5 h-5 rounded accent-[#00AEEF]" />
               <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: phase.color }} />
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h4 className={cn('text-sm font-semibold', phase.active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40 line-through')}>{phase.name}</h4>
                   <Badge variant="outline" className="text-[10px] border-[var(--card-border)] text-[var(--page-text)]/60">{phase.weeks} weeks</Badge>
+                  {phase.intensityTarget && <Badge variant="outline" className="text-[10px] border-[#F59E0B]/40 text-[#F59E0B]">{phase.intensityTarget}</Badge>}
+                  {phase.volumeTarget && <Badge variant="outline" className="text-[10px] border-[#8B5CF6]/40 text-[#8B5CF6]">{phase.volumeTarget}</Badge>}
                 </div>
                 <p className={cn('text-xs mt-0.5', phase.active ? 'text-[var(--page-text)]/60' : 'text-[var(--page-text)]/40')}>{phase.focus}</p>
               </div>
+              <button onClick={() => setEditingPhase({ ...phase })} className="p-1.5 rounded-lg hover:bg-[var(--page-bg)] text-[var(--page-text)]/60 hover:text-[var(--page-text)] transition-colors"><Pencil className="w-4 h-4" /></button>
+              <button onClick={() => duplicatePhase(phase)} className="p-1.5 rounded-lg hover:bg-[var(--page-bg)] text-[var(--page-text)]/60 hover:text-[var(--page-text)] transition-colors"><Copy className="w-4 h-4" /></button>
               <button onClick={() => removePhase(phase.id)} className="p-1.5 rounded-lg hover:bg-[#EF4444]/10 text-[var(--page-text)]/60 hover:text-[#EF4444] transition-colors"><X className="w-4 h-4" /></button>
             </div>
           </motion.div>
@@ -629,8 +668,57 @@ function Step4Phases({ data, updateData }: StepProps) {
       </div>
       <div className="flex gap-2">
         <Button variant="outline" size="sm" onClick={addPhase} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs"><Plus className="w-3.5 h-3.5 mr-1" />Add Phase</Button>
-        <Button variant="outline" size="sm" onClick={() => updateData({ phases: PHASES_DEFAULT.map((p) => ({ ...p })) })} className="border-[#8B5CF6] text-[#8B5CF6] hover:bg-[#8B5CF6]/10 text-xs"><Bot className="w-3.5 h-3.5 mr-1" />Recommend Phases</Button>
       </div>
+
+      {/* Phase edit dialog (Phase 30B) */}
+      <AnimatePresence>
+        {editingPhase && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setEditingPhase(null)}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl w-full max-w-md p-5 shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-[var(--page-text)] text-base font-bold">Edit Phase</h3>
+                <button onClick={() => setEditingPhase(null)} className="p-1.5 rounded-lg hover:bg-[var(--page-bg)] text-[var(--page-text)]/60"><X className="w-4 h-4" /></button>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[var(--page-text)]/60 text-xs mb-1 block">Name</label>
+                  <Input value={editingPhase.name} onChange={(e) => setEditingPhase({ ...editingPhase, name: e.target.value })} className="bg-[var(--page-bg)] border-[var(--card-border)] text-[var(--page-text)]" />
+                </div>
+                <div>
+                  <label className="text-[var(--page-text)]/60 text-xs mb-1 block">Weeks (1–16)</label>
+                  <Input type="number" min={1} max={16} value={editingPhase.weeks} onChange={(e) => setEditingPhase({ ...editingPhase, weeks: parseInt(e.target.value) || 1 })} className="bg-[var(--page-bg)] border-[var(--card-border)] text-[var(--page-text)]" />
+                </div>
+                <div>
+                  <label className="text-[var(--page-text)]/60 text-xs mb-1 block">Focus</label>
+                  <Input value={editingPhase.focus} onChange={(e) => setEditingPhase({ ...editingPhase, focus: e.target.value })} className="bg-[var(--page-bg)] border-[var(--card-border)] text-[var(--page-text)]" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[var(--page-text)]/60 text-xs mb-1 block">Intensity target</label>
+                    <Input value={editingPhase.intensityTarget ?? ''} placeholder="e.g. RPE 7-8" onChange={(e) => setEditingPhase({ ...editingPhase, intensityTarget: e.target.value || undefined })} className="bg-[var(--page-bg)] border-[var(--card-border)] text-[var(--page-text)]" />
+                  </div>
+                  <div>
+                    <label className="text-[var(--page-text)]/60 text-xs mb-1 block">Volume target</label>
+                    <Input value={editingPhase.volumeTarget ?? ''} placeholder="e.g. MEV range" onChange={(e) => setEditingPhase({ ...editingPhase, volumeTarget: e.target.value || undefined })} className="bg-[var(--page-bg)] border-[var(--card-border)] text-[var(--page-text)]" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[var(--page-text)]/60 text-xs mb-1.5 block">Color</label>
+                  <div className="flex gap-2">
+                    {PHASE_COLORS.map((c) => (
+                      <button key={c} onClick={() => setEditingPhase({ ...editingPhase, color: c })} className={cn('w-7 h-7 rounded-full border-2 transition-all', editingPhase.color === c ? 'border-white scale-110' : 'border-transparent')} style={{ backgroundColor: c }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-5">
+                <Button variant="outline" onClick={() => setEditingPhase(null)} className="flex-1 border-[var(--card-border)] text-[var(--page-text)]">Cancel</Button>
+                <Button onClick={saveEditedPhase} className="flex-1 bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] font-bold">Save Phase</Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

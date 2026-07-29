@@ -3,7 +3,7 @@
 // Pure functions: easy to unit test and reuse between pages.
 // ═══════════════════════════════════════════════════════════════════════
 
-import type { Database } from "@/types/supabase";
+import type { Database, Json } from "@/types/supabase";
 import type {
   ProgramData,
   ProgramExercise,
@@ -26,6 +26,7 @@ export interface DbProgramInsert {
   status: "draft" | "active";
   start_date: string | null;
   end_date: string | null;
+  phases: Json | null;
 }
 
 export interface DbWorkoutInsert {
@@ -155,6 +156,8 @@ export function buildProgramInsert(
     status: isAssigned ? "active" : "draft",
     start_date: startDate ? startDate.toISOString().split("T")[0] : null,
     end_date: endDate ? endDate.toISOString().split("T")[0] : null,
+    // Phase 30B: persist the ACTIVE phase structure (all fields) as jsonb
+    phases: activePhases.length > 0 ? (activePhases as unknown as Json) : null,
   };
 }
 
@@ -305,6 +308,18 @@ export function programDataFromDb(
   const programExercises: ProgramExercise[] =
     Object.values(workoutExercises)[0] || defaultData.exercises;
 
+  // Phase 30B: restore the full phase structure when persisted (jsonb array);
+  // fall back to the legacy single-phase shape derived from duration_weeks.
+  const storedPhases = Array.isArray(program.phases)
+    ? (program.phases as unknown[]).filter(
+        (p): p is ProgramData["phases"][number] =>
+          typeof p === "object" && p !== null &&
+          typeof (p as Record<string, unknown>).id === "string" &&
+          typeof (p as Record<string, unknown>).name === "string" &&
+          typeof (p as Record<string, unknown>).weeks === "number"
+      )
+    : [];
+
   return {
     ...defaultData,
     id: program.id,
@@ -313,16 +328,18 @@ export function programDataFromDb(
     assignedClient: program.client_id || "",
     isPublic: false,
     tags: [],
-    phases: [
-      {
-        id: "p1",
-        name: "Program Phase",
-        weeks: program.duration_weeks || 4,
-        focus: "",
-        color: "#00AEEF",
-        active: true,
-      },
-    ],
+    phases: storedPhases.length > 0
+      ? storedPhases
+      : [
+          {
+            id: "p1",
+            name: "Program Phase",
+            weeks: program.duration_weeks || 4,
+            focus: "",
+            color: "#00AEEF",
+            active: true,
+          },
+        ],
     split,
     exercises: programExercises,
     workoutExercises,
