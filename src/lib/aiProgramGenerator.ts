@@ -183,11 +183,17 @@ export function applySafetyFilter(exercises: string[], injuries?: string): strin
   return exercises.map((e) => {
     const hits = findContraindications(e, limitations);
     if (!hits.some((h) => h.severity === 'exclude')) return e;
+    // First SAFE candidate only — a substitution that itself hits an 'exclude'
+    // contraindication (e.g. one deadlift variant for another) is not a swap.
     const alt = findExerciseSubstitutions(e, {
       reason: hits.map((h) => h.limitation).join(' '),
       excluded: exercises,
-    })[0];
-    if (alt && !swapped.has(alt.name)) {
+    }).find(
+      (cand) =>
+        !findContraindications(cand.name, limitations).some((h) => h.severity === 'exclude') &&
+        !swapped.has(cand.name)
+    );
+    if (alt) {
       swapped.add(alt.name);
       return alt.name;
     }
@@ -258,11 +264,23 @@ function getCategoryDisplayName(categoryId: string): string {
   return cat?.label || categoryId;
 }
 
+export const MIN_EXERCISES_PER_DAY = 8;
+
 export function generateProgram(profile: ClientProfile): GeneratedProgram {
   const split = getSplitConfig(profile.trainingFrequency);
   const goalParams = GOAL_PARAMS[profile.primaryGoal] || GOAL_PARAMS.general_health;
   const pool = buildExercisePool(profile);
   const usedExercises = new Set<string>();
+
+  const makeExercise = (orderIdx: number, name: string, categoryId: string): GeneratedExercise => ({
+    order: getOrderPrefix(orderIdx),
+    name,
+    category: getCategoryDisplayName(categoryId),
+    sets: Math.floor(Math.random() * (goalParams.setsMax - goalParams.setsMin + 1)) + goalParams.setsMin,
+    reps: goalParams.reps,
+    tempo: goalParams.tempo,
+    restSeconds: Math.floor(Math.random() * (goalParams.restMax - goalParams.restMin + 1)) + goalParams.restMin,
+  });
 
   const workouts: GeneratedWorkout[] = split.days.map((day, dayIndex) => {
     const exercises: GeneratedExercise[] = [];
@@ -273,19 +291,39 @@ export function generateProgram(profile: ClientProfile): GeneratedProgram {
       if (!name) continue;
 
       usedExercises.add(name);
+      exercises.push(makeExercise(i, name, category));
+    }
 
-      const sets = Math.floor(Math.random() * (goalParams.setsMax - goalParams.setsMin + 1)) + goalParams.setsMin;
-      const rest = Math.floor(Math.random() * (goalParams.restMax - goalParams.restMin + 1)) + goalParams.restMin;
-
-      exercises.push({
-        order: getOrderPrefix(i),
-        name,
-        category: getCategoryDisplayName(category),
-        sets,
-        reps: goalParams.reps,
-        tempo: goalParams.tempo,
-        restSeconds: rest,
-      });
+    // Phase 29B top-up: every training day ends with >= MIN_EXERCISES_PER_DAY.
+    // Candidates only ever come from the filtered pool, so applySafetyFilter
+    // 'exclude' removals are never bypassed.
+    let topUp = 0; // extra order prefixes start past the slot range (E1, E2, …)
+    if (exercises.length < MIN_EXERCISES_PER_DAY) {
+      // 1) cycle the day's own slotCategories again — pickExercise's
+      //    same-category fallback already handles repeats
+      for (let i = 0; exercises.length < MIN_EXERCISES_PER_DAY && i < day.slotCategories.length; i++) {
+        const category = day.slotCategories[i];
+        const name = pickExercise(pool, category, usedExercises);
+        if (!name) continue;
+        usedExercises.add(name);
+        exercises.push(makeExercise(day.slotCategories.length + topUp++, name, category));
+      }
+    }
+    if (exercises.length < MIN_EXERCISES_PER_DAY) {
+      // 2) any exercise across the whole filtered pool, preferring unused;
+      //    3) last resort — reuse (the unused-preferred ordering degenerates
+      //       to repeats) is better than a short day
+      const allNames = [...new Set(Object.values(pool).flat())];
+      const unusedFirst = allNames
+        .filter((n) => !usedExercises.has(n))
+        .concat(allNames.filter((n) => usedExercises.has(n)));
+      for (const name of unusedFirst) {
+        if (exercises.length >= MIN_EXERCISES_PER_DAY) break;
+        usedExercises.add(name);
+        const categoryId =
+          Object.keys(pool).find((cid) => pool[cid].includes(name)) || day.slotCategories[0];
+        exercises.push(makeExercise(day.slotCategories.length + topUp++, name, categoryId));
+      }
     }
 
     const exerciseCount = exercises.length;
