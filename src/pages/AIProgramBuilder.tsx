@@ -11,7 +11,7 @@ import {
   Zap, Bot, Save, RotateCcw, Check,
   Dumbbell, TrendingUp, Flame, Wind, HeartPulse, Pencil, Trash2,
   Plus, Eye, BarChart3, Download, X, Target, Award, Sparkles,
-  AlertTriangle, Layers, Calendar, Users, Play, ArrowLeft, Upload, ShieldAlert,
+  AlertTriangle, Layers, Calendar, Users, Play, ArrowLeft, Upload, ShieldAlert, Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -28,6 +28,15 @@ import {
   TEMPLATE_GOAL_MAP,
   TEMPLATE_METHOD_MAP,
 } from '@/lib/programTemplates';
+import {
+  rankMethods,
+  groupByCategory,
+  resolveMethodName,
+  WIZARD_GOAL_TO_DB,
+  type DbMethod,
+  type DbMethodCategory,
+  type RankedMethod,
+} from '@/lib/methodCatalog';
 import { setActiveSession, type WorkoutLog, type LoggedExercise, type LoggedSet } from '@/lib/storage';
 import {
   buildProgramInsert,
@@ -55,7 +64,7 @@ export interface ProgramSplit { day: string; active: boolean; workout: string; d
 export interface ProgramExercise { code: string; name: string; sets: number; reps: string; pct1RM: string; tempo: string; rest: string; dbId?: string; isSubstituted?: boolean; safetyNote?: string; }
 export interface ProgramData { id?: string; goal: string; method: string; clientContext: ClientContext; phases: ProgramPhase[]; weeklyHours: number; split: ProgramSplit[]; exercises: ProgramExercise[]; workoutExercises?: Record<number, ProgramExercise[]>; programName: string; description: string; tags: string[]; isPublic: boolean; assignedClient: string; }
 export interface SavedProgram { id: string; createdAt: string; updatedAt: string; data: ProgramData; }
-interface StepProps { data: ProgramData; updateData: (partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => void; onSave?: () => void; onSaveAndAssign?: () => void; program?: GeneratedProgram | null; clientName?: string; clients?: ClientRow[]; saving?: boolean; limitations?: string[]; }
+interface StepProps { data: ProgramData; updateData: (partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => void; onSave?: () => void; onSaveAndAssign?: () => void; program?: GeneratedProgram | null; clientName?: string; clients?: ClientRow[]; saving?: boolean; limitations?: string[]; dbMethods?: DbMethod[]; methodCategories?: DbMethodCategory[]; goalScores?: { method_id: string; score: number }[]; methodsLoading?: boolean; methodsError?: string | null; }
 
 type ClientRow = Database['public']['Tables']['clients']['Row'];
 type ProgramRow = Database['public']['Tables']['programs']['Row'];
@@ -308,6 +317,12 @@ function profileFromClient(client: ClientRow): ClientProfile {
 }
 
 const GOAL_MAP: Record<string, string> = { lose_fat: 'fatloss', build_muscle: 'hypertrophy', strength: 'strength', recomposition: 'fatloss', performance: 'power', general_health: 'endurance' };
+// Auto-generate fallback: goal → default method id. Phase 30A note: the five
+// legacy ids (german-volume/5x5/hiit/conjugate/triphasic) keep their current
+// behavior everywhere (LEGACY_METHODS labels/details, resolveMethodName).
+// Methods selected from the live DB catalog are stored as their slug and are
+// metadata only — the generator never consumes data.method (documented in
+// src/lib/methodCatalog.ts), so no further mapping is needed.
 const METHOD_MAP: Record<string, string> = { strength: '5x5', hypertrophy: 'german-volume', fatloss: 'hiit', power: 'triphasic', endurance: 'hiit', rehab: 'triphasic' };
 const PCT_MAP: Record<string, string> = { strength: '82.5%', hypertrophy: '75%', fatloss: '65%', power: '70%', endurance: '60%', rehab: '50%' };
 // eslint-disable-next-line react-refresh/only-export-components
@@ -325,7 +340,10 @@ const GOALS = [
   { id: 'rehab', name: 'Rehab', icon: HeartPulse, color: '#6B7280', desc: 'Recover from injury and rebuild movement patterns' },
   { id: 'power', name: 'Power', icon: Zap, color: '#EAB308', desc: 'Develop explosive speed and rate of force' },
 ];
-const METHODS = [
+// Legacy hardcoded method list (pre-30A) — kept ONLY as a display/detail
+// fallback for old saved values and the METHOD_MAP auto-generate defaults.
+// Step 2 renders the live DB catalog instead (see Step2Method).
+const LEGACY_METHODS = [
   { id: 'german-volume', name: 'German Volume Training', category: 'Hypertrophy', desc: '10 sets of 10 reps for massive muscle growth', score: 95, structure: '10x10 @ 60% 1RM', progression: '+5% load/week', targetAudience: 'Intermediate+' },
   { id: '5x5', name: '5x5 Stronglifts', category: 'Strength', desc: 'Classic compound lift protocol for raw strength', score: 92, structure: '5x5 compounds', progression: 'Linear +2.5kg', targetAudience: 'Beginner-Advanced' },
   { id: 'hiit', name: 'HIIT Metabolic', category: 'Fat Loss', desc: 'High-intensity intervals for maximum calorie burn', score: 88, structure: 'Work:Rest intervals', progression: 'Reduce rest periods', targetAudience: 'All levels' },
@@ -396,47 +414,115 @@ function Step1Goal({ data, updateData }: StepProps) {
   );
 }
 
-function Step2Method({ data, updateData }: StepProps) {
-  const [experience, setExperience] = useState('Intermediate');
-  const [equipment, setEquipment] = useState('Full Gym');
-  const [budget, setBudget] = useState('Mid-range');
-  const filteredMethods = useMemo(() => { let sorted = [...METHODS]; if (experience === 'Beginner') sorted = sorted.sort((a, b) => (a.id === '5x5' ? -1 : b.id === '5x5' ? 1 : 0)); else if (experience === 'Advanced') sorted = sorted.sort((a, b) => (a.id === 'conjugate' ? -1 : b.id === 'conjugate' ? 1 : 0)); return sorted; }, [experience]);
-  const selectMethod = useCallback((methodId: string) => updateData({ method: methodId }), [updateData]);
+function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], goalScores = [], methodsLoading, methodsError }: StepProps) {
+  const [drawerMethod, setDrawerMethod] = useState<RankedMethod | null>(null);
+  const ranked = useMemo(() => rankMethods(dbMethods, goalScores), [dbMethods, goalScores]);
+  const groups = useMemo(() => groupByCategory(ranked, methodCategories), [ranked, methodCategories]);
+  const best = useMemo(() => ranked.find((m) => m.score != null) ?? null, [ranked]);
+  const goalName = GOALS.find((g) => g.id === data.goal)?.name || '';
+  const selectMethod = useCallback(
+    (m: DbMethod) =>
+      updateData((prev) => ({
+        method: m.slug,
+        // replace the 'AI Generated' placeholder tag with the method name (Phase 30A)
+        tags: prev.tags.map((t) => (t === 'AI Generated' ? m.name : t)),
+      })),
+    [updateData]
+  );
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {[
-          { label: 'Experience Level', value: experience, options: ['Beginner', 'Intermediate', 'Advanced', 'Elite'], set: setExperience },
-          { label: 'Equipment', value: equipment, options: ['Full Gym', 'Dumbbells Only', 'Bodyweight', 'Minimal'], set: setEquipment },
-          { label: 'Budget', value: budget, options: ['Premium', 'Mid-range', 'Budget-friendly'], set: setBudget },
-        ].map((f) => (
-          <div key={f.label}>
-            <label className="text-[var(--page-text)]/60 text-xs font-medium mb-1.5 block">{f.label}</label>
-            <select value={f.value} onChange={(e) => f.set(e.target.value)} className="w-full bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--page-text)] text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#00AEEF]">
-              {f.options.map((o) => <option key={o}>{o}</option>)}
-            </select>
-          </div>
-        ))}
-      </div>
-      <div className="bg-[#22C55E]/5 border border-[#22C55E]/30 rounded-xl p-3 flex items-center gap-3">
-        <Award className="w-5 h-5 text-[#22C55E]" />
-        <div><span className="text-[#22C55E] text-xs font-semibold">Best Match</span><span className="text-[var(--page-text)] text-sm ml-2">{filteredMethods[0]?.name} ({filteredMethods[0]?.score}%)</span></div>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {filteredMethods.map((method) => { const isSelected = data.method === method.id; return (
-          <motion.button key={method.id} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => selectMethod(method.id)} className={cn('flex flex-col items-start p-4 rounded-xl border-2 transition-all text-left', isSelected ? 'border-[#8B5CF6] bg-[#8B5CF6]/5 shadow-lg shadow-[#8B5CF6]/10' : 'border-[var(--card-border)] bg-[var(--card-bg)] hover:border-[var(--azfit-primary)]/50')}>
-            <div className="flex items-center justify-between w-full mb-2">
-              <Badge variant="outline" className="text-[10px] border-[var(--card-border)] text-[var(--page-text)]/60">{method.category}</Badge>
-              <div className={cn('w-5 h-5 rounded border flex items-center justify-center transition-colors', isSelected ? 'bg-[#8B5CF6] border-[#8B5CF6]' : 'border-[var(--card-border)] bg-[var(--page-bg)]')}>{isSelected && <Check className="w-3 h-3 text-white" />}</div>
+      {methodsLoading ? (
+        <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-[#00AEEF]" /></div>
+      ) : methodsError ? (
+        <div className="rounded-xl border border-[#EF4444]/40 bg-[#EF4444]/10 px-4 py-3 text-xs text-[#EF4444]">
+          Couldn't load the method catalog ({methodsError}). Check your connection and reopen this step.
+        </div>
+      ) : (
+        <>
+          {best && (
+            <div className="bg-[#22C55E]/5 border border-[#22C55E]/30 rounded-xl p-3 flex items-center gap-3">
+              <Award className="w-5 h-5 text-[#22C55E] shrink-0" />
+              <div>
+                <span className="text-[#22C55E] text-xs font-semibold">Best Match{goalName ? ` for ${goalName}` : ''}</span>
+                <span className="text-[var(--page-text)] text-sm ml-2">{best.name} ({best.score?.toFixed(1)})</span>
+              </div>
             </div>
-            <h4 className="text-[var(--page-text)] font-semibold text-sm mb-1">{method.name}</h4>
-            <p className="text-[var(--page-text)]/60 text-xs mb-3">{method.desc}</p>
-            <div className="w-full bg-[var(--page-bg)] rounded-full h-2 mt-auto"><motion.div initial={{ width: 0 }} animate={{ width: `${method.score}%` }} transition={{ duration: 0.6, ease: 'easeOut' }} className="h-full rounded-full" style={{ backgroundColor: method.score >= 90 ? '#22C55E' : method.score >= 80 ? '#F59E0B' : '#EF4444' }} /></div>
-            <span className="text-[var(--page-text)]/60 text-[10px] mt-1">{method.score}% match</span>
-          </motion.button>
-        ); })}
-      </div>
-      <Button variant="outline" size="sm" onClick={() => selectMethod('german-volume')} className="border-[#8B5CF6] text-[#8B5CF6] hover:bg-[#8B5CF6]/10 text-xs"><Bot className="w-3.5 h-3.5 mr-1" />Recommend Method</Button>
+          )}
+          {groups.map((group) => (
+            <div key={group.category}>
+              <h4 className="text-[var(--page-text)]/60 text-xs font-semibold uppercase tracking-wider mb-2">{group.category}</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+                {group.methods.map((method) => {
+                  const isSelected = data.method === method.slug;
+                  const isBest = best?.id === method.id;
+                  const labels = templateTagLabels(method.tags);
+                  return (
+                    <motion.button key={method.id} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setDrawerMethod(method)} className={cn('flex flex-col items-start p-4 rounded-xl border-2 transition-all text-left', isSelected ? 'border-[#8B5CF6] bg-[#8B5CF6]/5 shadow-lg shadow-[#8B5CF6]/10' : 'border-[var(--card-border)] bg-[var(--card-bg)] hover:border-[var(--azfit-primary)]/50')}>
+                      <div className="flex items-center justify-between w-full mb-2 gap-2">
+                        <Badge variant="outline" className="text-[10px] border-[var(--card-border)] text-[var(--page-text)]/60 truncate">{method.category}</Badge>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {isBest && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#22C55E]/15 text-[#22C55E] border border-[#22C55E]/40">Best Match</span>}
+                          <div className={cn('w-5 h-5 rounded border flex items-center justify-center transition-colors', isSelected ? 'bg-[#8B5CF6] border-[#8B5CF6]' : 'border-[var(--card-border)] bg-[var(--page-bg)]')}>{isSelected && <Check className="w-3 h-3 text-white" />}</div>
+                        </div>
+                      </div>
+                      <h4 className="text-[var(--page-text)] font-semibold text-sm mb-1">{method.name}</h4>
+                      {method.description && <p className="text-[var(--page-text)]/60 text-xs mb-2 line-clamp-2">{method.description}</p>}
+                      <div className="flex flex-wrap gap-1 mt-auto pt-1">
+                        {labels.slice(0, 3).map((l) => (
+                          <span key={l} className="px-1.5 py-0.5 rounded-full text-[9px] border border-[var(--card-border)] text-[var(--page-text)]/50">{l}</span>
+                        ))}
+                      </div>
+                      {method.score != null && (
+                        <span className="text-[10px] mt-1.5 font-mono text-[#00AEEF]">{method.score.toFixed(1)} match</span>
+                      )}
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+
+      {/* Method detail drawer */}
+      <AnimatePresence>
+        {drawerMethod && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm" onClick={() => setDrawerMethod(null)}>
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'tween', duration: 0.2 }}
+              onClick={(e) => e.stopPropagation()}
+              className="absolute right-0 top-0 h-full w-full max-w-md bg-[var(--card-bg)] border-l border-[var(--card-border)] p-5 overflow-y-auto shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div>
+                  <h3 className="text-[var(--page-text)] text-lg font-bold">{drawerMethod.name}</h3>
+                  <p className="text-[var(--page-text)]/60 text-xs mt-0.5">{drawerMethod.category}</p>
+                </div>
+                <button onClick={() => setDrawerMethod(null)} className="p-1.5 rounded-lg hover:bg-[var(--page-bg)] text-[var(--page-text)]/60 hover:text-[var(--page-text)] transition-colors"><X className="w-4 h-4" /></button>
+              </div>
+              {drawerMethod.score != null && (
+                <p className="text-xs mb-3"><span className="text-[var(--page-text)]/60">Score{goalName ? ` for ${goalName}` : ''}: </span><span className="font-mono text-[#00AEEF] font-bold">{drawerMethod.score.toFixed(1)}</span></p>
+              )}
+              {drawerMethod.description ? (
+                <p className="text-[var(--page-text)]/80 text-sm leading-relaxed mb-4">{drawerMethod.description}</p>
+              ) : (
+                <p className="text-[var(--page-text)]/40 text-xs italic mb-4">No description in the catalog yet.</p>
+              )}
+              <div className="flex flex-wrap gap-1.5 mb-5">
+                {templateTagLabels(drawerMethod.tags).map((l) => (
+                  <span key={l} className="px-2 py-0.5 rounded-full text-[10px] border border-[var(--card-border)] text-[var(--page-text)]/60">{l}</span>
+                ))}
+              </div>
+              <Button onClick={() => { selectMethod(drawerMethod); setDrawerMethod(null); }} className="w-full bg-gradient-to-r from-[#00AEEF] to-[#8B5CF6] text-white font-semibold">
+                Select This Method
+              </Button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -893,7 +979,7 @@ function Step6Exercises({ data, updateData, limitations }: StepProps) {
   );
 }
 
-function Step7Preview({ data, program, clientName }: StepProps) {
+function Step7Preview({ data, program, clientName, dbMethods = [] }: StepProps) {
   const navigate = useNavigate();
   const totalWeeks = useMemo(() => data.phases.filter((p) => p.active).reduce((s, p) => s + p.weeks, 0), [data.phases]);
   // Per-day lists (loaded programs) are the source of truth when present.
@@ -910,8 +996,8 @@ function Step7Preview({ data, program, clientName }: StepProps) {
   const avgRest = useMemo(() => { const rests = allExercises.map((e) => parseInt(e.rest) || 90); return Math.round(rests.reduce((a, b) => a + b, 0) / rests.length); }, [allExercises]);
   const aiConfidence = useMemo(() => { let score = 70; if (data.goal) score += 10; if (data.method) score += 10; if (data.clientContext.ageRange) score += 5; if (data.phases.length > 0) score += 5; return Math.min(score, 98); }, [data]);
   const goalName = GOALS.find((g) => g.id === data.goal)?.name || '—';
-  const methodName = METHODS.find((m) => m.id === data.method)?.name || '—';
-  const methodData = METHODS.find((m) => m.id === data.method);
+  const methodName = resolveMethodName(data.method, dbMethods);
+  const methodData = LEGACY_METHODS.find((m) => m.id === data.method);
   const splitName = data.split.filter((d) => d.active).length > 0 ? `${activeDays}-Day Split` : '—';
   const handleStartWorkout = (workout: GeneratedWorkout) => { if (!program) return; const session = workoutToSession(workout, program.id); setActiveSession(session); navigate(`/sheets?session=${session.id}`); };
   return (
@@ -1079,7 +1165,7 @@ function Step7Preview({ data, program, clientName }: StepProps) {
   );
 }
 
-function Step8Save({ data, updateData, onSave, clients, saving }: StepProps) {
+function Step8Save({ data, updateData, onSave, clients, saving, dbMethods = [] }: StepProps) {
   const [showDetails, setShowDetails] = useState(true);
   const toggleTag = useCallback((tag: string) => updateData((prev) => { const next = prev.tags.includes(tag) ? prev.tags.filter((t) => t !== tag) : [...prev.tags, tag]; return { tags: next }; }), [updateData]);
   const selectedClient = clients?.find((c) => c.id === data.assignedClient);
@@ -1094,7 +1180,7 @@ function Step8Save({ data, updateData, onSave, clients, saving }: StepProps) {
     return lists.flat().filter((e) => e.isSubstituted).length;
   }, [data.workoutExercises, data.exercises]);
   const goalName = GOALS.find((g) => g.id === data.goal)?.name || '—';
-  const methodName = METHODS.find((m) => m.id === data.method)?.name || '—';
+  const methodName = resolveMethodName(data.method, dbMethods);
   const clientName = selectedClient?.full_name || data.clientContext.experience || 'Unassigned';
   const activePhases = data.phases.filter((p) => p.active);
   const splitSummary = data.split
@@ -1282,6 +1368,53 @@ export default function AIProgramBuilderPage() {
     if (!user?.id) return;
     loadSavedPrograms(user.id).then(setSavedList).catch((err) => console.error('Failed to load saved programs:', err));
   }, [user]);
+
+  // Phase 30A — live method catalog + goals for the Step 2 browser
+  const [dbMethods, setDbMethods] = useState<DbMethod[]>([]);
+  const [methodCategories, setMethodCategories] = useState<DbMethodCategory[]>([]);
+  const [dbGoals, setDbGoals] = useState<{ id: string; name: string }[]>([]);
+  const [goalScores, setGoalScores] = useState<{ method_id: string; score: number }[]>([]);
+  const [methodsLoading, setMethodsLoading] = useState(true);
+  const [methodsError, setMethodsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setMethodsLoading(true);
+      setMethodsError(null);
+      const [mRes, cRes, gRes] = await Promise.all([
+        supabase.from('methods').select('id, name, slug, category, category_id, description, tags, display_order').eq('is_active', true).order('display_order'),
+        supabase.from('method_categories').select('id, name, display_order').order('display_order'),
+        supabase.from('goals').select('id, name'),
+      ]);
+      if (cancelled) return;
+      if (mRes.error) setMethodsError(mRes.error.message);
+      else setDbMethods((mRes.data as DbMethod[] | null) ?? []);
+      if (!cRes.error) setMethodCategories((cRes.data as DbMethodCategory[] | null) ?? []);
+      if (!gRes.error) setDbGoals((gRes.data as { id: string; name: string }[] | null) ?? []);
+      setMethodsLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Rank the catalog by the selected goal's pre-computed scores (Phase 30A).
+  // Graceful degradation: any failure leaves an empty list → unranked alphabetical.
+  const selectedGoal = data.goal;
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const names = WIZARD_GOAL_TO_DB[selectedGoal] ?? [];
+      const ids = dbGoals.filter((g) => names.includes(g.name)).map((g) => g.id);
+      if (ids.length === 0) {
+        if (!cancelled) setGoalScores([]);
+        return;
+      }
+      const { data: rows, error } = await supabase.from('goal_method_scores').select('method_id, score').in('goal_id', ids);
+      if (cancelled) return;
+      setGoalScores(error ? [] : ((rows as { method_id: string; score: number }[] | null) ?? []));
+    })();
+    return () => { cancelled = true; };
+  }, [selectedGoal, dbGoals]);
 
   // Pre-select a client when arriving via /ai-program-builder?clientId=…
   const [searchParams] = useSearchParams();
@@ -1613,7 +1746,7 @@ export default function AIProgramBuilderPage() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
         <AnimatePresence mode="wait">
           <motion.div key={currentStep} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.2 }}>
-            <CurrentComponent data={data} updateData={updateData} program={program} onSave={handleSave} onSaveAndAssign={handleSaveAndAssign} clientName={selectedClientName} clients={clients} saving={saving} limitations={wizardLimitations} />
+            <CurrentComponent data={data} updateData={updateData} program={program} onSave={handleSave} onSaveAndAssign={handleSaveAndAssign} clientName={selectedClientName} clients={clients} saving={saving} limitations={wizardLimitations} dbMethods={dbMethods} methodCategories={methodCategories} goalScores={goalScores} methodsLoading={methodsLoading} methodsError={methodsError} />
           </motion.div>
         </AnimatePresence>
 

@@ -558,24 +558,27 @@ export type Database = {
       };
       method_categories: {
         Row: {
-          id: string;
+          id: number;
           name: string;
+          slug: string;
           description: string | null;
-          sort_order: number;
+          display_order: number;
           created_at: string;
         };
         Insert: {
-          id?: string;
+          id?: number;
           name: string;
+          slug: string;
           description?: string | null;
-          sort_order?: number;
+          display_order?: number;
           created_at?: string;
         };
         Update: {
-          id?: string;
+          id?: number;
           name?: string;
+          slug?: string;
           description?: string | null;
-          sort_order?: number;
+          display_order?: number;
           created_at?: string;
         };
         Relationships: [];
@@ -583,27 +586,51 @@ export type Database = {
       methods: {
         Row: {
           id: string;
+          step_number: number;
+          step_name: string;
+          category: string;
           name: string;
           slug: string;
           description: string | null;
-          category_id: string;
+          icon_url: string | null;
+          is_active: boolean;
+          display_order: number;
           created_at: string;
+          updated_at: string;
+          category_id: number | null;
+          tags: string | null;
         };
         Insert: {
           id?: string;
+          step_number: number;
+          step_name: string;
+          category: string;
           name: string;
           slug: string;
           description?: string | null;
-          category_id: string;
+          icon_url?: string | null;
+          is_active?: boolean;
+          display_order?: number;
           created_at?: string;
+          updated_at?: string;
+          category_id?: number | null;
+          tags?: string | null;
         };
         Update: {
           id?: string;
+          step_number?: number;
+          step_name?: string;
+          category?: string;
           name?: string;
           slug?: string;
           description?: string | null;
-          category_id?: string;
+          icon_url?: string | null;
+          is_active?: boolean;
+          display_order?: number;
           created_at?: string;
+          updated_at?: string;
+          category_id?: number | null;
+          tags?: string | null;
         };
         Relationships: [
           {
