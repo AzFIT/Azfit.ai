@@ -4,13 +4,15 @@ import { supabase } from "@/lib/supabase";
 import {
   calculateBMR,
   calculateTDEE,
-  calculateGoalCalories,
-  calculateMacroBreakdown,
+  calculateGoalCaloriesPct,
+  applySafetyGuardrails,
+  calculateMacroTargets,
   ACTIVITY_LEVELS,
-  GOAL_ADJUSTMENTS,
+  GOAL_ADJUSTMENTS_PCT,
+  MAX_KCAL_DELTA,
   DIET_PRESETS,
   type ActivityLevelKey,
-  type GoalKey,
+  type GoalKeyPct,
   type DietKey,
 } from "@/lib/tdee";
 import { saveNutritionTargets } from "@/lib/foodApi";
@@ -41,10 +43,11 @@ const ACTIVITY_LABELS: Record<string, string> = {
 };
 
 const GOAL_LABELS: Record<string, string> = {
+  aggressive_fat_loss: "Aggressive (−20%)",
+  fat_loss: "Fat Loss (−10%)",
   maintenance: "Maintenance (TDEE)",
-  fat_loss: "Fat Loss (−500)",
-  aggressive_fat_loss: "Aggressive (−750)",
-  muscle_gain: "Muscle Gain (+250)",
+  lean_gain: "Lean Gain (+5%)",
+  muscle_gain: "Muscle Gain (+10%)",
 };
 
 function ageFromDob(dob: string | null): number {
@@ -68,7 +71,7 @@ export default function TdeeCalculator({
   const [age, setAge] = useState(30);
   const [gender, setGender] = useState<"male" | "female">("male");
   const [activity, setActivity] = useState<ActivityLevelKey>("moderate");
-  const [goal, setGoal] = useState<GoalKey>("maintenance");
+  const [goal, setGoal] = useState<GoalKeyPct>("maintenance");
   const [diet, setDiet] = useState<DietKey>("balanced");
 
   // Pull client stats + latest weight when opened
@@ -107,9 +110,13 @@ export default function TdeeCalculator({
     if (!weight || !height || !age) return null;
     const bmr = calculateBMR(weight, height, age, gender);
     const tdee = calculateTDEE(bmr, activity);
-    const calories = calculateGoalCalories(tdee, goal);
-    const macros = calculateMacroBreakdown(calories, diet, weight);
-    return { bmr, tdee, calories, macros };
+    // Phase 28E pipeline: pct goal adjustment → safety guardrails (never silent)
+    const goalCalories = calculateGoalCaloriesPct(tdee, goal);
+    const guard = applySafetyGuardrails(goalCalories, bmr, tdee);
+    const calories = guard.calories;
+    const macros = calculateMacroTargets({ calories, weightKg: weight, gender, goal, diet });
+    const rawDelta = Math.round(tdee * (GOAL_ADJUSTMENTS_PCT[goal] ?? 0));
+    return { bmr, tdee, calories, macros, guard, rawDelta };
   }, [weight, height, age, gender, activity, goal, diet]);
 
   const apply = async () => {
@@ -252,16 +259,23 @@ export default function TdeeCalculator({
               </label>
               <select
                 value={goal}
-                onChange={(e) => setGoal(e.target.value as GoalKey)}
+                onChange={(e) => setGoal(e.target.value as GoalKeyPct)}
                 className={inputCls}
                 style={selectStyle}
               >
-                {Object.keys(GOAL_ADJUSTMENTS).map((k) => (
+                {Object.keys(GOAL_ADJUSTMENTS_PCT).map((k) => (
                   <option key={k} value={k}>
                     {GOAL_LABELS[k] ?? k}
                   </option>
                 ))}
               </select>
+              {result && (
+                <p className="mt-0.5 text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+                  {result.calories - result.tdee >= 0 ? "+" : "−"}
+                  {Math.abs(result.calories - result.tdee).toLocaleString()} kcal/day
+                  {Math.abs(result.rawDelta) > MAX_KCAL_DELTA && " · capped at ±1,000"}
+                </p>
+              )}
             </div>
             <div>
               <label className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
@@ -281,6 +295,21 @@ export default function TdeeCalculator({
               </select>
             </div>
           </div>
+
+          {result && result.guard.clamped && (
+            <div
+              className="rounded-lg border px-3 py-2 text-[11px] font-medium"
+              style={{
+                borderColor: "rgba(245, 158, 11, 0.4)",
+                backgroundColor: "rgba(245, 158, 11, 0.12)",
+                color: "#F59E0B",
+              }}
+            >
+              {result.guard.warnings.map((w) => (
+                <p key={w}>⚠ {w}</p>
+              ))}
+            </div>
+          )}
 
           {result && (
             <div
@@ -302,6 +331,8 @@ export default function TdeeCalculator({
                 <span>P {result.macros.protein}g</span>
                 <span>C {result.macros.carbs}g</span>
                 <span>F {result.macros.fats}g</span>
+                <span>Fiber: {result.macros.fiber} g</span>
+                <span>Water: {result.macros.waterMl.toLocaleString()} ml</span>
               </div>
             </div>
           )}

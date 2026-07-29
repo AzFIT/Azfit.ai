@@ -101,7 +101,10 @@ export function activityLabel(key: ActivityLevelKey | string): string {
 
 /* ── Phase 16: goal adjustments + spec diet presets + macro breakdown ── */
 
-/** Calorie adjustments from TDEE per client goal (kcal/day). */
+/**
+ * Calorie adjustments from TDEE per client goal (kcal/day).
+ * @deprecated flat-kcal model — use GOAL_ADJUSTMENTS_PCT + calculateGoalCaloriesPct (Phase 28E).
+ */
 export const GOAL_ADJUSTMENTS = {
   maintenance: 0,
   fat_loss: -500,
@@ -111,9 +114,160 @@ export const GOAL_ADJUSTMENTS = {
 
 export type GoalKey = keyof typeof GOAL_ADJUSTMENTS;
 
+/**
+ * @deprecated flat-kcal model — use calculateGoalCaloriesPct (Phase 28E).
+ */
 export function calculateGoalCalories(tdee: number, goal: GoalKey | string): number {
   const adj = GOAL_ADJUSTMENTS[goal as GoalKey] ?? GOAL_ADJUSTMENTS.maintenance;
   return Math.max(0, Math.round(tdee + adj));
+}
+
+/* ── Phase 28E: percentage goals, safety guardrails, lean-mass macros ── */
+
+/** Percentage-based goal adjustments (spec Part A). */
+export const GOAL_ADJUSTMENTS_PCT = {
+  aggressive_fat_loss: -0.20,
+  fat_loss: -0.10,
+  maintenance: 0,
+  lean_gain: 0.05,
+  muscle_gain: 0.10,
+} as const;
+
+export type GoalKeyPct = keyof typeof GOAL_ADJUSTMENTS_PCT;
+
+export const MAX_KCAL_DELTA = 1000;
+
+/**
+ * Percentage-based goal calories: tdee × (1 + pct), delta clamped to
+ * ±MAX_KCAL_DELTA, rounded, never below 0.
+ * SPEC AMBIGUITY (documented): Part A says "Aggressive −20% (max −1000 cal)"
+ * while Part D code applies raw percentages without caps — we implement the
+ * Part A reading (percent + ±1000 kcal cap).
+ */
+export function calculateGoalCaloriesPct(tdee: number, goal: GoalKeyPct | string): number {
+  const pct = GOAL_ADJUSTMENTS_PCT[goal as GoalKeyPct] ?? 0;
+  const rawDelta = Math.round(tdee * pct);
+  const delta = Math.max(-MAX_KCAL_DELTA, Math.min(MAX_KCAL_DELTA, rawDelta));
+  return Math.max(0, Math.round(tdee + delta));
+}
+
+export interface GuardrailResult {
+  calories: number;
+  clamped: boolean;
+  warnings: string[];
+}
+
+/**
+ * Safety guardrails: floor = BMR × 1.2, ceiling = TDEE + 1000.
+ * Clamps are NEVER silent — a human-readable warning is returned for each.
+ */
+export function applySafetyGuardrails(
+  targetCalories: number,
+  bmr: number,
+  tdee: number
+): GuardrailResult {
+  const floor = Math.round(bmr * 1.2);
+  const ceiling = Math.round(tdee + MAX_KCAL_DELTA);
+  const warnings: string[] = [];
+  let calories = targetCalories;
+  if (calories < floor) {
+    calories = floor;
+    warnings.push(`Target raised to BMR × 1.2 safety floor: ${floor.toLocaleString()} kcal`);
+  }
+  if (calories > ceiling) {
+    calories = ceiling;
+    warnings.push(`Target lowered to TDEE + 1000 safety ceiling: ${ceiling.toLocaleString()} kcal`);
+  }
+  return { calories, clamped: warnings.length > 0, warnings };
+}
+
+export interface MacroTargetsAdvanced {
+  protein: number;
+  carbs: number;
+  fats: number;
+  fiber: number;
+  waterMl: number;
+  proteinPerKgLbm: number;
+}
+
+/**
+ * Lean-mass protein-first macro algorithm (spec D6, Phase 28E).
+ * 1. Protein on lean mass (LBM = weight × (1 − BF%), or weight × 0.8 when BF
+ *    unknown): 2.0 g/kg LBM base; 2.2 if BF>25% OR goal in
+ *    (muscle_gain, lean_gain, aggressive_fat_loss); else 1.8 if BF<12% OR
+ *    vegetarian/vegan; hard-capped at 1.6 when kidneyConcern; protein also
+ *    capped at 35% of total kcal.
+ * 2. Fats: 25% of remaining kcal (midpoint of the 20–30% band), floored at
+ *    0.6 g/kg total weight; female minimum 25% of total kcal.
+ * 3. Carbs fill the remainder.
+ * 4. Fiber: 14 g per 1000 kcal, floored at 25 g (female) / 38 g (male).
+ * 5. Water: 35 ml/kg + 500 ml per training day (default 3), rounded to 50 ml.
+ */
+export function calculateMacroTargets(input: {
+  calories: number;
+  weightKg: number;
+  bodyFatPct?: number;
+  gender: "male" | "female";
+  goal: string;
+  diet?: string;
+  trainingDaysPerWeek?: number;
+  kidneyConcern?: boolean;
+}): MacroTargetsAdvanced {
+  const {
+    calories,
+    weightKg,
+    bodyFatPct,
+    gender,
+    goal,
+    diet,
+    trainingDaysPerWeek = 3,
+    kidneyConcern = false,
+  } = input;
+
+  // 1 — protein on lean mass
+  const lbm =
+    bodyFatPct != null && bodyFatPct > 0 && bodyFatPct < 100
+      ? weightKg * (1 - bodyFatPct / 100)
+      : weightKg * 0.8;
+  let multiplier = 2.0;
+  if (
+    (bodyFatPct != null && bodyFatPct > 25) ||
+    goal === "muscle_gain" ||
+    goal === "lean_gain" ||
+    goal === "aggressive_fat_loss"
+  ) {
+    multiplier = 2.2;
+  } else if (
+    (bodyFatPct != null && bodyFatPct > 0 && bodyFatPct < 12) ||
+    diet === "vegetarian" ||
+    diet === "vegan"
+  ) {
+    multiplier = 1.8;
+  }
+  if (kidneyConcern) multiplier = Math.min(multiplier, 1.6);
+  const proteinPerKgLbm = multiplier;
+  let protein = lbm * multiplier;
+  const proteinKcalCap = calories * 0.35;
+  if (protein * 4 > proteinKcalCap) protein = proteinKcalCap / 4;
+  protein = Math.round(protein);
+
+  // 2 — fats: 25% of remaining kcal, with floors
+  const remainingKcal = Math.max(0, calories - protein * 4);
+  let fatG = (remainingKcal * 0.25) / 9;
+  fatG = Math.max(fatG, weightKg * 0.6);
+  if (gender === "female") fatG = Math.max(fatG, (calories * 0.25) / 9);
+  const fats = Math.round(fatG);
+
+  // 3 — carbs fill the remainder
+  const carbs = Math.round(Math.max(0, calories - protein * 4 - fats * 9) / 4);
+
+  // 4 — fiber
+  const fiber = Math.round(Math.max((calories / 1000) * 14, gender === "female" ? 25 : 38));
+
+  // 5 — water
+  const waterMl = Math.round((35 * weightKg + 500 * trainingDaysPerWeek) / 50) * 50;
+
+  return { protein, carbs, fats, fiber, waterMl, proteinPerKgLbm };
 }
 
 /** Diet preference macro splits (% of calories), per legacy PHASE_2 spec. */
@@ -136,6 +290,7 @@ export interface MacroBreakdown {
  * Macro grams for a calorie target + diet split.
  * Protein uses the HIGHER of the percentage-based value or 1.6 g/kg
  * minimum (legacy spec); carbs/fats come from the remaining split.
+ * @deprecated simple mode — use calculateMacroTargets (Phase 28E lean-mass algorithm).
  */
 export function calculateMacroBreakdown(
   calories: number,
