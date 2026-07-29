@@ -397,6 +397,32 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
                       {program.description}
                     </p>
 
+                    {/* Progression rules (read-only, Phase 30D) */}
+                    {program.progressionRules && program.progressionRules.length > 0 && (
+                      <div
+                        className="rounded-xl border px-3 py-2.5"
+                        style={{
+                          backgroundColor: "var(--light-elevated)",
+                          borderColor: "var(--card-border)",
+                        }}
+                      >
+                        <span
+                          className="text-[10px] font-semibold uppercase tracking-wider"
+                          style={{ color: "var(--light-text-muted)" }}
+                        >
+                          Progression Rules
+                        </span>
+                        <ul className="mt-1.5 space-y-1">
+                          {program.progressionRules.map((r, i) => (
+                            <li key={i} className="text-xs">
+                              <span className="font-medium" style={{ color: "var(--page-text)" }}>{r.label}</span>
+                              <span style={{ color: "var(--light-text-secondary)" }}> — {r.text}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
                     {/* Phases */}
                     {program.phases.map((phase) => (
                       <div

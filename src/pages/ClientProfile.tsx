@@ -130,6 +130,15 @@ async function fetchClientPrograms(clientId: string): Promise<ClientGeneratedPro
       createdAt: p.created_at,
       startDate: p.start_date,
       endDate: p.end_date,
+      // Phase 30D: progression rules (validated; absent on old rows)
+      progressionRules: Array.isArray(p.progression_rules)
+        ? (p.progression_rules as unknown[]).filter(
+            (r): r is { id?: string; label: string; text: string } =>
+              typeof r === "object" && r !== null &&
+              typeof (r as Record<string, unknown>).label === "string" &&
+              typeof (r as Record<string, unknown>).text === "string"
+          )
+        : [],
       phases: [
         {
           id: `phase-${p.id}`,

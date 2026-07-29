@@ -114,6 +114,7 @@ export type Database = {
           end_date: string | null;
           phase_name: string | null;
           phases: Json | null;
+          progression_rules: Json | null;
           created_at: string;
           updated_at: string;
         };
@@ -130,6 +131,7 @@ export type Database = {
           end_date?: string | null;
           phase_name?: string | null;
           phases?: Json | null;
+          progression_rules?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -146,6 +148,7 @@ export type Database = {
           end_date?: string | null;
           phase_name?: string | null;
           phases?: Json | null;
+          progression_rules?: Json | null;
           created_at?: string;
           updated_at?: string;
         };

@@ -39,6 +39,16 @@ import {
 } from '@/lib/methodCatalog';
 import { suggestPhasesForMethod } from '@/lib/phaseSuggestions';
 import { pairingStyleForMethod, assignPairGroups } from '@/lib/supersets';
+import {
+  PROGRESSION_PRESETS,
+  progressionNoteForWeek,
+  type ProgressionRule,
+} from '@/lib/progression';
+import {
+  setsPerMuscleGroup,
+  equipmentChecklist,
+  estimateSessionMinutes,
+} from '@/lib/previewMetrics';
 import { setActiveSession, type WorkoutLog, type LoggedExercise, type LoggedSet } from '@/lib/storage';
 import {
   buildProgramInsert,
@@ -64,7 +74,7 @@ export interface ClientContext { ageRange: string; experience: string; bodyType:
 export interface ProgramPhase { id: string; name: string; weeks: number; focus: string; color: string; active: boolean; intensityTarget?: string; volumeTarget?: string; }
 export interface ProgramSplit { day: string; active: boolean; workout: string; dbId?: string; }
 export interface ProgramExercise { code: string; name: string; sets: number; reps: string; pct1RM: string; tempo: string; rest: string; dbId?: string; isSubstituted?: boolean; safetyNote?: string; supersetGroup?: string; }
-export interface ProgramData { id?: string; goal: string; method: string; clientContext: ClientContext; phases: ProgramPhase[]; weeklyHours: number; split: ProgramSplit[]; exercises: ProgramExercise[]; workoutExercises?: Record<number, ProgramExercise[]>; programName: string; description: string; tags: string[]; isPublic: boolean; assignedClient: string; }
+export interface ProgramData { id?: string; goal: string; method: string; clientContext: ClientContext; phases: ProgramPhase[]; weeklyHours: number; split: ProgramSplit[]; exercises: ProgramExercise[]; workoutExercises?: Record<number, ProgramExercise[]>; progressionRules: ProgressionRule[]; programName: string; description: string; tags: string[]; isPublic: boolean; assignedClient: string; }
 export interface SavedProgram { id: string; createdAt: string; updatedAt: string; data: ProgramData; }
 interface StepProps { data: ProgramData; updateData: (partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => void; onSave?: () => void; onSaveAndAssign?: () => void; program?: GeneratedProgram | null; clientName?: string; clients?: ClientRow[]; saving?: boolean; limitations?: string[]; dbMethods?: DbMethod[]; methodCategories?: DbMethodCategory[]; goalScores?: { method_id: string; score: number }[]; methodsLoading?: boolean; methodsError?: string | null; }
 
@@ -329,7 +339,7 @@ const METHOD_MAP: Record<string, string> = { strength: '5x5', hypertrophy: 'germ
 const PCT_MAP: Record<string, string> = { strength: '82.5%', hypertrophy: '75%', fatloss: '65%', power: '70%', endurance: '60%', rehab: '50%' };
 // eslint-disable-next-line react-refresh/only-export-components
 export function mapGeneratedToProgramData(gen: GeneratedProgram, profile: ClientProfile | null): ProgramData { const genGoal = GOAL_MAP[gen.goal] || 'hypertrophy'; const genMethod = METHOD_MAP[genGoal] || 'german-volume'; const activeWorkouts = gen.phases[0]?.workouts || []; const totalWeeks = gen.totalWeeks || 4; let phases: ProgramPhase[]; if (totalWeeks >= 12) { const w1 = Math.round(totalWeeks * 0.33); const w2 = Math.round(totalWeeks * 0.33); const w3 = totalWeeks - w1 - w2; phases = [{ id: 'p1', name: 'Accumulation', weeks: w1, focus: 'Build work capacity and aerobic base with higher volume', color: '#F59E0B', active: true }, { id: 'p2', name: 'Intensification', weeks: w2, focus: 'Increase intensity with moderate volume reduction', color: '#EF4444', active: true }, { id: 'p3', name: 'Realization', weeks: w3, focus: 'Peak intensity with sport-specific demands', color: '#22C55E', active: true }]; } else { phases = [{ id: 'p1', name: 'Adaptation', weeks: totalWeeks, focus: 'Build foundational fitness and work capacity', color: '#00AEEF', active: true }]; } const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']; const split: ProgramSplit[] = dayNames.map((day, idx) => { const workout = activeWorkouts[idx]; return { day, active: !!workout, workout: workout ? `${workout.name} — ${workout.focus}` : 'Rest Day' }; }); const toProgramExercise = (ex: GeneratedExercise): ProgramExercise => { const restMins = Math.floor(ex.restSeconds / 60); const restSecs = ex.restSeconds % 60; return { code: ex.order, name: ex.name, sets: ex.sets, reps: ex.reps, pct1RM: PCT_MAP[genGoal] || 'N/A', tempo: ex.tempo, rest: `${restMins}:${String(restSecs).padStart(2, '0')}` }; }; // Phase 29A: each generated day keeps its OWN exercise list (workouts are day-indexed: Mon idx 0 → key 1 … Sun idx 6 → key 7)
-const workoutExercises: Record<number, ProgramExercise[]> = {}; activeWorkouts.forEach((workout, idx) => { if (workout && workout.exercises?.length) workoutExercises[idx + 1] = workout.exercises.map(toProgramExercise); }); const firstDayList = Object.values(workoutExercises)[0]; const exercises: ProgramExercise[] = firstDayList ? firstDayList.map((e) => ({ ...e })) : []; const clientContext: ClientContext = profile ? { ageRange: '', experience: profile.trainingExperience === 'beginner' ? '<1 year' : profile.trainingExperience === 'advanced' ? '5-10 years' : '1-3 years', bodyType: 'Mesomorph', availability: `${profile.trainingFrequency} days`, limitations: profile.injuries ? ['Other'] : ['None (healthy)'], otherLimitation: profile.injuries || '' } : { ageRange: '', experience: '', bodyType: '', availability: '', limitations: [], otherLimitation: '' }; return { goal: genGoal, method: genMethod, clientContext, phases, weeklyHours: 4.5, split, exercises, workoutExercises, programName: gen.name, description: gen.description, tags: ['AI Generated', GOALS.find((g) => g.id === genGoal)?.name || 'Custom'], isPublic: false, assignedClient: '' }; }
+const workoutExercises: Record<number, ProgramExercise[]> = {}; activeWorkouts.forEach((workout, idx) => { if (workout && workout.exercises?.length) workoutExercises[idx + 1] = workout.exercises.map(toProgramExercise); }); const firstDayList = Object.values(workoutExercises)[0]; const exercises: ProgramExercise[] = firstDayList ? firstDayList.map((e) => ({ ...e })) : []; const clientContext: ClientContext = profile ? { ageRange: '', experience: profile.trainingExperience === 'beginner' ? '<1 year' : profile.trainingExperience === 'advanced' ? '5-10 years' : '1-3 years', bodyType: 'Mesomorph', availability: `${profile.trainingFrequency} days`, limitations: profile.injuries ? ['Other'] : ['None (healthy)'], otherLimitation: profile.injuries || '' } : { ageRange: '', experience: '', bodyType: '', availability: '', limitations: [], otherLimitation: '' }; return { goal: genGoal, method: genMethod, clientContext, phases, weeklyHours: 4.5, split, exercises, workoutExercises, progressionRules: [], programName: gen.name, description: gen.description, tags: ['AI Generated', GOALS.find((g) => g.id === genGoal)?.name || 'Custom'], isPublic: false, assignedClient: '' }; }
 
 function createEmptySet(setNumber: number, restSeconds: number): LoggedSet { return { setNumber, load: 0, reps: 0, rpe: 0, done: false, restSeconds, type: 'Normal' }; }
 function workoutToSession(workout: GeneratedWorkout, programId: string): WorkoutLog { const exercises: LoggedExercise[] = workout.exercises.map((ex) => ({ order: ex.order, name: ex.name, category: ex.category, targetSets: ex.sets, targetReps: ex.reps, targetLoad: 0, tempo: ex.tempo, sets: Array.from({ length: ex.sets }, (_, i) => createEmptySet(i + 1, ex.restSeconds)), notes: '' })); const totalSets = exercises.reduce((sum, ex) => sum + ex.targetSets, 0); return { id: crypto.randomUUID(), programId, clientId: 'self', clientName: 'You', workoutName: workout.name, phaseName: 'Phase 1: Adaptation', weekNumber: 1, dayNumber: workout.dayNumber, exercises, startTime: new Date().toISOString(), durationSeconds: 0, totalVolume: totalSets * 10 * 20, totalSets, completedSets: 0, avgRpe: 0, status: 'in_progress', createdAt: new Date().toISOString() }; }
@@ -385,7 +395,7 @@ const STEPS = [
   { title: 'Program Preview', component: Step7Preview },
   { title: 'Save & Assign', component: Step8Save },
 ];
-const defaultData: ProgramData = { goal: '', method: '', clientContext: { ageRange: '', experience: '', bodyType: '', availability: '', limitations: [], otherLimitation: '' }, phases: PHASES_DEFAULT.map((p) => ({ ...p })), weeklyHours: 4.5, split: SPLIT_DEFAULTS['Upper/Lower'].map((d) => ({ ...d })), exercises: DEFAULT_EXERCISES.map((e) => ({ ...e })), programName: '', description: '', tags: [], isPublic: false, assignedClient: '' };
+const defaultData: ProgramData = { goal: '', method: '', clientContext: { ageRange: '', experience: '', bodyType: '', availability: '', limitations: [], otherLimitation: '' }, phases: PHASES_DEFAULT.map((p) => ({ ...p })), weeklyHours: 4.5, split: SPLIT_DEFAULTS['Upper/Lower'].map((d) => ({ ...d })), exercises: DEFAULT_EXERCISES.map((e) => ({ ...e })), progressionRules: [], programName: '', description: '', tags: [], isPublic: false, assignedClient: '' };
 
 function Step1Goal({ data, updateData }: StepProps) {
   const [dropdownGoal, setDropdownGoal] = useState(data.goal || '');
@@ -1103,11 +1113,78 @@ function Step6Exercises({ data, updateData, limitations }: StepProps) {
         </div>
         <p className="text-[var(--page-text)]/40 text-[10px] mt-1.5">Example: 4-0-1-0 = 4s down, no pause, 1s up, no pause</p>
       </div>
+
+      {/* Progression rules editor (Phase 30D) */}
+      <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-3 space-y-2.5">
+        <h5 className="text-[var(--page-text)] text-xs font-semibold flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5 text-[#00AEEF]" />Progression Rules</h5>
+        <div className="flex flex-wrap gap-1.5">
+          {PROGRESSION_PRESETS.map((preset) => {
+            const active = data.progressionRules.some((r) => r.id === preset.id);
+            return (
+              <button
+                key={preset.id}
+                onClick={() => updateData((prev) => ({
+                  progressionRules: active
+                    ? prev.progressionRules.filter((r) => r.id !== preset.id)
+                    : [...prev.progressionRules, { ...preset }],
+                }))}
+                className={cn(
+                  'px-2.5 py-1 rounded-full border text-[11px] font-medium transition-all',
+                  active
+                    ? 'border-[#00AEEF] text-[#00AEEF] bg-[#00AEEF]/10'
+                    : 'border-[var(--card-border)] text-[var(--page-text)]/60 hover:border-[#00AEEF]/50'
+                )}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
+        </div>
+        {data.progressionRules.length > 0 && (
+          <ul className="space-y-1.5">
+            {data.progressionRules.map((rule, idx) => (
+              <li key={`${rule.id ?? 'custom'}-${idx}`} className="flex items-start gap-2 rounded-lg border border-[var(--card-border)] bg-[var(--page-bg)] px-2.5 py-1.5">
+                {rule.id ? (
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-semibold text-[var(--page-text)]">{rule.label}</span>
+                    <p className="text-[11px] text-[var(--page-text)]/60">{rule.text}</p>
+                  </div>
+                ) : (
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <Input
+                      value={rule.label}
+                      onChange={(e) => updateData((prev) => ({ progressionRules: prev.progressionRules.map((r, i) => (i === idx ? { ...r, label: e.target.value } : r)) }))}
+                      className="h-6 text-xs bg-[var(--card-bg)] border-[var(--card-border)] text-[var(--page-text)]"
+                    />
+                    <Input
+                      value={rule.text}
+                      onChange={(e) => updateData((prev) => ({ progressionRules: prev.progressionRules.map((r, i) => (i === idx ? { ...r, text: e.target.value } : r)) }))}
+                      className="h-6 text-[11px] bg-[var(--card-bg)] border-[var(--card-border)] text-[var(--page-text)]"
+                    />
+                  </div>
+                )}
+                <button
+                  onClick={() => updateData((prev) => ({ progressionRules: prev.progressionRules.filter((_, i) => i !== idx) }))}
+                  className="p-1 rounded hover:bg-[#EF4444]/10 text-[var(--page-text)]/50 hover:text-[#EF4444] transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <button
+          onClick={() => updateData((prev) => ({ progressionRules: [...prev.progressionRules, { label: 'Custom Rule', text: 'Edit me' }] }))}
+          className="text-[11px] font-medium text-[#00AEEF] hover:opacity-80 transition"
+        >
+          + Add custom rule
+        </button>
+      </div>
     </div>
   );
 }
 
-function Step7Preview({ data, program, clientName, dbMethods = [] }: StepProps) {
+function Step7Preview({ data, program, clientName, dbMethods = [], clients = [] }: StepProps) {
   const navigate = useNavigate();
   const totalWeeks = useMemo(() => data.phases.filter((p) => p.active).reduce((s, p) => s + p.weeks, 0), [data.phases]);
   // Per-day lists (loaded programs) are the source of truth when present.
@@ -1128,6 +1205,35 @@ function Step7Preview({ data, program, clientName, dbMethods = [] }: StepProps) 
   const methodData = LEGACY_METHODS.find((m) => m.id === data.method);
   const splitName = data.split.filter((d) => d.active).length > 0 ? `${activeDays}-Day Split` : '—';
   const handleStartWorkout = (workout: GeneratedWorkout) => { if (!program) return; const session = workoutToSession(workout, program.id); setActiveSession(session); navigate(`/sheets?session=${session.id}`); };
+
+  // Phase 30D — derived preview metrics (summary vs week-by-week)
+  const [previewTab, setPreviewTab] = useState<'summary' | 'weeks'>('summary');
+  const dayLists = useMemo(
+    () =>
+      data.split
+        .filter((d) => d.active)
+        .map((d) => {
+          const idx = SPLIT_DAY_INDEX[d.day] || 1;
+          return { day: d.day, workout: d.workout, exercises: data.workoutExercises?.[idx] ?? data.exercises };
+        }),
+    [data.split, data.workoutExercises, data.exercises]
+  );
+  const muscleRows = useMemo(() => setsPerMuscleGroup(allExercises), [allExercises]);
+  const clientEquipment = useMemo(() => {
+    const row = clients.find((c) => c.id === data.assignedClient);
+    const eq = (row?.intake_profile as Record<string, unknown> | null)?.equipment;
+    return Array.isArray(eq) && eq.length > 0 ? (eq as string[]) : null;
+  }, [clients, data.assignedClient]);
+  const equipmentRows = useMemo(() => equipmentChecklist(allExercises, clientEquipment), [allExercises, clientEquipment]);
+  const weekCards = useMemo(
+    () =>
+      Array.from({ length: totalWeeks }, (_, i) => ({
+        week: i + 1,
+        note: progressionNoteForWeek(i + 1, data.progressionRules),
+        isDeload: data.progressionRules.some((r) => r.id === 'deload') && (i + 1) % 4 === 0,
+      })),
+    [totalWeeks, data.progressionRules]
+  );
   return (
     <div className="space-y-5">
       <Card className="bg-[var(--card-bg)] border-[var(--card-border)] p-5">
@@ -1172,6 +1278,108 @@ function Step7Preview({ data, program, clientName, dbMethods = [] }: StepProps) 
           {[{ i: Eye, l: 'Preview Workout' }, { i: BarChart3, l: 'Analytics' }, { i: Download, l: 'Export PDF' }].map((b) => <Button key={b.l} variant="outline" size="sm" className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs"><b.i className="w-3.5 h-3.5 mr-1" />{b.l}</Button>)}
         </div>
       </Card>
+
+      {/* Phase 30D — derived preview metrics */}
+      <div className="flex gap-2">
+        {(['summary', 'weeks'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setPreviewTab(tab)}
+            className={cn(
+              'px-3 py-1.5 rounded-lg border text-xs font-medium transition-all',
+              previewTab === tab
+                ? 'border-[#00AEEF] text-[#00AEEF] bg-[#00AEEF]/10'
+                : 'border-[var(--card-border)] text-[var(--page-text)]/60 hover:border-[#00AEEF]/50'
+            )}
+          >
+            {tab === 'summary' ? 'Summary' : 'Week-by-Week'}
+          </button>
+        ))}
+      </div>
+
+      {previewTab === 'summary' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {/* Sets per muscle group */}
+          <Card className="bg-[var(--card-bg)] border-[var(--card-border)] p-5">
+            <h4 className="text-[var(--page-text)] text-sm font-bold mb-3 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-[#00AEEF]" />Sets per Muscle Group</h4>
+            <div className="space-y-2">
+              {muscleRows.map((row) => (
+                <div key={row.category}>
+                  <div className="flex justify-between text-[11px] mb-0.5">
+                    <span className="text-[var(--page-text)]">{row.label}</span>
+                    <span className="text-[var(--page-text)]/60 font-mono">{row.sets} · {row.pct}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-[var(--page-bg)] overflow-hidden">
+                    <motion.div initial={{ width: 0 }} animate={{ width: `${row.pct}%` }} transition={{ duration: 0.5 }} className="h-full rounded-full" style={{ background: 'linear-gradient(90deg, #00AEEF, #8B5CF6)' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* Equipment checklist */}
+          <Card className="bg-[var(--card-bg)] border-[var(--card-border)] p-5">
+            <h4 className="text-[var(--page-text)] text-sm font-bold mb-3 flex items-center gap-2"><Dumbbell className="w-4 h-4 text-[#8B5CF6]" />Equipment Checklist</h4>
+            {clientEquipment == null && (
+              <p className="text-[10px] text-[var(--page-text)]/50 mb-2">No client equipment profile — Full Gym assumed.</p>
+            )}
+            <ul className="space-y-1.5">
+              {equipmentRows.map((row) => (
+                <li key={row.item} className="flex items-center gap-2 text-xs">
+                  <span>{row.covered === null ? '➖' : row.covered ? '✅' : '⚠️'}</span>
+                  <span className="text-[var(--page-text)]">{row.item}</span>
+                  {row.covered === false && <span className="text-[10px] text-[#F59E0B]">not in client setup</span>}
+                </li>
+              ))}
+            </ul>
+          </Card>
+
+          {/* Time per session + progression rules */}
+          <div className="space-y-5">
+            <Card className="bg-[var(--card-bg)] border-[var(--card-border)] p-5">
+              <h4 className="text-[var(--page-text)] text-sm font-bold mb-3 flex items-center gap-2"><Calendar className="w-4 h-4 text-[#F59E0B]" />Estimated Time per Session</h4>
+              <ul className="space-y-1.5">
+                {dayLists.map((d) => (
+                  <li key={d.day} className="flex justify-between text-xs">
+                    <span className="text-[var(--page-text)]">{d.day} · {d.workout.split('—')[0].trim() || 'Workout'}</span>
+                    <span className="font-mono text-[#00AEEF]">~{estimateSessionMinutes(d.exercises)} min</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[10px] text-[var(--page-text)]/40 mt-2">sets × 40s + rest periods</p>
+            </Card>
+            {data.progressionRules.length > 0 && (
+              <Card className="bg-[var(--card-bg)] border-[var(--card-border)] p-5">
+                <h4 className="text-[var(--page-text)] text-sm font-bold mb-2 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-[#22C55E]" />Progression Rules</h4>
+                <ul className="space-y-1.5">
+                  {data.progressionRules.map((r, i) => (
+                    <li key={i} className="text-xs">
+                      <span className="text-[var(--page-text)] font-medium">{r.label}</span>
+                      <span className="text-[var(--page-text)]/60"> — {r.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {weekCards.map((card) => (
+            <Card key={card.week} className={cn('bg-[var(--card-bg)] border p-4', card.isDeload ? 'border-[#F59E0B]/40' : 'border-[var(--card-border)]')}>
+              <h4 className={cn('text-sm font-bold mb-2', card.isDeload ? 'text-[#F59E0B]' : 'text-[var(--page-text)]')}>Week {card.week}</h4>
+              <ul className="space-y-1 mb-2">
+                {dayLists.map((d) => (
+                  <li key={d.day} className="text-[11px] text-[var(--page-text)]/70">{d.day} · {d.exercises.length} exercises</li>
+                ))}
+              </ul>
+              {card.note && (
+                <p className={cn('text-[10px] leading-snug', card.isDeload ? 'text-[#F59E0B]' : 'text-[var(--page-text)]/50')}>{card.note}</p>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <Card className="bg-[var(--card-bg)] border-[var(--card-border)] p-5">
@@ -1356,6 +1564,21 @@ function Step8Save({ data, updateData, onSave, clients, saving, dbMethods = [] }
             ))}
           </div>
         </div>
+
+        {/* Progression rules (read-only, Phase 30D) */}
+        {data.progressionRules.length > 0 && (
+          <div className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-3 mb-3">
+            <span className="text-xs text-[var(--page-text)]/60 block mb-1.5">Progression Rules</span>
+            <ul className="space-y-1">
+              {data.progressionRules.map((r, i) => (
+                <li key={i} className="text-xs">
+                  <span className="text-[var(--page-text)] font-medium">{r.label}</span>
+                  <span className="text-[var(--page-text)]/60"> — {r.text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Weekly Split summary */}
         <div className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-3 mb-4">

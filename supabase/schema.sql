@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS programs (
   end_date DATE,
   phase_name TEXT, -- Phase 26E: editable phase label (cards fall back to "Program Phase")
   phases JSONB, -- Phase 30B: full phase structure array [{id,name,weeks,focus,color,active,intensityTarget?,volumeTarget?}]
+  progression_rules JSONB, -- Phase 30D: progression rules array [{id?,label,text}]
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

@@ -27,6 +27,7 @@ export interface DbProgramInsert {
   start_date: string | null;
   end_date: string | null;
   phases: Json | null;
+  progression_rules: Json | null;
 }
 
 export interface DbWorkoutInsert {
@@ -162,6 +163,9 @@ export function buildProgramInsert(
     end_date: endDate ? endDate.toISOString().split("T")[0] : null,
     // Phase 30B: persist the ACTIVE phase structure (all fields) as jsonb
     phases: activePhases.length > 0 ? (activePhases as unknown as Json) : null,
+    // Phase 30D: persist progression rules (empty list -> null)
+    progression_rules:
+      data.progressionRules.length > 0 ? (data.progressionRules as unknown as Json) : null,
   };
 }
 
@@ -253,6 +257,7 @@ export function defaultProgramData(
     weeklyHours: 4.5,
     split: defaultSplit,
     exercises: defaultExercises,
+    progressionRules: [],
     programName: "",
     description: "",
     tags: [],
@@ -327,6 +332,16 @@ export function programDataFromDb(
       )
     : [];
 
+  // Phase 30D: restore progression rules when persisted; fallback [].
+  const storedRules = Array.isArray(program.progression_rules)
+    ? (program.progression_rules as unknown[]).filter(
+        (r): r is ProgramData["progressionRules"][number] =>
+          typeof r === "object" && r !== null &&
+          typeof (r as Record<string, unknown>).label === "string" &&
+          typeof (r as Record<string, unknown>).text === "string"
+      )
+    : [];
+
   return {
     ...defaultData,
     id: program.id,
@@ -335,6 +350,7 @@ export function programDataFromDb(
     assignedClient: program.client_id || "",
     isPublic: false,
     tags: [],
+    progressionRules: storedRules,
     phases: storedPhases.length > 0
       ? storedPhases
       : [

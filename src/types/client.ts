@@ -69,6 +69,7 @@ export interface ClientGeneratedProgram {
   createdAt?: string;
   startDate?: string | null;
   endDate?: string | null;
+  progressionRules?: Array<{ id?: string; label: string; text: string }>;
   phases: Array<{
     id: string;
     name: string;
