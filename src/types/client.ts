@@ -90,6 +90,7 @@ export interface ClientGeneratedProgram {
         tempo: string;
         restSeconds: number;
         load?: number | null;
+        supersetGroup?: string;
       }>;
     }>;
   }>;

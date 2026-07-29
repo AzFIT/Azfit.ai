@@ -104,12 +104,14 @@ export function exerciseNotes(ex: ProgramExercise): string {
     // Phase 28D safety markers (optional — omitted unless set)
     ...(ex.isSubstituted ? { isSubstituted: true } : {}),
     ...(ex.safetyNote ? { safetyNote: ex.safetyNote } : {}),
+    // Phase 30C superset group (optional — omitted unless set)
+    ...(ex.supersetGroup ? { supersetGroup: ex.supersetGroup } : {}),
   });
 }
 
 export function parseExerciseNotes(
   notes: string | null
-): { tempo: string; pct1RM: string; isSubstituted?: boolean; safetyNote?: string } {
+): { tempo: string; pct1RM: string; isSubstituted?: boolean; safetyNote?: string; supersetGroup?: string } {
   try {
     if (notes) {
       const parsed = JSON.parse(notes) as {
@@ -117,12 +119,14 @@ export function parseExerciseNotes(
         pct1RM?: string;
         isSubstituted?: boolean;
         safetyNote?: string;
+        supersetGroup?: string;
       };
       return {
         tempo: parsed.tempo || "2-0-1-0",
         pct1RM: parsed.pct1RM || "N/A",
         ...(parsed.isSubstituted ? { isSubstituted: true } : {}),
         ...(parsed.safetyNote ? { safetyNote: parsed.safetyNote } : {}),
+        ...(parsed.supersetGroup ? { supersetGroup: parsed.supersetGroup } : {}),
       };
     }
   } catch {
@@ -279,8 +283,9 @@ export function programDataFromDb(
   // day_of_week), each exercise carrying its DB id for diff-based saves.
   const toProgramExercise = (ex: ExerciseRow): ProgramExercise => {
     const extra = parseExerciseNotes(ex.notes);
+    const code = codeFromOrderIndex(ex.order_index);
     return {
-      code: codeFromOrderIndex(ex.order_index),
+      code,
       name: ex.name,
       sets: ex.sets || 0,
       reps: ex.reps || "",
@@ -290,6 +295,8 @@ export function programDataFromDb(
       dbId: ex.id,
       ...(extra.isSubstituted ? { isSubstituted: true } : {}),
       ...(extra.safetyNote ? { safetyNote: extra.safetyNote } : {}),
+      // Phase 30C: stored group wins; fall back to the order-code letter
+      supersetGroup: extra.supersetGroup ?? code.charAt(0),
     };
   };
 

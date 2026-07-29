@@ -582,6 +582,21 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
                                                   >
                                                     {ex.name}
                                                   </span>
+                                                  {(() => {
+                                                    if (!ex.supersetGroup) return null;
+                                                    const members = workout.exercises.filter(
+                                                      (x) => x.supersetGroup === ex.supersetGroup
+                                                    );
+                                                    if (members.length < 2) return null;
+                                                    return (
+                                                      <span
+                                                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[9px] font-bold shrink-0"
+                                                        style={{ borderColor: "rgba(139, 92, 246, 0.5)", color: "#8B5CF6" }}
+                                                      >
+                                                        {members.map((x) => x.order).join(" ↔ ")}
+                                                      </span>
+                                                    );
+                                                  })()}
                                                 </div>
                                                 <span
                                                   className="text-[10px] shrink-0"

@@ -147,8 +147,9 @@ async function fetchClientPrograms(clientId: string): Promise<ClientGeneratedPro
               estimatedMinutes: Math.max(30, wExercises.length * 5),
               exercises: wExercises.map((e) => {
                 const extra = parseExerciseNotes(e.notes);
+                const code = codeFromOrderIndex(e.order_index);
                 return {
-                  order: codeFromOrderIndex(e.order_index),
+                  order: code,
                   name: e.name,
                   category: "custom",
                   sets: e.sets || 0,
@@ -156,6 +157,8 @@ async function fetchClientPrograms(clientId: string): Promise<ClientGeneratedPro
                   tempo: extra.tempo,
                   restSeconds: e.rest_seconds || 60,
                   load: e.weight_kg ?? null,
+                  // Phase 30C: stored group wins; fall back to the order-code letter
+                  supersetGroup: extra.supersetGroup ?? code.charAt(0),
                 };
               }),
             };

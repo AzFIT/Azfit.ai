@@ -11,7 +11,7 @@ import {
   Zap, Bot, Save, RotateCcw, Check,
   Dumbbell, TrendingUp, Flame, Wind, HeartPulse, Pencil, Trash2,
   Plus, Eye, BarChart3, Download, X, Target, Award, Sparkles,
-  AlertTriangle, Layers, Calendar, Users, Play, ArrowLeft, Upload, ShieldAlert, Loader2, Copy,
+  AlertTriangle, Layers, Calendar, Users, Play, ArrowLeft, Upload, ShieldAlert, Loader2, Copy, Link2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -38,6 +38,7 @@ import {
   type RankedMethod,
 } from '@/lib/methodCatalog';
 import { suggestPhasesForMethod } from '@/lib/phaseSuggestions';
+import { pairingStyleForMethod, assignPairGroups } from '@/lib/supersets';
 import { setActiveSession, type WorkoutLog, type LoggedExercise, type LoggedSet } from '@/lib/storage';
 import {
   buildProgramInsert,
@@ -62,7 +63,7 @@ import { Textarea } from '@/components/ui/textarea';
 export interface ClientContext { ageRange: string; experience: string; bodyType: string; availability: string; limitations: string[]; otherLimitation: string; }
 export interface ProgramPhase { id: string; name: string; weeks: number; focus: string; color: string; active: boolean; intensityTarget?: string; volumeTarget?: string; }
 export interface ProgramSplit { day: string; active: boolean; workout: string; dbId?: string; }
-export interface ProgramExercise { code: string; name: string; sets: number; reps: string; pct1RM: string; tempo: string; rest: string; dbId?: string; isSubstituted?: boolean; safetyNote?: string; }
+export interface ProgramExercise { code: string; name: string; sets: number; reps: string; pct1RM: string; tempo: string; rest: string; dbId?: string; isSubstituted?: boolean; safetyNote?: string; supersetGroup?: string; }
 export interface ProgramData { id?: string; goal: string; method: string; clientContext: ClientContext; phases: ProgramPhase[]; weeklyHours: number; split: ProgramSplit[]; exercises: ProgramExercise[]; workoutExercises?: Record<number, ProgramExercise[]>; programName: string; description: string; tags: string[]; isPublic: boolean; assignedClient: string; }
 export interface SavedProgram { id: string; createdAt: string; updatedAt: string; data: ProgramData; }
 interface StepProps { data: ProgramData; updateData: (partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => void; onSave?: () => void; onSaveAndAssign?: () => void; program?: GeneratedProgram | null; clientName?: string; clients?: ClientRow[]; saving?: boolean; limitations?: string[]; dbMethods?: DbMethod[]; methodCategories?: DbMethodCategory[]; goalScores?: { method_id: string; score: number }[]; methodsLoading?: boolean; methodsError?: string | null; }
@@ -889,6 +890,22 @@ function Step6Exercises({ data, updateData, limitations }: StepProps) {
   const handleAutoFill = useCallback(() => setList(() => DEFAULT_EXERCISES.map((e) => ({ ...e }))), [setList]);
   const toggleRow = useCallback((idx: number) => setOpenRows((prev) => ({ ...prev, [idx]: !prev[idx] })), []);
 
+  // Phase 30C — superset group badges + per-exercise pair control
+  const groupLabels = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const e of list) {
+      if (!e.supersetGroup || m.has(e.supersetGroup)) continue;
+      const members = list.filter((x) => x.supersetGroup === e.supersetGroup);
+      if (members.length > 1) m.set(e.supersetGroup, members.map((x) => x.code).join(' ↔ '));
+    }
+    return m;
+  }, [list]);
+  const handlePairChange = useCallback(
+    (idx: number, group: string) =>
+      setList((prev) => prev.map((e, i) => (i === idx ? { ...e, supersetGroup: group || undefined } : e))),
+    [setList]
+  );
+
   // Phase 28D — safety flags for the current day list
   const flagsByIdx = useMemo(() => {
     const m = new Map<number, SafetyFlag>();
@@ -972,6 +989,8 @@ function Step6Exercises({ data, updateData, limitations }: StepProps) {
           {list.map((exercise, idx) => {
             const flag = flagsByIdx.get(idx);
             const activeFlag = flag && !resolvedFlags[flagKey(idx)] ? flag : null;
+            const groupBadge = exercise.supersetGroup ? groupLabels.get(exercise.supersetGroup) : undefined;
+            const isLastOfGroup = !!exercise.supersetGroup && (idx === list.length - 1 || list[idx + 1]?.supersetGroup !== exercise.supersetGroup);
             return (
             <motion.div key={`${exercise.code}-${idx}`} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className={cn(
               "border-b border-[var(--card-border)] last:border-b-0",
@@ -982,12 +1001,20 @@ function Step6Exercises({ data, updateData, limitations }: StepProps) {
                 <span className="col-span-2 text-[var(--page-text)] font-medium truncate flex items-center gap-1">
                   {activeFlag && <ShieldAlert className={cn('w-3 h-3 shrink-0', activeFlag.severity === 'exclude' ? 'text-[#EF4444]' : 'text-[#F59E0B]')} />}
                   <span className="truncate">{exercise.name}</span>
+                  {groupBadge && (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border border-[#8B5CF6]/50 text-[#8B5CF6] text-[9px] font-bold shrink-0">
+                      <Link2 className="w-2.5 h-2.5" />{groupBadge}
+                    </span>
+                  )}
                 </span>
                 <span className="text-[var(--page-text)]/60">{exercise.sets}</span>
                 <span className="text-[var(--page-text)]/60">{exercise.reps}</span>
                 <span className="text-[var(--page-text)]/60 font-mono">{exercise.pct1RM}</span>
                 <span className="text-[#8B5CF6] font-mono">{exercise.tempo}</span>
-                <span className="text-[#F59E0B] font-mono">{exercise.rest}</span>
+                <span className="text-[#F59E0B] font-mono">
+                  {exercise.rest}
+                  {isLastOfGroup && groupBadge && <span className="block text-[8px] font-sans">Rest after group</span>}
+                </span>
                 <div className="flex justify-end gap-1">
                   <button onClick={() => toggleRow(idx)} className="p-1 rounded hover:bg-[var(--page-bg)] text-[var(--page-text)]/60 hover:text-[var(--page-text)] transition-colors"><Pencil className="w-3 h-3" /></button>
                   <button onClick={() => deleteExercise(idx)} className="p-1 rounded hover:bg-[#EF4444]/10 text-[var(--page-text)]/60 hover:text-[#EF4444] transition-colors"><Trash2 className="w-3 h-3" /></button>
@@ -1039,6 +1066,19 @@ function Step6Exercises({ data, updateData, limitations }: StepProps) {
                           <Input type={f.type} value={exercise[f.field]} onChange={(e) => updateExercise(idx, f.field, f.type === 'number' ? parseInt(e.target.value) || 0 : e.target.value)} className="h-7 text-xs bg-[var(--card-bg)] border-[var(--card-border)] text-[var(--page-text)]" />
                         </div>
                       ))}
+                      <div>
+                        <label className="text-[10px] text-[var(--page-text)]/60">Superset Group</label>
+                        <select
+                          value={exercise.supersetGroup ?? ''}
+                          onChange={(e) => handlePairChange(idx, e.target.value)}
+                          className="h-7 w-full text-xs rounded-md bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--page-text)]"
+                        >
+                          <option value="">None</option>
+                          {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((g) => (
+                            <option key={g} value={g}>{g}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -1547,16 +1587,35 @@ export default function AIProgramBuilderPage() {
   const handleAutoGenerate = useCallback(() => {
     setGenerating(true);
     const p = generationProfile;
+    const selectedMethod = data.method; // 30A selection — mapGeneratedToProgramData overwrites it
     setTimeout(() => {
       const generated = generateProgram(p);
       setProgram(generated);
-      setData(mapGeneratedToProgramData(generated, p));
+      const mapped = mapGeneratedToProgramData(generated, p);
+      // Phase 30C: method-aware superset pairing, applied at the wizard layer
+      const style = pairingStyleForMethod(selectedMethod);
+      if (style) {
+        setData({
+          ...mapped,
+          exercises: assignPairGroups(mapped.exercises, style),
+          ...(mapped.workoutExercises
+            ? {
+                workoutExercises: Object.fromEntries(
+                  Object.entries(mapped.workoutExercises).map(([day, list]) => [day, assignPairGroups(list, style)])
+                ),
+              }
+            : {}),
+        });
+        toast.success(`Supersets configured for ${resolveMethodName(selectedMethod, dbMethods)}`);
+      } else {
+        setData(mapped);
+      }
       setGenerating(false);
       setCurrentStep(6);
       setMaxStep((s) => Math.max(s, 6));
       saveGeneratedProgram(generated);
     }, 1500);
-  }, [generationProfile]);
+  }, [generationProfile, data.method, dbMethods]);
 
   const handleReset = useCallback(() => { setData(defaultData); setProgram(null); setCurrentStep(0); setMaxStep(0); }, []);
   const handleSave = useCallback(async () => {
