@@ -7,6 +7,7 @@ import {
   type SessionSet,
   buildSessionExercise,
   createEmptySet,
+  cascadeTargetLoad,
   getSessionVolume,
   getSessionTargetVolume,
   getSessionCompletedSets,
@@ -461,11 +462,13 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
     [workoutLog, clientId]
   );
 
-  // Phase 33C Fix 1: the header target-load input now actually updates
-  // exercise.targetLoad AND cascades to unfinished sets with no client load
-  // yet (the old handler only wrote sets, producing the "40 becomes 4" bug).
-  // Persisted PER SESSION via workout_log_entries.notes jsonb (client-writable;
-  // the shared program exercise row is not — and must not change mid-session).
+  // Phase 33C Fix 1 + 33E: the header target-load input updates
+  // exercise.targetLoad AND cascades to the sets that follow the target —
+  // sets whose clientLoad is 0 or still equals the PREVIOUS target (33E:
+  // multi-digit edits used to cascade only the first keystroke because the
+  // check was clientLoad <= 0). Manual divergences and done sets are never
+  // touched. Persisted PER SESSION via workout_log_entries.notes jsonb
+  // (client-writable; the shared program exercise row is not).
   const updateExerciseTargetLoad = useCallback(
     (exerciseId: string, load: number) => {
       const current = exercisesRef.current.find((e) => e.id === exerciseId);
@@ -473,9 +476,7 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
       const updated: SessionExercise = {
         ...current,
         targetLoad: load,
-        sets: current.sets.map((s) =>
-          !s.done && s.clientLoad <= 0 ? { ...s, clientLoad: load, load } : s
-        ),
+        sets: cascadeTargetLoad(current.sets, current.targetLoad, load),
       };
       setExercises((prev) => prev.map((e) => (e.id === exerciseId ? updated : e)));
       void writeExerciseToDb(updated);

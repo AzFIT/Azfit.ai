@@ -115,6 +115,20 @@ export function getSessionAvgRpe(exercises: SessionExercise[]): number {
   return done.reduce((sum, s) => sum + s.rpe, 0) / done.length;
 }
 
+/**
+ * Phase 33E: cascade a target-load change X → Y to the sets that FOLLOW the
+ * target — every unfinished set whose clientLoad is 0 or still equals X.
+ * Sets the user manually diverged (any other value) and done sets are
+ * never touched. Pure.
+ */
+export function cascadeTargetLoad(sets: SessionSet[], prevTarget: number, nextTarget: number): SessionSet[] {
+  return sets.map((s) =>
+    !s.done && (s.clientLoad <= 0 || s.clientLoad === prevTarget)
+      ? { ...s, clientLoad: nextTarget, load: nextTarget }
+      : s
+  );
+}
+
 export function createEmptySet(setNumber: number, defaults: Partial<SessionSet> = {}): SessionSet {
   return {
     setNumber,
