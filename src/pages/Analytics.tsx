@@ -14,6 +14,8 @@ import {
   TrendingDown,
   Minus,
   Download,
+  Loader2,
+  type LucideIcon,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -31,6 +33,7 @@ import {
   Cell,
 } from 'recharts';
 import Layout from '@/components/Layout';
+import { supabase } from '@/lib/supabase';
 
 /* ------------------------------------------------------------------ */
 /*  Animation helpers                                                  */
@@ -49,150 +52,77 @@ const staggerContainer = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Mock Data                                                          */
+/*  Types & constants                                                  */
 /* ------------------------------------------------------------------ */
-
-const weightData30D = [
-  { date: '2025-01-15', weight: 82.5, movingAvg: 82.7 },
-  { date: '2025-01-14', weight: 82.8, movingAvg: 82.8 },
-  { date: '2025-01-13', weight: 83.1, movingAvg: 82.9 },
-  { date: '2025-01-12', weight: 83.0, movingAvg: 83.0 },
-  { date: '2025-01-11', weight: 83.2, movingAvg: 83.1 },
-  { date: '2025-01-10', weight: 83.0, movingAvg: 83.2 },
-  { date: '2025-01-09', weight: 82.9, movingAvg: 83.3 },
-  { date: '2025-01-08', weight: 83.3, movingAvg: 83.4 },
-  { date: '2025-01-07', weight: 83.5, movingAvg: 83.5 },
-  { date: '2025-01-06', weight: 83.4, movingAvg: 83.6 },
-  { date: '2025-01-05', weight: 83.6, movingAvg: 83.7 },
-  { date: '2025-01-04', weight: 83.8, movingAvg: 83.8 },
-  { date: '2025-01-03', weight: 84.0, movingAvg: 83.9 },
-  { date: '2025-01-02', weight: 84.2, movingAvg: 84.0 },
-  { date: '2025-01-01', weight: 84.5, movingAvg: 84.1 },
-  { date: '2024-12-31', weight: 84.3, movingAvg: 84.2 },
-  { date: '2024-12-30', weight: 84.6, movingAvg: 84.3 },
-  { date: '2024-12-29', weight: 84.8, movingAvg: 84.4 },
-  { date: '2024-12-28', weight: 85.0, movingAvg: 84.5 },
-  { date: '2024-12-27', weight: 85.2, movingAvg: 84.6 },
-  { date: '2024-12-26', weight: 85.1, movingAvg: 84.7 },
-  { date: '2024-12-25', weight: 85.5, movingAvg: 84.8 },
-  { date: '2024-12-24', weight: 85.3, movingAvg: 84.9 },
-  { date: '2024-12-23', weight: 85.6, movingAvg: 85.0 },
-  { date: '2024-12-22', weight: 85.8, movingAvg: 85.1 },
-  { date: '2024-12-21', weight: 86.0, movingAvg: 85.2 },
-  { date: '2024-12-20', weight: 86.2, movingAvg: 85.3 },
-  { date: '2024-12-19', weight: 86.0, movingAvg: 85.4 },
-  { date: '2024-12-18', weight: 86.5, movingAvg: 85.5 },
-  { date: '2024-12-17', weight: 86.3, movingAvg: 85.6 },
-];
-
-const volumeData = [
-  { week: 'Week 1', legs: 18500, chest: 12800, back: 15200, shoulders: 8400, arms: 6200 },
-  { week: 'Week 2', legs: 21200, chest: 14500, back: 16800, shoulders: 9600, arms: 7800 },
-  { week: 'Week 3', legs: 19800, chest: 13900, back: 17500, shoulders: 10200, arms: 8100 },
-  { week: 'Week 4', legs: 22400, chest: 15600, back: 18200, shoulders: 11000, arms: 8900 },
-];
-
-const macroData = [
-  { name: 'Protein', value: 38, grams: 260, color: '#0D9488' },
-  { name: 'Carbs', value: 47, grams: 325, color: '#06B6D4' },
-  { name: 'Fats', value: 15, grams: 88, color: '#F59E0B' },
-];
-
-const prData = [
-  { exercise: 'Squat', muscleGroup: 'Legs', weight: 140, unit: 'kg', reps: 1, date: '2024-12-01', change: '+5', previous: 135 },
-  { exercise: 'Deadlift', muscleGroup: 'Legs', weight: 180, unit: 'kg', reps: 1, date: '2024-12-15', change: '+10', previous: 170 },
-  { exercise: 'Bench Press', muscleGroup: 'Push', weight: 100, unit: 'kg', reps: 1, date: '2024-11-20', change: '+5', previous: 95 },
-  { exercise: 'Overhead Press', muscleGroup: 'Push', weight: 62.5, unit: 'kg', reps: 1, date: '2024-11-10', change: '+2.5', previous: 60 },
-  { exercise: 'Pull-up', muscleGroup: 'Pull', weight: 30, unit: 'kg', reps: 5, date: '2024-12-10', change: '+5', previous: 25 },
-  { exercise: 'Leg Press', muscleGroup: 'Legs', weight: 280, unit: 'kg', reps: 8, date: '2024-11-28', change: '+20', previous: 260 },
-];
-
-const summaryStats = [
-  { value: '42', label: 'This Month', icon: Dumbbell, color: 'var(--azfit-primary)' },
-  { value: '84,200 kg', label: 'Total Lifted', icon: Weight, color: 'var(--azfit-secondary)' },
-  { value: '7.2', label: 'Intensity', icon: Gauge, color: 'var(--warning)' },
-  { value: '78%', label: 'Training Days', icon: Target, color: 'var(--success)' },
-];
 
 const timeRanges = ['7D', '30D', '90D', '1Y'] as const;
 type TimeRange = (typeof timeRanges)[number];
 
-/* ------------------------------------------------------------------ */
-/*  Muscle group badge color                                           */
-/* ------------------------------------------------------------------ */
+const RANGE_DAYS: Record<TimeRange, number> = { '7D': 7, '30D': 30, '90D': 90, '1Y': 365 };
 
-function muscleGroupBadge(group: string) {
-  switch (group) {
-    case 'Legs':
-      return { bg: 'rgba(13,148,136,0.15)', color: '#0D9488' };
-    case 'Push':
-      return { bg: 'rgba(6,182,212,0.15)', color: '#06B6D4' };
-    case 'Pull':
-      return { bg: 'rgba(139,92,246,0.15)', color: '#8B5CF6' };
-    default:
-      return { bg: 'rgba(100,116,139,0.15)', color: '#64748B' };
-  }
+const DAY_MS = 86_400_000;
+
+interface WeightPoint {
+  date: string; // recorded_at (ISO)
+  weight: number;
+  movingAvg?: number;
+}
+
+interface MacroSlice {
+  name: string;
+  value: number; // % of macro calories
+  grams: number;
+  color: string;
+}
+
+interface PersonalRecord {
+  exercise: string;
+  weight: number;
+  reps: number;
+  date: string;
+}
+
+/**
+ * Heatmap cell intensity scale (derived from sessions):
+ *  -1   padding cell — outside the 90-day window or a future day
+ *   0   no session that day
+ *   0.25 a session was scheduled on a past day but never completed
+ *   1   at least one completed session that day (multiple sessions still cap at 1)
+ * Cancelled/other statuses count as no session.
+ */
+interface HeatCell {
+  level: number;
+  label: string;
+}
+
+interface SummaryStats {
+  thisMonth: number;
+  totalLiftedKg: number;
+  avgRpe: number | null;
+  trainingDaysPct: number;
+}
+
+const MUSCLE_PALETTE = ['#0D9488', '#06B6D4', '#8B5CF6', '#F59E0B', '#A78BFA', '#84CC16', '#F87171'];
+
+const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+function dayKey(d: Date): string {
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
 /* ------------------------------------------------------------------ */
-/*  Heatmap data generator (90 days)                                   */
+/*  Heatmap color                                                      */
 /* ------------------------------------------------------------------ */
-
-function generateHeatmapData(): number[][] {
-  const patterns: number[][] = [];
-  const rng = (seed: number) => {
-    let s = seed;
-    return () => {
-      s = (s * 16807 + 0) % 2147483647;
-      return (s - 1) / 2147483646;
-    };
-  };
-  const rand = rng(42);
-
-  for (let week = 0; week < 13; week++) {
-    const days: number[] = [];
-    for (let day = 0; day < 7; day++) {
-      const idx = week * 7 + day;
-      if (idx >= 90) {
-        days.push(-1); // empty cell
-        continue;
-      }
-      // Simulate patterns: more rest on weekends, more intense mid-week
-      const isWeekend = day >= 5;
-      const base = isWeekend ? 0.3 : 0.7;
-      const r = rand();
-      let intensity: number;
-      if (r > base) {
-        intensity = 0; // rest
-      } else if (r > base * 0.6) {
-        intensity = 1; // light
-      } else if (r > base * 0.3) {
-        intensity = 2; // moderate
-      } else if (r > base * 0.1) {
-        intensity = 3; // heavy
-      } else {
-        intensity = 4; // intense
-      }
-      days.push(intensity);
-    }
-    patterns.push(days);
-  }
-  return patterns;
-}
 
 function heatmapColor(level: number, isDark: boolean): string {
   if (level === -1) return 'transparent';
   if (level === 0) return isDark ? 'var(--dark-elevated)' : 'var(--light-elevated)';
-  if (level === 1) return 'rgba(132,204,22,0.25)';
-  if (level === 2) return 'rgba(132,204,22,0.45)';
-  if (level === 3) return 'rgba(132,204,22,0.7)';
+  if (level < 1) return 'rgba(132,204,22,0.25)';
   return '#84CC16';
 }
 
-const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
 /* ------------------------------------------------------------------ */
-/*  Recharts tooltip style                                             */
+/*  Shared small components                                            */
 /* ------------------------------------------------------------------ */
 
 function tooltipStyle() {
@@ -207,40 +137,59 @@ function tooltipStyle() {
   };
 }
 
+function SectionLoading() {
+  return (
+    <div className="flex justify-center py-10">
+      <Loader2 size={22} className="animate-spin" style={{ color: '#00AEEF' }} />
+    </div>
+  );
+}
+
+function EmptyState({ icon: Icon, message }: { icon: LucideIcon; message: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-10 text-center">
+      <Icon size={28} style={{ color: 'var(--light-text-muted)' }} />
+      <p className="mt-2 max-w-xs text-sm" style={{ color: 'var(--light-text-muted)' }}>
+        {message}
+      </p>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
-/*  Weight Tooltip                                                     */
+/*  Chart tooltips                                                     */
 /* ------------------------------------------------------------------ */
 
 function WeightTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; dataKey: string }>; label?: string }) {
   if (!active || !payload || payload.length === 0) return null;
   const w = payload.find((p) => p.dataKey === 'weight');
-  const change = payload.length > 1 && payload[0]?.value ? (payload[0].value - (payload[payload.length - 1]?.value ?? 0)).toFixed(1) : '0';
+  const ma = payload.find((p) => p.dataKey === 'movingAvg');
+  const dateLabel = label
+    ? new Date(label).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '';
   return (
     <div style={tooltipStyle()}>
-      <p className="text-[11px] font-medium" style={{ color: 'var(--light-text-muted)' }}>{label}</p>
-      <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--azfit-primary)' }}>
-        {w ? `${w.value} kg` : ''}
-      </p>
+      <p className="text-[11px] font-medium" style={{ color: 'var(--light-text-muted)' }}>{dateLabel}</p>
       {w && (
-        <p className="text-xs" style={{ color: 'var(--success)' }}>
-          <TrendingDown size={10} className="mr-1 inline" />
-          {change} kg vs prev
+        <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--azfit-primary)' }}>
+          {w.value} kg
+        </p>
+      )}
+      {ma && (
+        <p className="text-xs" style={{ color: 'var(--azfit-secondary)' }}>
+          {ma.value} kg avg
         </p>
       )}
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Volume Tooltip                                                     */
-/* ------------------------------------------------------------------ */
-
 function VolumeTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
   if (!active || !payload || payload.length === 0) return null;
   const total = payload.reduce((s, p) => s + (p.value ?? 0), 0);
   return (
     <div style={tooltipStyle()}>
-      <p className="text-[11px] font-medium" style={{ color: 'var(--light-text-muted)' }}>{label}</p>
+      <p className="text-[11px] font-medium" style={{ color: 'var(--light-text-muted)' }}>Week of {label}</p>
       <p className="mt-1 text-sm font-bold" style={{ color: 'var(--azfit-secondary)' }}>
         Total: {total.toLocaleString()} kg
       </p>
@@ -252,10 +201,6 @@ function VolumeTooltip({ active, payload, label }: { active?: boolean; payload?:
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/*  Macro Tooltip                                                      */
-/* ------------------------------------------------------------------ */
 
 function MacroTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; payload: { grams: number; color: string } }> }) {
   if (!active || !payload || payload.length === 0) return null;
@@ -279,6 +224,22 @@ export default function Analytics() {
   const [timeRange, setTimeRange] = useState<TimeRange>('30D');
   const [isDark, setIsDark] = useState(false);
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<SummaryStats>({ thisMonth: 0, totalLiftedKg: 0, avgRpe: null, trainingDaysPct: 0 });
+  const [weightRows, setWeightRows] = useState<WeightPoint[]>([]);
+  const [macros, setMacros] = useState<MacroSlice[] | null>(null);
+  const [targetCalories, setTargetCalories] = useState<number | null>(null);
+  const [volumeWeeks, setVolumeWeeks] = useState<Record<string, string | number>[]>([]);
+  const [volumeMuscles, setVolumeMuscles] = useState<{ key: string; color: string }[]>([]);
+  const [volumeTotal, setVolumeTotal] = useState(0);
+  const [heatmap, setHeatmap] = useState<HeatCell[][]>([]);
+  const [consistencyPct, setConsistencyPct] = useState(0);
+  const [prs, setPrs] = useState<PersonalRecord[]>([]);
+  // Timestamp of the data load, used as "now" for range filtering so render
+  // stays pure (react-hooks/purity forbids Date.now() during render).
+  const [loadedAt, setLoadedAt] = useState(0);
+
   useEffect(() => {
     const check = () => setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
     check();
@@ -293,29 +254,244 @@ export default function Analytics() {
     return () => clearTimeout(timeoutId);
   }, []);
 
-  const heatmapData = useMemo(() => generateHeatmapData(), []);
+  /* ── Real data loading (Phase 33B) ── */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData.user;
+      if (!user) {
+        if (!cancelled) setLoading(false);
+        return;
+      }
 
+      // The user's clients row scopes body_composition (client_id = clients.id).
+      // A trainer with no clients row simply gets the weight empty state.
+      const { data: clientRow, error: clientError } = user.email
+        ? await supabase
+            .from('clients')
+            .select('id, trainer_id')
+            .eq('email', user.email)
+            .maybeSingle()
+        : { data: null, error: null };
+
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const windowStart = new Date(todayStart.getTime() - 89 * DAY_MS);
+
+      const [sessionsRes, entriesRes, targetsRes, bodyRes] = await Promise.all([
+        supabase
+          .from('sessions')
+          .select('id, status, starts_at')
+          .eq('client_id', user.id)
+          .gte('starts_at', windowStart.toISOString()),
+        supabase
+          .from('workout_log_entries')
+          .select('id, exercise_id, exercise_name, reps_per_set, weight_per_set, rpe_per_set, created_at')
+          .eq('client_id', user.id),
+        supabase
+          .from('nutrition_targets')
+          .select('calories, protein_g, carbs_g, fats_g')
+          .eq('user_id', user.id)
+          .maybeSingle(),
+        clientRow
+          ? supabase
+              .from('body_composition')
+              .select('recorded_at, weight_kg')
+              .eq('client_id', clientRow.id)
+              .not('weight_kg', 'is', null)
+              .order('recorded_at', { ascending: true })
+          : Promise.resolve({ data: [] as { recorded_at: string; weight_kg: number | null }[], error: null }),
+      ]);
+      if (cancelled) return;
+
+      const firstError =
+        clientError ?? sessionsRes.error ?? entriesRes.error ?? targetsRes.error ?? bodyRes.error;
+      if (firstError) setError(firstError.message);
+
+      const sessions = sessionsRes.data ?? [];
+      const entries = entriesRes.data ?? [];
+
+      /* ── Summary stats ── */
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const completedThisMonth = sessions.filter(
+        (s) => s.status === 'completed' && new Date(s.starts_at) >= monthStart,
+      );
+      const trainedDays = new Set(completedThisMonth.map((s) => dayKey(new Date(s.starts_at))));
+
+      let totalLifted = 0;
+      const rpeValues: number[] = [];
+      for (const e of entries) {
+        e.weight_per_set.forEach((w, i) => {
+          totalLifted += w * (e.reps_per_set[i] ?? 0);
+        });
+        rpeValues.push(...e.rpe_per_set);
+      }
+
+      setStats({
+        thisMonth: completedThisMonth.length,
+        totalLiftedKg: Math.round(totalLifted),
+        avgRpe: rpeValues.length > 0 ? rpeValues.reduce((a, b) => a + b, 0) / rpeValues.length : null,
+        trainingDaysPct: Math.round((trainedDays.size / now.getDate()) * 100),
+      });
+
+      /* ── Weight series (chronological) ── */
+      setWeightRows(
+        (bodyRes.data ?? [])
+          .filter((r): r is { recorded_at: string; weight_kg: number } => r.weight_kg != null)
+          .map((r) => ({ date: r.recorded_at, weight: r.weight_kg })),
+      );
+
+      /* ── Macro split from nutrition targets ── */
+      const targets = targetsRes.data;
+      if (targets) {
+        const protein = targets.protein_g ?? 0;
+        const carbs = targets.carbs_g ?? 0;
+        const fats = targets.fats_g ?? 0;
+        const macroCalories = protein * 4 + carbs * 4 + fats * 9;
+        if (macroCalories > 0) {
+          setMacros([
+            { name: 'Protein', value: Math.round(((protein * 4) / macroCalories) * 100), grams: protein, color: '#0D9488' },
+            { name: 'Carbs', value: Math.round(((carbs * 4) / macroCalories) * 100), grams: carbs, color: '#06B6D4' },
+            { name: 'Fats', value: Math.round(((fats * 9) / macroCalories) * 100), grams: fats, color: '#F59E0B' },
+          ]);
+          setTargetCalories(targets.calories ?? macroCalories);
+        }
+      }
+
+      /* ── Weekly volume by primary muscle (last 4 weeks, Mon-start) ── */
+      const exerciseIds = [...new Set(entries.map((e) => e.exercise_id))];
+      const muscleMap = new Map<string, string>();
+      if (exerciseIds.length > 0) {
+        const { data: libRows } = await supabase
+          .from('exercise_library')
+          .select('id, primary_muscle')
+          .in('id', exerciseIds);
+        if (cancelled) return;
+        for (const r of libRows ?? []) muscleMap.set(r.id, r.primary_muscle);
+      }
+
+      const monday = new Date(todayStart);
+      monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+      const weekStarts: number[] = [];
+      for (let w = 3; w >= 0; w--) weekStarts.push(monday.getTime() - w * 7 * DAY_MS);
+
+      const weekBuckets = weekStarts.map(() => new Map<string, number>());
+      const muscleTotals = new Map<string, number>();
+      for (const e of entries) {
+        const t = new Date(e.created_at).getTime();
+        const wi = weekStarts.findIndex((start) => t >= start && t < start + 7 * DAY_MS);
+        if (wi === -1) continue;
+        const vol = e.weight_per_set.reduce((s, w, i) => s + w * (e.reps_per_set[i] ?? 0), 0);
+        if (vol <= 0) continue;
+        const muscle = muscleMap.get(e.exercise_id) ?? 'Other';
+        weekBuckets[wi].set(muscle, (weekBuckets[wi].get(muscle) ?? 0) + vol);
+        muscleTotals.set(muscle, (muscleTotals.get(muscle) ?? 0) + vol);
+      }
+
+      const muscles = [...muscleTotals.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([key], i) => ({ key, color: MUSCLE_PALETTE[i % MUSCLE_PALETTE.length] }));
+      setVolumeMuscles(muscles);
+      setVolumeWeeks(
+        weekStarts.map((start, wi) => {
+          const row: Record<string, string | number> = {
+            week: new Date(start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          };
+          for (const m of muscles) row[m.key] = Math.round(weekBuckets[wi].get(m.key) ?? 0);
+          return row;
+        }),
+      );
+      setVolumeTotal(Math.round([...muscleTotals.values()].reduce((a, b) => a + b, 0)));
+
+      /* ── Consistency heatmap (last 90 days) ── */
+      const dayStatus = new Map<string, 'completed' | 'scheduled'>();
+      for (const s of sessions) {
+        const key = dayKey(new Date(s.starts_at));
+        if (s.status === 'completed') {
+          dayStatus.set(key, 'completed');
+        } else if (s.status === 'scheduled' && dayStatus.get(key) !== 'completed') {
+          dayStatus.set(key, 'scheduled');
+        }
+      }
+
+      const leadPad = (windowStart.getDay() + 6) % 7; // Monday-first columns
+      const cells: HeatCell[] = [];
+      for (let i = 0; i < leadPad; i++) cells.push({ level: -1, label: '' });
+      for (let d = 0; d < 90; d++) {
+        const date = new Date(windowStart.getTime() + d * DAY_MS);
+        const status = dayStatus.get(dayKey(date));
+        const dateLabel = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        if (status === 'completed') {
+          cells.push({ level: 1, label: `${dateLabel}: Completed` });
+        } else if (status === 'scheduled' && date.getTime() < todayStart.getTime()) {
+          cells.push({ level: 0.25, label: `${dateLabel}: Scheduled` });
+        } else {
+          cells.push({ level: 0, label: `${dateLabel}: Rest` });
+        }
+      }
+      while (cells.length % 7 !== 0) cells.push({ level: -1, label: '' });
+      const grid: HeatCell[][] = [];
+      for (let i = 0; i < cells.length; i += 7) grid.push(cells.slice(i, i + 7));
+      setHeatmap(grid);
+      setConsistencyPct(
+        Math.round(([...dayStatus.values()].filter((v) => v === 'completed').length / 90) * 100),
+      );
+
+      /* ── Personal records (max single-set weight per exercise) ── */
+      const best = new Map<string, PersonalRecord>();
+      for (const e of entries) {
+        e.weight_per_set.forEach((w, i) => {
+          const current = best.get(e.exercise_name);
+          if (!current || w > current.weight) {
+            best.set(e.exercise_name, {
+              exercise: e.exercise_name,
+              weight: w,
+              reps: e.reps_per_set[i] ?? 0,
+              date: e.created_at,
+            });
+          }
+        });
+      }
+      setPrs([...best.values()].sort((a, b) => b.weight - a.weight).slice(0, 6));
+
+      setLoadedAt(Date.now());
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /* ── Weight series for the selected range + 3-point moving average ── */
   const filteredWeightData = useMemo(() => {
-    const sliceMap: Record<TimeRange, number> = { '7D': 7, '30D': 30, '90D': 30, '1Y': 30 };
-    const sliceN = sliceMap[timeRange];
-    return weightData30D.slice(0, sliceN).reverse();
-  }, [timeRange]);
+    const cutoff = loadedAt - RANGE_DAYS[timeRange] * DAY_MS;
+    const inRange = weightRows.filter((p) => new Date(p.date).getTime() >= cutoff);
+    return inRange.map((p, i) => {
+      const windowPts = inRange.slice(Math.max(0, i - 2), i + 1);
+      const avg = windowPts.reduce((s, x) => s + x.weight, 0) / windowPts.length;
+      return { ...p, movingAvg: +avg.toFixed(1) };
+    });
+  }, [timeRange, weightRows, loadedAt]);
 
   const formatDate = useCallback((dateStr: string) => {
     const d = new Date(dateStr);
     return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}`;
   }, []);
 
-  const totalVolume = useMemo(() => {
-    return volumeData.reduce((sum, w) => sum + w.legs + w.chest + w.back + w.shoulders + w.arms, 0);
-  }, []);
+  const summaryStats = [
+    { value: String(stats.thisMonth), label: 'This Month', icon: Dumbbell, color: 'var(--azfit-primary)' },
+    { value: `${stats.totalLiftedKg.toLocaleString()} kg`, label: 'Total Lifted', icon: Weight, color: 'var(--azfit-secondary)' },
+    { value: stats.avgRpe === null ? '—' : stats.avgRpe.toFixed(1), label: 'Avg RPE', icon: Gauge, color: 'var(--warning)' },
+    { value: `${stats.trainingDaysPct}%`, label: 'Training Days', icon: Target, color: 'var(--success)' },
+  ];
 
-  const totalCalories = useMemo(() => {
-    const proteinCals = macroData[0].grams * 4;
-    const carbCals = macroData[1].grams * 4;
-    const fatCals = macroData[2].grams * 9;
-    return proteinCals + carbCals + fatCals;
-  }, []);
+  const latestWeight = filteredWeightData.length > 0 ? filteredWeightData[filteredWeightData.length - 1].weight : null;
+  const weightDelta =
+    filteredWeightData.length >= 2
+      ? +(filteredWeightData[filteredWeightData.length - 1].weight - filteredWeightData[0].weight).toFixed(1)
+      : null;
 
   /* ───────────────────── render ───────────────────── */
 
@@ -400,12 +576,16 @@ export default function Analytics() {
               }}
             >
               <stat.icon size={20} style={{ color: stat.color }} />
-              <span
-                className="mt-2 text-lg font-bold"
-                style={{ color: stat.color, textShadow: 'var(--text-shadow-dark)' }}
-              >
-                {stat.value}
-              </span>
+              {loading ? (
+                <Loader2 size={18} className="mt-2 animate-spin" style={{ color: stat.color }} />
+              ) : (
+                <span
+                  className="mt-2 text-lg font-bold"
+                  style={{ color: stat.color, textShadow: 'var(--text-shadow-dark)' }}
+                >
+                  {stat.value}
+                </span>
+              )}
               <span
                 className="mt-0.5 text-[11px] font-medium"
                 style={{ color: 'var(--light-text-muted)' }}
@@ -415,6 +595,12 @@ export default function Analytics() {
             </motion.div>
           ))}
         </motion.div>
+
+        {error && (
+          <p className="mb-6 text-center text-xs" style={{ color: '#F59E0B' }}>
+            Some analytics couldn't be loaded ({error}).
+          </p>
+        )}
 
         {/* ── Chart Grid ── */}
         <div className="flex flex-col gap-6">
@@ -441,77 +627,93 @@ export default function Analytics() {
                   Weight Trend
                 </h3>
               </div>
-              <div className="flex items-center gap-3">
-                <span
-                  className="text-lg font-bold"
-                  style={{ color: 'var(--azfit-primary)', textShadow: 'var(--text-shadow-dark)' }}
-                >
-                  82.5 kg
-                </span>
-                <span
-                  className="flex items-center gap-0.5 text-xs font-semibold"
-                  style={{ color: 'var(--success)' }}
-                >
-                  <TrendingDown size={12} />
-                  -3.8 kg
-                </span>
-              </div>
+              {latestWeight !== null && !loading && (
+                <div className="flex items-center gap-3">
+                  <span
+                    className="text-lg font-bold"
+                    style={{ color: 'var(--azfit-primary)', textShadow: 'var(--text-shadow-dark)' }}
+                  >
+                    {latestWeight} kg
+                  </span>
+                  {weightDelta !== null && (
+                    <span
+                      className="flex items-center gap-0.5 text-xs font-semibold"
+                      style={{ color: 'var(--light-text-muted)' }}
+                    >
+                      {weightDelta > 0 ? <TrendingUp size={12} /> : weightDelta < 0 ? <TrendingDown size={12} /> : <Minus size={12} />}
+                      {weightDelta > 0 ? '+' : ''}{weightDelta} kg
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Chart */}
-            <div style={{ width: '100%', height: window?.innerWidth >= 1024 ? 360 : 300 }}>
-              <ResponsiveContainer>
-                <AreaChart data={filteredWeightData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#0D9488" stopOpacity={0.2} />
-                      <stop offset="100%" stopColor="#0D9488" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--light-border)" opacity={0.4} />
-                  <XAxis
-                    dataKey="date"
-                    tickFormatter={formatDate}
-                    tick={{ fill: 'var(--light-text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
-                    axisLine={{ stroke: 'var(--light-border)' }}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    domain={['dataMin - 2', 'dataMax + 2']}
-                    tick={{ fill: 'var(--light-text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={50}
-                  />
-                  <Tooltip content={<WeightTooltip />} />
-                  <Area
-                    type="monotone"
-                    dataKey="weight"
-                    stroke="#0D9488"
-                    strokeWidth={2.5}
-                    fill="url(#weightGradient)"
-                    dot={false}
-                    activeDot={{ r: 4, fill: '#0D9488', strokeWidth: 0 }}
-                    animationDuration={1200}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="movingAvg"
-                    stroke="#06B6D4"
-                    strokeWidth={1.5}
-                    strokeDasharray="6 4"
-                    fill="none"
-                    dot={false}
-                    animationDuration={1200}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            {loading ? (
+              <SectionLoading />
+            ) : filteredWeightData.length < 2 ? (
+              <EmptyState
+                icon={Scale}
+                message={
+                  weightRows.length === 0
+                    ? 'No weight data yet — log your first measurement'
+                    : 'Not enough measurements in this range — try a wider one'
+                }
+              />
+            ) : (
+              <div style={{ width: '100%', height: window?.innerWidth >= 1024 ? 360 : 300 }}>
+                <ResponsiveContainer>
+                  <AreaChart data={filteredWeightData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#0D9488" stopOpacity={0.2} />
+                        <stop offset="100%" stopColor="#0D9488" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--light-border)" opacity={0.4} />
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={formatDate}
+                      tick={{ fill: 'var(--light-text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
+                      axisLine={{ stroke: 'var(--light-border)' }}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      domain={['dataMin - 2', 'dataMax + 2']}
+                      tick={{ fill: 'var(--light-text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={50}
+                    />
+                    <Tooltip content={<WeightTooltip />} />
+                    <Area
+                      type="monotone"
+                      dataKey="weight"
+                      stroke="#0D9488"
+                      strokeWidth={2.5}
+                      fill="url(#weightGradient)"
+                      dot={false}
+                      activeDot={{ r: 4, fill: '#0D9488', strokeWidth: 0 }}
+                      animationDuration={1200}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="movingAvg"
+                      stroke="#06B6D4"
+                      strokeWidth={1.5}
+                      strokeDasharray="6 4"
+                      fill="none"
+                      dot={false}
+                      animationDuration={1200}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </motion.div>
 
-          {/* Row 2: Macro Donut + Mini Weight (side by side on desktop) */}
+          {/* Row 2: Macro Donut */}
           <div className="flex flex-col gap-6 lg:flex-row">
-            {/* Macro Donut */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={mounted ? { opacity: 1, y: 0 } : {}}
@@ -533,83 +735,94 @@ export default function Analytics() {
                     Macro Split
                   </h3>
                 </div>
-                <span
-                  className="text-lg font-bold"
-                  style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}
-                >
-                  {totalCalories.toLocaleString()} kcal avg
-                </span>
+                {targetCalories !== null && !loading && (
+                  <span
+                    className="text-lg font-bold"
+                    style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}
+                  >
+                    {targetCalories.toLocaleString()} kcal target
+                  </span>
+                )}
               </div>
 
-              <div className="flex flex-col items-center gap-4 sm:flex-row">
-                {/* Donut Chart */}
-                <div style={{ width: '100%', maxWidth: 240, height: 220 }}>
-                  <ResponsiveContainer>
-                    <RePieChart>
-                      <Pie
-                        data={macroData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={85}
-                        paddingAngle={2}
-                        dataKey="value"
-                        strokeWidth={0}
-                        animationDuration={1000}
-                        animationBegin={200}
+              {loading ? (
+                <SectionLoading />
+              ) : !macros ? (
+                <EmptyState
+                  icon={PieChart}
+                  message="No nutrition targets set yet — your macro split will appear here once targets exist"
+                />
+              ) : (
+                <div className="flex flex-col items-center gap-4 sm:flex-row">
+                  {/* Donut Chart */}
+                  <div style={{ width: '100%', maxWidth: 240, height: 220 }}>
+                    <ResponsiveContainer>
+                      <RePieChart>
+                        <Pie
+                          data={macros}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={85}
+                          paddingAngle={2}
+                          dataKey="value"
+                          strokeWidth={0}
+                          animationDuration={1000}
+                          animationBegin={200}
+                        >
+                          {macros.map((entry) => (
+                            <Cell key={`macro-${entry.name}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<MacroTooltip />} />
+                      </RePieChart>
+                    </ResponsiveContainer>
+                    {/* Center text overlay */}
+                    <div className="pointer-events-none relative -mt-[140px] flex h-[140px] flex-col items-center justify-center">
+                      <span
+                        className="text-xl font-bold"
+                        style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}
                       >
-                        {macroData.map((entry) => (
-                          <Cell key={`macro-${entry.name}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<MacroTooltip />} />
-                    </RePieChart>
-                  </ResponsiveContainer>
-                  {/* Center text overlay */}
-                  <div className="pointer-events-none relative -mt-[140px] flex h-[140px] flex-col items-center justify-center">
-                    <span
-                      className="text-xl font-bold"
-                      style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}
-                    >
-                      {totalCalories.toLocaleString()}
-                    </span>
-                    <span
-                      className="text-[11px] font-medium"
-                      style={{ color: 'var(--light-text-muted)' }}
-                    >
-                      kcal
-                    </span>
+                        {(targetCalories ?? 0).toLocaleString()}
+                      </span>
+                      <span
+                        className="text-[11px] font-medium"
+                        style={{ color: 'var(--light-text-muted)' }}
+                      >
+                        kcal
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Macro bars */}
+                  <div className="flex w-full flex-col gap-3">
+                    {macros.map((macro) => (
+                      <div key={macro.name} className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold" style={{ color: macro.color }}>
+                            {macro.name}
+                          </span>
+                          <span style={{ color: 'var(--light-text-muted)' }}>
+                            {macro.grams}g ({macro.value}%)
+                          </span>
+                        </div>
+                        <div
+                          className="h-2 w-full overflow-hidden rounded-full"
+                          style={{ backgroundColor: `${macro.color}20` }}
+                        >
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={mounted ? { width: `${macro.value}%` } : {}}
+                            transition={{ delay: 0.6, duration: 0.8, ease: easeDefault }}
+                            className="h-full rounded-full"
+                            style={{ backgroundColor: macro.color }}
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-
-                {/* Macro bars */}
-                <div className="flex w-full flex-col gap-3">
-                  {macroData.map((macro) => (
-                    <div key={macro.name} className="flex flex-col gap-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold" style={{ color: macro.color }}>
-                          {macro.name}
-                        </span>
-                        <span style={{ color: 'var(--light-text-muted)' }}>
-                          {macro.grams}g ({macro.value}%)
-                        </span>
-                      </div>
-                      <div
-                        className="h-2 w-full overflow-hidden rounded-full"
-                        style={{ backgroundColor: `${macro.color}20` }}
-                      >
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={mounted ? { width: `${macro.value}%` } : {}}
-                          transition={{ delay: 0.6, duration: 0.8, ease: easeDefault }}
-                          className="h-full rounded-full"
-                          style={{ backgroundColor: macro.color }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              )}
             </motion.div>
           </div>
 
@@ -635,45 +848,61 @@ export default function Analytics() {
                   Workout Volume
                 </h3>
               </div>
-              <span
-                className="text-lg font-bold"
-                style={{ color: 'var(--azfit-secondary)', textShadow: 'var(--text-shadow-dark)' }}
-              >
-                Total: {totalVolume.toLocaleString()} kg
-              </span>
+              {volumeTotal > 0 && !loading && (
+                <span
+                  className="text-lg font-bold"
+                  style={{ color: 'var(--azfit-secondary)', textShadow: 'var(--text-shadow-dark)' }}
+                >
+                  Last 4 wks: {volumeTotal.toLocaleString()} kg
+                </span>
+              )}
             </div>
 
-            <div style={{ width: '100%', height: window?.innerWidth >= 1024 ? 320 : 280 }}>
-              <ResponsiveContainer>
-                <BarChart data={volumeData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--light-border)" opacity={0.4} vertical={false} />
-                  <XAxis
-                    dataKey="week"
-                    tick={{ fill: 'var(--light-text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
-                    axisLine={{ stroke: 'var(--light-border)' }}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: 'var(--light-text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={55}
-                    tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip content={<VolumeTooltip />} />
-                  <Legend
-                    wrapperStyle={{ fontSize: '12px', paddingTop: '12px' }}
-                    iconType="circle"
-                    iconSize={8}
-                  />
-                  <Bar dataKey="legs" stackId="a" fill="#0D9488" radius={[0, 0, 0, 0]} animationDuration={600} />
-                  <Bar dataKey="chest" stackId="a" fill="#06B6D4" radius={[0, 0, 0, 0]} animationDuration={600} animationBegin={100} />
-                  <Bar dataKey="back" stackId="a" fill="#8B5CF6" radius={[0, 0, 0, 0]} animationDuration={600} animationBegin={200} />
-                  <Bar dataKey="shoulders" stackId="a" fill="#F59E0B" radius={[0, 0, 0, 0]} animationDuration={600} animationBegin={300} />
-                  <Bar dataKey="arms" stackId="a" fill="#A78BFA" radius={[4, 4, 0, 0]} animationDuration={600} animationBegin={400} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {loading ? (
+              <SectionLoading />
+            ) : volumeMuscles.length === 0 ? (
+              <EmptyState
+                icon={BarChart3}
+                message="No workout volume logged in the last 4 weeks — complete a workout to see it here"
+              />
+            ) : (
+              <div style={{ width: '100%', height: window?.innerWidth >= 1024 ? 320 : 280 }}>
+                <ResponsiveContainer>
+                  <BarChart data={volumeWeeks} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--light-border)" opacity={0.4} vertical={false} />
+                    <XAxis
+                      dataKey="week"
+                      tick={{ fill: 'var(--light-text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
+                      axisLine={{ stroke: 'var(--light-border)' }}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fill: 'var(--light-text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={55}
+                      tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip content={<VolumeTooltip />} />
+                    <Legend
+                      wrapperStyle={{ fontSize: '12px', paddingTop: '12px' }}
+                      iconType="circle"
+                      iconSize={8}
+                    />
+                    {volumeMuscles.map((m, idx) => (
+                      <Bar
+                        key={m.key}
+                        dataKey={m.key}
+                        stackId="a"
+                        fill={m.color}
+                        radius={idx === volumeMuscles.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                        animationDuration={600}
+                      />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </motion.div>
 
           {/* Row 4: Consistency Heatmap */}
@@ -698,59 +927,72 @@ export default function Analytics() {
                   Training Consistency
                 </h3>
               </div>
-              <span
-                className="text-lg font-bold"
-                style={{ color: 'var(--success)', textShadow: 'var(--text-shadow-dark)' }}
-              >
-                78% consistency
-              </span>
-            </div>
-
-            {/* Day labels */}
-            <div className="mb-2 flex gap-1 pl-0">
-              {dayLabels.map((d) => (
-                <div
-                  key={d}
-                  className="flex h-7 w-7 items-center justify-center text-[10px] font-medium lg:h-8 lg:w-8"
-                  style={{ color: 'var(--light-text-muted)' }}
+              {!loading && (
+                <span
+                  className="text-lg font-bold"
+                  style={{ color: 'var(--success)', textShadow: 'var(--text-shadow-dark)' }}
                 >
-                  {d.slice(0, 2)}
-                </div>
-              ))}
+                  {consistencyPct}% consistency
+                </span>
+              )}
             </div>
 
-            {/* Heatmap grid */}
-            <div className="flex flex-col gap-1">
-              {heatmapData.map((week, wi) => (
-                <div key={wi} className="flex gap-1">
-                  {week.map((day, di) => (
+            {loading ? (
+              <SectionLoading />
+            ) : (
+              <>
+                {/* Day labels */}
+                <div className="mb-2 flex gap-1 pl-0">
+                  {dayLabels.map((d) => (
                     <div
-                      key={di}
-                      className="h-7 w-7 rounded transition-transform duration-150 hover:scale-110 lg:h-8 lg:w-8"
-                      style={{
-                        backgroundColor: heatmapColor(day, isDark),
-                        cursor: day >= 0 ? 'pointer' : 'default',
-                      }}
-                      title={day >= 0 ? `Intensity: ${['Rest', 'Light', 'Moderate', 'Heavy', 'Intense'][day]}` : ''}
-                    />
+                      key={d}
+                      className="flex h-7 w-7 items-center justify-center text-[10px] font-medium lg:h-8 lg:w-8"
+                      style={{ color: 'var(--light-text-muted)' }}
+                    >
+                      {d.slice(0, 2)}
+                    </div>
                   ))}
                 </div>
-              ))}
-            </div>
 
-            {/* Legend */}
-            <div className="mt-4 flex items-center gap-3">
-              <span className="text-[11px] font-medium" style={{ color: 'var(--light-text-muted)' }}>Less</span>
-              {[0, 1, 2, 3, 4].map((level) => (
-                <div key={level} className="flex items-center gap-1">
-                  <div
-                    className="h-4 w-4 rounded"
-                    style={{ backgroundColor: heatmapColor(level, isDark) }}
-                  />
+                {/* Heatmap grid */}
+                <div className="flex flex-col gap-1">
+                  {heatmap.map((week, wi) => (
+                    <div key={wi} className="flex gap-1">
+                      {week.map((day, di) => (
+                        <div
+                          key={di}
+                          className="h-7 w-7 rounded transition-transform duration-150 hover:scale-110 lg:h-8 lg:w-8"
+                          style={{
+                            backgroundColor: heatmapColor(day.level, isDark),
+                            cursor: day.level >= 0 ? 'pointer' : 'default',
+                          }}
+                          title={day.label}
+                        />
+                      ))}
+                    </div>
+                  ))}
                 </div>
-              ))}
-              <span className="text-[11px] font-medium" style={{ color: 'var(--light-text-muted)' }}>More</span>
-            </div>
+
+                {/* Legend */}
+                <div className="mt-4 flex items-center gap-3">
+                  {[
+                    { label: 'Rest', level: 0 },
+                    { label: 'Scheduled', level: 0.25 },
+                    { label: 'Completed', level: 1 },
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-center gap-1">
+                      <div
+                        className="h-4 w-4 rounded"
+                        style={{ backgroundColor: heatmapColor(item.level, isDark) }}
+                      />
+                      <span className="text-[11px] font-medium" style={{ color: 'var(--light-text-muted)' }}>
+                        {item.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </motion.div>
 
           {/* Row 5: Personal Records Table */}
@@ -775,59 +1017,60 @@ export default function Analytics() {
                   Personal Records
                 </h3>
               </div>
-              <span
-                className="text-lg font-bold"
-                style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}
-              >
-                {prData.length} Records
-              </span>
+              {!loading && (
+                <span
+                  className="text-lg font-bold"
+                  style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}
+                >
+                  {prs.length} Records
+                </span>
+              )}
             </div>
 
-            {/* Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr
-                    className="border-b"
-                    style={{ borderColor: 'var(--card-border)' }}
-                  >
-                    <th
-                      className="px-3 py-3 text-left text-xs font-semibold"
-                      style={{ color: 'var(--light-text-muted)' }}
+            {loading ? (
+              <SectionLoading />
+            ) : prs.length === 0 ? (
+              <EmptyState
+                icon={Trophy}
+                message="No personal records yet — complete a workout to set your first PRs"
+              />
+            ) : (
+              /* Table */
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr
+                      className="border-b"
+                      style={{ borderColor: 'var(--card-border)' }}
                     >
-                      Exercise
-                    </th>
-                    <th
-                      className="px-3 py-3 text-right text-xs font-semibold"
-                      style={{ color: 'var(--light-text-muted)' }}
-                    >
-                      Weight
-                    </th>
-                    <th
-                      className="px-3 py-3 text-center text-xs font-semibold"
-                      style={{ color: 'var(--light-text-muted)' }}
-                    >
-                      Reps
-                    </th>
-                    <th
-                      className="px-3 py-3 text-right text-xs font-semibold"
-                      style={{ color: 'var(--light-text-muted)' }}
-                    >
-                      Date
-                    </th>
-                    <th
-                      className="px-3 py-3 text-right text-xs font-semibold"
-                      style={{ color: 'var(--light-text-muted)' }}
-                    >
-                      Change
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {prData.map((pr, i) => {
-                    const badge = muscleGroupBadge(pr.muscleGroup);
-                    const changeVal = parseFloat(pr.change);
-                    return (
+                      <th
+                        className="px-3 py-3 text-left text-xs font-semibold"
+                        style={{ color: 'var(--light-text-muted)' }}
+                      >
+                        Exercise
+                      </th>
+                      <th
+                        className="px-3 py-3 text-right text-xs font-semibold"
+                        style={{ color: 'var(--light-text-muted)' }}
+                      >
+                        Weight
+                      </th>
+                      <th
+                        className="px-3 py-3 text-center text-xs font-semibold"
+                        style={{ color: 'var(--light-text-muted)' }}
+                      >
+                        Reps
+                      </th>
+                      <th
+                        className="px-3 py-3 text-right text-xs font-semibold"
+                        style={{ color: 'var(--light-text-muted)' }}
+                      >
+                        Date
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {prs.map((pr, i) => (
                       <motion.tr
                         key={pr.exercise}
                         initial={{ opacity: 0, x: -20 }}
@@ -837,27 +1080,19 @@ export default function Analytics() {
                         style={{ borderColor: 'var(--card-border)', height: 56 }}
                       >
                         <td className="px-3 py-3">
-                          <div className="flex flex-col gap-0.5">
-                            <span
-                              className="text-sm font-semibold"
-                              style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}
-                            >
-                              {pr.exercise}
-                            </span>
-                            <span
-                              className="w-fit rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                              style={{ backgroundColor: badge.bg, color: badge.color }}
-                            >
-                              {pr.muscleGroup}
-                            </span>
-                          </div>
+                          <span
+                            className="text-sm font-semibold"
+                            style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}
+                          >
+                            {pr.exercise}
+                          </span>
                         </td>
                         <td className="px-3 py-3 text-right">
                           <span
                             className="font-mono text-sm font-bold"
                             style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}
                           >
-                            {pr.weight} {pr.unit}
+                            {pr.weight} kg
                           </span>
                         </td>
                         <td className="px-3 py-3 text-center">
@@ -876,21 +1111,12 @@ export default function Analytics() {
                             {new Date(pr.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </span>
                         </td>
-                        <td className="px-3 py-3 text-right">
-                          <span
-                            className="flex items-center justify-end gap-1 text-xs font-semibold"
-                            style={{ color: changeVal > 0 ? 'var(--success)' : 'var(--light-text-muted)' }}
-                          >
-                            {changeVal > 0 ? <TrendingUp size={12} /> : <Minus size={12} />}
-                            {pr.change > '0' ? `${pr.change} ${pr.unit}` : 'New'}
-                          </span>
-                        </td>
                       </motion.tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </motion.div>
         </div>
       </div>

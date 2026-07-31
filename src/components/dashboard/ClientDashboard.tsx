@@ -22,6 +22,8 @@ import {
 import { useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { useSessions } from "@/hooks/useSessions";
+import { supabase } from "@/lib/supabase";
+import { codeFromOrderIndex } from "@/lib/aiProgramMapper";
 import { useHabits, last7Days, isDoneOnDate } from "@/components/checkins/useHabits";
 import HabitRow from "@/components/checkins/HabitRow";
 import { generateICS, downloadICS, icsFilename } from "@/lib/ics";
@@ -80,40 +82,9 @@ interface HydrationLog {
   target: number;
 }
 
-/* ── Mock Data ───────────────────────────────────────────────────── */
-// TODO: wire to Supabase
-const MOCK_WORKOUT: WorkoutExercise[] = [
-  { id: "e1", order: "A1", name: "Back Squat", sets: 4, reps: "6", load: "120kg", completed: true },
-  { id: "e2", order: "A2", name: "Romanian Deadlift", sets: 3, reps: "8", load: "100kg", completed: true },
-  { id: "e3", order: "B1", name: "Leg Press", sets: 3, reps: "10", load: "200kg", completed: false },
-  { id: "e4", order: "B2", name: "Walking Lunge", sets: 3, reps: "12", load: "20kg", completed: false },
-  { id: "e5", order: "C1", name: "Leg Curl", sets: 3, reps: "12", load: "45kg", completed: false },
-  { id: "e6", order: "C2", name: "Calf Raise", sets: 4, reps: "15", load: "60kg", completed: false },
-];
-
-const WEEKLY_COMPLIANCE = [
-  { day: "Mon", value: 100 },
-  { day: "Tue", value: 85 },
-  { day: "Wed", value: 0 },
-  { day: "Thu", value: 95 },
-  { day: "Fri", value: 70 },
-  { day: "Sat", value: 100 },
-  { day: "Sun", value: 60 },
-];
-
-// TODO: wire to Supabase — coach assignment
-const MOCK_COACH = {
-  name: "Coach Marcus",
-  avatar: "/avatar-coach.jpg",
-  isOnline: true,
-  nextSession: { day: "Wed", time: "6:00 PM", workout: "Lower Body" },
-};
-
-// TODO: wire to Supabase — check-in schedule
-const isCheckinDue = true;
-
-// TODO: wire to Supabase — unread notifications
-const unreadNotifications = 3;
+/* ── Phase 33B: mock data removed — today's workout, weekly compliance,
+      coach identity, check-in due and unread counts are all computed from
+      real Supabase queries in the effects below. ── */
 
 /* ── Helper: Percentage Calculator ───────────────────────────────── */
 function calcPct(current: number, target: number): number {
@@ -188,15 +159,149 @@ export default function ClientDashboard() {
   // Hydration
   const [hydration, setHydration] = useState<HydrationLog>({ current: 1.8, target: 3.0 });
 
-  // Workout checklist
-  const [exercises, setExercises] = useState<WorkoutExercise[]>(MOCK_WORKOUT);
+  // Workout checklist (Phase 33B — real program day for today)
+  const [exercises, setExercises] = useState<WorkoutExercise[]>([]);
+  const [workoutName, setWorkoutName] = useState<string | null>(null);
+  const [workoutLoading, setWorkoutLoading] = useState(true);
 
-  // Weekly compliance
-  const [complianceData] = useState(WEEKLY_COMPLIANCE);
+  // Weekly compliance (Phase 33B — computed from real sessions:
+  // a day scores 100 when at least one session was completed that day)
+  const [complianceData, setComplianceData] = useState<{ day: string; value: number }[]>([]);
+
+  // Phase 33B — real coach identity / check-in due / unread count
+  const [coachName, setCoachName] = useState<string | null>(null);
+  const [checkinDue, setCheckinDue] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   // Habits
   const { habits, logs, loading: habitsLoading, toggleToday } = useHabits({ role: "client" });
   const today = last7Days()[6];
+
+  // Phase 33B data effect: today's workout, coach, check-in due, unread count
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data: clientRow } = await supabase
+        .from("clients")
+        .select("id, trainer_id")
+        .eq("email", user.email)
+        .maybeSingle();
+
+      // Unread notifications (real count)
+      const { count: unread } = await supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("read", false);
+
+      let todays: WorkoutExercise[] = [];
+      let wName: string | null = null;
+      let coach: string | null = null;
+      let due = false;
+
+      if (clientRow) {
+        // Today's program workout (active program, today's weekday, Mon=1..Sun=7)
+        const todayIdx = ((new Date().getDay() + 6) % 7) + 1;
+        const { data: prog } = await supabase
+          .from("programs")
+          .select("id")
+          .eq("client_id", clientRow.id)
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (prog) {
+          const { data: w } = await supabase
+            .from("workouts")
+            .select("id, name")
+            .eq("program_id", prog.id)
+            .eq("day_of_week", todayIdx)
+            .maybeSingle();
+          if (w) {
+            wName = w.name;
+            const { data: exs } = await supabase
+              .from("exercises")
+              .select("id, name, sets, reps, weight_kg, order_index")
+              .eq("workout_id", w.id)
+              .order("order_index");
+            todays = (exs || []).map((e) => ({
+              id: e.id,
+              order: codeFromOrderIndex(e.order_index),
+              name: e.name,
+              sets: e.sets ?? 0,
+              reps: e.reps ?? "",
+              load: e.weight_kg != null ? `${e.weight_kg}kg` : "",
+              completed: false,
+            }));
+          }
+        }
+
+        // Real coach name via the SECURITY DEFINER helper (Phase 28A)
+        if (clientRow.trainer_id) {
+          const { data: name } = await supabase.rpc("get_trainer_display_name", { p_trainer_id: clientRow.trainer_id });
+          coach = typeof name === "string" && name ? name : null;
+        }
+
+        // Check-in due: trainer has an active form AND I haven't submitted in 7 days
+        const { count: activeForms } = await supabase
+          .from("check_in_forms")
+          .select("id", { count: "exact", head: true })
+          .eq("trainer_id", clientRow.trainer_id)
+          .eq("active", true);
+        if ((activeForms ?? 0) > 0) {
+          const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+          const { count: recentSubs } = await supabase
+            .from("check_in_submissions")
+            .select("id", { count: "exact", head: true })
+            .eq("client_id", user.id)
+            .gte("submitted_at", weekAgo);
+          due = (recentSubs ?? 0) === 0;
+        }
+      }
+
+      if (!cancelled) {
+        setExercises(todays);
+        setWorkoutName(wName);
+        setCoachName(coach);
+        setCheckinDue(due);
+        setUnreadNotifications(unread ?? 0);
+        setWorkoutLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
+  // Phase 33B — weekly compliance from the client's real sessions this week
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const now = new Date();
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+      const dayKey = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const weekEnd = new Date(monday);
+      weekEnd.setDate(monday.getDate() + 7);
+      const { data } = await supabase
+        .from("sessions")
+        .select("starts_at, status")
+        .eq("client_id", user.id)
+        .gte("starts_at", dayKey(monday) + "T00:00:00")
+        .lt("starts_at", dayKey(weekEnd) + "T00:00:00");
+      const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+      const out = days.map((day, i) => {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        const key = dayKey(d);
+        const daySessions = (data || []).filter((s) => (s.starts_at || "").slice(0, 10) === key);
+        return { day, value: daySessions.some((s) => s.status === "completed") ? 100 : 0 };
+      });
+      if (!cancelled) setComplianceData(out);
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
 
   /* ── Derived Values ────────────────────────────────────────────── */
   const stepsPct = calcPct(stepsCurrent, stepsTarget);
@@ -322,31 +427,27 @@ export default function ClientDashboard() {
           className="!p-5"
         >
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            {/* Coach Info */}
+            {/* Coach Info (real trainer, Phase 33B) */}
             <div className="flex items-center gap-4">
               <div className="relative">
-                <img
-                  src={MOCK_COACH.avatar}
-                  alt={MOCK_COACH.name}
-                  className="h-14 w-14 rounded-full object-cover"
-                  style={{ border: "2px solid var(--card-border)" }}
-                />
-                {MOCK_COACH.isOnline && (
-                  <span
-                    className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2"
-                    style={{
-                      backgroundColor: "#84CC16",
-                      borderColor: "var(--card-bg)",
-                    }}
-                  />
-                )}
+                <div
+                  className="flex h-14 w-14 items-center justify-center rounded-full text-lg font-bold text-white"
+                  style={{ border: "2px solid var(--card-border)", background: "linear-gradient(135deg, #00AEEF, #8B5CF6)" }}
+                >
+                  {(coachName || "?")
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((p) => p[0].toUpperCase())
+                    .join("")}
+                </div>
               </div>
               <div>
                 <p className="text-sm font-medium" style={{ color: "var(--light-text-muted)" }}>
                   Your Coach
                 </p>
                 <p className="text-lg font-bold" style={{ color: "var(--page-text)" }}>
-                  {MOCK_COACH.name}
+                  {coachName ?? "No coach assigned yet"}
                 </p>
               </div>
             </div>
@@ -460,17 +561,19 @@ export default function ClientDashboard() {
         className="mb-6"
       >
         <CollapsibleSection
-          title="Today's Workout"
+          title={workoutName ? `Today's Workout — ${workoutName}` : "Today's Workout"}
           icon={<Dumbbell className="h-4 w-4" />}
           defaultExpanded
           accentColor="#0D9488"
           badge={
-            <span
-              className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
-              style={{ backgroundColor: workoutProgress === 100 ? "#84CC16" : "#0D9488" }}
-            >
-              {completedExercises}/{exercises.length}
-            </span>
+            exercises.length > 0 ? (
+              <span
+                className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+                style={{ backgroundColor: workoutProgress === 100 ? "#84CC16" : "#0D9488" }}
+              >
+                {completedExercises}/{exercises.length}
+              </span>
+            ) : undefined
           }
           headerAction={
             <button
@@ -494,6 +597,17 @@ export default function ClientDashboard() {
             Start Workout
           </motion.button>
 
+          {/* Honest states (Phase 33B): loading / nothing scheduled / real list */}
+          {workoutLoading ? (
+            <div className="flex justify-center py-4">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#0D9488] border-t-transparent" />
+            </div>
+          ) : exercises.length === 0 ? (
+            <p className="py-3 text-center text-xs" style={{ color: "var(--light-text-muted)" }}>
+              Nothing scheduled today — enjoy the calm.
+            </p>
+          ) : (
+            <>
           {/* Workout progress bar */}
           <div className="mb-4">
             <div className="flex items-center justify-between mb-1">
@@ -584,13 +698,15 @@ export default function ClientDashboard() {
               </motion.div>
             ))}
           </div>
+            </>
+          )}
         </CollapsibleSection>
       </motion.div>
 
       {/* ═══════════════════════════════════════════════════════════
           CHECK-IN DUE CARD (conditional)
           ═══════════════════════════════════════════════════════════ */}
-      {isCheckinDue && (
+      {checkinDue && (
         <motion.div
           variants={fadeInUp}
           initial="hidden"
@@ -930,7 +1046,7 @@ export default function ClientDashboard() {
             {/* Bar chart */}
             <div className="flex items-end justify-between gap-2 h-40 px-2">
               {complianceData.map((day, i) => {
-                const isToday = day.day === "Sat"; // Mock "today"
+                const isToday = day.day === ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date().getDay()];
                 return (
                   <div key={day.day} className="flex flex-1 flex-col items-center gap-2">
                     {/* Bar */}

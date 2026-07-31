@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Search,
@@ -7,48 +7,33 @@ import {
   ClipboardList,
   Filter,
   Plus,
+  Loader2,
+  Users,
 } from 'lucide-react';
-import { clients, type Client } from './data';
+import { supabase } from '@/lib/supabase';
+import { clientStatusMeta } from '@/lib/clientStatus';
+import { formatDate } from '@/lib/utils';
 import QuickAddClientModal from '@/components/QuickAddClientModal';
+import type { Database } from '@/types/supabase';
 
-const filterOptions = ['All', 'Active', 'Away', 'New'] as const;
+/**
+ * Coach dashboard clients tab (Phase 33B) — real trainer-scoped clients only.
+ * All fabricated metrics (fitness score, streak, compliance, weight change,
+ * progress, last active, next session) were REMOVED: no honest data source
+ * for them exists.
+ */
+type ClientRow = Pick<
+  Database['public']['Tables']['clients']['Row'],
+  | 'id'
+  | 'full_name'
+  | 'email'
+  | 'status'
+  | 'fitness_goal'
+  | 'experience_level'
+  | 'created_at'
+>;
 
-function ComplianceBadge({ rate }: { rate: number }) {
-  let bg: string;
-  let color: string;
-  if (rate >= 80) {
-    bg = 'rgba(132, 204, 22, 0.15)';
-    color = '#84CC16';
-  } else if (rate >= 50) {
-    bg = 'rgba(245, 158, 11, 0.15)';
-    color = '#F59E0B';
-  } else {
-    bg = 'rgba(248, 113, 113, 0.15)';
-    color = '#F87171';
-  }
-  return (
-    <span
-      className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
-      style={{ backgroundColor: bg, color }}
-    >
-      {rate}%
-    </span>
-  );
-}
-
-function StatusDot({ status }: { status: Client['status'] }) {
-  const color =
-    status === 'active' ? '#84CC16' : status === 'away' ? '#F59E0B' : '#0D9488';
-  return (
-    <span
-      className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2"
-      style={{
-        backgroundColor: color,
-        borderColor: 'var(--card-bg)',
-      }}
-    />
-  );
-}
+const filterOptions = ['All', 'Active', 'Inactive', 'Paused', 'Trial'] as const;
 
 const cardVariants = {
   hidden: { opacity: 0, y: 12 },
@@ -67,18 +52,54 @@ export default function ClientsTab() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<(typeof filterOptions)[number]>('All');
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [clientList, setClientList] = useState<ClientRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const trainerId = userData.user?.id;
+      if (!trainerId) {
+        if (!cancelled) {
+          setClientList([]);
+          setLoading(false);
+        }
+        return;
+      }
+      const { data, error: queryError } = await supabase
+        .from('clients')
+        .select('id, full_name, email, status, fitness_goal, experience_level, created_at')
+        .eq('trainer_id', trainerId)
+        .neq('status', 'archived')
+        .order('full_name');
+      if (cancelled) return;
+      if (queryError) {
+        setError(queryError.message);
+      } else {
+        setClientList(data ?? []);
+      }
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filtered = useMemo(() => {
-    return clients.filter((c) => {
+    return clientList.filter((c) => {
+      const term = search.toLowerCase();
       const matchesSearch =
         !search ||
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.goal.toLowerCase().includes(search.toLowerCase());
+        c.full_name.toLowerCase().includes(term) ||
+        c.email.toLowerCase().includes(term) ||
+        (c.fitness_goal ?? '').toLowerCase().includes(term);
       const matchesFilter =
         filter === 'All' || c.status === filter.toLowerCase();
       return matchesSearch && matchesFilter;
     });
-  }, [search, filter]);
+  }, [clientList, search, filter]);
 
   return (
     <div className="space-y-4">
@@ -141,179 +162,180 @@ export default function ClientsTab() {
         </div>
       </div>
 
-      {/* Client Grid */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {filtered.map((client, i) => (
-          <motion.div
-            key={client.id}
-            custom={i}
-            variants={cardVariants}
-            initial="hidden"
-            animate="visible"
-            className="rounded-2xl border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-            style={{
-              backgroundColor: 'var(--card-bg)',
-              borderColor: 'var(--card-border)',
-            }}
-          >
-            {/* Top row: Avatar + Info + Actions */}
-            <div className="flex items-start gap-3">
-              {/* Avatar */}
-              <div className="relative h-16 w-16 shrink-0 lg:h-20 lg:w-20">
-                <img
-                  src={client.avatar}
-                  alt={client.name}
-                  className="h-full w-full rounded-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
-                <div
-                  className="absolute inset-0 flex items-center justify-center rounded-full text-lg font-bold"
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 size={24} className="animate-spin" style={{ color: '#00AEEF' }} />
+        </div>
+      ) : error ? (
+        <p className="py-4 text-center text-xs" style={{ color: '#F59E0B' }}>
+          Couldn't load clients ({error}).
+        </p>
+      ) : (
+        <>
+          {/* Client Grid */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((client, i) => {
+              const meta = clientStatusMeta(client.status);
+              return (
+                <motion.div
+                  key={client.id}
+                  custom={i}
+                  variants={cardVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className="rounded-2xl border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
                   style={{
-                    backgroundColor: 'var(--light-elevated)',
-                    color: 'var(--azfit-primary)',
+                    backgroundColor: 'var(--card-bg)',
+                    borderColor: 'var(--card-border)',
                   }}
                 >
-                  {client.name
-                    .split(' ')
-                    .map((n) => n[0])
-                    .join('')}
-                </div>
-                <StatusDot status={client.status} />
-              </div>
+                  {/* Top row: Avatar + Info */}
+                  <div className="flex items-start gap-3">
+                    {/* Avatar: initials + status dot */}
+                    <div className="relative h-16 w-16 shrink-0 lg:h-20 lg:w-20">
+                      <div
+                        className="flex h-full w-full items-center justify-center rounded-full text-lg font-bold"
+                        style={{
+                          backgroundColor: 'var(--light-elevated)',
+                          color: 'var(--azfit-primary)',
+                        }}
+                      >
+                        {client.full_name
+                          .split(' ')
+                          .map((n) => n[0])
+                          .join('')}
+                      </div>
+                      <span
+                        className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2"
+                        style={{
+                          backgroundColor: meta.color,
+                          borderColor: 'var(--card-bg)',
+                        }}
+                      />
+                    </div>
 
-              {/* Info */}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <h3
-                    className="truncate text-sm font-semibold"
-                    style={{ color: 'var(--page-text)' }}
-                  >
-                    {client.name}
-                  </h3>
-                  {client.status === 'new' && (
-                    <span
-                      className="shrink-0 rounded-full px-1.5 py-0 text-[10px] font-bold"
-                      style={{
-                        backgroundColor: 'rgba(13, 148, 136, 0.15)',
-                        color: '#0D9488',
+                    {/* Info */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3
+                          className="truncate text-sm font-semibold"
+                          style={{ color: 'var(--page-text)' }}
+                        >
+                          {client.full_name}
+                        </h3>
+                        <span
+                          className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                          style={{
+                            backgroundColor: meta.bg,
+                            color: meta.color,
+                          }}
+                        >
+                          {meta.label}
+                        </span>
+                      </div>
+                      <p
+                        className="truncate text-xs"
+                        style={{ color: 'var(--light-text-muted)' }}
+                      >
+                        {client.email}
+                      </p>
+                      <p
+                        className="mt-1 text-xs"
+                        style={{ color: 'var(--light-text-muted)' }}
+                      >
+                        {client.fitness_goal ?? 'No goal set'}
+                        {client.experience_level
+                          ? ` · ${client.experience_level[0].toUpperCase()}${client.experience_level.slice(1)}`
+                          : ''}
+                      </p>
+                      <p
+                        className="mt-1 text-[11px]"
+                        style={{ color: 'var(--light-text-muted)' }}
+                      >
+                        Client since {formatDate(client.created_at)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Quick Actions */}
+                  <div className="mt-3 flex items-center gap-1 border-t pt-2.5" style={{ borderColor: 'var(--card-border)' }}>
+                    <button
+                      className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-[11px] font-medium transition-all duration-150 active:scale-[0.95]"
+                      style={{ color: '#0D9488' }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(13,148,136,0.08)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
                       }}
                     >
-                      NEW
-                    </span>
-                  )}
-                </div>
-                <p
-                  className="text-xs"
-                  style={{ color: 'var(--light-text-muted)' }}
-                >
-                  {client.age} yrs · {client.goal}
-                </p>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <ComplianceBadge rate={client.compliance} />
-                  <span
-                    className="text-[11px]"
+                      <MessageSquare size={14} />
+                      Message
+                    </button>
+                    <button
+                      className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-[11px] font-medium transition-all duration-150 active:scale-[0.95]"
+                      style={{ color: 'var(--light-text-secondary)' }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--light-elevated)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      <UserCircle size={14} />
+                      Profile
+                    </button>
+                    <button
+                      className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-[11px] font-medium transition-all duration-150 active:scale-[0.95]"
+                      style={{ color: 'var(--light-text-secondary)' }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--light-elevated)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      <ClipboardList size={14} />
+                      Program
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+
+          {filtered.length === 0 && (
+            <div
+              className="flex flex-col items-center justify-center rounded-2xl border py-12"
+              style={{
+                backgroundColor: 'var(--card-bg)',
+                borderColor: 'var(--card-border)',
+              }}
+            >
+              {clientList.length === 0 ? (
+                <>
+                  <Users size={32} style={{ color: 'var(--light-text-muted)' }} />
+                  <p
+                    className="mt-2 text-sm font-medium"
                     style={{ color: 'var(--light-text-muted)' }}
                   >
-                    {client.lastActive}
-                  </span>
-                </div>
-              </div>
+                    No clients yet
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Search size={32} style={{ color: 'var(--light-text-muted)' }} />
+                  <p
+                    className="mt-2 text-sm font-medium"
+                    style={{ color: 'var(--light-text-muted)' }}
+                  >
+                    No clients found
+                  </p>
+                </>
+              )}
             </div>
-
-            {/* Progress Bar */}
-            <div className="mt-3">
-              <div className="mb-1 flex items-center justify-between">
-                <span
-                  className="text-[11px] font-medium"
-                  style={{ color: 'var(--light-text-secondary)' }}
-                >
-                  Progress
-                </span>
-                <span
-                  className="text-[11px] font-semibold"
-                  style={{ color: '#0D9488' }}
-                >
-                  {client.progress}%
-                </span>
-              </div>
-              <div
-                className="h-1.5 w-full overflow-hidden rounded-full"
-                style={{ backgroundColor: 'var(--light-elevated)' }}
-              >
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{ backgroundColor: '#0D9488' }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${client.progress}%` }}
-                  transition={{ duration: 0.8, ease: 'easeOut', delay: i * 0.06 }}
-                />
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="mt-3 flex items-center gap-1 border-t pt-2.5" style={{ borderColor: 'var(--card-border)' }}>
-              <button
-                className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-[11px] font-medium transition-all duration-150 active:scale-[0.95]"
-                style={{ color: '#0D9488' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(13,148,136,0.08)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                <MessageSquare size={14} />
-                Message
-              </button>
-              <button
-                className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-[11px] font-medium transition-all duration-150 active:scale-[0.95]"
-                style={{ color: 'var(--light-text-secondary)' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--light-elevated)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                <UserCircle size={14} />
-                Profile
-              </button>
-              <button
-                className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-[11px] font-medium transition-all duration-150 active:scale-[0.95]"
-                style={{ color: 'var(--light-text-secondary)' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--light-elevated)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                <ClipboardList size={14} />
-                Program
-              </button>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      {filtered.length === 0 && (
-        <div
-          className="flex flex-col items-center justify-center rounded-2xl border py-12"
-          style={{
-            backgroundColor: 'var(--card-bg)',
-            borderColor: 'var(--card-border)',
-          }}
-        >
-          <Search size={32} style={{ color: 'var(--light-text-muted)' }} />
-          <p
-            className="mt-2 text-sm font-medium"
-            style={{ color: 'var(--light-text-muted)' }}
-          >
-            No clients found
-          </p>
-        </div>
+          )}
+        </>
       )}
 
       {/* Quick Add Client Modal */}

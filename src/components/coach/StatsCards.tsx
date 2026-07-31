@@ -1,36 +1,17 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Target, Calendar, TrendingUp } from 'lucide-react';
+import { Users, Target, Calendar, Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
-const stats = [
-  {
-    label: 'Total Clients',
-    value: '24',
-    sublabel: '+3 this month',
-    icon: Users,
-    color: '#0D9488',
-  },
-  {
-    label: 'Active Programs',
-    value: '8',
-    sublabel: '92% compliance',
-    icon: Target,
-    color: '#84CC16',
-  },
-  {
-    label: 'Sessions This Week',
-    value: '42',
-    sublabel: 'Scheduled',
-    icon: Calendar,
-    color: '#06B6D4',
-  },
-  {
-    label: 'Avg Client Progress',
-    value: '78%',
-    sublabel: 'Upward trend',
-    icon: TrendingUp,
-    color: '#8B5CF6',
-  },
-];
+/**
+ * Coach dashboard stat cards (Phase 33B) — real trainer-scoped aggregates.
+ * "Avg Client Progress" was REMOVED: no honest data source for it exists.
+ */
+interface CoachStats {
+  activeClients: number;
+  activePrograms: number;
+  sessionsThisMonth: number;
+}
 
 const cardVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -46,9 +27,83 @@ const cardVariants = {
 };
 
 export default function StatsCards() {
+  const [stats, setStats] = useState<CoachStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const trainerId = userData.user?.id;
+      if (!trainerId) {
+        if (!cancelled) {
+          setStats({ activeClients: 0, activePrograms: 0, sessionsThisMonth: 0 });
+          setLoading(false);
+        }
+        return;
+      }
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      const [clientsRes, programsRes, sessionsRes] = await Promise.all([
+        supabase
+          .from('clients')
+          .select('id', { count: 'exact', head: true })
+          .eq('trainer_id', trainerId)
+          .eq('status', 'active'),
+        supabase
+          .from('programs')
+          .select('id', { count: 'exact', head: true })
+          .eq('trainer_id', trainerId)
+          .eq('status', 'active'),
+        supabase
+          .from('sessions')
+          .select('id', { count: 'exact', head: true })
+          .eq('trainer_id', trainerId)
+          .gte('starts_at', monthStart.toISOString()),
+      ]);
+      if (cancelled) return;
+      const firstError = clientsRes.error ?? programsRes.error ?? sessionsRes.error;
+      if (firstError) {
+        setError(firstError.message);
+      } else {
+        setStats({
+          activeClients: clientsRes.count ?? 0,
+          activePrograms: programsRes.count ?? 0,
+          sessionsThisMonth: sessionsRes.count ?? 0,
+        });
+      }
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const cards = [
+    { label: 'Active Clients', value: stats?.activeClients ?? 0, sublabel: 'status: active', icon: Users, color: '#0D9488' },
+    { label: 'Active Programs', value: stats?.activePrograms ?? 0, sublabel: 'assigned to clients', icon: Target, color: '#84CC16' },
+    { label: 'Sessions This Month', value: stats?.sessionsThisMonth ?? 0, sublabel: 'all statuses', icon: Calendar, color: '#06B6D4' },
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-6">
+        <Loader2 size={20} className="animate-spin" style={{ color: '#00AEEF' }} />
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <p className="py-4 text-center text-xs" style={{ color: '#F59E0B' }}>
+        Couldn't load stats ({error}).
+      </p>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-      {stats.map((stat, i) => {
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4">
+      {cards.map((stat, i) => {
         const Icon = stat.icon;
         return (
           <motion.div

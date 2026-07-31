@@ -22,7 +22,6 @@ import {
   Camera,
   Download,
   Timer,
-  Trophy,
   Flame,
   Brain,
   MessageSquare,
@@ -58,7 +57,6 @@ const baseSecondaryNavItems = [
   { icon: Flame, label: "Warm-up", path: "/warmup" },
   { icon: Brain, label: "Recovery", path: "/deload" },
   { icon: Download, label: "Export", path: "/export" },
-  { icon: Trophy, label: "Leaderboard", path: "/leaderboard" },
 ];
 
 // Messages nav item (both roles)

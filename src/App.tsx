@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from "react-router";
+import { Routes, Route, useLocation, Navigate } from "react-router";
 import { Suspense, lazy, useEffect, type ReactNode } from "react";
 import * as Sentry from "@sentry/react";
 import { useAnalytics } from "@/hooks/useAnalytics";
@@ -46,7 +46,6 @@ const ProgressPhotosPage = lazy(() => import("@/pages/ProgressPhotos"));
 const ExportSharePage = lazy(() => import("@/pages/ExportShare"));
 const TimerModesPage = lazy(() => import("@/pages/TimerModes"));
 const NotificationsPage = lazy(() => import("@/pages/Notifications"));
-const LeaderboardPage = lazy(() => import("@/pages/Leaderboard"));
 const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
 const DemoDashboard = lazy(() => import("@/pages/DemoDashboard"));
 const ClientProfile = lazy(() => import("@/pages/ClientProfile"));
@@ -289,9 +288,9 @@ export default function App() {
                   <Route
                     path="/leaderboard"
                     element={
-                      <ProtectedRoute>
-                        <LeaderboardPage />
-                      </ProtectedRoute>
+                      // Phase 33B: no real leaderboard data source exists — the mock was
+                      // removed; the route redirects and the sidebar entry is hidden.
+                      <Navigate to="/dashboard" replace />
                     }
                   />
                   <Route

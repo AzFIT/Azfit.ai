@@ -27,7 +27,10 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { GOAL_TYPE_LABELS, goalLabel, type ClientGoalRow, type ClientGoalType } from '@/lib/clientGoals';
+import { formatDate } from '@/lib/utils';
 import {
   getPushState,
   subscribePush,
@@ -224,9 +227,67 @@ function DeviceRow({ device }: { device: DeviceItem }) {
 
 export default function Settings() {
   const { theme, toggleTheme } = useTheme();
-  const { logout, user } = useAuth();
+  const { logout, user, isTrainer } = useAuth();
   const navigate = useNavigate();
   const isDark = theme === 'dark';
+
+  /* ---- Phase 33B: real profile identity + goals ---- */
+  const [clientRow, setClientRow] = useState<{
+    id: string;
+    created_at: string;
+    phone: string | null;
+    date_of_birth: string | null;
+    height_cm: number | null;
+    gender: string | null;
+  } | null>(null);
+  const [goals, setGoals] = useState<ClientGoalRow[]>([]);
+  const [goalPickerOpen, setGoalPickerOpen] = useState(false);
+
+  useEffect(() => {
+    if (!user?.email) return;
+    let cancelled = false;
+    (async () => {
+      const { data: row } = await supabase
+        .from('clients')
+        .select('id, created_at, phone, date_of_birth, height_cm, gender')
+        .eq('email', user.email)
+        .maybeSingle();
+      if (cancelled) return;
+      setClientRow(row ?? null);
+      if (row) {
+        const { data: g } = await supabase
+          .from('client_goals')
+          .select('*')
+          .eq('client_id', row.id)
+          .eq('is_achieved', false)
+          .order('created_at');
+        if (!cancelled) setGoals(g ?? []);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
+  const addGoal = useCallback(async (goalType: ClientGoalType) => {
+    if (!clientRow) return;
+    const { error } = await supabase.from('client_goals').insert({ client_id: clientRow.id, goal_type: goalType });
+    if (error) {
+      // RLS: only trainers manage goals — be honest about it
+      toast.error("Couldn't add the goal — your coach manages goals");
+      return;
+    }
+    toast.success('Goal added');
+    setGoalPickerOpen(false);
+    const { data: g } = await supabase
+      .from('client_goals')
+      .select('*')
+      .eq('client_id', clientRow.id)
+      .eq('is_achieved', false)
+      .order('created_at');
+    setGoals(g ?? []);
+  }, [clientRow]);
+
+  const displayName = user?.full_name?.trim() || user?.email || '';
+  const initials = displayName.split(/[\s@]+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('');
 
   /* ---- units state ---- */
   const [weightUnit, setWeightUnit] = useState('kg');
@@ -411,19 +472,11 @@ export default function Settings() {
                 className="h-20 w-20 overflow-hidden rounded-full border-2"
                 style={{ borderColor: 'var(--azfit-primary)' }}
               >
-                <img
-                  src="./avatar-alex.jpg"
-                  alt="Alex Chen"
-                  className="h-full w-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
                 <div
                   className="flex h-full w-full items-center justify-center text-2xl font-bold"
                   style={{ backgroundColor: 'var(--light-elevated)', color: 'var(--azfit-primary)' }}
                 >
-                  AC
+                  {initials || '?'}
                 </div>
               </div>
               <button
@@ -443,16 +496,16 @@ export default function Settings() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-bold" style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}>
-                    Alex Chen
+                    {displayName || '—'}
                   </h2>
                   <p className="mt-0.5 text-xs font-semibold" style={{ color: 'var(--azfit-primary)' }}>
-                    Premium Member
+                    {isTrainer ? 'Trainer' : 'Client'}
                   </p>
                   <p className="mt-0.5 text-sm" style={{ color: 'var(--light-text-secondary)' }}>
-                    alex.chen@email.com
+                    {user?.email || '—'}
                   </p>
                   <p className="mt-0.5 font-mono text-xs" style={{ color: 'var(--light-text-muted)' }}>
-                    Member since March 2025
+                    {clientRow ? `Member since ${formatDate(clientRow.created_at)}` : 'Member since —'}
                   </p>
                 </div>
                 <button
@@ -480,10 +533,10 @@ export default function Settings() {
             className="mt-4 grid grid-cols-2 gap-3"
           >
             {[
-              { icon: <Phone size={16} />, label: 'Phone', value: '+1 (555) 123-4567' },
-              { icon: <Calendar size={16} />, label: 'Birth Date', value: 'March 15, 1997' },
-              { icon: <Ruler size={16} />, label: 'Height', value: '178 cm' },
-              { icon: <User size={16} />, label: 'Gender', value: 'Male' },
+              { icon: <Phone size={16} />, label: 'Phone', value: clientRow?.phone || 'Not set' },
+              { icon: <Calendar size={16} />, label: 'Birth Date', value: clientRow?.date_of_birth ? formatDate(clientRow.date_of_birth) : 'Not set' },
+              { icon: <Ruler size={16} />, label: 'Height', value: clientRow?.height_cm ? `${clientRow.height_cm} cm` : 'Not set' },
+              { icon: <User size={16} />, label: 'Gender', value: clientRow?.gender ? clientRow.gender.charAt(0).toUpperCase() + clientRow.gender.slice(1) : 'Not set' },
             ].map((item) => (
               <motion.div key={item.label} variants={childFade} className="flex items-center gap-2.5">
                 <div style={{ color: 'var(--light-text-muted)' }}>{item.icon}</div>
@@ -499,30 +552,55 @@ export default function Settings() {
             ))}
           </motion.div>
 
-          {/* Goal Tags */}
-          <div className="mt-4 flex flex-wrap gap-2">
-            {['Strength', 'Muscle Gain'].map((goal) => (
-              <span
-                key={goal}
-                className="rounded-full px-3 py-1 text-xs font-semibold"
-                style={{
-                  backgroundColor: goal === 'Strength' ? 'rgba(13,148,136,0.15)' : 'rgba(139,92,246,0.15)',
-                  color: goal === 'Strength' ? 'var(--azfit-primary)' : 'var(--azfit-accent)',
-                  textShadow: 'var(--text-shadow-dark)',
-                }}
-              >
-                {goal}
-              </span>
-            ))}
-            <button
-              className="flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors duration-150 hover:bg-[var(--light-elevated)]"
-              style={{ color: 'var(--light-text-muted)' }}
-              type="button"
-              onClick={() => toast.info('Goal setting coming soon')}
-            >
-              + Add Goal
-            </button>
-          </div>
+          {/* Goal Tags (real client_goals when the user has a clients row) */}
+          {clientRow && (
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {goals.map((goal) => (
+                <span
+                  key={goal.id}
+                  className="rounded-full px-3 py-1 text-xs font-semibold"
+                  style={{
+                    backgroundColor: 'rgba(13,148,136,0.15)',
+                    color: 'var(--azfit-primary)',
+                    textShadow: 'var(--text-shadow-dark)',
+                  }}
+                >
+                  {goalLabel(goal)}
+                </span>
+              ))}
+              {goals.length === 0 && (
+                <span className="text-xs" style={{ color: 'var(--light-text-muted)' }}>No goals set yet</span>
+              )}
+              <div className="relative">
+                <button
+                  className="flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors duration-150 hover:bg-[var(--light-elevated)]"
+                  style={{ color: 'var(--light-text-muted)' }}
+                  type="button"
+                  onClick={() => setGoalPickerOpen((s) => !s)}
+                >
+                  + Add Goal
+                </button>
+                {goalPickerOpen && (
+                  <div
+                    className="absolute left-0 top-full z-50 mt-1 w-44 rounded-lg border py-1 shadow-lg"
+                    style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }}
+                  >
+                    {(Object.keys(GOAL_TYPE_LABELS) as ClientGoalType[]).map((gt) => (
+                      <button
+                        key={gt}
+                        type="button"
+                        onClick={() => addGoal(gt)}
+                        className="w-full px-3 py-1.5 text-left text-xs transition-colors hover:bg-[var(--light-elevated)]"
+                        style={{ color: 'var(--page-text)' }}
+                      >
+                        {GOAL_TYPE_LABELS[gt]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </motion.div>
 
         {/* ====== Appearance Section ====== */}

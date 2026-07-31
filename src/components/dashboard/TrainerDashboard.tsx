@@ -1,17 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
-  DollarSign,
   Users,
   TrendingUp,
   Calendar,
   Clock,
   ChevronRight,
-  ArrowUpRight,
-  ArrowDownRight,
   Activity,
   Zap,
-  BarChart3,
   MoreHorizontal,
   Bell,
   UserPlus,
@@ -33,12 +29,9 @@ import { ProgressRing } from "./shared/ProgressRing";
 import { CollapsibleSection } from "./shared/CollapsibleSection";
 import { ClientHealthGrid } from "./ClientHealthGrid";
 import FollowUpsWidget from "./FollowUpsWidget";
-import { AIInsightsPanel } from "./AIInsightsPanel";
-import { RevenueSnapshot } from "./RevenueSnapshot";
 import { useClientHealth } from "./useClientHealth";
 import { useSessions } from "@/hooks/useSessions";
 import QuickAddClientModal from "@/components/QuickAddClientModal";
-import type { AIInsight, RevenueSnapshotData } from "./types";
 
 function formatDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -82,65 +75,10 @@ const scaleIn = {
 /* ── Types ───────────────────────────────────────────────────────── */
 // SessionItem type replaced by useSessions Session type
 
-/* ── Mock Data ───────────────────────────────────────────────────── */
-// TODO: wire to Supabase
-// Session data replaced by useSessions hook
-
-// TODO: wire to Supabase — active clients count
-const MOCK_ACTIVE_CLIENTS = {
-  count: 24,
-  trend: "+2" as string,
-  trendPositive: true,
-};
-
-const MOCK_AI_INSIGHTS: AIInsight[] = [
-  {
-    id: "ai1",
-    severity: "danger",
-    clientName: "Alex Rivera",
-    clientId: "c3",
-    title: "Missed 2 sessions — recommend check-in",
-    description: "Alex hasn't logged a workout in 4 days. His HRV is down 12% according to his Apple Health sync.",
-    suggestedAction: "Send Check-in",
-    timestamp: "2h ago",
-  },
-  {
-    id: "ai2",
-    severity: "warning",
-    clientName: "David Kim",
-    clientId: "c5",
-    title: "Weight stalled for 3 weeks",
-    description: "David's weight has been flat at 78.2kg for 3 consecutive weeks. Consider adjusting his calorie target.",
-    suggestedAction: "Adjust Plan",
-    timestamp: "5h ago",
-  },
-  {
-    id: "ai3",
-    severity: "info",
-    clientName: "Emma Wilson",
-    clientId: "c4",
-    title: "New PR on bench press",
-    description: "Emma hit 62.5kg x 5 on bench press yesterday. Should we auto-progress her program?",
-    suggestedAction: "Progress Program",
-    timestamp: "1d ago",
-  },
-];
-
-const MOCK_REVENUE: RevenueSnapshotData = {
-  thisMonth: 24500,
-  lastMonth: 22800,
-  currency: "HK$",
-  activeClients: 24,
-  clientLimit: 30,
-  avgPerClient: 1021,
-};
-
-const WEEKLY_METRICS = [
-  { label: "Total Volume", value: "142,500 kg", change: "+12%", positive: true, icon: BarChart3 },
-  { label: "Avg RPE", value: "7.8", change: "-0.3", positive: true, icon: Activity },
-  { label: "Session Hours", value: "28.5h", change: "+2.5h", positive: true, icon: Clock },
-  { label: "Client PRs", value: "8", change: "+3", positive: true, icon: Zap },
-];
+/* ── Phase 33B: mock data removed — all dashboard numbers below are
+      computed from real trainer-scoped queries (client stats effect and
+      the weekly metrics memo in the component). The fabricated AI-insights
+      feed and revenue card are REMOVED (no honest data source exists). ── */
 
 /* ── Helper Components ─────────────────────────────────────────── */
 
@@ -173,6 +111,77 @@ export default function TrainerDashboard() {
     const t = setTimeout(() => setMounted(true), 50);
     return () => clearTimeout(t);
   }, []);
+
+  // Phase 33B — real client stats for the Active Clients card.
+  // "At risk" definition: active clients with no non-cancelled session in the
+  // last 14 days (sessions key on profiles.id, resolved via email; account-less
+  // clients count as never-having-trained).
+  const [clientStats, setClientStats] = useState<{ active: number; newThisWeek: number; atRisk: number } | null>(null);
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const now = new Date();
+      const weekStart = formatDateKey(addDays(now, -((now.getDay() + 6) % 7)));
+      const twoWeeksAgo = addDays(now, -14).toISOString();
+      const [activeRes, newRes, activeClientsRes] = await Promise.all([
+        supabase.from("clients").select("id", { count: "exact", head: true }).eq("trainer_id", user.id).eq("status", "active"),
+        supabase.from("clients").select("id", { count: "exact", head: true }).eq("trainer_id", user.id).neq("status", "archived").gte("created_at", weekStart),
+        supabase.from("clients").select("email").eq("trainer_id", user.id).eq("status", "active"),
+      ]);
+      let atRisk = 0;
+      const emails = (activeClientsRes.data || []).map((c) => c.email);
+      if (emails.length > 0) {
+        const { data: profiles } = await supabase.from("profiles").select("id, email").in("email", emails);
+        const profileIds = (profiles || []).map((p) => p.id);
+        let engaged = 0;
+        if (profileIds.length > 0) {
+          const { data: recent } = await supabase
+            .from("sessions")
+            .select("client_id")
+            .in("client_id", profileIds)
+            .gte("starts_at", twoWeeksAgo)
+            .neq("status", "cancelled");
+          engaged = new Set((recent || []).map((s) => s.client_id)).size;
+        }
+        atRisk = emails.length - engaged;
+      }
+      if (!cancelled) {
+        setClientStats({ active: activeRes.count ?? 0, newThisWeek: newRes.count ?? 0, atRisk });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
+  // Phase 33B — weekly metrics computed from the real sessions list
+  // (Mon–Sun of the current week; hours from starts_at→ends_at).
+  const weeklyStats = useMemo(() => {
+    const now = new Date();
+    const monday = addDays(now, -((now.getDay() + 6) % 7));
+    const weekStart = formatDateKey(monday);
+    const weekEnd = formatDateKey(addDays(monday, 7));
+    const inWeek = allSessions.filter((s) => {
+      const d = (s.startsAt || "").slice(0, 10);
+      return d >= weekStart && d < weekEnd;
+    });
+    const scheduled = inWeek.filter((s) => s.status !== "cancelled");
+    const hours = scheduled.reduce(
+      (sum, s) => sum + Math.max(0, (new Date(s.endsAt).getTime() - new Date(s.startsAt).getTime()) / 3600000),
+      0
+    );
+    return {
+      scheduled: scheduled.length,
+      completed: inWeek.filter((s) => s.status === "completed").length,
+      hours: Math.round(hours * 10) / 10,
+      cancelled: inWeek.filter((s) => s.status === "cancelled").length,
+    };
+  }, [allSessions]);
+  const weeklyMetrics = [
+    { label: "Sessions This Week", value: String(weeklyStats.scheduled), change: `${weeklyStats.completed} completed`, positive: true, icon: Calendar },
+    { label: "Scheduled Hours", value: `${weeklyStats.hours}h`, change: "this week", positive: true, icon: Clock },
+    { label: "Completed", value: String(weeklyStats.completed), change: "this week", positive: true, icon: Zap },
+    { label: "Cancelled", value: String(weeklyStats.cancelled), change: "this week", positive: weeklyStats.cancelled === 0, icon: Activity },
+  ];
 
   // Real today's sessions from useSessions
   const todaysSessionList = todaySessions();
@@ -644,73 +653,24 @@ export default function TrainerDashboard() {
       </motion.div>
 
       {/* ═══════════════════════════════════════════════════════════
-          BUSINESS AT A GLANCE (Revenue + Compliance + Active Clients)
+          BUSINESS AT A GLANCE (Compliance + Active Clients — Phase 33B)
           ═══════════════════════════════════════════════════════════ */}
       <motion.section
         variants={staggerContainer}
         initial="hidden"
         animate={mounted ? "visible" : "hidden"}
-        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-6"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-2 mb-6"
       >
-        {/* Revenue Ring */}
-        <motion.div variants={fadeInUp}>
-          <GlassCard
-            title="Revenue"
-            titleIcon={<DollarSign className="h-4 w-4" />}
-            headerAction={
-              <span className="text-[11px] font-medium" style={{ color: "#84CC16" }}>
-                +8% vs last month
-              </span>
-            }
-            glass
-            glow
-            accentColor="#0D9488"
-            hover
-            onClick={() => navigate("/coach")}
-          >
-            <div className="flex items-center justify-center py-4">
-              <ProgressRing
-                size={160}
-                strokeWidth={12}
-                percentage={65}
-                color="#0D9488"
-                gradientEndColor="#14B8A6"
-                label="of $10k goal"
-                value="$6,500"
-                subtitle="Monthly target"
-                glowClass="glow-teal"
-                showPulse
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3 border-t pt-4" style={{ borderColor: "var(--card-border)" }}>
-              <div className="text-center">
-                <p className="text-lg font-semibold font-mono" style={{ color: "var(--page-text)" }}>
-                  $4,200
-                </p>
-                <p className="text-[10px] uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>
-                  Paid
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-semibold font-mono" style={{ color: "var(--page-text)" }}>
-                  $2,300
-                </p>
-                <p className="text-[10px] uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>
-                  Outstanding
-                </p>
-              </div>
-            </div>
-          </GlassCard>
-        </motion.div>
-
-        {/* Client Compliance Ring */}
+        {/* Phase 33B: the hardcoded Revenue ring was removed — no revenue
+            data source exists in the schema. */}
+        {/* Client Compliance Ring (real health statuses, Phase 33B) */}
         <motion.div variants={fadeInUp}>
           <GlassCard
             title="Client Compliance"
             titleIcon={<Users className="h-4 w-4" />}
             headerAction={
               <span className="text-[11px] font-medium" style={{ color: "#84CC16" }}>
-                17/20 active
+                {healthClients.filter((c) => c.status === "on_track").length}/{healthClients.length} on track
               </span>
             }
             glass
@@ -723,30 +683,30 @@ export default function TrainerDashboard() {
               <ProgressRing
                 size={160}
                 strokeWidth={12}
-                percentage={85}
+                percentage={healthClients.length > 0 ? Math.round((healthClients.filter((c) => c.status === "on_track").length / healthClients.length) * 100) : 0}
                 color="#06B6D4"
                 gradientEndColor="#22D3EE"
                 label="compliance"
-                value="85%"
-                subtitle="Weekly average"
+                value={`${healthClients.length > 0 ? Math.round((healthClients.filter((c) => c.status === "on_track").length / healthClients.length) * 100) : 0}%`}
+                subtitle="this week"
                 glowClass="glow-cyan"
               />
             </div>
             <div className="grid grid-cols-3 gap-2 border-t pt-4" style={{ borderColor: "var(--card-border)" }}>
               <div className="text-center">
-                <p className="text-base font-semibold" style={{ color: "#84CC16" }}>12</p>
+                <p className="text-base font-semibold" style={{ color: "#84CC16" }}>{healthClients.filter((c) => c.status === "on_track").length}</p>
                 <p className="text-[10px] uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>
                   On Track
                 </p>
               </div>
               <div className="text-center">
-                <p className="text-base font-semibold" style={{ color: "#F59E0B" }}>3</p>
+                <p className="text-base font-semibold" style={{ color: "#F59E0B" }}>{healthClients.filter((c) => c.status === "needs_attention").length}</p>
                 <p className="text-[10px] uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>
                   At Risk
                 </p>
               </div>
               <div className="text-center">
-                <p className="text-base font-semibold" style={{ color: "#F87171" }}>2</p>
+                <p className="text-base font-semibold" style={{ color: "#F87171" }}>{healthClients.filter((c) => c.status === "at_risk").length}</p>
                 <p className="text-[10px] uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>
                   Off Track
                 </p>
@@ -755,24 +715,11 @@ export default function TrainerDashboard() {
           </GlassCard>
         </motion.div>
 
-        {/* Active Clients (replaced Sessions ring) */}
+        {/* Active Clients (real count, Phase 33B) */}
         <motion.div variants={fadeInUp}>
           <GlassCard
             title="Active Clients"
             titleIcon={<Users className="h-4 w-4" />}
-            headerAction={
-              <span
-                className="flex items-center gap-0.5 text-[11px] font-medium"
-                style={{ color: MOCK_ACTIVE_CLIENTS.trendPositive ? "#84CC16" : "#F87171" }}
-              >
-                {MOCK_ACTIVE_CLIENTS.trendPositive ? (
-                  <ArrowUpRight className="h-3 w-3" />
-                ) : (
-                  <ArrowDownRight className="h-3 w-3" />
-                )}
-                {MOCK_ACTIVE_CLIENTS.trend}
-              </span>
-            }
             glass
             hover
             accentColor="#8B5CF6"
@@ -780,16 +727,16 @@ export default function TrainerDashboard() {
           >
             <div className="flex flex-col items-center justify-center py-6">
               <p className="text-5xl font-bold font-mono" style={{ color: "var(--page-text)" }}>
-                {MOCK_ACTIVE_CLIENTS.count}
+                {clientStats?.active ?? "—"}
               </p>
               <p className="mt-1 text-[11px]" style={{ color: "var(--light-text-muted)" }}>
-                clients this month
+                active clients
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3 border-t pt-4" style={{ borderColor: "var(--card-border)" }}>
               <div className="text-center">
                 <p className="text-lg font-semibold font-mono" style={{ color: "var(--page-text)" }}>
-                  6
+                  {clientStats?.newThisWeek ?? "—"}
                 </p>
                 <p className="text-[10px] uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>
                   New this week
@@ -797,7 +744,7 @@ export default function TrainerDashboard() {
               </div>
               <div className="text-center">
                 <p className="text-lg font-semibold font-mono" style={{ color: "var(--page-text)" }}>
-                  2
+                  {clientStats?.atRisk ?? "—"}
                 </p>
                 <p className="text-[10px] uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>
                   At risk of churn
@@ -817,7 +764,7 @@ export default function TrainerDashboard() {
         animate={mounted ? "visible" : "hidden"}
         className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-6"
       >
-        {WEEKLY_METRICS.map((metric) => (
+        {weeklyMetrics.map((metric) => (
           <motion.div key={metric.label} variants={fadeInUp}>
             <GlassCard
               glass
@@ -894,32 +841,9 @@ export default function TrainerDashboard() {
       {/* FOLLOW-UPS (no session 5d+, BioPrint overdue, no active program) */}
       <FollowUpsWidget />
 
-      {/* ═══════════════════════════════════════════════════════════
-          AI INSIGHTS + REVENUE SNAPSHOT
-          ═══════════════════════════════════════════════════════════ */}
-      <motion.section
-        variants={staggerContainer}
-        initial="hidden"
-        animate={mounted ? "visible" : "hidden"}
-        className="grid grid-cols-1 gap-4 lg:grid-cols-3 mb-6"
-      >
-        <motion.div variants={fadeInUp} className="lg:col-span-2">
-          <AIInsightsPanel
-            insights={MOCK_AI_INSIGHTS}
-            onViewAll={() => navigate("/coach")}
-            onActionClick={(id, action) => {
-              console.log(`AI action: ${action} for insight ${id}`);
-            }}
-          />
-        </motion.div>
-
-        <motion.div variants={fadeInUp}>
-          <RevenueSnapshot
-            data={MOCK_REVENUE}
-            onViewDetails={() => navigate("/analytics")}
-          />
-        </motion.div>
-      </motion.section>
+      {/* Phase 33B: the fabricated AI-insights feed and revenue snapshot were
+          removed — no honest data source exists for either. FollowUpsWidget
+          above carries the real attention data. */}
 
       {/* ═══════════════════════════════════════════════════════════
           QUICK ACTIONS — 6 compact buttons
