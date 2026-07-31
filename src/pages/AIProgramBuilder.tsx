@@ -11,7 +11,7 @@ import {
   Zap, Bot, Save, RotateCcw, Check,
   Dumbbell, TrendingUp, Flame, Wind, HeartPulse, Pencil, Trash2,
   Plus, BarChart3, X, Target, Award, Sparkles,
-  AlertTriangle, Layers, Calendar, Users, Play, ArrowLeft, Upload, ShieldAlert, Loader2, Copy, Link2,
+  AlertTriangle, Layers, Calendar, Users, Play, ArrowLeft, Upload, ShieldAlert, Loader2, Copy, Link2, Printer,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -37,6 +37,7 @@ import {
   type DbMethodCategory,
   type RankedMethod,
 } from '@/lib/methodCatalog';
+import { buildPrintModelFromWizard } from '@/lib/programPrint';
 import { suggestPhasesForMethod } from '@/lib/phaseSuggestions';
 import { pairingStyleForMethod, assignPairGroups } from '@/lib/supersets';
 import ExercisePickerDialog, { type LibraryExercise } from '@/components/exercise/ExercisePickerDialog';
@@ -1232,6 +1233,24 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [] 
   const methodData = LEGACY_METHODS.find((m) => m.id === data.method);
   const splitName = data.split.filter((d) => d.active).length > 0 ? `${activeDays}-Day Split` : '—';
   const handleStartWorkout = (workout: GeneratedWorkout) => { if (!program) return; const session = workoutToSession(workout, program.id); setActiveSession(session); navigate(`/sheets?session=${session.id}`); };
+  const { user } = useAuth();
+
+  // Phase 34 — WORKING Export PDF: saved programs print from the DB rows;
+  // drafts print from the in-memory ProgramData via a sessionStorage handoff.
+  const handleExportPdf = () => {
+    if (data.id) {
+      navigate(`/print/program/${data.id}`);
+      return;
+    }
+    const model = buildPrintModelFromWizard(
+      { ...data, programName: data.programName ? `Draft — ${data.programName}` : 'Draft — Untitled Program' },
+      clientName || 'Unassigned',
+      user?.full_name || 'AzFIT Trainer'
+    );
+    sessionStorage.setItem('azfit-print-draft', JSON.stringify(model));
+    navigate('/print/program/draft');
+  };
+  const canExport = allExercises.length > 0;
 
   // Phase 30D — derived preview metrics (summary vs week-by-week)
   const [previewTab, setPreviewTab] = useState<'summary' | 'weeks'>('summary');
@@ -1278,6 +1297,16 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [] 
           <div className="text-right">
             <div className="text-[var(--page-text)]/60 text-[10px]">AI Confidence</div>
             <div className="text-lg font-bold font-mono" style={{ color: aiConfidence > 85 ? '#22C55E' : aiConfidence > 60 ? '#F59E0B' : '#EF4444' }}>{aiConfidence}%</div>
+            {/* Phase 34: working Export PDF (33D removed the dead one) */}
+            {canExport && (
+              <button
+                onClick={handleExportPdf}
+                className="mt-2 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-white transition hover:opacity-90"
+                style={{ background: 'linear-gradient(135deg, #00AEEF, #8B5CF6)' }}
+              >
+                <Printer className="w-3.5 h-3.5" /> Export PDF
+              </button>
+            )}
           </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">

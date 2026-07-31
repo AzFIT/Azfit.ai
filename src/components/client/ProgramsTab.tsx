@@ -11,6 +11,7 @@ import {
   Archive,
   ArchiveRestore,
   SquarePen,
+  Printer,
   Plus,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -343,6 +344,15 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
                   >
                     <SquarePen size={12} />
                     Edit
+                  </button>
+                  <button
+                    onClick={() => navigate(`/print/program/${program.id}`)}
+                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition hover:opacity-90"
+                    style={{ backgroundColor: "rgba(139,92,246,0.12)", color: "#8B5CF6" }}
+                    title="Export PDF"
+                  >
+                    <Printer size={12} />
+                    Export PDF
                   </button>
                   {confirmArchiveId === program.id ? (
                     <div className="flex items-center gap-2">
