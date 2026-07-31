@@ -7,6 +7,7 @@ import {
   calculateGoalCaloriesPct,
   applySafetyGuardrails,
   calculateMacroTargets,
+  calculateNutritionPipeline,
   GOAL_ADJUSTMENTS,
   GOAL_ADJUSTMENTS_PCT,
   MAX_KCAL_DELTA,
@@ -209,5 +210,53 @@ describe("Phase 28E — calculateMacroTargets", () => {
     expect(calculateMacroTargets({ ...base, weightKg: 60, trainingDaysPerWeek: 5 }).waterMl).toBe(4600);
     // rounding: 77 kg → 2695 + 1500 = 4195 → 4200
     expect(calculateMacroTargets({ ...base, weightKg: 77 }).waterMl).toBe(4200);
+  });
+});
+
+describe("Phase 33D — calculateNutritionPipeline (wizard parity with TdeeCalculator)", () => {
+  // Shared fixture (the audit's hand-check): Alex — 80 kg, 178 cm, 30 yo male, moderate
+  const fixture = { weightKg: 80, heightCm: 178, age: 30, gender: "male" as const, activity: "moderate", goal: "maintenance" };
+
+  it("matches the audit's hand-computed values", () => {
+    const p = calculateNutritionPipeline(fixture);
+    expect(p.bmr).toBe(1768);
+    expect(p.tdee).toBe(2740);
+    expect(p.goalCalories).toBe(2740);
+    expect(p.guard.clamped).toBe(false);
+    expect(p.macros.protein).toBe(128); // 2.0 × 64 LBM
+    expect(p.macros.fats).toBe(62);
+    expect(p.macros.carbs).toBe(418);
+    expect(p.macros.fiber).toBe(38);
+    expect(p.macros.waterMl).toBe(4300);
+  });
+
+  it("is byte-identical to TdeeCalculator's inline chain", () => {
+    // Exactly what TdeeCalculator.tsx does in its result memo
+    const bmr = calculateBMR(fixture.weightKg, fixture.heightCm, fixture.age, fixture.gender);
+    const tdee = calculateTDEE(bmr, fixture.activity);
+    const goalCalories = calculateGoalCaloriesPct(tdee, fixture.goal);
+    const guard = applySafetyGuardrails(goalCalories, bmr, tdee);
+    const macros = calculateMacroTargets({
+      calories: guard.calories,
+      weightKg: fixture.weightKg,
+      gender: fixture.gender,
+      goal: fixture.goal,
+    });
+
+    const p = calculateNutritionPipeline(fixture);
+    expect(p.goalCalories).toBe(guard.calories);
+    expect(p.macros).toEqual(macros);
+  });
+
+  it("applies the guardrail with a visible warning when forced below BMR × 1.2", () => {
+    const p = calculateNutritionPipeline({ ...fixture, activity: "sedentary", goal: "aggressive_fat_loss" });
+    expect(p.guard.clamped).toBe(true);
+    expect(p.goalCalories).toBe(Math.round(p.bmr * 1.2));
+    expect(p.guard.warnings[0]).toContain("BMR × 1.2 safety floor");
+  });
+
+  it("pct goal with lean_gain (+5%) matches the calculator's goal set", () => {
+    const p = calculateNutritionPipeline({ ...fixture, goal: "lean_gain" });
+    expect(p.goalCalories).toBe(Math.round(2740 * 1.05));
   });
 });

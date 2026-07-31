@@ -18,13 +18,12 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   calculateBMR,
   calculateTDEE,
-  calculateGoalCalories,
-  calculateMacroBreakdown,
+  calculateNutritionPipeline,
   ACTIVITY_LEVELS,
-  GOAL_ADJUSTMENTS,
+  GOAL_ADJUSTMENTS_PCT,
   DIET_PRESETS,
   type ActivityLevelKey,
-  type GoalKey,
+  type GoalKeyPct,
   type DietKey,
 } from "@/lib/tdee";
 import { calculateBodyFat, PROTOCOL_SITES, type SkinfoldSite } from "@/lib/bodyfat";
@@ -100,7 +99,7 @@ interface IntakeData {
   weightKg: string;
   heightCm: string;
   activity: ActivityLevelKey;
-  goalKey: GoalKey;
+  goalKey: GoalKeyPct;
   diet: DietKey;
   skinfolds: Partial<Record<SkinfoldSite, string>>;
   injuries: string;
@@ -166,8 +165,6 @@ export default function ClientIntakeWizard({ open, onClose, onSuccess }: ClientI
 
   const bmr = weightNum && heightNum && age ? calculateBMR(weightNum, heightNum, age, data.gender === "female" ? "female" : "male") : 0;
   const tdee = bmr ? calculateTDEE(bmr, data.activity) : 0;
-  const goalCalories = tdee ? calculateGoalCalories(tdee, data.goalKey) : 0;
-  const macros = goalCalories ? calculateMacroBreakdown(goalCalories, data.diet, weightNum) : null;
 
   const jp7Sites = PROTOCOL_SITES.jp7;
   const enteredSkinfolds = jp7Sites.filter((s) => (parseFloat(data.skinfolds[s] || "") || 0) > 0);
@@ -178,6 +175,25 @@ export default function ClientIntakeWizard({ open, onClose, onSuccess }: ClientI
       : null;
   const bodyFatPct = bfResult?.bodyFatPct ?? null;
   const leanMass = bodyFatPct != null && weightNum ? weightNum * (1 - bodyFatPct / 100) : null;
+
+  // Phase 33D Fix 1: the wizard now uses the SAME 28E pipeline as TdeeCalculator
+  // (pct goals ±1000 cap, BMR×1.2/TDEE+1000 guardrails, D6 lean-mass macros)
+  const pipeline = tdee
+    ? calculateNutritionPipeline({
+        weightKg: weightNum,
+        heightCm: heightNum,
+        age,
+        gender: data.gender === "female" ? "female" : "male",
+        activity: data.activity,
+        goal: data.goalKey,
+        diet: data.diet,
+        bodyFatPct: bodyFatPct ?? undefined,
+        trainingDaysPerWeek: data.sessionsPerWeek,
+      })
+    : null;
+  const goalCalories = pipeline?.goalCalories ?? 0;
+  const macros = pipeline?.macros ?? null;
+  const guard = pipeline?.guard ?? null;
 
   /* ── Validation per step ── */
   const validate = (s: number): boolean => {
@@ -540,9 +556,11 @@ export default function ClientIntakeWizard({ open, onClose, onSuccess }: ClientI
                     </div>
                     <div>
                       <label className={labelCls}>Goal *</label>
-                      <select className={inputCls} value={data.goalKey} onChange={(e) => set("goalKey", e.target.value as GoalKey)}>
-                        {Object.keys(GOAL_ADJUSTMENTS).map((k) => (
-                          <option key={k} value={k}>{k.replace(/_/g, " ")}</option>
+                      <select className={inputCls} value={data.goalKey} onChange={(e) => set("goalKey", e.target.value as GoalKeyPct)}>
+                        {Object.keys(GOAL_ADJUSTMENTS_PCT).map((k) => (
+                          <option key={k} value={k}>
+                            {({ aggressive_fat_loss: "Aggressive (−20%)", fat_loss: "Fat Loss (−10%)", maintenance: "Maintenance (TDEE)", lean_gain: "Lean Gain (+5%)", muscle_gain: "Muscle Gain (+10%)" } as Record<string, string>)[k] ?? k}
+                          </option>
                         ))}
                       </select>
                     </div>
@@ -556,10 +574,22 @@ export default function ClientIntakeWizard({ open, onClose, onSuccess }: ClientI
                     </div>
                   </div>
 
+                  {guard?.clamped && (
+                    <div
+                      className="rounded-lg border px-3 py-2 text-[11px] font-medium"
+                      style={{ borderColor: "rgba(245, 158, 11, 0.4)", backgroundColor: "rgba(245, 158, 11, 0.12)", color: "#F59E0B" }}
+                    >
+                      {guard.warnings.map((w) => (
+                        <p key={w}>⚠ {w}</p>
+                      ))}
+                    </div>
+                  )}
+
                   {tdee > 0 && macros && (
                     <div className="rounded-lg p-3 text-xs" style={{ backgroundColor: "var(--light-elevated)", color: "var(--page-text)" }}>
                       BMR <strong>{bmr.toLocaleString()}</strong> • TDEE <strong>{tdee.toLocaleString()}</strong> • Target{" "}
                       <strong style={{ color: "#00AEEF" }}>{goalCalories.toLocaleString()}</strong> kcal — P {macros.protein}g / C {macros.carbs}g / F {macros.fats}g
+                      {" "}• Fiber {macros.fiber}g • Water {macros.waterMl.toLocaleString()}ml
                     </div>
                   )}
 

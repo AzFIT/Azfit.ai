@@ -181,6 +181,45 @@ export function applySafetyGuardrails(
   return { calories, clamped: warnings.length > 0, warnings };
 }
 
+/**
+ * Full 28E nutrition pipeline in one call (Phase 33D — shared by the intake
+ * wizard so it can never drift from TdeeCalculator's inline chain):
+ * BMR → TDEE → pct goal (±1000 cap) → safety guardrails → D6 macros.
+ */
+export function calculateNutritionPipeline(input: {
+  weightKg: number;
+  heightCm: number;
+  age: number;
+  gender: "male" | "female";
+  activity: ActivityLevelKey | string;
+  goal: GoalKeyPct | string;
+  diet?: string;
+  bodyFatPct?: number;
+  trainingDaysPerWeek?: number;
+  kidneyConcern?: boolean;
+}): {
+  bmr: number;
+  tdee: number;
+  goalCalories: number;
+  guard: GuardrailResult;
+  macros: MacroTargetsAdvanced;
+} {
+  const bmr = calculateBMR(input.weightKg, input.heightCm, input.age, input.gender);
+  const tdee = calculateTDEE(bmr, input.activity);
+  const guard = applySafetyGuardrails(calculateGoalCaloriesPct(tdee, input.goal), bmr, tdee);
+  const macros = calculateMacroTargets({
+    calories: guard.calories,
+    weightKg: input.weightKg,
+    bodyFatPct: input.bodyFatPct,
+    gender: input.gender,
+    goal: input.goal,
+    diet: input.diet,
+    trainingDaysPerWeek: input.trainingDaysPerWeek,
+    kidneyConcern: input.kidneyConcern,
+  });
+  return { bmr, tdee, goalCalories: guard.calories, guard, macros };
+}
+
 export interface MacroTargetsAdvanced {
   protein: number;
   carbs: number;

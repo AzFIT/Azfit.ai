@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Zap, Bot, Save, RotateCcw, Check,
   Dumbbell, TrendingUp, Flame, Wind, HeartPulse, Pencil, Trash2,
-  Plus, Eye, BarChart3, Download, X, Target, Award, Sparkles,
+  Plus, BarChart3, X, Target, Award, Sparkles,
   AlertTriangle, Layers, Calendar, Users, Play, ArrowLeft, Upload, ShieldAlert, Loader2, Copy, Link2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -1301,12 +1301,11 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [] 
           </div>
           <div className="flex justify-between text-[10px] text-[var(--page-text)]/60 mt-1"><span>Week 1</span><span>Week {totalWeeks}</span></div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {[{ i: Eye, l: 'Preview Workout' }, { i: BarChart3, l: 'Analytics' }, { i: Download, l: 'Export PDF' }].map((b) => <Button key={b.l} variant="outline" size="sm" className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs"><b.i className="w-3.5 h-3.5 mr-1" />{b.l}</Button>)}
-        </div>
       </Card>
 
-      {/* Phase 30D — derived preview metrics */}
+      {/* Phase 33D: the dead Preview Workout / Analytics / Export PDF buttons
+          were removed — the 30D Summary/Week-by-Week toggle below IS the
+          preview; PDF export isn't built (no fake functionality). */}
       <div className="flex gap-2">
         {(['summary', 'weeks'] as const).map((tab) => (
           <button
@@ -1522,8 +1521,6 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [] 
           ))}
         </div>
       </Card>
-
-      <Button variant="outline" size="sm" className="border-[#8B5CF6] text-[#8B5CF6] hover:bg-[#8B5CF6]/10 text-xs"><Sparkles className="w-3.5 h-3.5 mr-1" />Recommend Adjustments</Button>
     </div>
   );
 }

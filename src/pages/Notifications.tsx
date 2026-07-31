@@ -105,13 +105,13 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <header className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-xl border-b border-slate-800">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--page-bg)', color: 'var(--page-text)' }}>
+      <header className="sticky top-0 z-30 backdrop-blur-xl border-b" style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }}>
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={() => navigate('/dashboard')} className="p-2 rounded-lg hover:bg-slate-800 transition-colors">
-            <ArrowLeft className="w-5 h-5 text-slate-400" />
+          <button onClick={() => navigate('/dashboard')} className="p-2 rounded-lg transition-colors" style={{ color: 'var(--light-text-muted)' }}>
+            <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-lg font-bold text-white flex items-center gap-2">
+          <h1 className="text-lg font-bold flex items-center gap-2" style={{ color: 'var(--page-text)' }}>
             <BellRing className="w-5 h-5 text-[#00AEEF]" />
             Notifications
           </h1>
@@ -142,23 +142,28 @@ export default function NotificationsPage() {
             <motion.div
               key={setting.id}
               layout
-              className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4"
+              className="rounded-2xl border p-4"
+              style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }}
             >
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                  setting.enabled ? 'bg-[#00AEEF]/10 text-[#00AEEF]' : 'bg-slate-800 text-slate-500'
-                }`}>
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center"
+                  style={
+                    setting.enabled
+                      ? { backgroundColor: 'rgba(0,174,239,0.1)', color: '#00AEEF' }
+                      : { backgroundColor: 'var(--light-elevated)', color: 'var(--light-text-muted)' }
+                  }
+                >
                   <setting.icon className="w-5 h-5" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-white">{setting.label}</h3>
-                  <p className="text-xs text-slate-400">{setting.description}</p>
+                  <h3 className="text-sm font-semibold" style={{ color: 'var(--page-text)' }}>{setting.label}</h3>
+                  <p className="text-xs" style={{ color: 'var(--light-text-secondary)' }}>{setting.description}</p>
                 </div>
                 <button
                   onClick={() => toggleSetting(setting.id)}
-                  className={`w-12 h-7 rounded-full transition-colors relative ${
-                    setting.enabled ? 'bg-[#00AEEF]' : 'bg-slate-700'
-                  }`}
+                  className="w-12 h-7 rounded-full transition-colors relative"
+                  style={{ backgroundColor: setting.enabled ? '#00AEEF' : 'var(--card-border)' }}
                 >
                   <motion.div
                     animate={{ x: setting.enabled ? 20 : 2 }}
@@ -171,15 +176,17 @@ export default function NotificationsPage() {
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
-                  className="mt-3 pt-3 border-t border-slate-800 flex items-center gap-3"
+                  className="mt-3 pt-3 flex items-center gap-3"
+                  style={{ borderTop: '1px solid var(--card-border)' }}
                 >
-                  <Clock className="w-4 h-4 text-slate-500" />
-                  <span className="text-xs text-slate-400">Time:</span>
+                  <Clock className="w-4 h-4" style={{ color: 'var(--light-text-muted)' }} />
+                  <span className="text-xs" style={{ color: 'var(--light-text-secondary)' }}>Time:</span>
                   <input
                     type="time"
                     value={setting.time}
                     onChange={(e) => updateTime(setting.id, e.target.value)}
-                    className="px-2 py-1 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-[#00AEEF]"
+                    className="px-2 py-1 rounded-lg text-sm focus:outline-none focus:border-[#00AEEF]"
+                    style={{ backgroundColor: 'var(--page-bg)', border: '1px solid var(--card-border)', color: 'var(--page-text)' }}
                   />
                   <button
                     onClick={() => sendTest(setting)}

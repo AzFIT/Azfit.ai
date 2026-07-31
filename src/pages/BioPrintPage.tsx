@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   TrendingDown, TrendingUp, Plus, Trash2, Edit3, X,
@@ -50,7 +51,8 @@ interface ClientProfileSnapshot {
 /* ── Main Component ────────────────────────────────────── */
 
 export default function BioPrintPage() {
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { user, isTrainer } = useAuth();
   const {
     hasClientRecord,
     loading,
@@ -63,6 +65,25 @@ export default function BioPrintPage() {
     deleteBodyComposition,
     deleteAssessment,
   } = useBodyComposition();
+
+  // Phase 33D Fix 7: trainers have no client record of their own — give them
+  // a useful landing (client picker → client's Bio History tab) instead of
+  // the client-centric dead end.
+  const [trainerClients, setTrainerClients] = useState<{ id: string; full_name: string }[]>([]);
+  useEffect(() => {
+    if (!isTrainer || !user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("clients")
+        .select("id, full_name")
+        .eq("trainer_id", user.id)
+        .neq("status", "archived")
+        .order("full_name");
+      if (!cancelled) setTrainerClients(data ?? []);
+    })();
+    return () => { cancelled = true; };
+  }, [isTrainer, user?.id]);
 
   const [showLogModal, setShowLogModal] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
@@ -186,6 +207,41 @@ export default function BioPrintPage() {
 
   /* ── Empty state when no client record ─────────────────────────────── */
   if (!hasClientRecord && !loading) {
+    if (isTrainer) {
+      // Trainer landing: pick a client to view their Bio History
+      return (
+        <div className="min-h-[100dvh] pb-20" style={{ backgroundColor: "var(--page-bg)" }}>
+          <div className="mx-auto max-w-4xl px-4 py-6">
+            <h1 className="mb-6 text-2xl font-bold" style={{ color: "var(--text-primary)" }}>Bio Print Tracker</h1>
+            <div className="rounded-2xl border p-6" style={{ borderColor: "var(--card-border)", backgroundColor: "var(--card-bg)" }}>
+              <p className="mb-1 text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                Bio Print data lives on each client's profile.
+              </p>
+              <p className="mb-4 text-sm" style={{ color: "var(--light-text-muted)" }}>
+                Pick a client to open their Bio History tab, or add a new client from the Clients page.
+              </p>
+              {trainerClients.length === 0 ? (
+                <p className="text-sm" style={{ color: "var(--light-text-muted)" }}>No clients yet — add your first client from the Clients page.</p>
+              ) : (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {trainerClients.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => navigate(`/client/${c.id}?tab=bio`)}
+                      className="rounded-xl border px-4 py-3 text-left text-sm font-medium transition-all hover:border-[#00AEEF]/60"
+                      style={{ borderColor: "var(--card-border)", backgroundColor: "var(--light-elevated)", color: "var(--page-text)" }}
+                    >
+                      {c.full_name}
+                      <span className="mt-0.5 block text-[11px]" style={{ color: "#00AEEF" }}>Open Bio History →</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="min-h-[100dvh] pb-20" style={{ backgroundColor: "var(--page-bg)" }}>
         <div className="mx-auto max-w-4xl px-4 py-6">

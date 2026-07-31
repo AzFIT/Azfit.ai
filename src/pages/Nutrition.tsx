@@ -106,6 +106,24 @@ interface Targets extends NutritionTargets {
 
 const DEFAULT_WATER = 2500;
 
+/**
+ * Phase 33D: water target from the 28E formula (35 ml/kg + 500 ml per
+ * training day, default 3, rounded to 50 ml) using the client's latest
+ * recorded weight. null → caller falls back to DEFAULT_WATER.
+ */
+async function computedWaterTarget(clientId: string | null): Promise<number | null> {
+  if (!clientId) return null;
+  const { data } = await supabase
+    .from("body_composition")
+    .select("weight_kg")
+    .eq("client_id", clientId)
+    .order("recorded_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!data?.weight_kg) return null;
+  return Math.round((35 * Number(data.weight_kg) + 1500) / 50) * 50;
+}
+
 async function loadTargets(): Promise<Targets> {
   const { data: userData } = await supabase.auth.getUser();
   const userId = userData.user?.id;
@@ -158,29 +176,35 @@ export default function NutritionPage() {
   });
 
   const refreshTargets = useCallback(() => {
-    loadTargets().then(setTargets);
-  }, []);
+    loadTargets().then(async (t) => {
+      const water = await computedWaterTarget(clientId);
+      setTargets({ ...t, water: water ?? DEFAULT_WATER });
+    });
+  }, [clientId]);
 
   useEffect(() => {
     let cancelled = false;
-    loadTargets().then((t) => {
-      if (!cancelled) setTargets(t);
-    });
-    // Resolve own clients.id for the TDEE calculator
-    supabase.auth.getUser().then(({ data: userData }) => {
+    (async () => {
+      // Resolve own clients.id first (TDEE calculator + water target need it)
+      const { data: userData } = await supabase.auth.getUser();
       const email = userData.user?.email;
-      if (!email || cancelled) return;
-      supabase
-        .from("clients")
-        .select("id")
-        .eq("email", email)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (!cancelled && data) setClientId(data.id);
-        });
-    });
+      let cid: string | null = null;
+      if (email) {
+        const { data } = await supabase
+          .from("clients")
+          .select("id")
+          .eq("email", email)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        cid = data?.id ?? null;
+      }
+      if (cancelled) return;
+      if (cid) setClientId(cid);
+      const water = await computedWaterTarget(cid);
+      const t = await loadTargets();
+      if (!cancelled) setTargets({ ...t, water: water ?? DEFAULT_WATER });
+    })();
     return () => {
       cancelled = true;
     };
@@ -198,7 +222,7 @@ export default function NutritionPage() {
 
   const handleSaveTargets = async () => {
     await saveNutritionTargets(targetsDraft);
-    setTargets({ ...targetsDraft, water: DEFAULT_WATER });
+    setTargets({ ...targetsDraft, water: targets.water }); // manual edit keeps the computed water target
     setEditingTargets(false);
   };
 

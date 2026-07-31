@@ -1,5 +1,18 @@
 import { motion } from "framer-motion";
 import type { Conversation } from "./types";
+import { formatDate } from "@/lib/utils";
+
+/** Phase 33D: chat timestamps — today shows HH:MM, older shows the shared date format. */
+function formatMessageTime(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) {
+    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  }
+  return formatDate(d);
+}
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -122,7 +135,7 @@ export default function ConversationList({
                 className="shrink-0 text-[10px]"
                 style={{ color: "var(--light-text-muted)" }}
               >
-                {conv.lastMessageAt}
+                {formatMessageTime(conv.lastMessageAt)}
               </span>
             </div>
             <p

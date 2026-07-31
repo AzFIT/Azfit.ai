@@ -280,7 +280,7 @@ export default function App() {
                   <Route
                     path="/clients"
                     element={
-                      <ProtectedRoute>
+                      <ProtectedRoute requireTrainer>
                         <ClientsPage />
                       </ProtectedRoute>
                     }
