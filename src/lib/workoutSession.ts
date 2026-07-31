@@ -24,6 +24,7 @@ export interface SessionExercise {
   tempo: string;
   restSeconds: number;
   prescribedRpe?: number;
+  equipment?: string; // Phase 33C Fix 5: barbell-only plate hint
   sets: SessionSet[];
   notes: string;
 }
@@ -51,7 +52,9 @@ export function parseTargetReps(reps: string): number {
 
 export function getTargetVolumeForExercise(exercise: SessionExercise): number {
   const reps = parseTargetReps(exercise.targetReps);
-  return exercise.targetSets * reps * exercise.targetLoad;
+  // Phase 33C Fix 2: derive from the ACTUAL set count so Add/Remove Set
+  // moves the target immediately; targetLoad is live (Fix 1).
+  return exercise.sets.length * reps * exercise.targetLoad;
 }
 
 export function getLiftedVolumeForSet(set: SessionSet): number {

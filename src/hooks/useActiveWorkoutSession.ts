@@ -18,6 +18,13 @@ import {
   DEFAULT_TEMPO,
 } from "@/lib/workoutSession";
 import { findCategoryForExercise } from "@/data/exerciseDatabase";
+import { inferEquipment } from "@/lib/previewMetrics";
+import {
+  normalizeOrderLabels,
+  labelsForPairAdd,
+  nextSeriesLetter,
+  labelsAfterRemove,
+} from "@/lib/exerciseLabels";
 
 type WorkoutLogRow = Database["public"]["Tables"]["workout_logs"]["Row"];
 type WorkoutRow = Database["public"]["Tables"]["workouts"]["Row"];
@@ -62,6 +69,12 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(Date.now());
+  // Mirror of exercises for handlers that need the current value outside
+  // setState updaters (React 19 doesn't run updaters eagerly).
+  const exercisesRef = useRef<SessionExercise[]>([]);
+  useEffect(() => {
+    exercisesRef.current = exercises;
+  }, [exercises]);
 
   const clientId = workoutLog?.client_id || null;
 
@@ -180,6 +193,58 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
         buildSessionExercise(ex as ExerciseRow, findCategoryForExercise(ex.name) || "Other", lastLoad)
       );
 
+      // Phase 33C Fix 1d: restore per-session targetLoad saved in entry notes
+      const { data: entryRows } = await supabase
+        .from("workout_log_entries")
+        .select("exercise_id, notes")
+        .eq("workout_log_id", workoutLogId);
+      for (const entry of entryRows || []) {
+        if (!entry.notes) continue;
+        try {
+          const parsed = JSON.parse(entry.notes) as { targetLoad?: number };
+          if (typeof parsed.targetLoad === "number" && parsed.targetLoad > 0) {
+            const ex = sessionExercises.find((e) => e.id === entry.exercise_id);
+            if (ex) {
+              ex.targetLoad = parsed.targetLoad;
+              ex.sets = ex.sets.map((s) =>
+                !s.done && s.clientLoad <= 0 ? { ...s, clientLoad: parsed.targetLoad as number, load: parsed.targetLoad as number } : s
+              );
+            }
+          }
+        } catch {
+          // pre-33C free-text notes — ignore
+        }
+      }
+
+      // Phase 33C Fix 4a: repair legacy duplicate order labels on load
+      // (e.g. ...D1 D1 → ...D1 D2; singleton series collapse to plain letters)
+      const normalizedOrders = normalizeOrderLabels(sessionExercises.map((e) => e.order));
+      sessionExercises.forEach((e, i) => { e.order = normalizedOrders[i]; });
+
+      // Phase 33C Fix 5: equipment per exercise for the barbell-only plate hint.
+      // Legacy session names ('Back Squat') predate the library's names
+      // ('BB Back Squat') — match exact, then substring (prefer the shortest
+      // library name = closest), then the documented name regexes.
+      const names = sessionExercises.map((e) => e.name);
+      if (names.length > 0) {
+        const { data: libRows } = await supabase
+          .from("exercise_library")
+          .select("name, equipment");
+        const libList = (libRows || []) as { name: string; equipment: string }[];
+        const exactByName = new Map(libList.map((r) => [r.name, r.equipment]));
+        const equipmentFor = (name: string): string => {
+          const exact = exactByName.get(name);
+          if (exact) return exact;
+          const lower = name.toLowerCase();
+          const contains = libList
+            .filter((r) => r.name.toLowerCase().includes(lower))
+            .sort((a, b) => a.name.length - b.name.length)[0];
+          if (contains) return contains.equipment;
+          return inferEquipment(name);
+        };
+        sessionExercises.forEach((e) => { e.equipment = equipmentFor(e.name); });
+      }
+
       setExercises(sessionExercises);
       startTimeRef.current = Date.now();
     } catch (err) {
@@ -279,6 +344,7 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
     [updateExercise]
   );
 
+
   const swapExercise = useCallback((exerciseId: string, newName: string) => {
     setExercises((prev) =>
       prev.map((ex) =>
@@ -294,16 +360,32 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
   }, []);
 
   const removeExercise = useCallback((exerciseId: string) => {
-    setExercises((prev) => prev.filter((ex) => ex.id !== exerciseId));
+    setExercises((prev) => {
+      const idx = prev.findIndex((ex) => ex.id === exerciseId);
+      if (idx === -1) return prev;
+      const relabeled = labelsAfterRemove(prev.map((e) => e.order), idx);
+      return prev.filter((ex) => ex.id !== exerciseId).map((ex, i) => ({ ...ex, order: relabeled[i] }));
+    });
   }, []);
 
-  const addExercise = useCallback((name: string) => {
+  // Phase 33C Fix 4b: smart Add Exercise — after the exercise is picked the
+  // trainer chooses "pair with last series" (E → E1/E2 auto-rename) or
+  // "start new series" (next letter).
+  const addExercise = useCallback((name: string, mode: "pair" | "newSeries" = "newSeries") => {
     setExercises((prev) => {
-      const orderIndex = prev.length * 2;
       const category = findCategoryForExercise(name) || "Other";
+      let order: string;
+      let updatedPrev = prev;
+      if (mode === "pair") {
+        const { updated, newLabel } = labelsForPairAdd(prev.map((e) => e.order));
+        updatedPrev = prev.map((e, i) => ({ ...e, order: updated[i] }));
+        order = newLabel;
+      } else {
+        order = nextSeriesLetter(prev.map((e) => e.order));
+      }
       const newEx: SessionExercise = {
         id: crypto.randomUUID(),
-        order: String.fromCharCode(65 + Math.floor(orderIndex / 2)) + ((orderIndex % 2) + 1),
+        order,
         name,
         category,
         targetSets: 3,
@@ -314,7 +396,7 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
         sets: [createEmptySet(1, { reps: 10, restSeconds: 60, tempo: DEFAULT_TEMPO })],
         notes: "",
       };
-      return [...prev, newEx];
+      return [...updatedPrev, newEx];
     });
   }, []);
 
@@ -323,6 +405,12 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
       if (!workoutLog || !clientId) return false;
 
       const doneSets = exercise.sets.filter((s) => s.done);
+      // Phase 33C: notes is an additive JSON channel — { note, targetLoad }
+      // (targetLoad persists per session; nothing else reads notes today).
+      const notesJson = JSON.stringify({
+        note: exercise.notes || "",
+        ...(exercise.targetLoad > 0 ? { targetLoad: exercise.targetLoad } : {}),
+      });
       const payload: Database["public"]["Tables"]["workout_log_entries"]["Insert"] = {
         workout_log_id: workoutLog.id,
         client_id: clientId,
@@ -333,7 +421,7 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
         reps_per_set: exercise.sets.map((s) => (s.done ? s.reps : 0)),
         weight_per_set: exercise.sets.map((s) => (s.done ? s.load : 0)),
         rpe_per_set: exercise.sets.map((s) => (s.done ? s.rpe : 0)),
-        notes: exercise.notes || null,
+        notes: notesJson,
       };
 
       try {
@@ -371,6 +459,28 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
       }
     },
     [workoutLog, clientId]
+  );
+
+  // Phase 33C Fix 1: the header target-load input now actually updates
+  // exercise.targetLoad AND cascades to unfinished sets with no client load
+  // yet (the old handler only wrote sets, producing the "40 becomes 4" bug).
+  // Persisted PER SESSION via workout_log_entries.notes jsonb (client-writable;
+  // the shared program exercise row is not — and must not change mid-session).
+  const updateExerciseTargetLoad = useCallback(
+    (exerciseId: string, load: number) => {
+      const current = exercisesRef.current.find((e) => e.id === exerciseId);
+      if (!current) return;
+      const updated: SessionExercise = {
+        ...current,
+        targetLoad: load,
+        sets: current.sets.map((s) =>
+          !s.done && s.clientLoad <= 0 ? { ...s, clientLoad: load, load } : s
+        ),
+      };
+      setExercises((prev) => prev.map((e) => (e.id === exerciseId ? updated : e)));
+      void writeExerciseToDb(updated);
+    },
+    [writeExerciseToDb]
   );
 
   const toggleSetDone = useCallback(
@@ -496,6 +606,7 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
     addSet,
     removeSet,
     updateExerciseNotes,
+    updateExerciseTargetLoad,
     toggleSetDone,
     swapExercise,
     removeExercise,

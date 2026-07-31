@@ -1,7 +1,8 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, CheckCircle, Square, Plus, Minus, Pencil, StickyNote, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { supabase } from '@/lib/supabase';
 import type { SessionExercise, SessionSet } from '@/lib/workoutSession';
 import type { SessionUpdateResult } from '@/hooks/useActiveWorkoutSession';
 import {
@@ -83,6 +84,7 @@ interface SessionExerciseCardProps {
   isExpanded: boolean;
   onToggle: () => void;
   onUpdateSet: (setIndex: number, updates: Partial<SessionSet>) => void;
+  onUpdateTargetLoad: (load: number) => void;
   onToggleDone: (setIndex: number) => Promise<SessionUpdateResult | null>;
   onAddSet: () => void;
   onRemoveSet: (setIndex: number) => void;
@@ -102,6 +104,7 @@ export function SessionExerciseCard({
   isExpanded,
   onToggle,
   onUpdateSet,
+  onUpdateTargetLoad,
   onToggleDone,
   onAddSet,
   onRemoveSet,
@@ -203,6 +206,76 @@ export function SessionExerciseCard({
     [onSwapExercise]
   );
 
+  // Phase 33C Fix 6: create a custom exercise from the Swap dialog.
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const [customName, setCustomName] = useState('');
+  const [customMuscle, setCustomMuscle] = useState('');
+  const [customEquipment, setCustomEquipment] = useState('');
+  const [customDifficulty, setCustomDifficulty] = useState('Intermediate');
+  const [customType, setCustomType] = useState('Compound');
+  const [muscleOptions, setMuscleOptions] = useState<string[]>([]);
+  const [equipmentOptions, setEquipmentOptions] = useState<string[]>([]);
+  const [customSaving, setCustomSaving] = useState(false);
+
+  // Live option sets for the custom form (distinct values in the library)
+  useEffect(() => {
+    if (!showCustomForm) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.from('exercise_library').select('primary_muscle, equipment').eq('is_active', true).limit(500);
+      if (cancelled || !data) return;
+      setMuscleOptions([...new Set(data.map((r) => r.primary_muscle))].sort());
+      setEquipmentOptions([...new Set(data.map((r) => r.equipment))].sort());
+    })();
+    return () => { cancelled = true; };
+  }, [showCustomForm]);
+
+  const slugifyCustom = (name: string) =>
+    name.toLowerCase().replace(/['’]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+  const handleCreateCustom = useCallback(async () => {
+    const name = customName.trim();
+    if (!name || !customMuscle || !customEquipment) {
+      toast.error('Name, primary muscle and equipment are required');
+      return;
+    }
+    setCustomSaving(true);
+    try {
+      // Next code in the EX#### series + a unique slug
+      const { data: maxRows } = await supabase.from('exercise_library').select('code').order('code', { ascending: false }).limit(1);
+      const maxNum = maxRows?.[0]?.code ? parseInt(maxRows[0].code.replace(/\D/g, ''), 10) || 0 : 0;
+      const code = `EX${String(maxNum + 1).padStart(4, '0')}`;
+      let slug = slugifyCustom(name);
+      const { data: slugClash } = await supabase.from('exercise_library').select('slug').eq('slug', slug).maybeSingle();
+      if (slugClash) slug = `${slug}-2`;
+
+      const { error } = await supabase.from('exercise_library').insert({
+        code,
+        exercise_code: code,
+        slug,
+        name,
+        equipment: customEquipment,
+        primary_muscle: customMuscle,
+        difficulty: customDifficulty,
+        exercise_type: customType,
+        is_active: true,
+      });
+      if (error) {
+        // RLS fallback: library insert blocked — keep it session-local
+        handleSwap(name);
+        setShowCustomForm(false);
+        toast.info(`"${name}" added to this session only — the library blocked the save`);
+        return;
+      }
+      toast.success(`"${name}" added to the exercise library`);
+      setShowCustomForm(false);
+      setCustomName('');
+      handleSwap(name);
+    } finally {
+      setCustomSaving(false);
+    }
+  }, [customName, customMuscle, customEquipment, customDifficulty, customType, handleSwap]);
+
   const formatRest = (s: SessionSet) => {
     if (!restTimer || !restTimer.active) return `${s.restSeconds}s`;
     const rt = restTimer;
@@ -247,7 +320,7 @@ export function SessionExerciseCard({
         <span className="text-[var(--text-primary)] font-semibold text-[15px] truncate">{exercise.name}</span>
 
         <span className="text-[#00AEEF] font-semibold text-sm tabular-nums ml-auto">
-          {exercise.targetSets}×{exercise.targetReps}
+          {exercise.sets.length}×{exercise.targetReps}
         </span>
 
         <div className="flex items-center gap-1 text-sm">
@@ -257,9 +330,7 @@ export function SessionExerciseCard({
             value={exercise.targetLoad || ''}
             onChange={(e) => {
               const val = parseFloat(e.target.value) || 0;
-              exercise.sets.forEach((s, i) => {
-                if (!s.done && s.clientLoad <= 0) onUpdateSet(i, { clientLoad: val, load: val });
-              });
+              onUpdateTargetLoad(val);
             }}
             onClick={(e) => e.stopPropagation()}
             className="w-14 h-7 px-1.5 text-center text-[13px] font-semibold bg-[var(--page-bg)] border-[var(--card-border)] text-[var(--text-primary)] focus:border-[#00AEEF] py-0"
@@ -333,7 +404,7 @@ export function SessionExerciseCard({
                     {lastLoad > 0 && (
                       <span className="block text-[10px] text-[var(--text-muted)] mt-0.5">last: {lastLoad}{unit}</span>
                     )}
-                    {s.clientLoad > 20 && (
+                    {s.clientLoad > 20 && exercise.equipment === 'Barbell' && (
                       <span className="block text-[10px] text-[#00AEEF] mt-0.5">{formatPlateBreakdown(s.clientLoad, unit)}</span>
                     )}
                   </td>
@@ -595,6 +666,89 @@ export function SessionExerciseCard({
                 </button>
               </div>
               <div className="p-4 flex-1 overflow-y-auto">
+                {showCustomForm ? (
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold uppercase text-[var(--text-muted)]">New custom exercise</p>
+                    <div>
+                      <label className="text-[11px] text-[var(--text-muted)]">Name *</label>
+                      <Input
+                        type="text"
+                        value={customName}
+                        onChange={(e) => setCustomName(e.target.value)}
+                        placeholder="e.g. Landmine Press"
+                        className="w-full h-9 bg-[var(--page-bg)] border-[var(--card-border)] text-[var(--text-primary)]"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[11px] text-[var(--text-muted)]">Primary muscle *</label>
+                        <select
+                          value={customMuscle}
+                          onChange={(e) => setCustomMuscle(e.target.value)}
+                          className="w-full h-9 text-sm bg-[var(--page-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-lg px-2"
+                        >
+                          <option value="">— Select —</option>
+                          {muscleOptions.map((m) => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-[var(--text-muted)]">Equipment *</label>
+                        <select
+                          value={customEquipment}
+                          onChange={(e) => setCustomEquipment(e.target.value)}
+                          className="w-full h-9 text-sm bg-[var(--page-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-lg px-2"
+                        >
+                          <option value="">— Select —</option>
+                          {equipmentOptions.map((m) => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-[var(--text-muted)]">Difficulty</label>
+                        <select
+                          value={customDifficulty}
+                          onChange={(e) => setCustomDifficulty(e.target.value)}
+                          className="w-full h-9 text-sm bg-[var(--page-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-lg px-2"
+                        >
+                          {['Beginner', 'Intermediate', 'Advanced'].map((d) => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-[var(--text-muted)]">Type</label>
+                        <select
+                          value={customType}
+                          onChange={(e) => setCustomType(e.target.value)}
+                          className="w-full h-9 text-sm bg-[var(--page-bg)] border border-[var(--card-border)] text-[var(--text-primary)] rounded-lg px-2"
+                        >
+                          {['Compound', 'Isolation', 'Core'].map((d) => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={() => setShowCustomForm(false)}
+                        className="flex-1 py-2 rounded-lg border border-[var(--card-border)] text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                      >
+                        Back
+                      </button>
+                      <button
+                        onClick={handleCreateCustom}
+                        disabled={customSaving}
+                        className="flex-1 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-[#00AEEF] to-[#8B5CF6] hover:opacity-90 transition-opacity disabled:opacity-50"
+                      >
+                        {customSaving ? 'Saving…' : 'Save & Select'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
                 <Input
                   type="text"
                   value={swapQuery}
@@ -602,6 +756,13 @@ export function SessionExerciseCard({
                   placeholder="Search exercises..."
                   className="w-full h-10 mb-3 bg-[var(--page-bg)] border-[var(--card-border)] text-[var(--text-primary)]"
                 />
+
+                <button
+                  onClick={() => setShowCustomForm(true)}
+                  className="w-full mb-3 py-2 rounded-lg border border-dashed border-[#00AEEF]/50 text-sm font-medium text-[#00AEEF] hover:bg-[#00AEEF]/10 transition-colors"
+                >
+                  + Add new exercise
+                </button>
 
                 {!swapQuery && (
                   <div>
@@ -647,6 +808,8 @@ export function SessionExerciseCard({
                       ))}
                     </div>
                   </div>
+                )}
+                  </>
                 )}
               </div>
               <div className="p-4 border-t border-[var(--card-border)]">

@@ -1,11 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router';
-import { ArrowLeft, Clock, Dumbbell, Target, TrendingUp, CheckCircle2, Pause, Play, Plus } from 'lucide-react';
+import { ArrowLeft, Clock, Dumbbell, Target, TrendingUp, CheckCircle2, Pause, Play, Plus, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { SessionExerciseCard } from '@/components/session/SessionExerciseCard';
 import { SessionSummaryModal } from '@/components/session/SessionSummaryModal';
 import { useActiveWorkoutSession } from '@/hooks/useActiveWorkoutSession';
 import { useRestTimer } from '@/hooks/useRestTimer';
 import { formatElapsed, splitProgramIntoPhases, getCurrentPhase } from '@/lib/workoutSession';
+import { labelsForPairAdd, nextSeriesLetter } from '@/lib/exerciseLabels';
+import { supabase } from '@/lib/supabase';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 
 export default function SheetsPage() {
@@ -25,11 +29,18 @@ export default function SheetsPage() {
     finishSession,
     setPaused,
     lastLoadPerExercise,
+    updateExerciseTargetLoad,
   } = useActiveWorkoutSession(workoutLogId);
 
   const { timers, startTimer, skipTimer, addTime } = useRestTimer();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showSummary, setShowSummary] = useState(false);
+
+  // Phase 33C Fix 4b: smart Add Exercise dialog (pick → pair/new-series)
+  const [addOpen, setAddOpen] = useState(false);
+  const [addQuery, setAddQuery] = useState('');
+  const [addResults, setAddResults] = useState<string[]>([]);
+  const [addPicked, setAddPicked] = useState<string | null>(null);
 
   const { workoutLog, workout, program, exercises, elapsedSeconds, isPaused, totalVolume, targetVolume, completedSets, totalSets, avgRpe, loading, error } =
     snapshot;
@@ -51,6 +62,37 @@ export default function SheetsPage() {
     const ok = await finishSession();
     if (ok) setShowSummary(true);
   }, [finishSession]);
+
+  // Debounced library search for the Add Exercise dialog
+  useEffect(() => {
+    if (!addOpen) return;
+    const t = setTimeout(async () => {
+      const q = addQuery.trim();
+      if (!q) { setAddResults([]); return; }
+      const { data } = await supabase
+        .from('exercise_library')
+        .select('name')
+        .eq('is_active', true)
+        .ilike('name', `%${q}%`)
+        .order('name')
+        .limit(8);
+      setAddResults((data || []).map((r) => r.name));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [addQuery, addOpen]);
+
+  const orderLabels = useMemo(() => exercises.map((e) => e.order), [exercises]);
+  const pairPreview = useMemo(() => labelsForPairAdd(orderLabels), [orderLabels]);
+  const newSeriesLetterLabel = useMemo(() => nextSeriesLetter(orderLabels), [orderLabels]);
+
+  const handleAddConfirm = useCallback((mode: 'pair' | 'newSeries') => {
+    if (!addPicked) return;
+    addExercise(addPicked, mode);
+    setAddOpen(false);
+    setAddPicked(null);
+    setAddQuery('');
+    setAddResults([]);
+  }, [addPicked, addExercise]);
 
   const progressPct = targetVolume > 0 ? Math.round((totalVolume / targetVolume) * 100) : 0;
   const phases = program ? splitProgramIntoPhases(program.duration_weeks || 1) : [];
@@ -202,6 +244,7 @@ export default function SheetsPage() {
             isExpanded={expandedId === exercise.id}
             onToggle={() => handleToggle(exercise.id)}
             onUpdateSet={(setIndex, updates) => updateSet(exercise.id, setIndex, updates)}
+            onUpdateTargetLoad={(load) => updateExerciseTargetLoad(exercise.id, load)}
             onToggleDone={(setIndex) => toggleSetDone(exercise.id, setIndex)}
             onAddSet={() => addSet(exercise.id)}
             onRemoveSet={(setIndex) => removeSet(exercise.id, setIndex)}
@@ -217,13 +260,94 @@ export default function SheetsPage() {
         ))}
 
         <button
-          onClick={() => addExercise('New Exercise')}
+          onClick={() => setAddOpen(true)}
           className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-[var(--card-border)] text-[var(--text-muted)] hover:text-[#00AEEF] hover:border-[#00AEEF]/50 transition-colors"
         >
           <Plus className="w-4 h-4" />
           <span className="text-sm font-medium">Add Exercise</span>
         </button>
       </main>
+
+      {/* Smart Add Exercise dialog (Phase 33C Fix 4b) */}
+      <AnimatePresence>
+        {addOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+              onClick={() => { setAddOpen(false); setAddPicked(null); }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-50 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl md:w-full md:max-w-md overflow-hidden flex flex-col"
+            >
+              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--card-border)]">
+                <h3 className="text-lg font-bold text-[var(--text-primary)]">Add Exercise</h3>
+                <button onClick={() => { setAddOpen(false); setAddPicked(null); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-4">
+                {!addPicked ? (
+                  <>
+                    <Input
+                      type="text"
+                      value={addQuery}
+                      onChange={(e) => setAddQuery(e.target.value)}
+                      placeholder="Search the exercise library..."
+                      className="w-full h-10 mb-3 bg-[var(--page-bg)] border-[var(--card-border)] text-[var(--text-primary)]"
+                    />
+                    <div className="space-y-1">
+                      {addResults.map((name) => (
+                        <button
+                          key={name}
+                          onClick={() => setAddPicked(name)}
+                          className="w-full text-left px-3 py-2 rounded-lg text-sm text-[var(--text-primary)] hover:bg-[var(--card-border)]/50 transition-colors"
+                        >
+                          {name}
+                        </button>
+                      ))}
+                      {addQuery.trim() && addResults.length === 0 && (
+                        <p className="text-center text-xs text-[var(--text-muted)] py-3">No matches — try another search.</p>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm text-[var(--text-primary)]">
+                      Add <span className="font-semibold text-[#00AEEF]">{addPicked}</span> as…
+                    </p>
+                    <button
+                      onClick={() => handleAddConfirm('pair')}
+                      className="w-full text-left rounded-lg border border-[var(--card-border)] px-3 py-2.5 hover:border-[#00AEEF]/60 transition-colors"
+                    >
+                      <span className="text-sm font-medium text-[var(--text-primary)]">Pair with series {pairPreview.newLabel[0]} — becomes {pairPreview.newLabel}</span>
+                      <span className="block text-[11px] text-[var(--text-muted)]">superset with the last exercise</span>
+                    </button>
+                    <button
+                      onClick={() => handleAddConfirm('newSeries')}
+                      className="w-full text-left rounded-lg border border-[var(--card-border)] px-3 py-2.5 hover:border-[#00AEEF]/60 transition-colors"
+                    >
+                      <span className="text-sm font-medium text-[var(--text-primary)]">Start new series — {newSeriesLetterLabel}</span>
+                      <span className="block text-[11px] text-[var(--text-muted)]">standalone exercise</span>
+                    </button>
+                    <button
+                      onClick={() => setAddPicked(null)}
+                      className="w-full py-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                    >
+                      ← back to search
+                    </button>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Mobile Sticky Bottom */}
       <div className="fixed bottom-0 left-0 right-0 z-30 backdrop-blur-xl border-t border-[var(--card-border)] sm:hidden" style={{ backgroundColor: 'var(--card-bg)', opacity: 0.95 }}>
