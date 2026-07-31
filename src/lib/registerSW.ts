@@ -39,6 +39,10 @@ export function registerServiceWorker(): void {
       .then((registration) => {
         console.log('[PWA] Service Worker registered:', registration.scope);
 
+        // Phase 33A Fix 3: check for a new SW on every load, so open tabs
+        // pick up deploys promptly instead of serving stale chunk maps.
+        registration.update().catch(() => {});
+
         // Listen for updates
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
@@ -56,9 +60,17 @@ export function registerServiceWorker(): void {
         console.error('[PWA] Service Worker registration failed:', error);
       });
 
-    // Listen for controller changes (new SW activated)
+    // Listen for controller changes (new SW activated): reload ONCE so the
+    // tab picks up the new build's chunk map. The 10s window guard prevents
+    // any reload loop while still allowing future updates in the same tab.
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      console.log('[PWA] New service worker activated');
+      const last = Number(sessionStorage.getItem('sw-reload-at') || 0);
+      if (Date.now() - last < 10000) {
+        console.log('[PWA] New service worker activated (reload suppressed — already reloaded)');
+        return;
+      }
+      console.log('[PWA] New service worker activated — reloading once');
+      sessionStorage.setItem('sw-reload-at', String(Date.now()));
       window.location.reload();
     });
   });

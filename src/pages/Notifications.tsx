@@ -25,17 +25,40 @@ const DEFAULT_SETTINGS: NotificationSetting[] = [
 
 const STORAGE_KEY = 'azfit_notification_settings';
 
-function loadSettings(): NotificationSetting[] {
+/* eslint-disable react-refresh/only-export-components */
+// Phase 33A Fix 1: persist ONLY plain data (id/enabled/time) — never the icon
+// component. Loading merges saved values onto DEFAULT_SETTINGS by id, which
+// auto-repairs pre-fix poisoned payloads (icons serialized as junk objects).
+export function saveSettings(settings: NotificationSetting[]) {
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify(settings.map((s) => ({ id: s.id, enabled: s.enabled, time: s.time })))
+  );
+}
+
+export function loadSettings(): NotificationSetting[] {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    if (saved.length > 0) return saved;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw) as unknown;
+      if (Array.isArray(saved) && saved.length > 0) {
+        return DEFAULT_SETTINGS.map((def) => {
+          const entry = saved.find(
+            (s): s is { id: string; enabled?: unknown; time?: unknown } =>
+              typeof s === 'object' && s !== null && (s as { id?: unknown }).id === def.id
+          );
+          return {
+            ...def,
+            enabled: typeof entry?.enabled === 'boolean' ? entry.enabled : def.enabled,
+            time: typeof entry?.time === 'string' ? entry.time : def.time,
+          };
+        });
+      }
+    }
   } catch { /* ignore */ }
   return DEFAULT_SETTINGS;
 }
-
-function saveSettings(settings: NotificationSetting[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-}
+/* eslint-enable react-refresh/only-export-components */
 
 export default function NotificationsPage() {
   const navigate = useNavigate();

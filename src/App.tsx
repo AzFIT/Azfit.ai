@@ -1,5 +1,5 @@
-import { Routes, Route } from "react-router";
-import { Suspense, lazy, useEffect } from "react";
+import { Routes, Route, useLocation } from "react-router";
+import { Suspense, lazy, useEffect, type ReactNode } from "react";
 import * as Sentry from "@sentry/react";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { ThemeProvider } from "@/hooks/useTheme";
@@ -101,6 +101,18 @@ function ErrorFallback() {
   );
 }
 
+// Phase 33A Fix 2: an error boundary keyed on the route — remounting per
+// pathname resets it, so a page crash can't poison the whole SPA. Page errors
+// still hit the same Sentry reporting + fallback UI.
+function RouteErrorBoundary({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  return (
+    <Sentry.ErrorBoundary key={location.pathname} fallback={<ErrorFallback />}>
+      {children}
+    </Sentry.ErrorBoundary>
+  );
+}
+
 export default function App() {
   useAnalytics();
   useEffect(() => {
@@ -121,6 +133,7 @@ export default function App() {
               <Toaster />
               <OfflineBanner />
               <Suspense fallback={<PageLoader />}>
+                <RouteErrorBoundary>
                 <Routes>
                   <Route path="/demo" element={<DemoDashboard />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
@@ -331,6 +344,7 @@ export default function App() {
                   />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
+                </RouteErrorBoundary>
               </Suspense>
             </AIContextProvider>
           </ChatProvider>
