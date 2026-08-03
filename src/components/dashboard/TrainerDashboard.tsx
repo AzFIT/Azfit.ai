@@ -207,9 +207,14 @@ export default function TrainerDashboard() {
           .select("id")
           .eq("email", c.email)
           .maybeSingle();
-        if (!prof) continue;
+        // Phase 35: match holiday sessions by profiles.id OR clients.id
         const latestEnd = allSessions
-          .filter((s) => s.type === "holiday" && s.clientId === prof.id && s.status !== "cancelled")
+          .filter(
+            (s) =>
+              s.type === "holiday" &&
+              s.status !== "cancelled" &&
+              ((prof && s.clientId === prof.id) || s.clientRecordId === c.id)
+          )
           .map((s) => s.endsAt.split("T")[0])
           .sort()
           .pop();

@@ -83,6 +83,7 @@ export interface ClientGeneratedProgram {
       focus: string;
       estimatedMinutes: number;
       exercises: Array<{
+        id?: string;
         order: string;
         name: string;
         category: string;
@@ -91,6 +92,7 @@ export interface ClientGeneratedProgram {
         tempo: string;
         restSeconds: number;
         load?: number | null;
+        notesRaw?: string | null;
         supersetGroup?: string;
       }>;
     }>;

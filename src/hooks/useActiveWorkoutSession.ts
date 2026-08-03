@@ -559,26 +559,41 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
     [historyPbs, writeExerciseToDb]
   );
 
-  const finishSession = useCallback(async () => {
+  // Phase 35 ITEM 1: airtight Finish — flush ALL exercises FIRST, only mark
+  // the log completed after every write lands. Session RPE rides in the log's
+  // notes jsonb (additive { sessionRpe } — no schema change).
+  const finishSession = useCallback(async (sessionRpe?: number) => {
     if (!workoutLog) return false;
 
     try {
+      const results = await Promise.all(exercises.map((ex) => writeExerciseToDb(ex)));
+      if (results.some((r) => !r)) throw new Error("Some exercises failed to save");
+
+      let notesPayload: string | null = null;
+      if (sessionRpe != null) {
+        let existing: Record<string, unknown> = {};
+        try {
+          existing = workoutLog.notes ? (JSON.parse(workoutLog.notes) as Record<string, unknown>) : {};
+        } catch {
+          existing = { note: workoutLog.notes };
+        }
+        notesPayload = JSON.stringify({ ...existing, sessionRpe });
+      }
+
       const durationMinutes = Math.floor(elapsedSeconds / 60);
       const { error } = await supabase
         .from("workout_logs")
-        .update({ completed_at: new Date().toISOString(), duration_minutes: durationMinutes })
+        .update({
+          completed_at: new Date().toISOString(),
+          duration_minutes: durationMinutes,
+          ...(notesPayload ? { notes: notesPayload } : {}),
+        })
         .eq("id", workoutLog.id);
 
       if (error) throw error;
-
-      // Ensure all exercises are written
-      await Promise.all(exercises.map((ex) => writeExerciseToDb(ex)));
-
-      toast.success("Workout finished!");
       return true;
     } catch (err) {
       console.error("[useActiveWorkoutSession] finish failed:", err);
-      toast.error("Failed to finish workout");
       return false;
     }
   }, [workoutLog, elapsedSeconds, exercises, writeExerciseToDb]);

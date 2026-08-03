@@ -11,7 +11,8 @@ import { findSessionConflicts, type ConflictCandidate } from "@/lib/sessionConfl
 export interface Session {
   id: string;
   trainerId: string;
-  clientId: string;
+  clientId: string | null; // null for account-less sessions (see clientRecordId)
+  clientRecordId?: string | null; // Phase 35: clients.id for account-less bookings
   title: string;
   type: string;
   status: "requested" | "scheduled" | "completed" | "cancelled";
@@ -30,7 +31,8 @@ function toSession(raw: Record<string, unknown>): Session {
   return {
     id: raw.id as string,
     trainerId: raw.trainer_id as string,
-    clientId: raw.client_id as string,
+    clientId: (raw.client_id as string | null) ?? null,
+    clientRecordId: (raw.client_record_id as string | null) ?? null,
     title: raw.title as string,
     type: raw.type as string,
     status: raw.status as Session["status"],
@@ -65,14 +67,32 @@ export function useSessions() {
     setLoading(true);
 
     try {
+      // Phase 35 ITEM 2d: account-less sessions key on client_record_id
+      // (clients.id). Resolve the caller's clients row (client role) so their
+      // sessions booked pre-account still show up; embed names from BOTH FKs.
+      let myClientsId: string | null = null;
+      if (!isTrainer && user?.email) {
+        const { data: cr } = await supabase
+          .from("clients")
+          .select("id")
+          .eq("email", user.email)
+          .maybeSingle();
+        myClientsId = cr?.id ?? null;
+      }
+
+      const clientFilter = myClientsId
+        ? `client_id.eq.${myId},client_record_id.eq.${myClientsId}`
+        : `client_id.eq.${myId}`;
+
       const { data, error } = await supabase
         .from("sessions")
         .select(`
           *,
           client:profiles!sessions_client_id_fkey(full_name, avatar_url),
-          trainer:profiles!sessions_trainer_id_fkey(full_name)
+          trainer:profiles!sessions_trainer_id_fkey(full_name),
+          clientRecord:clients!sessions_client_record_id_fkey(full_name)
         `)
-        .or(isTrainer ? `trainer_id.eq.${myId}` : `client_id.eq.${myId}`)
+        .or(isTrainer ? `trainer_id.eq.${myId}` : clientFilter)
         .order("starts_at", { ascending: true });
 
       if (error) throw error;
@@ -81,9 +101,10 @@ export function useSessions() {
         const s = toSession(raw);
         const clientData = raw.client as Record<string, unknown> | undefined;
         const trainerData = raw.trainer as Record<string, unknown> | undefined;
+        const recordData = raw.clientRecord as Record<string, unknown> | undefined;
         return {
           ...s,
-          clientName: clientData?.full_name as string | undefined,
+          clientName: (clientData?.full_name ?? recordData?.full_name) as string | undefined,
           clientAvatar: clientData?.avatar_url as string | null | undefined,
           trainerName: trainerData?.full_name as string | undefined,
         };
@@ -95,7 +116,7 @@ export function useSessions() {
     } finally {
       setLoading(false);
     }
-  }, [myId, isTrainer]);
+  }, [myId, isTrainer, user?.email]);
 
   /* ── Create session ────────────────────────────────────────────── */
   const createSession = useCallback(

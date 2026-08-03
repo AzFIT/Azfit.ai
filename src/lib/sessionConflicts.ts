@@ -64,10 +64,11 @@ export function generateWeeklyOccurrences(
     notes: string | null;
   },
   count: number
-): Omit<Session, "id" | "createdAt" | "clientName" | "clientAvatar" | "trainerName">[] {
+  // clientId stays non-null here — occurrences always carry the caller's id
+): (Omit<Session, "id" | "createdAt" | "clientName" | "clientAvatar" | "trainerName"> & { clientId: string })[] {
   const duration =
     new Date(base.endsAt).getTime() - new Date(base.startsAt).getTime();
-  const out: Omit<Session, "id" | "createdAt" | "clientName" | "clientAvatar" | "trainerName">[] = [];
+  const out: (Omit<Session, "id" | "createdAt" | "clientName" | "clientAvatar" | "trainerName"> & { clientId: string })[] = [];
   for (let i = 0; i < count; i++) {
     const start = new Date(base.startsAt);
     start.setDate(start.getDate() + i * 7);

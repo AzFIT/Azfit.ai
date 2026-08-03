@@ -90,7 +90,7 @@ function sessionToEvent(session: ReturnType<typeof useSessions>['sessions'][numb
     startTime,
     endTime,
     type: session.type === 'blocked' ? 'blocked' : session.status === 'requested' ? 'reminder' : 'session',
-    clientId: session.clientId,
+    clientId: session.clientId ?? '',
     clientName: session.clientName,
     description: session.notes || undefined,
     location: session.location,
@@ -439,7 +439,7 @@ export default function SchedulePage() {
     if (finalStatus === 'scheduled' || finalStatus === 'requested') {
       const conflicts = findSessionConflicts(sessions, {
         trainerId: original.trainerId,
-        clientId: original.clientId,
+        clientId: original.clientId ?? '',
         startsAt: finalStartsAt,
         endsAt: finalEndsAt,
         excludeId: id,

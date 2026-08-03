@@ -158,6 +158,7 @@ async function fetchClientPrograms(clientId: string): Promise<ClientGeneratedPro
                 const extra = parseExerciseNotes(e.notes);
                 const code = codeFromOrderIndex(e.order_index);
                 return {
+                  id: e.id, // Phase 35 ITEM 3: needed for inline prescription edits
                   order: code,
                   name: e.name,
                   category: "custom",
@@ -166,6 +167,7 @@ async function fetchClientPrograms(clientId: string): Promise<ClientGeneratedPro
                   tempo: extra.tempo,
                   restSeconds: e.rest_seconds || 60,
                   load: e.weight_kg ?? null,
+                  notesRaw: e.notes ?? null,
                   // Phase 30C: stored group wins; fall back to the order-code letter
                   supersetGroup: extra.supersetGroup ?? code.charAt(0),
                 };

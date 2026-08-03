@@ -57,9 +57,9 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<TabEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [noProfile, setNoProfile] = useState(false);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [profileName, setProfileName] = useState("");
+  const [recordName, setRecordName] = useState(""); // clients.full_name (account-less bookings)
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [bookOpen, setBookOpen] = useState(false);
   const [booking, setBooking] = useState(false);
@@ -69,28 +69,41 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
   const [actionSaving, setActionSaving] = useState(false);
 
   const load = useCallback(async () => {
-    if (!clientEmail) return;
+    if (!clientEmail && !clientsId) return;
     setLoading(true);
     try {
-      const { data: prof, error: profErr } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .eq("email", clientEmail)
-        .maybeSingle();
-      if (profErr) throw profErr;
-      if (!prof) {
-        setNoProfile(true);
-        setProfileId(null);
+      // Resolve both id spaces: profiles.id (via email) and the clients row
+      const [profRes, clientRes] = await Promise.all([
+        clientEmail
+          ? supabase.from("profiles").select("id, full_name").eq("email", clientEmail).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        clientsId
+          ? supabase.from("clients").select("full_name").eq("id", clientsId).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ]);
+      if (profRes.error) throw profRes.error;
+      const prof = profRes.data;
+      const cName =
+        (clientRes.data as { full_name?: string } | null)?.full_name ||
+        (prof as { full_name?: string | null } | null)?.full_name ||
+        "Client";
+      setRecordName(cName);
+      setProfileId(prof?.id ?? null);
+      setProfileName((prof as { full_name?: string | null } | null)?.full_name || cName);
+
+      // Phase 35 ITEM 2: sessions live in either id space — client_id
+      // (profiles) for account-holders, client_record_id (clients) otherwise
+      const filters: string[] = [];
+      if (prof?.id) filters.push(`client_id.eq.${prof.id}`);
+      if (clientsId) filters.push(`client_record_id.eq.${clientsId}`);
+      if (filters.length === 0) {
         setEvents([]);
         return;
       }
-      setProfileId(prof.id);
-      setProfileName((prof as { full_name?: string | null }).full_name || "Client");
-
       const { data: rows, error } = await supabase
         .from("sessions")
         .select("*")
-        .eq("client_id", prof.id)
+        .or(filters.join(","))
         .neq("status", "cancelled")
         .order("starts_at", { ascending: false })
         .limit(200);
@@ -106,8 +119,8 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
           s.type === "holiday" || s.type === "reminder"
             ? s.type
             : "session",
-        clientId: prof.id,
-        clientName: (prof as { full_name?: string | null }).full_name || "",
+        clientId: s.client_id ?? s.client_record_id ?? "",
+        clientName: cName,
         location: s.location ?? undefined,
         description: s.notes ?? undefined,
         status: s.status,
@@ -122,7 +135,7 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
     } finally {
       setLoading(false);
     }
-  }, [clientEmail]);
+  }, [clientEmail, clientsId]);
 
   useEffect(() => {
     load();
@@ -159,17 +172,24 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
     ? `${year}-${String(month + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`
     : null;
 
+  // Phase 35 ITEM 2: session rows carry BOTH ids when a profile exists
+  // (client_id + client_record_id — so every session is resolvable to the
+  // clients row), and client_record_id only for account-less clients.
+  const sessionIds = () => ({
+    client_id: profileId ?? null,
+    ...(clientsId ? { client_record_id: clientsId } : {}),
+  });
+
   /* ── Booking (mirrors Schedule.tsx handleBook mapping, minus the
         conflict-check block — v1 books all occurrences) ─────────────── */
   const handleBook = async (event: CalendarEvent, recurringCount = 1) => {
-    if (!profileId || !user?.id || booking) return;
+    if ((!profileId && !clientsId) || !user?.id || booking) return;
     setBooking(true);
     try {
       const startDate = new Date(`${event.date}T${event.startTime}`);
       const endDate = new Date(`${event.date}T${event.endTime}`);
       const baseSession = {
         trainerId: user.id,
-        clientId: profileId,
         title: event.title,
         type: event.type === "blocked" ? "blocked" : "1-on-1",
         status: "scheduled" as const,
@@ -180,11 +200,11 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
       };
       const occurrences =
         recurringCount > 1
-          ? generateWeeklyOccurrences(baseSession, recurringCount)
+          ? generateWeeklyOccurrences({ ...baseSession, clientId: profileId ?? "" }, recurringCount)
           : [baseSession];
       const payload = occurrences.map((occ) => ({
         trainer_id: occ.trainerId,
-        client_id: occ.clientId,
+        ...sessionIds(),
         title: occ.title,
         type: occ.type,
         status: occ.status,
@@ -214,12 +234,12 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
 
   /* ── Holiday: one sessions row (type='holiday') + clients.status='on_holiday' ── */
   const handleSaveHoliday = async (start: string, end: string, note: string) => {
-    if (!profileId || !user?.id || actionSaving) return;
+    if ((!profileId && !clientsId) || !user?.id || actionSaving) return;
     setActionSaving(true);
     try {
       const { error } = await supabase.from("sessions").insert({
         trainer_id: user.id,
-        client_id: profileId,
+        ...sessionIds(),
         title: "Holiday",
         type: "holiday",
         status: "scheduled",
@@ -255,14 +275,14 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
 
   /* ── Reminder: one sessions row (type='reminder', 30 min at 09:00 local) ── */
   const handleSaveReminder = async (title: string, date: string, note: string) => {
-    if (!profileId || !user?.id || actionSaving) return;
+    if ((!profileId && !clientsId) || !user?.id || actionSaving) return;
     setActionSaving(true);
     try {
       const startsAt = new Date(`${date}T09:00:00`);
       const endsAt = new Date(startsAt.getTime() + 30 * 60 * 1000);
       const { error } = await supabase.from("sessions").insert({
         trainer_id: user.id,
-        client_id: profileId,
+        ...sessionIds(),
         title,
         type: "reminder",
         status: "scheduled",
@@ -549,41 +569,34 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
             </div>
           )}
 
-          {noProfile ? (
-            <p
-              className="text-center text-xs"
-              style={{ color: "var(--light-text-muted)" }}
-            >
-              Scheduling activates when this client creates an app account.
-            </p>
-          ) : (
-            <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-              {[
-                { icon: CalendarPlus, label: "Book a session", onClick: () => setBookOpen(true), primary: true },
-                { icon: Sun, label: "Add holiday", onClick: () => setHolidayOpen(true) },
-                { icon: Bell, label: "Add reminder", onClick: () => { setReminderPreset(""); setReminderIsCustom(true); } },
-                { icon: Ruler, label: "Request measurements", onClick: () => { setReminderPreset("Measure weight + body fat"); setReminderIsCustom(false); } },
-                { icon: Camera, label: "Request photos", onClick: () => { setReminderPreset("Progress photos due"); setReminderIsCustom(false); } },
-              ].map((a) => {
-                const Icon = a.icon;
-                return (
-                  <button
-                    key={a.label}
-                    onClick={a.onClick}
-                    className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold transition hover:opacity-90"
-                    style={
-                      a.primary
-                        ? { backgroundColor: "var(--azfit-primary)", color: "#fff" }
-                        : { backgroundColor: "var(--light-elevated)", color: "var(--page-text)", border: "1px solid var(--card-border)" }
-                    }
-                  >
-                    <Icon size={14} style={a.primary ? undefined : { color: "var(--azfit-primary)" }} />
-                    {a.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          {/* Phase 35 ITEM 2: the five actions work for account-less clients
+              too (bookings persist via client_record_id) — no dead-end note */}
+          <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+            {[
+              { icon: CalendarPlus, label: "Book a session", onClick: () => setBookOpen(true), primary: true },
+              { icon: Sun, label: "Add holiday", onClick: () => setHolidayOpen(true) },
+              { icon: Bell, label: "Add reminder", onClick: () => { setReminderPreset(""); setReminderIsCustom(true); } },
+              { icon: Ruler, label: "Request measurements", onClick: () => { setReminderPreset("Measure weight + body fat"); setReminderIsCustom(false); } },
+              { icon: Camera, label: "Request photos", onClick: () => { setReminderPreset("Progress photos due"); setReminderIsCustom(false); } },
+            ].map((a) => {
+              const Icon = a.icon;
+              return (
+                <button
+                  key={a.label}
+                  onClick={a.onClick}
+                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold transition hover:opacity-90"
+                  style={
+                    a.primary
+                      ? { backgroundColor: "var(--azfit-primary)", color: "#fff" }
+                      : { backgroundColor: "var(--light-elevated)", color: "var(--page-text)", border: "1px solid var(--card-border)" }
+                  }
+                >
+                  <Icon size={14} style={a.primary ? undefined : { color: "var(--azfit-primary)" }} />
+                  {a.label}
+                </button>
+              );
+            })}
+          </div>
         </motion.div>
       )}
 
@@ -681,20 +694,20 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
         </div>
       </motion.div>
 
-      {profileId && (
+      {(profileId || clientsId) && (
         <BookSessionDialog
           key={selectedDateStr || "none"}
           open={bookOpen}
           onOpenChange={setBookOpen}
           onBook={handleBook}
           isTrainer
-          clients={[{ id: profileId, name: profileName }]}
+          clients={[{ id: profileId ?? clientsId!, name: profileId ? profileName : recordName }]}
           initialDate={selectedDateStr || undefined}
-          initialClientId={profileId}
+          initialClientId={profileId ?? clientsId!}
         />
       )}
 
-      {profileId && selectedDateStr && (
+      {(profileId || clientsId) && selectedDateStr && (
         <>
           <HolidayDialog
             key={`holiday-${selectedDateStr}`}

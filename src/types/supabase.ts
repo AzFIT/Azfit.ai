@@ -463,7 +463,8 @@ export type Database = {
         Row: {
           id: string;
           trainer_id: string;
-          client_id: string;
+          client_id: string | null;
+          client_record_id: string | null;
           title: string;
           type: string;
           status: string;
@@ -476,7 +477,8 @@ export type Database = {
         Insert: {
           id?: string;
           trainer_id: string;
-          client_id: string;
+          client_id?: string | null;
+          client_record_id?: string | null;
           title: string;
           type?: string;
           status?: string;
@@ -489,7 +491,8 @@ export type Database = {
         Update: {
           id?: string;
           trainer_id?: string;
-          client_id?: string;
+          client_id?: string | null;
+          client_record_id?: string | null;
           title?: string;
           type?: string;
           status?: string;

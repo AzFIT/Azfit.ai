@@ -36,6 +36,10 @@ export default function SheetsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showSummary, setShowSummary] = useState(false);
 
+  // Phase 35 ITEM 1: RPE prompt + blocking finish UX
+  const [showRpePrompt, setShowRpePrompt] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+
   // Phase 33C Fix 4b: smart Add Exercise dialog (pick → pair/new-series)
   const [addOpen, setAddOpen] = useState(false);
   const [addQuery, setAddQuery] = useState('');
@@ -58,10 +62,23 @@ export default function SheetsPage() {
     [setExpandedId]
   );
 
-  const handleFinish = useCallback(async () => {
-    const ok = await finishSession();
-    if (ok) setShowSummary(true);
-  }, [finishSession]);
+  // Function declaration (hoisted) so the Retry action can call it
+  async function handleFinish(sessionRpe?: number) {
+    if (finishing) return;
+    setFinishing(true);
+    const ok = await finishSession(sessionRpe);
+    setFinishing(false);
+    if (ok) {
+      toast.success("Workout saved ✅", { duration: 2500 });
+      setShowRpePrompt(false);
+      setShowSummary(true);
+    } else {
+      toast.error("Couldn't save the workout — your data is still on this page.", {
+        duration: 8000,
+        action: { label: "Retry", onClick: () => handleFinish(sessionRpe) },
+      });
+    }
+  }
 
   // Debounced library search for the Add Exercise dialog
   useEffect(() => {
@@ -173,11 +190,12 @@ export default function SheetsPage() {
                 {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
               </button>
               <button
-                onClick={handleFinish}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#00AEEF] hover:bg-[#0098D1] text-[#0B1120] text-xs font-bold transition-colors"
+                onClick={() => setShowRpePrompt(true)}
+                disabled={finishing}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#00AEEF] hover:bg-[#0098D1] text-[#0B1120] text-xs font-bold transition-colors disabled:opacity-50"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                Finish
+                {finishing ? "Saving…" : "Finish"}
               </button>
             </div>
           </div>
@@ -363,11 +381,54 @@ export default function SheetsPage() {
             <span>|</span>
             <span>{totalVolume.toLocaleString()} kg</span>
           </div>
-          <button onClick={handleFinish} className="px-3 py-1.5 rounded-lg bg-[#00AEEF] text-[#0B1120] text-xs font-bold">
-            Finish
+          <button onClick={() => setShowRpePrompt(true)} disabled={finishing} className="px-3 py-1.5 rounded-lg bg-[#00AEEF] text-[#0B1120] text-xs font-bold disabled:opacity-50">
+            {finishing ? "Saving…" : "Finish"}
           </button>
         </div>
       </div>
+
+      {/* Session RPE prompt (Phase 35 ITEM 1) — between Finish and completion, skippable */}
+      <AnimatePresence>
+        {showRpePrompt && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+              onClick={() => !finishing && setShowRpePrompt(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[calc(100%-2rem)] max-w-sm bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-5 shadow-2xl"
+            >
+              <h3 className="text-base font-bold text-[var(--text-primary)]">How hard was that session?</h3>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">Session RPE (1 = easy, 10 = max effort) — optional.</p>
+              <div className="mt-4 grid grid-cols-5 gap-1.5">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                  <button
+                    key={n}
+                    disabled={finishing}
+                    onClick={() => handleFinish(n)}
+                    className="h-10 rounded-lg border border-[var(--card-border)] text-sm font-bold text-[var(--text-primary)] transition-all hover:border-[#00AEEF] hover:bg-[#00AEEF]/10 hover:text-[#00AEEF] disabled:opacity-50"
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => handleFinish()}
+                disabled={finishing}
+                className="mt-4 w-full py-2.5 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-[#00AEEF] to-[#8B5CF6] hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {finishing ? "Saving…" : "Skip & Finish"}
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       <SessionSummaryModal
         isOpen={showSummary}

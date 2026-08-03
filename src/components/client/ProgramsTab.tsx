@@ -38,6 +38,46 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
   const [phaseDraft, setPhaseDraft] = useState("");
   const [confirmArchiveId, setConfirmArchiveId] = useState<string | null>(null);
   const [busyIds, setBusyIds] = useState<Record<string, boolean>>({});
+  // Phase 35 ITEM 3: inline prescription editing (writes future-session
+  // targets on the exercises row; never touches workout_log_entries)
+  const [rxEditId, setRxEditId] = useState<string | null>(null);
+  const [rxDraft, setRxDraft] = useState<{ sets: string; reps: string; tempo: string }>({ sets: "", reps: "", tempo: "" });
+  const [rxBusy, setRxBusy] = useState(false);
+
+  const startRxEdit = (ex: { id?: string; sets: number; reps: string; tempo: string }) => {
+    if (!ex.id) return;
+    setRxEditId(ex.id);
+    setRxDraft({ sets: String(ex.sets), reps: ex.reps, tempo: ex.tempo });
+  };
+
+  const savePrescription = async (ex: { id?: string; name: string; sets: number; reps: string; notesRaw?: string | null }) => {
+    if (!ex.id || rxBusy) return;
+    setRxBusy(true);
+    try {
+      const sets = Math.max(1, Math.min(20, parseInt(rxDraft.sets, 10) || ex.sets));
+      const reps = rxDraft.reps.trim() || ex.reps;
+      const tempo = rxDraft.tempo.trim();
+      let notes: Record<string, unknown> = {};
+      try {
+        notes = ex.notesRaw ? (JSON.parse(ex.notesRaw) as Record<string, unknown>) : {};
+      } catch {
+        notes = {};
+      }
+      if (tempo) notes.tempo = tempo;
+      const { error } = await supabase
+        .from("exercises")
+        .update({ sets, reps, notes: JSON.stringify(notes) })
+        .eq("id", ex.id);
+      if (error) throw error;
+      toast.success(`Prescription updated for ${ex.name}`);
+      setRxEditId(null);
+      onChanged?.();
+    } catch (err) {
+      toast.error("Couldn't save: " + (err instanceof Error ? err.message : "Unknown error"));
+    } finally {
+      setRxBusy(false);
+    }
+  };
   // Optimistic display overrides (reverted on error)
   const [nameOverrides, setNameOverrides] = useState<Record<string, string>>({});
   const [phaseOverrides, setPhaseOverrides] = useState<Record<string, string>>({});
@@ -600,6 +640,58 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
                                         >
                                           <div className="px-3 pb-3 space-y-1">
                                             {workout.exercises.map((ex) => (
+                                              rxEditId && rxEditId === ex.id ? (
+                                                <div
+                                                  key={ex.order + ex.name}
+                                                  className="rounded-md px-2 py-2 space-y-2"
+                                                  style={{ backgroundColor: "var(--light-elevated)", border: "1px solid var(--azfit-primary)" }}
+                                                >
+                                                  <p className="text-xs font-medium truncate" style={{ color: "var(--page-text)" }}>{ex.name}</p>
+                                                  <div className="flex items-center gap-2 flex-wrap">
+                                                    <label className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>Sets</label>
+                                                    <input
+                                                      type="number"
+                                                      min={1}
+                                                      max={20}
+                                                      value={rxDraft.sets}
+                                                      onChange={(e) => setRxDraft((d) => ({ ...d, sets: e.target.value }))}
+                                                      className="w-14 rounded-md border px-2 py-1 text-xs"
+                                                      style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)", color: "var(--page-text)" }}
+                                                    />
+                                                    <label className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>Reps</label>
+                                                    <input
+                                                      value={rxDraft.reps}
+                                                      onChange={(e) => setRxDraft((d) => ({ ...d, reps: e.target.value }))}
+                                                      placeholder="8-12"
+                                                      className="w-16 rounded-md border px-2 py-1 text-xs"
+                                                      style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)", color: "var(--page-text)" }}
+                                                    />
+                                                    <label className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>Tempo</label>
+                                                    <input
+                                                      value={rxDraft.tempo}
+                                                      onChange={(e) => setRxDraft((d) => ({ ...d, tempo: e.target.value }))}
+                                                      placeholder="3-0-1-0"
+                                                      className="w-20 rounded-md border px-2 py-1 text-xs"
+                                                      style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)", color: "var(--page-text)" }}
+                                                    />
+                                                    <button
+                                                      onClick={() => savePrescription(ex)}
+                                                      disabled={rxBusy}
+                                                      className="rounded-md px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
+                                                      style={{ background: "linear-gradient(135deg, #00AEEF, #8B5CF6)" }}
+                                                    >
+                                                      {rxBusy ? "Saving…" : "Save"}
+                                                    </button>
+                                                    <button
+                                                      onClick={() => setRxEditId(null)}
+                                                      className="rounded-md px-2 py-1 text-[11px]"
+                                                      style={{ color: "var(--light-text-muted)" }}
+                                                    >
+                                                      Cancel
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              ) : (
                                               <div
                                                 key={ex.order + ex.name}
                                                 className="flex items-center justify-between rounded-md px-2 py-1.5"
@@ -634,14 +726,26 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
                                                     );
                                                   })()}
                                                 </div>
-                                                <span
-                                                  className="text-[10px] shrink-0"
-                                                  style={{ color: "var(--light-text-muted)" }}
-                                                >
-                                                  {ex.sets} × {ex.reps}
-                                                  {ex.load ? ` @ ${ex.load}kg` : ""}
+                                                <span className="flex items-center gap-1.5 shrink-0">
+                                                  <span
+                                                    className="text-[10px]"
+                                                    style={{ color: "var(--light-text-muted)" }}
+                                                  >
+                                                    {ex.sets} × {ex.reps}
+                                                    {ex.load ? ` @ ${ex.load}kg` : ""}
+                                                  </span>
+                                                  {ex.id && (
+                                                    <button
+                                                      onClick={() => startRxEdit(ex)}
+                                                      className="p-0.5 rounded hover:opacity-80"
+                                                      title="Edit prescription"
+                                                    >
+                                                      <Pencil size={10} style={{ color: "var(--azfit-primary)" }} />
+                                                    </button>
+                                                  )}
                                                 </span>
                                               </div>
+                                              )
                                             ))}
 
                                             {onStartWorkout && program.clientId && (

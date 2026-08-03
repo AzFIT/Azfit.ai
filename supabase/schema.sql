@@ -333,6 +333,21 @@ CREATE POLICY "Trainers can read client logs"
     )
   );
 
+-- Phase 35: UPDATE policies (Finish flow must persist completion)
+CREATE POLICY "Clients can update their logs"
+  ON workout_logs FOR UPDATE
+  USING (
+    client_id IN (
+      SELECT id FROM clients WHERE email = (
+        SELECT email FROM profiles WHERE id = auth.uid()
+      )
+    )
+  );
+
+CREATE POLICY "Trainers can update client logs"
+  ON workout_logs FOR UPDATE
+  USING (is_my_client_id(client_id));
+
 -- WORKOUT LOG ENTRIES
 CREATE POLICY "Clients can create their log entries"
   ON workout_log_entries FOR INSERT
@@ -1178,7 +1193,8 @@ CREATE POLICY "form-checks_trainer_read"
 CREATE TABLE IF NOT EXISTS sessions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   trainer_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  client_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  client_id UUID REFERENCES profiles(id) ON DELETE CASCADE, -- Phase 35: nullable (account-less sessions)
+  client_record_id UUID REFERENCES clients(id) ON DELETE CASCADE, -- Phase 35: clients row for account-less clients
   title TEXT NOT NULL,
   type TEXT NOT NULL DEFAULT '1-on-1',
   status TEXT NOT NULL DEFAULT 'requested'
