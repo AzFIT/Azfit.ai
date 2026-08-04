@@ -29,6 +29,7 @@ import { ProgressRing } from "./shared/ProgressRing";
 import { CollapsibleSection } from "./shared/CollapsibleSection";
 import { ClientHealthGrid } from "./ClientHealthGrid";
 import FollowUpsWidget from "./FollowUpsWidget";
+import NutritionCommandCenter from "./NutritionCommandCenter";
 import { useClientHealth } from "./useClientHealth";
 import { useSessions } from "@/hooks/useSessions";
 import QuickAddClientModal from "@/components/QuickAddClientModal";
@@ -845,6 +846,9 @@ export default function TrainerDashboard() {
 
       {/* FOLLOW-UPS (no session 5d+, BioPrint overdue, no active program) */}
       <FollowUpsWidget />
+
+      {/* NUTRITION COMMAND CENTER (Phase 37) — per-client targets/plan/adherence */}
+      <NutritionCommandCenter />
 
       {/* Phase 33B: the fabricated AI-insights feed and revenue snapshot were
           removed — no honest data source exists for either. FollowUpsWidget
