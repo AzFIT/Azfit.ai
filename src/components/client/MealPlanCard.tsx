@@ -5,19 +5,29 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  generateMealPlan,
   filterFoods,
   resolvePlanFood,
   MEAL_ORDER,
   type FoodInput,
-  type GeneratedPlan,
-  type MealPlanItem,
   type MealType,
 } from "@/lib/mealPlan";
+import {
+  generateMultiDayPlan,
+  regenerateDay,
+  accuracyOf,
+  roundingStep,
+  type Accuracy,
+  type MultiDayPlan,
+  type PlanItemV2,
+} from "@/lib/mealPlanV2";
 import { addFoodToLog, type MacroTotals } from "@/lib/foodApi";
 import type { Database, Json } from "@/types/supabase";
 
 type MealPlanRow = Database["public"]["Tables"]["meal_plans"]["Row"];
+
+/** Display item: 27F rows have no day/role (legacy single-day plans) —
+ * they render as day 1, unchanged. V2 rows carry day + role. */
+type PlanItem = Omit<PlanItemV2, "day" | "role"> & { day?: number; role?: string };
 
 interface MealPlanCardProps {
   clientId: string; // clients.id
@@ -47,16 +57,45 @@ const MEAL_LABELS: Record<string, string> = {
   snacks: "Snacks",
 };
 
+const DAY_OPTIONS = [1, 3, 5, 7];
+
+/** Plan-level accuracy = average of per-day percentages (matches the
+ * mealPlanV2 orchestration; used when re-deriving after edits). */
+function planAccuracy(items: PlanItem[], days: number, targets: MacroTotals): Accuracy {
+  const perDay: Accuracy[] = [];
+  for (let d = 1; d <= days; d++) {
+    perDay.push(accuracyOf(items.filter((i) => (i.day ?? 1) === d) as PlanItemV2[], targets));
+  }
+  const avg = (vals: number[]) => Math.round(vals.reduce((s, v) => s + v, 0) / Math.max(1, vals.length));
+  return {
+    kcalPct: avg(perDay.map((a) => a.kcalPct)),
+    proteinPct: avg(perDay.map((a) => a.proteinPct)),
+    carbsPct: avg(perDay.map((a) => a.carbsPct)),
+    fatsPct: avg(perDay.map((a) => a.fatsPct)),
+  };
+}
+
 export default function MealPlanCard({ clientId, targets, restrictions, diet, canLog = false, onLogged }: MealPlanCardProps) {
   const { user } = useAuth();
   const [savedPlan, setSavedPlan] = useState<MealPlanRow | null>(null);
-  const [draft, setDraft] = useState<GeneratedPlan | null>(null);
+  const [draft, setDraft] = useState<MultiDayPlan | null>(null);
   const [foods, setFoods] = useState<FoodInput[]>([]);
   const [seed, setSeed] = useState(1);
+  const [daySalt, setDaySalt] = useState(0);
+  const [dayCount, setDayCount] = useState(5);
+  const [selectedDay, setSelectedDay] = useState(1);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loggedMeals, setLoggedMeals] = useState<Set<string>>(new Set());
   const [loggingMeal, setLoggingMeal] = useState<string | null>(null);
+
+  // Day count of the SAVED plan (legacy plans without day → 1)
+  const savedDaysCount = savedPlan
+    ? Math.max(
+        1,
+        ...((savedPlan.items as unknown as PlanItem[]) || []).map((i) => i.day ?? 1),
+      )
+    : 1;
 
   const loadPlan = useCallback(async () => {
     const { data, error } = await supabase
@@ -126,67 +165,119 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet, ca
       toast.error("No foods in the database yet — log some food first");
       return;
     }
-    const plan = generateMealPlan(pool, targets, { restrictions, diet, seed });
+    const plan = generateMultiDayPlan(pool, targets, {
+      days: dayCount,
+      restrictions,
+      diet,
+      seed,
+    });
     if (plan.items.length === 0) {
       toast.error("No suitable foods after applying restrictions/diet");
       return;
     }
+    setSelectedDay(1);
     setDraft(plan);
-  }, [ensureFoods, targets, restrictions, diet, seed]);
+  }, [ensureFoods, targets, restrictions, diet, seed, dayCount]);
 
   const handleRegenerate = useCallback(async () => {
     const next = seed + 1;
     setSeed(next);
     const pool = await ensureFoods();
-    const plan = generateMealPlan(pool, targets, { restrictions, diet, seed: next });
-    if (plan.items.length > 0) setDraft(plan);
-  }, [ensureFoods, targets, restrictions, diet, seed]);
+    const plan = generateMultiDayPlan(pool, targets, {
+      days: draft?.days ?? savedDaysCount,
+      restrictions,
+      diet,
+      seed: next,
+    });
+    if (plan.items.length > 0) {
+      setSelectedDay(1);
+      setDraft(plan);
+    }
+  }, [ensureFoods, targets, restrictions, diet, seed, draft?.days, savedDaysCount]);
+
+  // Phase 40: regenerate ONLY the selected day; other days stay untouched
+  const handleRegenerateDay = useCallback(async () => {
+    if (!draft) return;
+    const salt = daySalt + 1;
+    setDaySalt(salt);
+    const pool = await ensureFoods();
+    const newDay = regenerateDay(draft.items, selectedDay, pool, targets, {
+      restrictions,
+      diet,
+      seed,
+      salt,
+    });
+    const items: PlanItemV2[] = [
+      ...draft.items.filter((i) => i.day !== selectedDay),
+      ...newDay,
+    ];
+    setDraft({
+      ...draft,
+      items,
+      accuracy: planAccuracy(items, draft.days, targets),
+    });
+  }, [draft, daySalt, ensureFoods, targets, restrictions, diet, seed, selectedDay]);
 
   const handleSwap = useCallback(
-    async (index: number) => {
+    async (dayItemIndex: number) => {
+      // Work on the full items array; index refers to the CURRENT day's list
+      const current = draft
+        ? draft.items.filter((i) => (i.day ?? 1) === selectedDay)[dayItemIndex]
+        : null;
       if (!draft) {
         // Swapping in the saved view converts it into a draft first
         if (!savedPlan) return;
-        const items = savedPlan.items as unknown as MealPlanItem[];
-        const rebuilt: GeneratedPlan = {
-          items,
-          byMeal: draftTotals(items).byMeal,
-          totals: draftTotals(items).totals,
-        };
-        setDraft(rebuilt);
+        const items = (savedPlan.items as unknown as PlanItem[]).map((i) => ({
+          ...i,
+          day: i.day ?? 1,
+        }));
+        const days = Math.max(1, ...items.map((i) => i.day ?? 1));
+        setDraft({
+          days,
+          items: items as PlanItemV2[],
+          accuracy: planAccuracy(items, days, targets),
+          warnings: [],
+        });
         return;
       }
+      if (!current) return;
       const pool = await ensureFoods();
-      const current = draft.items[index];
-      const candidates = shuffleFree(
-        filterFoods(pool, restrictions, diet).filter(
-          (f) => !draft.items.some((it) => it.name.startsWith(f.name)),
-        ),
-        index + seed,
+      const foodsByName = new Map(pool.map((f) => [f.name, f]));
+      const currentFood = foodsByName.get(current.name);
+      const sameCategory = filterFoods(pool, restrictions, diet).filter(
+        (f) =>
+          f.name !== current.name &&
+          (currentFood ? (f.category ?? "") === (currentFood.category ?? "") : true) &&
+          !draft.items.some((it) => it.name === f.name && (it.day ?? 1) === selectedDay),
       );
-      if (candidates.length === 0) {
+      if (sameCategory.length === 0) {
         toast.error("No alternative foods left for this slot");
         return;
       }
-      const replacement = candidates[0];
+      const replacement = shuffleFree(sameCategory, dayItemIndex + seed)[0];
+      // kcal-parity sizing, rounded to the replacement's realistic step
+      const ratio = current.calories / replacement.calories;
+      const step = roundingStep(replacement);
       const serving = Math.max(
-        15,
-        Math.round(((current.calories / replacement.calories) * replacement.serving_size_g) / 5) * 5,
+        step,
+        Math.round(((ratio * replacement.serving_size_g) || replacement.serving_size_g) / step) * step,
       );
-      const ratio = serving / replacement.serving_size_g;
-      const newItem: MealPlanItem = {
-        meal: current.meal,
-        name: replacement.brand ? `${replacement.name} (${replacement.brand})` : replacement.name,
+      const per = replacement.serving_size_g;
+      const newItem: PlanItemV2 = {
+        ...current,
+        name: replacement.name,
         serving_g: serving,
-        calories: Math.round(replacement.calories * ratio),
-        protein: Math.round(replacement.protein * ratio * 10) / 10,
-        carbs: Math.round(replacement.carbs * ratio * 10) / 10,
-        fats: Math.round(replacement.fats * ratio * 10) / 10,
+        calories: Math.round((replacement.calories / per) * serving),
+        protein: Math.round(((replacement.protein / per) * serving) * 10) / 10,
+        carbs: Math.round(((replacement.carbs / per) * serving) * 10) / 10,
+        fats: Math.round(((replacement.fats / per) * serving) * 10) / 10,
       };
-      const items = draft.items.map((it, i) => (i === index ? newItem : it));
-      setDraft({ items, ...draftTotals(items) });
+      const dayItems = draft.items.filter((i) => (i.day ?? 1) === selectedDay);
+      const target = dayItems[dayItemIndex];
+      const items: PlanItemV2[] = draft.items.map((it) => (it === target ? newItem : it));
+      setDraft({ ...draft, items, accuracy: planAccuracy(items, draft.days, targets) });
     },
-    [draft, savedPlan, ensureFoods, restrictions, diet, seed],
+    [draft, savedPlan, ensureFoods, restrictions, diet, seed, selectedDay, targets],
   );
 
   const handleSave = useCallback(async () => {
@@ -194,7 +285,8 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet, ca
     if (savedPlan && !window.confirm("Overwrite the saved meal plan for this client?")) return;
     setSaving(true);
     try {
-      const targetsSnapshot = { ...targets } as unknown as Json;
+      // targets jsonb gains an additive accuracy report (Phase 40)
+      const targetsSnapshot = { ...targets, accuracy: draft.accuracy } as unknown as Json;
       const itemsJson = draft.items as unknown as Json;
       if (savedPlan) {
         const { error } = await supabase
@@ -225,7 +317,7 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet, ca
   // Items store no food id: resolve names via resolvePlanFood (exact
   // match only), skip + report anything unmatched, never insert garbage.
   const handleLogMeal = useCallback(
-    async (meal: MealType, items: MealPlanItem[]) => {
+    async (meal: MealType, items: PlanItem[]) => {
       if (loggingMeal) return;
       setLoggingMeal(meal);
       try {
@@ -263,22 +355,22 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet, ca
     [loggingMeal, ensureFoods, onLogged],
   );
 
-  // What to display: draft wins, else saved
-  const displayItems: MealPlanItem[] | null = draft
+  // What to display: draft wins, else saved (legacy items default to day 1)
+  const allItems: PlanItem[] | null = draft
     ? draft.items
     : savedPlan
-      ? (savedPlan.items as unknown as MealPlanItem[])
+      ? ((savedPlan.items as unknown as PlanItem[]) || null)
       : null;
-  const displayTotals = draft
-    ? draft.totals
-    : savedPlan
-      ? draftTotals((savedPlan.items as unknown as MealPlanItem[]) || []).totals
-      : null;
-  const byMeal = draft
-    ? draft.byMeal
-    : savedPlan
-      ? draftTotals((savedPlan.items as unknown as MealPlanItem[]) || []).byMeal
-      : null;
+  const planDays = draft
+    ? draft.days
+    : Math.max(1, ...((allItems ?? []).map((i) => i.day ?? 1)));
+  const effectiveDay = Math.min(selectedDay, planDays);
+  const dayItems = (allItems ?? []).filter((i) => (i.day ?? 1) === effectiveDay);
+  const displayTotals = allItems ? draftTotals(dayItems).totals : null;
+  const byMeal = allItems ? draftTotals(dayItems).byMeal : null;
+  const dayAccuracy = allItems
+    ? accuracyOf(dayItems as PlanItemV2[], targets)
+    : null;
 
   return (
     <motion.div
@@ -311,45 +403,127 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet, ca
             </span>
           )}
         </div>
-        {displayItems && !canLog && (
-          <button
-            onClick={handleRegenerate}
-            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition hover:opacity-80"
-            style={{ color: "var(--azfit-primary)" }}
-          >
-            <RefreshCw size={12} />
-            Regenerate
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {allItems && !canLog && (
+            <button
+              onClick={handleRegenerate}
+              className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition hover:opacity-80"
+              style={{ color: "var(--azfit-primary)" }}
+              title="Regenerate the whole plan (new seed)"
+            >
+              <RefreshCw size={12} />
+              Regenerate
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
         <div className="h-16 animate-pulse rounded-xl" style={{ backgroundColor: "var(--light-elevated)" }} />
-      ) : !displayItems ? (
+      ) : !allItems ? (
         canLog ? (
           <p className="py-4 text-center text-xs" style={{ color: "var(--light-text-muted)" }}>
             No meal plan yet — your trainer can create one from your Nutrition tab.
           </p>
         ) : (
-        <div className="flex flex-col items-center py-4">
-          <p className="text-xs" style={{ color: "var(--light-text-muted)" }}>
-            No meal plan yet — generate one from {targets.calories} kcal of targets.
-          </p>
-          <button
-            onClick={handleGenerate}
-            className="mt-3 flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90"
-            style={{ backgroundColor: "var(--azfit-primary)" }}
-          >
-            <ChefHat size={14} />
-            Generate meal plan
-          </button>
-        </div>
+          <div className="flex flex-col items-center py-4">
+            <p className="text-xs" style={{ color: "var(--light-text-muted)" }}>
+              No meal plan yet — generate one from {targets.calories} kcal of targets.
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <select
+                value={dayCount}
+                onChange={(e) => setDayCount(Number(e.target.value))}
+                className="rounded-lg border px-2 py-2 text-xs"
+                style={{
+                  backgroundColor: "var(--light-elevated)",
+                  borderColor: "var(--card-border)",
+                  color: "var(--page-text)",
+                }}
+                title="Days per plan"
+              >
+                {DAY_OPTIONS.map((d) => (
+                  <option key={d} value={d}>
+                    {d} day{d > 1 ? "s" : ""}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleGenerate}
+                className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90"
+                style={{ backgroundColor: "var(--azfit-primary)" }}
+              >
+                <ChefHat size={14} />
+                Generate meal plan
+              </button>
+            </div>
+          </div>
         )
       ) : (
         <>
+          {/* Day tabs (multi-day plans, Phase 40) */}
+          {planDays > 1 && (
+            <div className="mb-3 flex flex-wrap items-center gap-1.5">
+              {Array.from({ length: planDays }, (_, i) => i + 1).map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setSelectedDay(d)}
+                  className="rounded-lg px-2.5 py-1 text-[11px] font-semibold transition"
+                  style={
+                    d === effectiveDay
+                      ? { background: "linear-gradient(135deg, #00AEEF, #8B5CF6)", color: "#fff" }
+                      : { backgroundColor: "var(--light-elevated)", color: "var(--light-text-muted)" }
+                  }
+                >
+                  Day {d}
+                </button>
+              ))}
+              {draft && !canLog && (
+                <button
+                  onClick={handleRegenerateDay}
+                  className="ml-auto flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium transition hover:opacity-80"
+                  style={{ color: "var(--azfit-primary)" }}
+                  title={`Regenerate day ${effectiveDay} only`}
+                >
+                  <RefreshCw size={11} />
+                  Regenerate day
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Honest accuracy chip (never rounded to 100%) */}
+          {dayAccuracy && (
+            <p className="mb-2 text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+              Day {effectiveDay} vs targets:{" "}
+              <span style={{ color: "#00AEEF" }}>{dayAccuracy.kcalPct}% kcal</span>
+              {" · "}
+              <span style={{ color: "#0D9488" }}>{dayAccuracy.proteinPct}% protein</span>
+              {" · "}
+              <span>{dayAccuracy.carbsPct}% carbs</span>
+              {" · "}
+              <span>{dayAccuracy.fatsPct}% fats</span>
+            </p>
+          )}
+
+          {draft && draft.warnings.length > 0 && (
+            <div
+              className="mb-2 rounded-lg border px-2.5 py-1.5 text-[10px]"
+              style={{
+                borderColor: "rgba(245,158,11,0.4)",
+                backgroundColor: "rgba(245,158,11,0.10)",
+                color: "#F59E0B",
+              }}
+            >
+              {draft.warnings.map((w) => (
+                <p key={w}>⚠ {w}</p>
+              ))}
+            </div>
+          )}
+
           <div className="space-y-3">
             {MEAL_ORDER.map((meal) => {
-              const items = displayItems.filter((i) => i.meal === meal);
+              const items = dayItems.filter((i) => i.meal === meal);
               if (items.length === 0) return null;
               const mealTotals = byMeal?.[meal];
               return (
@@ -386,7 +560,7 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet, ca
                               backgroundColor: "rgba(0,174,239,0.12)",
                               color: "var(--azfit-primary)",
                             }}
-                            title={`Log all ${items.length} items to today's ${MEAL_LABELS[meal]}`}
+                            title={`Log all ${items.length} items to today's ${MEAL_LABELS[meal]} (day ${effectiveDay})`}
                           >
                             <ClipboardList size={10} />
                             {loggingMeal === meal
@@ -401,10 +575,10 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet, ca
                   </div>
                   <div className="space-y-1">
                     {items.map((item) => {
-                      const globalIdx = displayItems.indexOf(item);
+                      const dayIdx = dayItems.indexOf(item);
                       return (
                         <div
-                          key={`${item.meal}-${item.name}-${globalIdx}`}
+                          key={`${item.meal}-${item.name}-${dayIdx}`}
                           className="flex items-center justify-between rounded-lg px-2 py-1.5"
                           style={{ backgroundColor: "var(--light-elevated)" }}
                         >
@@ -417,7 +591,7 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet, ca
                             </span>
                             {!canLog && (
                               <button
-                                onClick={() => handleSwap(globalIdx)}
+                                onClick={() => handleSwap(dayIdx)}
                                 className="p-1 rounded hover:opacity-80"
                                 title="Swap this item"
                               >
@@ -440,7 +614,7 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet, ca
               style={{ borderColor: "var(--card-border)" }}
             >
               <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>
-                Day: <strong style={{ color: "var(--page-text)" }}>{displayTotals.calories}</strong>/{targets.calories} kcal
+                Day {effectiveDay}: <strong style={{ color: "var(--page-text)" }}>{displayTotals.calories}</strong>/{targets.calories} kcal
                 {" • "}P {displayTotals.protein}/{targets.protein}g
                 {" • "}C {displayTotals.carbs}/{targets.carbs}g
                 {" • "}F {displayTotals.fats}/{targets.fats}g
@@ -464,9 +638,12 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet, ca
   );
 }
 
-function draftTotals(items: MealPlanItem[]): Pick<GeneratedPlan, "byMeal" | "totals"> {
+function draftTotals(items: PlanItem[]): {
+  byMeal: Record<MealType, { calories: number; protein: number; carbs: number; fats: number }>;
+  totals: { calories: number; protein: number; carbs: number; fats: number };
+} {
   const zero = { calories: 0, protein: 0, carbs: 0, fats: 0 };
-  const byMeal: GeneratedPlan["byMeal"] = {
+  const byMeal: Record<MealType, typeof zero> = {
     breakfast: { ...zero },
     lunch: { ...zero },
     dinner: { ...zero },

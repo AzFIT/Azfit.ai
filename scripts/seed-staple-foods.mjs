@@ -60,9 +60,11 @@ const STAPLES = [
   ["Lentils, Cooked", "carbs", 100, 116, 9.0, 20.1, 0.4],
   ["Kidney Beans, Canned, Drained", "carbs", 100, 127, 8.7, 22.8, 0.5],
   ["Baked Beans in Tomato Sauce", "carbs", 100, 94, 5.0, 15.3, 0.4],
+  ["Black Beans, Cooked", "carbs", 100, 132, 8.9, 23.7, 0.5],
   ["Granola", "carbs", 100, 471, 10.0, 64.0, 20.0],
   ["Cornflakes", "carbs", 100, 378, 7.0, 84.0, 0.9],
   ["Honey", "carbs", 100, 304, 0.3, 82.4, 0.0],
+  ["Wholemeal English Muffin", "carbs", 100, 220, 9.0, 44.0, 2.0],
 
   /* ── fruit ── */
   ["Banana", "fruit", 100, 89, 1.1, 22.8, 0.3],
@@ -77,6 +79,7 @@ const STAPLES = [
   ["Kiwi", "fruit", 100, 61, 1.1, 14.7, 0.5],
   ["Dates", "fruit", 100, 282, 2.4, 75.0, 0.2],
   ["Raisins", "fruit", 100, 299, 3.1, 79.2, 0.5],
+  ["Mixed Berries", "fruit", 100, 50, 0.7, 11.9, 0.3],
 
   /* ── vegetables ── */
   ["Broccoli", "vegetables", 100, 34, 2.8, 6.6, 0.4],
@@ -92,6 +95,7 @@ const STAPLES = [
   ["Courgette", "vegetables", 100, 17, 1.2, 3.1, 0.3],
   ["Kale", "vegetables", 100, 49, 4.3, 8.8, 0.9],
   ["Cauliflower", "vegetables", 100, 25, 1.9, 5.0, 0.3],
+  ["Cauliflower Rice", "vegetables", 100, 24, 2.0, 4.7, 0.2],
   ["Asparagus", "vegetables", 100, 20, 2.2, 3.9, 0.1],
   ["Cabbage", "vegetables", 100, 25, 1.3, 5.8, 0.1],
 
@@ -118,6 +122,7 @@ const STAPLES = [
   ["Mozzarella, Light", "dairy", 100, 215, 18.0, 3.5, 14.0],
   ["Parmesan", "dairy", 100, 431, 38.0, 4.1, 29.0],
   ["Cheddar", "dairy", 100, 403, 24.9, 1.3, 33.1],
+  ["Feta", "dairy", 100, 264, 14.2, 4.1, 21.3],
   ["Protein Yogurt, High Protein", "dairy", 100, 60, 10.0, 6.0, 0.4],
   ["Protein Bar (60g bar)", "snacks", 60, 220, 20.0, 22.0, 8.0],
   ["Hummus", "snacks", 100, 166, 7.9, 14.3, 9.6],

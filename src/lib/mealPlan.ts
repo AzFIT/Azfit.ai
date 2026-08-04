@@ -128,6 +128,8 @@ export const MEAL_SPLIT: Record<MealType, number> = {
 const MEAT_KEYWORDS = [
   "chicken", "beef", "pork", "fish", "salmon", "tuna", "meat", "turkey",
   "lamb", "bacon", "ham", "shrimp", "prawn", "duck", "veal", "anchov", "sardine",
+  // Phase 40: whole-fish staples the original list missed
+  "cod", "haddock", "mackerel", "tilapia", "trout",
 ];
 const DAIRY_EGG_KEYWORDS = [
   "milk", "cheese", "yogurt", "yoghurt", "egg", "butter", "cream", "whey", "dairy",
@@ -159,7 +161,7 @@ export function filterFoods(
 }
 
 /** Deterministic PRNG (mulberry32) — same seed, same plan. */
-function seededRng(seed: number): () => number {
+export function seededRng(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a |= 0;
