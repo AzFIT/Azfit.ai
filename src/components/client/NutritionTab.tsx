@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Flame, Utensils, Pencil, TrendingUp, ClipboardList } from "lucide-react";
+import { Flame, Utensils, Pencil, ClipboardList } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import {
   getNutritionTargets,
@@ -15,6 +15,7 @@ import { activityLabel, DIET_PRESETS } from "@/lib/tdee";
 import { toast } from "sonner";
 import TdeeCalculator from "@/components/nutrition/TdeeCalculator";
 import MealPlanCard from "@/components/client/MealPlanCard";
+import WeeklyAdherenceStrip from "@/components/nutrition/WeeklyAdherenceStrip";
 import type { Json } from "@/types/supabase";
 
 interface NutritionTabProps {
@@ -96,7 +97,6 @@ export default function NutritionTab({ clientId, clientEmail }: NutritionTabProp
   const [saving, setSaving] = useState(false);
   const [entries, setEntries] = useState<LoggedFoodEntry[]>([]);
   const [totals, setTotals] = useState({ calories: 0, protein: 0, carbs: 0, fats: 0 });
-  const [adherence, setAdherence] = useState({ daysLogged: 0, daysHit: 0 });
   const [clientBasics, setClientBasics] = useState<ClientBasics | null>(null);
   const [intake, setIntake] = useState<IntakeProfile | null>(null);
 
@@ -154,23 +154,7 @@ export default function NutritionTab({ clientId, clientEmail }: NutritionTabProp
       if (cancelled) return;
       setEntries(log.entries);
       setTotals(dayTotals);
-
-      let daysLogged = 0;
-      let daysHit = 0;
-      for (let i = 0; i < 7; i++) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const ds = d.toISOString().split("T")[0];
-        const dt = await getDayTotals(ds, prof.id);
-        if (dt.calories > 0) {
-          daysLogged++;
-          if (dt.calories >= t.calories * 0.8) daysHit++;
-        }
-      }
-      if (!cancelled) {
-        setAdherence({ daysLogged, daysHit });
-        setLoading(false);
-      }
+      setLoading(false);
     })();
     return () => {
       cancelled = true;
@@ -482,39 +466,10 @@ export default function NutritionTab({ clientId, clientEmail }: NutritionTabProp
             )}
           </motion.div>
 
-          {/* 7-day adherence */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="rounded-2xl border p-4"
-            style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}
-          >
-            <div className="mb-2 flex items-center gap-2">
-              <TrendingUp size={16} style={{ color: "#84CC16" }} />
-              <span className="text-sm font-semibold" style={{ color: "var(--page-text)" }}>
-                7-Day Adherence
-              </span>
-            </div>
-            <div className="flex items-center gap-4">
-              <div>
-                <span className="text-lg font-bold" style={{ color: "var(--page-text)" }}>
-                  {adherence.daysLogged}/7
-                </span>
-                <span className="ml-1 text-[10px]" style={{ color: "var(--light-text-muted)" }}>
-                  days logged
-                </span>
-              </div>
-              <div>
-                <span className="text-lg font-bold" style={{ color: "#84CC16" }}>
-                  {adherence.daysHit}/7
-                </span>
-                <span className="ml-1 text-[10px]" style={{ color: "var(--light-text-muted)" }}>
-                  days ≥80% of calorie target
-                </span>
-              </div>
-            </div>
-          </motion.div>
+          {/* Phase 38, Item 2 — weekly adherence strip (replaces the old
+              7-query "7-Day Adherence" card; same component as the
+              client's own Nutrition page) */}
+          <WeeklyAdherenceStrip userId={profileId} />
         </>
       )}
     </div>

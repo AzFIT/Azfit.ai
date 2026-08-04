@@ -41,6 +41,27 @@ export interface GeneratedPlan {
   totals: { calories: number; protein: number; carbs: number; fats: number };
 }
 
+/** Resolve a saved plan item name back to a foods_cache row (Phase 38).
+ * Plan items store NO food id — names are saved as `name` or
+ * `name (brand)` (see toItem). Match both forms, trimmed +
+ * case-insensitive; first match wins when names collide.
+ * Returns null when nothing matches exactly — callers skip the item
+ * rather than log garbage. */
+export function resolvePlanFood(
+  itemName: string,
+  foods: FoodInput[],
+): FoodInput | null {
+  const norm = (s: string) => s.trim().toLowerCase();
+  const target = norm(itemName);
+  return (
+    foods.find((f) => norm(f.name) === target) ??
+    foods.find(
+      (f) => f.brand != null && norm(`${f.name} (${f.brand})`) === target,
+    ) ??
+    null
+  );
+}
+
 export const MEAL_ORDER: MealType[] = ["breakfast", "lunch", "dinner", "snacks"];
 
 export const MEAL_SPLIT: Record<MealType, number> = {

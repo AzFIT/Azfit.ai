@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { filterFoods, generateMealPlan, MEAL_ORDER, MEAL_SPLIT, type FoodInput } from "@/lib/mealPlan";
+import { filterFoods, generateMealPlan, resolvePlanFood, MEAL_ORDER, MEAL_SPLIT, type FoodInput } from "@/lib/mealPlan";
 
 const food = (
   id: string,
@@ -127,5 +127,24 @@ describe("generateMealPlan", () => {
       expect(item.serving_g % 5).toBe(0);
       expect(item.serving_g).toBeGreaterThanOrEqual(15);
     }
+  });
+});
+
+describe("resolvePlanFood (Phase 38)", () => {
+  it("matches a plain name exactly (trimmed, case-insensitive)", () => {
+    expect(resolvePlanFood("grilled chicken breast", POOL)?.id).toBe("1");
+    expect(resolvePlanFood("  White Rice  ", POOL)?.id).toBe("2");
+  });
+
+  it("matches the composite `name (brand)` form", () => {
+    const foods = [food("9", "Almond Milk", 60, 2, 8, 2.5, { brand: "PeanutCo" })];
+    expect(resolvePlanFood("Almond Milk (PeanutCo)", foods)?.id).toBe("9");
+  });
+
+  it("returns null when nothing matches (caller skips, never guesses)", () => {
+    expect(resolvePlanFood("Unicorn Steak", POOL)).toBeNull();
+    // composite string must NOT match the plain name alone
+    const foods = [food("9", "Almond Milk", 60, 2, 8, 2.5, { brand: "PeanutCo" })];
+    expect(resolvePlanFood("Almond Milk (OtherBrand)", foods)).toBeNull();
   });
 });

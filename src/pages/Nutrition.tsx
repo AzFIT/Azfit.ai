@@ -12,8 +12,10 @@ import {
   Droplets,
   ChevronDown,
   ChevronUp,
+  Copy,
   Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 import FAB from "@/components/FAB";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +34,8 @@ import {
 } from "@/lib/foodApi";
 import { supabase } from "@/lib/supabase";
 import TdeeCalculator from "@/components/nutrition/TdeeCalculator";
+import MealPlanCard from "@/components/client/MealPlanCard";
+import WeeklyAdherenceStrip from "@/components/nutrition/WeeklyAdherenceStrip";
 
 /* ── Types & Data ──────────────────────────────────────── */
 
@@ -42,7 +46,10 @@ interface MealEntry {
 }
 
 interface Meal {
-  type: "breakfast" | "lunch" | "dinner" | "snack";
+  // Phase 38: "snacks" (plural) — the DB meal_type CHECK only allows
+  // breakfast/lunch/dinner/snacks; the old singular "snack" silently
+  // dropped every snack log from this page.
+  type: "breakfast" | "lunch" | "dinner" | "snacks";
   foods: MealEntry[];
 }
 
@@ -56,7 +63,7 @@ const MEAL_TYPES = [
   { type: "breakfast" as const, label: "Breakfast", icon: Coffee },
   { type: "lunch" as const, label: "Lunch", icon: Sun },
   { type: "dinner" as const, label: "Dinner", icon: Moon },
-  { type: "snack" as const, label: "Snacks", icon: Cookie },
+  { type: "snacks" as const, label: "Snacks", icon: Cookie },
 ];
 
 const WATER_KEY = "azfit_nutrition_water";
@@ -87,6 +94,32 @@ function saveWater(date: string, ml: number) {
   } catch {
     /* ignore */
   }
+}
+
+/** Restrictions/allergies may be an array or a comma-separated string
+ * (same shape NutritionTab handles). */
+function parseTerms(v: unknown): string[] {
+  if (Array.isArray(v)) {
+    return v.filter((x): x is string => typeof x === "string" && x.trim() !== "");
+  }
+  if (typeof v === "string" && v.trim() !== "") {
+    return v.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+function fmtLocalDate(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/** Client-local today (the page's date state is client-local too). */
+function todayLocal(): string {
+  return fmtLocalDate(new Date());
+}
+
+function yesterdayLocal(): string {
+  return fmtLocalDate(new Date(Date.now() - 86400000));
 }
 
 async function fetchLog(date: string): Promise<DailyLog> {
@@ -168,11 +201,18 @@ export default function NutritionPage() {
   const [editingTargets, setEditingTargets] = useState(false);
   const [targetsDraft, setTargetsDraft] = useState<NutritionTargets>(DEFAULT_TARGETS);
   const [clientId, setClientId] = useState<string | null>(null);
+  // Phase 38: diet/restrictions feed the meal-plan card on this page
+  const [intake, setIntake] = useState<{ diet?: string; restrictions: string[] }>({
+    restrictions: [],
+  });
+  const [yesterdayCount, setYesterdayCount] = useState(0);
+  const [copying, setCopying] = useState(false);
+  const [logVersion, setLogVersion] = useState(0);
   const [expandedMeals, setExpandedMeals] = useState<Record<string, boolean>>({
     breakfast: true,
     lunch: true,
     dinner: true,
-    snack: true,
+    snacks: true,
   });
 
   const refreshTargets = useCallback(() => {
@@ -192,12 +232,23 @@ export default function NutritionPage() {
       if (email) {
         const { data } = await supabase
           .from("clients")
-          .select("id")
+          .select("id, intake_profile")
           .eq("email", email)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
         cid = data?.id ?? null;
+        const ip = data?.intake_profile as {
+          diet?: string;
+          restrictions?: string[] | string | null;
+          allergies?: string[] | string | null;
+        } | null;
+        if (ip) {
+          setIntake({
+            diet: ip.diet,
+            restrictions: [...parseTerms(ip.restrictions), ...parseTerms(ip.allergies)],
+          });
+        }
       }
       if (cancelled) return;
       if (cid) setClientId(cid);
@@ -215,10 +266,39 @@ export default function NutritionPage() {
     fetchLog(date).then((loaded) => {
       if (!cancelled) setLog(loaded);
     });
+    // Phase 38, Item 3: Copy-yesterday visibility (only relevant on today)
+    if (date === todayLocal()) {
+      getDailyLog(yesterdayLocal()).then((y) => {
+        if (!cancelled) setYesterdayCount(y.entries.length);
+      });
+    }
     return () => {
       cancelled = true;
     };
   }, [date]);
+
+  const reloadLog = useCallback(() => {
+    fetchLog(date).then(setLog);
+    setLogVersion((v) => v + 1); // refreshes the weekly strip
+  }, [date]);
+
+  // Phase 38, Item 3 — duplicate yesterday's rows into today
+  const copyYesterday = async () => {
+    if (copying) return;
+    setCopying(true);
+    try {
+      const yesterday = await getDailyLog(yesterdayLocal());
+      for (const entry of yesterday.entries) {
+        await addFoodToLog(entry.mealType, entry.food.id, entry.quantity, todayLocal());
+      }
+      toast.success(`Copied ${yesterday.entries.length} items from yesterday ✅`);
+      reloadLog();
+    } catch (err) {
+      toast.error("Copy failed: " + (err instanceof Error ? err.message : "Unknown error"));
+    } finally {
+      setCopying(false);
+    }
+  };
 
   const handleSaveTargets = async () => {
     await saveNutritionTargets(targetsDraft);
@@ -255,8 +335,7 @@ export default function NutritionPage() {
       quantity,
       date,
     );
-    const loaded = await fetchLog(date);
-    setLog(loaded);
+    reloadLog();
     setShowFoodSearch(null);
   };
 
@@ -269,6 +348,7 @@ export default function NutritionPage() {
         foods: m.foods.filter((f) => f.logId !== logId),
       })),
     }));
+    setLogVersion((v) => v + 1);
   };
 
   const addWater = (amount: number) => {
@@ -413,6 +493,46 @@ export default function NutritionPage() {
           )}
           {clientId && <TdeeCalculator clientId={clientId} onApplied={refreshTargets} />}
         </div>
+
+        {/* Phase 38, Item 2 — weekly adherence strip (own data) */}
+        <div className="mb-4">
+          <WeeklyAdherenceStrip refreshKey={logVersion} />
+        </div>
+
+        {/* Phase 38, Item 1 — saved meal plan with per-meal Log actions
+            (own logs only; trainer view never gets canLog — RLS) */}
+        {clientId && (
+          <div className="mb-4">
+            <MealPlanCard
+              clientId={clientId}
+              targets={targets}
+              restrictions={intake.restrictions}
+              diet={intake.diet}
+              canLog
+              onLogged={reloadLog}
+            />
+          </div>
+        )}
+
+        {/* Phase 38, Item 3 — Copy yesterday (hidden when yesterday is empty
+            or a past/future date is being viewed) */}
+        {date === todayLocal() && yesterdayCount > 0 && (
+          <div className="mb-3 flex justify-end">
+            <button
+              onClick={copyYesterday}
+              disabled={copying}
+              className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition hover:opacity-90 disabled:opacity-50"
+              style={{
+                backgroundColor: "rgba(0,174,239,0.12)",
+                color: "var(--azfit-primary)",
+              }}
+            >
+              <Copy className="h-3.5 w-3.5" />
+              {copying ? "Copying…" : `Copy yesterday (${yesterdayCount} items)`}
+            </button>
+          </div>
+        )}
+
         <div className="space-y-3">
           {MEAL_TYPES.map((mealType) => {
             const meal = log.meals.find((m) => m.type === mealType.type);

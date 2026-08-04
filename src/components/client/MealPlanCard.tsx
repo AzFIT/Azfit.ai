@@ -1,18 +1,20 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { ChefHat, RefreshCw, Save, Shuffle } from "lucide-react";
+import { ChefHat, Check, ClipboardList, RefreshCw, Save, Shuffle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import {
   generateMealPlan,
   filterFoods,
+  resolvePlanFood,
   MEAL_ORDER,
   type FoodInput,
   type GeneratedPlan,
   type MealPlanItem,
+  type MealType,
 } from "@/lib/mealPlan";
-import type { MacroTotals } from "@/lib/foodApi";
+import { addFoodToLog, type MacroTotals } from "@/lib/foodApi";
 import type { Database, Json } from "@/types/supabase";
 
 type MealPlanRow = Database["public"]["Tables"]["meal_plans"]["Row"];
@@ -22,6 +24,20 @@ interface MealPlanCardProps {
   targets: MacroTotals; // normalized in both profile modes
   restrictions: string[]; // intake restrictions + allergies
   diet?: string;
+  /** Phase 38: show per-meal "Log" actions that insert nutrition_logs
+   * for the SIGNED-IN user. Only pass true on the client's own
+   * Nutrition page — RLS allows inserting own logs only, so the
+   * trainer view never gets this (documented deviation). */
+  canLog?: boolean;
+  /** Called after a successful log so the parent can refresh its day view */
+  onLogged?: () => void;
+}
+
+/** Client-local today as YYYY-MM-DD (toISOString would be UTC). */
+function todayLocal(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
 const MEAL_LABELS: Record<string, string> = {
@@ -31,7 +47,7 @@ const MEAL_LABELS: Record<string, string> = {
   snacks: "Snacks",
 };
 
-export default function MealPlanCard({ clientId, targets, restrictions, diet }: MealPlanCardProps) {
+export default function MealPlanCard({ clientId, targets, restrictions, diet, canLog = false, onLogged }: MealPlanCardProps) {
   const { user } = useAuth();
   const [savedPlan, setSavedPlan] = useState<MealPlanRow | null>(null);
   const [draft, setDraft] = useState<GeneratedPlan | null>(null);
@@ -39,6 +55,8 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet }: 
   const [seed, setSeed] = useState(1);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loggedMeals, setLoggedMeals] = useState<Set<string>>(new Set());
+  const [loggingMeal, setLoggingMeal] = useState<string | null>(null);
 
   const loadPlan = useCallback(async () => {
     const { data, error } = await supabase
@@ -62,6 +80,27 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet }: 
       cancelled = true;
     };
   }, [loadPlan]);
+
+  // Phase 38: which plan meals already have logs today (own view only)
+  useEffect(() => {
+    if (!canLog) return;
+    let cancelled = false;
+    (async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      if (!uid) return;
+      const { data } = await supabase
+        .from("nutrition_logs")
+        .select("meal_type")
+        .eq("user_id", uid)
+        .eq("logged_date", todayLocal());
+      if (cancelled || !data) return;
+      setLoggedMeals(new Set(data.map((r) => r.meal_type as string)));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canLog]);
 
   const ensureFoods = useCallback(async (): Promise<FoodInput[]> => {
     if (foods.length > 0) return foods;
@@ -179,6 +218,48 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet }: 
     }
   }, [draft, savedPlan, saving, targets, clientId, user?.id, loadPlan]);
 
+  // Phase 38, Item 1 — log a whole plan meal into today's nutrition_logs.
+  // Items store no food id: resolve names via resolvePlanFood (exact
+  // match only), skip + report anything unmatched, never insert garbage.
+  const handleLogMeal = useCallback(
+    async (meal: MealType, items: MealPlanItem[]) => {
+      if (loggingMeal) return;
+      setLoggingMeal(meal);
+      try {
+        const pool = await ensureFoods();
+        let logged = 0;
+        let skipped = 0;
+        for (const it of items) {
+          const food = resolvePlanFood(it.name, pool);
+          if (!food) {
+            skipped++;
+            continue;
+          }
+          await addFoodToLog(meal, food.id, it.serving_g, todayLocal());
+          logged++;
+        }
+        if (logged > 0) {
+          toast.success(`Logged ${logged} items to ${MEAL_LABELS[meal]} ✅`);
+          setLoggedMeals((prev) => new Set(prev).add(meal));
+          onLogged?.();
+        }
+        if (skipped > 0) {
+          toast.warning(`${skipped} skipped — not in food database`);
+        }
+        if (logged === 0) {
+          toast.error("No items matched the food database — nothing logged");
+        }
+      } catch (err) {
+        toast.error(
+          "Failed to log meal: " + (err instanceof Error ? err.message : "Unknown error"),
+        );
+      } finally {
+        setLoggingMeal(null);
+      }
+    },
+    [loggingMeal, ensureFoods, onLogged],
+  );
+
   // What to display: draft wins, else saved
   const displayItems: MealPlanItem[] | null = draft
     ? draft.items
@@ -227,7 +308,7 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet }: 
             </span>
           )}
         </div>
-        {displayItems && (
+        {displayItems && !canLog && (
           <button
             onClick={handleRegenerate}
             className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition hover:opacity-80"
@@ -242,6 +323,11 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet }: 
       {loading ? (
         <div className="h-16 animate-pulse rounded-xl" style={{ backgroundColor: "var(--light-elevated)" }} />
       ) : !displayItems ? (
+        canLog ? (
+          <p className="py-4 text-center text-xs" style={{ color: "var(--light-text-muted)" }}>
+            No meal plan yet — your trainer can create one from your Nutrition tab.
+          </p>
+        ) : (
         <div className="flex flex-col items-center py-4">
           <p className="text-xs" style={{ color: "var(--light-text-muted)" }}>
             No meal plan yet — generate one from {targets.calories} kcal of targets.
@@ -255,6 +341,7 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet }: 
             Generate meal plan
           </button>
         </div>
+        )
       ) : (
         <>
           <div className="space-y-3">
@@ -271,11 +358,43 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet }: 
                     >
                       {MEAL_LABELS[meal]}
                     </p>
-                    {mealTotals && (
-                      <span className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
-                        {mealTotals.calories} kcal
-                      </span>
-                    )}
+                    <span className="flex items-center gap-2">
+                      {mealTotals && (
+                        <span className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+                          {mealTotals.calories} kcal
+                        </span>
+                      )}
+                      {canLog && !draft && (
+                        <>
+                          {loggedMeals.has(meal) && (
+                            <span
+                              className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
+                              style={{ backgroundColor: "rgba(34,197,94,0.15)", color: "#22C55E" }}
+                            >
+                              <Check size={9} />
+                              Logged
+                            </span>
+                          )}
+                          <button
+                            onClick={() => handleLogMeal(meal, items)}
+                            disabled={loggingMeal !== null}
+                            className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-semibold transition hover:opacity-80 disabled:opacity-50"
+                            style={{
+                              backgroundColor: "rgba(0,174,239,0.12)",
+                              color: "var(--azfit-primary)",
+                            }}
+                            title={`Log all ${items.length} items to today's ${MEAL_LABELS[meal]}`}
+                          >
+                            <ClipboardList size={10} />
+                            {loggingMeal === meal
+                              ? "Logging…"
+                              : loggedMeals.has(meal)
+                                ? "Log again"
+                                : "Log"}
+                          </button>
+                        </>
+                      )}
+                    </span>
                   </div>
                   <div className="space-y-1">
                     {items.map((item) => {
@@ -293,13 +412,15 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet }: 
                             <span className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
                               {item.serving_g}g • {item.calories} kcal
                             </span>
-                            <button
-                              onClick={() => handleSwap(globalIdx)}
-                              className="p-1 rounded hover:opacity-80"
-                              title="Swap this item"
-                            >
-                              <Shuffle size={11} style={{ color: "var(--azfit-primary)" }} />
-                            </button>
+                            {!canLog && (
+                              <button
+                                onClick={() => handleSwap(globalIdx)}
+                                className="p-1 rounded hover:opacity-80"
+                                title="Swap this item"
+                              >
+                                <Shuffle size={11} style={{ color: "var(--azfit-primary)" }} />
+                              </button>
+                            )}
                           </span>
                         </div>
                       );
@@ -321,7 +442,7 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet }: 
                 {" • "}C {displayTotals.carbs}/{targets.carbs}g
                 {" • "}F {displayTotals.fats}/{targets.fats}g
               </p>
-              {draft && (
+              {draft && !canLog && (
                 <button
                   onClick={handleSave}
                   disabled={saving}
