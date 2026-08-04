@@ -4,6 +4,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import type { Database, Json } from "@/types/supabase";
+import { normalizeOrderLabels } from "@/lib/exerciseLabels";
 import type {
   ProgramData,
   ProgramExercise,
@@ -286,9 +287,9 @@ export function programDataFromDb(
 
   // Lossless: every workout day keeps its own exercise list (keyed by
   // day_of_week), each exercise carrying its DB id for diff-based saves.
-  const toProgramExercise = (ex: ExerciseRow): ProgramExercise => {
+  const toProgramExercise = (ex: ExerciseRow, normalizedCode?: string): ProgramExercise => {
     const extra = parseExerciseNotes(ex.notes);
-    const code = codeFromOrderIndex(ex.order_index);
+    const code = normalizedCode ?? codeFromOrderIndex(ex.order_index);
     return {
       code,
       name: ex.name,
@@ -308,10 +309,12 @@ export function programDataFromDb(
   const workoutExercises: Record<number, ProgramExercise[]> = {};
   for (const w of workouts) {
     const dayIdx = w.day_of_week ?? 1;
-    const list = exercises
+    const dayRows = exercises
       .filter((e) => e.workout_id === w.id)
-      .sort((a, b) => a.order_index - b.order_index)
-      .map(toProgramExercise);
+      .sort((a, b) => a.order_index - b.order_index);
+    // Phase 36: normalize display labels per day (D1 D1 → D1 D2) — display only
+    const dayLabels = normalizeOrderLabels(dayRows.map((e) => codeFromOrderIndex(e.order_index)));
+    const list = dayRows.map((e, i) => toProgramExercise(e, dayLabels[i]));
     if (list.length > 0) workoutExercises[dayIdx] = list;
   }
 

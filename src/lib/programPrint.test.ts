@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildPrintModel, buildPrintModelFromWizard } from "@/lib/programPrint";
+import { normalizeOrderLabels } from "@/lib/exerciseLabels";
+import { getOrderCode } from "@/lib/workoutSession";
 import type { Database } from "@/types/supabase";
 
 type ProgramRow = Database["public"]["Tables"]["programs"]["Row"];
@@ -100,5 +102,37 @@ describe("buildPrintModelFromWizard (draft)", () => {
     expect(model.days.map((d) => d.label)).toEqual(["Monday — Upper — Push", "Tuesday — Lower — Squat"]);
     expect(model.days[0].exercises[0].setsReps).toBe("5 × 5");
     expect(model.progressionRules[0].label).toBe("Deload Every 4th Week");
+  });
+});
+
+describe("Phase 36 — label parity between the session player and the print view", () => {
+  it("the same legacy fixture (duplicate order_index) yields identical labels on both paths", () => {
+    // Owner's case: 8 rows, the last two sharing order_index 6 → raw D1 D1
+    const orderIdx = [0, 1, 2, 3, 4, 5, 6, 6];
+    // Session-player path (33C): getOrderCode per row → normalizeOrderLabels
+    const sessionPath = normalizeOrderLabels(orderIdx.map(getOrderCode));
+    expect(sessionPath).toEqual(["A1", "A2", "B1", "B2", "C1", "C2", "D1", "D2"]);
+
+    // Print path (Phase 34/36): buildPrintModel normalizes per day
+    const w = { id: "w1", program_id: "p1", name: "Full Body A", day_of_week: 1 } as unknown as WorkoutRow;
+    const rows = orderIdx.map((oi, i) => ({
+      id: `e${i}`,
+      workout_id: "w1",
+      name: `Exercise ${i + 1}`,
+      sets: 3,
+      reps: "10",
+      order_index: oi,
+      rest_seconds: 60,
+      notes: null,
+    })) as unknown as ExerciseRow[];
+    const model = buildPrintModel(
+      { id: "p1", name: "T", client_id: "c", trainer_id: "t", created_at: "2026-01-01", start_date: null, end_date: null, phases: null, progression_rules: null } as unknown as ProgramRow,
+      [w],
+      rows,
+      "Client",
+      "Coach"
+    );
+    const printPath = model.days[0].exercises.map((e) => e.order);
+    expect(printPath).toEqual(sessionPath);
   });
 });

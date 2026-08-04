@@ -6,6 +6,7 @@
 
 import type { Database, Json } from "@/types/supabase";
 import { codeFromOrderIndex, parseExerciseNotes, restStringFromSeconds } from "@/lib/aiProgramMapper";
+import { normalizeOrderLabels } from "@/lib/exerciseLabels";
 import type { ProgramData, ProgramExercise } from "@/pages/AIProgramBuilder";
 import type { ProgressionRule } from "@/lib/progression";
 
@@ -67,9 +68,9 @@ function progressionRulesFromJson(rules: Json | null): { label: string; text: st
     .map((r) => ({ label: r.label, text: r.text }));
 }
 
-function mapDbExercise(ex: ExerciseRow): PrintExercise {
+function mapDbExercise(ex: ExerciseRow, normalizedCode?: string): PrintExercise {
   const extra = parseExerciseNotes(ex.notes);
-  const code = codeFromOrderIndex(ex.order_index);
+  const code = normalizedCode ?? codeFromOrderIndex(ex.order_index);
   const notes: string[] = [];
   if (extra.isSubstituted) notes.push("Swapped for safety");
   if (extra.safetyNote && !extra.isSubstituted) notes.push(extra.safetyNote);
@@ -103,13 +104,17 @@ export function buildPrintModel(
 ): PrintProgram {
   const days = [...workouts]
     .sort((a, b) => (a.day_of_week ?? 0) - (b.day_of_week ?? 0))
-    .map((w) => ({
-      label: `${DAY_NAMES[w.day_of_week ?? 0] ?? `Day ${w.day_of_week}`} — ${w.name}`,
-      exercises: exercises
+    .map((w) => {
+      const dayExercises = exercises
         .filter((e) => e.workout_id === w.id)
-        .sort((a, b) => a.order_index - b.order_index)
-        .map(mapDbExercise),
-    }))
+        .sort((a, b) => a.order_index - b.order_index);
+      // Phase 36: normalize display labels per day (D1 D1 → D1 D2), display only
+      const dayLabels = normalizeOrderLabels(dayExercises.map((e) => codeFromOrderIndex(e.order_index)));
+      return {
+        label: `${DAY_NAMES[w.day_of_week ?? 0] ?? `Day ${w.day_of_week}`} — ${w.name}`,
+        exercises: dayExercises.map((e, i) => mapDbExercise(e, dayLabels[i])),
+      };
+    })
     .filter((d) => d.exercises.length > 0);
 
   return {

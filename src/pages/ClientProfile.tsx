@@ -29,6 +29,7 @@ import {
 import type { Client, ClientGeneratedProgram } from "@/types/client";
 import { supabase } from "@/lib/supabase";
 import { codeFromOrderIndex, parseExerciseNotes } from "@/lib/aiProgramMapper";
+import { normalizeOrderLabels } from "@/lib/exerciseLabels";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import type { Database } from "@/types/supabase";
@@ -148,15 +149,20 @@ async function fetchClientPrograms(clientId: string): Promise<ClientGeneratedPro
           goal: p.description || "",
           workouts: programWorkouts.map((w) => {
             const wExercises = (exercises || []).filter((e) => e.workout_id === w.id);
+            // Phase 36: normalize display labels per workout (D1 D1 → D1 D2) —
+            // same normalizer the session player uses (33C); display only.
+            const dayCodes = normalizeOrderLabels(
+              wExercises.map((e) => codeFromOrderIndex(e.order_index))
+            );
             return {
               id: w.id,
               name: w.name,
               dayNumber: w.day_of_week || 1,
               focus: w.name,
               estimatedMinutes: Math.max(30, wExercises.length * 5),
-              exercises: wExercises.map((e) => {
+              exercises: wExercises.map((e, i) => {
                 const extra = parseExerciseNotes(e.notes);
-                const code = codeFromOrderIndex(e.order_index);
+                const code = dayCodes[i];
                 return {
                   id: e.id, // Phase 35 ITEM 3: needed for inline prescription edits
                   order: code,
