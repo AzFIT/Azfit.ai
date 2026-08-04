@@ -234,13 +234,16 @@ export interface MacroTargetsAdvanced {
  * 1. Protein on lean mass (LBM = weight × (1 − BF%), or weight × 0.8 when BF
  *    unknown): 2.0 g/kg LBM base; 2.2 if BF>25% OR goal in
  *    (muscle_gain, lean_gain, aggressive_fat_loss); else 1.8 if BF<12% OR
- *    vegetarian/vegan; hard-capped at 1.6 when kidneyConcern; protein also
- *    capped at 35% of total kcal.
- * 2. Fats: 25% of remaining kcal (midpoint of the 20–30% band), floored at
- *    0.6 g/kg total weight; female minimum 25% of total kcal.
- * 3. Carbs fill the remainder.
- * 4. Fiber: 14 g per 1000 kcal, floored at 25 g (female) / 38 g (male).
- * 5. Water: 35 ml/kg + 500 ml per training day (default 3), rounded to 50 ml.
+ *    vegetarian/vegan; +0.2 for high_protein (Phase 39); hard-capped at
+ *    1.6 when kidneyConcern; protein also capped at 35% of total kcal.
+ * 2. Fats/carbs split of the remainder (Phase 39 diet-aware):
+ *    low_carb — carbs ≤ ~20% of total kcal, fats absorb the remainder;
+ *    high_carb — fats ≈ 20% of total kcal (never below the floor), carbs
+ *    absorb the remainder; anything else — fats 25% of remaining kcal,
+ *    floored at 0.6 g/kg total weight and (female) 25% of total kcal,
+ *    carbs fill the rest.
+ * 3. Fiber: 14 g per 1000 kcal, floored at 25 g (female) / 38 g (male).
+ * 4. Water: 35 ml/kg + 500 ml per training day (default 3), rounded to 50 ml.
  */
 export function calculateMacroTargets(input: {
   calories: number;
@@ -283,6 +286,7 @@ export function calculateMacroTargets(input: {
   ) {
     multiplier = 1.8;
   }
+  if (diet === "high_protein") multiplier += 0.2; // Phase 39 — still capped below
   if (kidneyConcern) multiplier = Math.min(multiplier, 1.6);
   const proteinPerKgLbm = multiplier;
   let protein = lbm * multiplier;
@@ -290,15 +294,39 @@ export function calculateMacroTargets(input: {
   if (protein * 4 > proteinKcalCap) protein = proteinKcalCap / 4;
   protein = Math.round(protein);
 
-  // 2 — fats: 25% of remaining kcal, with floors
+  // 2+3 — fats/carbs split of the remaining kcal (diet-aware, Phase 39).
+  // balanced/undefined/vegetarian/vegan: identical to the pre-39 behavior
+  // (fats 25% of remaining, floors, carbs fill the rest).
   const remainingKcal = Math.max(0, calories - protein * 4);
-  let fatG = (remainingKcal * 0.25) / 9;
-  fatG = Math.max(fatG, weightKg * 0.6);
-  if (gender === "female") fatG = Math.max(fatG, (calories * 0.25) / 9);
+  const fatFloorG = Math.max(
+    weightKg * 0.6,
+    gender === "female" ? (calories * 0.25) / 9 : 0,
+  );
+  let fatG: number;
+  let carbsG: number;
+  if (diet === "low_carb") {
+    // carbs capped at ~20% of total kcal; fats absorb the remainder.
+    // Carbs must still leave room for the fat floor; if kcal are so low
+    // that even carbs=0 can't fund the floor, kcal consistency wins
+    // (documented — same corner the pre-39 code overspent in).
+    const carbCapG = (calories * 0.2) / 4;
+    carbsG = Math.min(
+      carbCapG,
+      Math.max(0, (calories - protein * 4 - fatFloorG * 9) / 4),
+    );
+    fatG = Math.max(0, calories - protein * 4 - carbsG * 4) / 9;
+  } else if (diet === "high_carb") {
+    // fats capped at ~20% of total kcal, NEVER below the floor; carbs
+    // absorb the remainder.
+    const fatCapG = (calories * 0.2) / 9;
+    fatG = Math.min(Math.max(fatCapG, fatFloorG), remainingKcal / 9);
+    carbsG = Math.max(0, calories - protein * 4 - fatG * 9) / 4;
+  } else {
+    fatG = Math.max((remainingKcal * 0.25) / 9, fatFloorG);
+    carbsG = Math.max(0, calories - protein * 4 - fatG * 9) / 4;
+  }
   const fats = Math.round(fatG);
-
-  // 3 — carbs fill the remainder
-  const carbs = Math.round(Math.max(0, calories - protein * 4 - fats * 9) / 4);
+  const carbs = Math.round(carbsG);
 
   // 4 — fiber
   const fiber = Math.round(Math.max((calories / 1000) * 14, gender === "female" ? 25 : 38));
@@ -309,12 +337,17 @@ export function calculateMacroTargets(input: {
   return { protein, carbs, fats, fiber, waterMl, proteinPerKgLbm };
 }
 
-/** Diet preference macro splits (% of calories), per legacy PHASE_2 spec. */
+/** Diet preference macro splits (% of calories), per legacy PHASE_2 spec.
+ * Phase 39: vegetarian/vegan added so both diet dropdowns (TdeeCalculator
+ * + intake wizard, both map over this object) offer them — the D6 protein
+ * ladder already handles them (1.8 g/kg LBM); their split stays balanced. */
 export const DIET_PRESETS = {
   balanced: { label: "Balanced", protein: 30, carbs: 35, fats: 35 },
   low_carb: { label: "Low Carb", protein: 35, carbs: 15, fats: 50 },
   high_carb: { label: "High Carb", protein: 25, carbs: 55, fats: 20 },
   high_protein: { label: "High Protein", protein: 40, carbs: 30, fats: 30 },
+  vegetarian: { label: "Vegetarian", protein: 30, carbs: 35, fats: 35 },
+  vegan: { label: "Vegan", protein: 30, carbs: 35, fats: 35 },
 } as const;
 
 export type DietKey = keyof typeof DIET_PRESETS;

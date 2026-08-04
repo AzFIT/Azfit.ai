@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { filterFoods, generateMealPlan, resolvePlanFood, MEAL_ORDER, MEAL_SPLIT, type FoodInput } from "@/lib/mealPlan";
+import { filterFoods, generateMealPlan, rankFoodPool, resolvePlanFood, MEAL_ORDER, MEAL_SPLIT, type FoodInput } from "@/lib/mealPlan";
 
 const food = (
   id: string,
@@ -146,5 +146,61 @@ describe("resolvePlanFood (Phase 38)", () => {
     // composite string must NOT match the plain name alone
     const foods = [food("9", "Almond Milk", 60, 2, 8, 2.5, { brand: "PeanutCo" })];
     expect(resolvePlanFood("Almond Milk (OtherBrand)", foods)).toBeNull();
+  });
+});
+
+describe("rankFoodPool (Phase 39)", () => {
+  const staple = (id: string, name: string, kcal: number, p: number, c: number, f: number, category: string) =>
+    food(id, name, kcal, p, c, f, { category, source: "seed-staples" });
+  const junk = (id: string, name: string, kcal: number, p: number, c: number, f: number) =>
+    food(id, name, kcal, p, c, f, { category: "Snacks", source: "off" });
+
+  it("seed-staples rank before non-staple rows regardless of macros", () => {
+    const ranked = rankFoodPool(
+      [junk("j", "Ice Cream", 207, 3.5, 24, 11), staple("s", "Chicken Breast", 120, 22, 0, 2.5, "protein")],
+      "lunch",
+    );
+    expect(ranked.map((f) => f.id)).toEqual(["s", "j"]);
+  });
+
+  it("snack slots prefer fruit/snacks/dairy categories within the staple tier", () => {
+    const ranked = rankFoodPool(
+      [
+        staple("v", "Broccoli", 34, 2.8, 7, 0.4, "vegetables"),
+        staple("f", "Banana", 89, 1.1, 23, 0.3, "fruit"),
+      ],
+      "snacks",
+    );
+    expect(ranked[0].id).toBe("f");
+  });
+
+  it("low_carb ranks low carb-density first; high_carb the reverse", () => {
+    const pool = [
+      staple("c", "Rice", 130, 2.7, 28, 0.3, "carbs"),
+      staple("p", "Chicken Breast", 120, 22, 0, 2.5, "protein"),
+    ];
+    expect(rankFoodPool(pool, "lunch", "low_carb")[0].id).toBe("p");
+    expect(rankFoodPool(pool, "lunch", "high_carb")[0].id).toBe("c");
+  });
+
+  it("high_protein / balanced rank protein-density first", () => {
+    const pool = [
+      staple("c", "Oats", 150, 5, 27, 2.5, "carbs"),
+      staple("p", "Egg Whites", 52, 11, 0.7, 0.2, "protein"),
+    ];
+    expect(rankFoodPool(pool, "lunch", "high_protein")[0].id).toBe("p");
+    expect(rankFoodPool(pool, "lunch")[0].id).toBe("p");
+  });
+
+  it("generateMealPlan keeps junk out when staples fill the pool", () => {
+    const staples = Array.from({ length: 12 }, (_, i) =>
+      staple(`s${i}`, `Staple ${i}`, 120 + i * 10, 20 - i, 5 + i * 2, 3, i % 2 ? "protein" : "carbs"),
+    );
+    const junkFoods = Array.from({ length: 8 }, (_, i) =>
+      junk(`j${i}`, `Ice Cream ${i}`, 250, 3, 30, 12),
+    );
+    const plan = generateMealPlan([...junkFoods, ...staples], { calories: 2400, protein: 150, carbs: 240, fats: 80 }, { seed: 3 });
+    expect(plan.items.length).toBeGreaterThan(0);
+    expect(plan.items.every((it) => it.name.startsWith("Staple"))).toBe(true);
   });
 });

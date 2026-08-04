@@ -260,3 +260,119 @@ describe("Phase 33D — calculateNutritionPipeline (wizard parity with TdeeCalcu
     expect(p.goalCalories).toBe(Math.round(2740 * 1.05));
   });
 });
+
+/* ── Phase 39, Item 1: diet-aware macro splits ─────────────────── */
+describe("diet-aware macro splits (Phase 39)", () => {
+  // 80 kg male, 2759 kcal, maintenance, no BF (LBM fallback 64 kg)
+  const base = {
+    calories: 2759,
+    weightKg: 80,
+    gender: "male" as const,
+    goal: "maintenance",
+  };
+  const balanced = calculateMacroTargets({ ...base, diet: "balanced" });
+  const lowCarb = calculateMacroTargets({ ...base, diet: "low_carb" });
+  const highCarb = calculateMacroTargets({ ...base, diet: "high_carb" });
+  const highProtein = calculateMacroTargets({ ...base, diet: "high_protein" });
+
+  it("4 diet keys → 4 visibly different macro outputs", () => {
+    const tuples = [balanced, lowCarb, highCarb, highProtein].map(
+      (m) => `${m.protein}/${m.carbs}/${m.fats}`,
+    );
+    expect(new Set(tuples).size).toBe(4);
+  });
+
+  it("balanced output is identical to undefined diet (no drift)", () => {
+    expect(balanced).toEqual(calculateMacroTargets(base));
+  });
+
+  it("low_carb caps carbs at ~20% of kcal; fats absorb the remainder", () => {
+    expect(lowCarb.carbs * 4).toBeLessThanOrEqual(base.calories * 0.205);
+    expect(lowCarb.fats).toBeGreaterThan(balanced.fats);
+    expect(lowCarb.carbs).toBeLessThan(balanced.carbs);
+  });
+
+  it("high_carb caps fats at ~20% of kcal; carbs absorb the remainder", () => {
+    expect(highCarb.fats * 9).toBeLessThanOrEqual(base.calories * 0.205 + 9);
+    expect(highCarb.carbs).toBeGreaterThan(balanced.carbs);
+    expect(highCarb.fats).toBeLessThanOrEqual(balanced.fats + 1);
+  });
+
+  it("high_carb never breaks the 0.6 g/kg fat floor (heavy client)", () => {
+    const heavy = calculateMacroTargets({ calories: 2000, weightKg: 120, gender: "male", goal: "maintenance", diet: "high_carb" });
+    expect(heavy.fats).toBeGreaterThanOrEqual(71); // 120 × 0.6 = 72 (±rounding)
+  });
+
+  it("high_protein adds +0.2 g/kg LBM over the ladder", () => {
+    expect(highProtein.protein).toBeGreaterThan(balanced.protein);
+    expect(highProtein.proteinPerKgLbm).toBeCloseTo(2.2, 5);
+  });
+
+  it("high_protein still respects the kidney 1.6 cap", () => {
+    const m = calculateMacroTargets({ ...base, diet: "high_protein", kidneyConcern: true });
+    expect(m.proteinPerKgLbm).toBe(1.6);
+  });
+
+  it("high_protein still respects the 35% kcal protein cap", () => {
+    const m = calculateMacroTargets({ calories: 1500, weightKg: 80, gender: "male", goal: "maintenance", diet: "high_protein" });
+    expect(m.protein * 4).toBeLessThanOrEqual(1500 * 0.35 + 4);
+  });
+
+  it("vegetarian/vegan keep the 1.8 ladder and the balanced split", () => {
+    expect(calculateMacroTargets({ ...base, diet: "vegetarian" }).proteinPerKgLbm).toBe(1.8);
+    expect(calculateMacroTargets({ ...base, diet: "vegan" }).proteinPerKgLbm).toBe(1.8);
+  });
+
+  it("DIET_PRESETS offers all 6 diet options (both dropdowns map over it)", () => {
+    expect(Object.keys(DIET_PRESETS).sort()).toEqual(
+      ["balanced", "high_carb", "high_protein", "low_carb", "vegan", "vegetarian"].sort(),
+    );
+  });
+});
+
+/* ── Phase 39, Item 3: sex/age/height/weight/activity/goal reactivity ── */
+describe("pipeline input reactivity (Phase 39)", () => {
+  const fixture = {
+    weightKg: 80,
+    heightCm: 180,
+    age: 30,
+    gender: "male" as const,
+    activity: "moderate",
+    goal: "maintenance",
+    diet: "balanced",
+  };
+  const run = (over: Partial<typeof fixture>) =>
+    calculateNutritionPipeline({ ...fixture, ...over });
+  const baseResult = run({});
+
+  it("sex: female → lower BMR/TDEE/targets than male", () => {
+    const f = run({ gender: "female" as const });
+    expect(f.bmr).toBeLessThan(baseResult.bmr);
+    expect(f.tdee).toBeLessThan(baseResult.tdee);
+    expect(f.goalCalories).toBeLessThan(baseResult.goalCalories);
+  });
+
+  it("age: older → lower BMR", () => {
+    expect(run({ age: 50 }).bmr).toBeLessThan(baseResult.bmr);
+  });
+
+  it("height: shorter → lower BMR", () => {
+    expect(run({ heightCm: 160 }).bmr).toBeLessThan(baseResult.bmr);
+  });
+
+  it("weight: heavier → higher BMR/TDEE", () => {
+    const h = run({ weightKg: 95 });
+    expect(h.bmr).toBeGreaterThan(baseResult.bmr);
+    expect(h.tdee).toBeGreaterThan(baseResult.tdee);
+  });
+
+  it("activity: sedentary < moderate < extreme TDEE", () => {
+    expect(run({ activity: "sedentary" }).tdee).toBeLessThan(baseResult.tdee);
+    expect(run({ activity: "extreme" }).tdee).toBeGreaterThan(baseResult.tdee);
+  });
+
+  it("goal: fat_loss < maintenance < muscle_gain calories", () => {
+    expect(run({ goal: "fat_loss" }).goalCalories).toBeLessThan(baseResult.goalCalories);
+    expect(run({ goal: "muscle_gain" }).goalCalories).toBeGreaterThan(baseResult.goalCalories);
+  });
+});

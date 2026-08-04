@@ -858,7 +858,7 @@ CREATE POLICY "Users select own feedback"
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.foods_cache (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  source TEXT NOT NULL DEFAULT 'off' CHECK (source IN ('off', 'custom')),
+  source TEXT NOT NULL DEFAULT 'off' CHECK (source IN ('off', 'custom', 'seed-staples')),
   source_id TEXT,
   name TEXT NOT NULL,
   brand TEXT,

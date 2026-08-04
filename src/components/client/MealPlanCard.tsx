@@ -106,7 +106,10 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet, ca
     if (foods.length > 0) return foods;
     const { data, error } = await supabase
       .from("foods_cache")
-      .select("id, name, brand, category, serving_size_g, calories, protein, carbs, fats")
+      .select("id, name, brand, category, serving_size_g, calories, protein, carbs, fats, source")
+      // Phase 39: 'seed-staples' sorts last alphabetically — descending puts
+      // staples first so the 500-row cap can never crowd them out.
+      .order("source", { ascending: false })
       .limit(500);
     if (error) {
       toast.error("Failed to load foods: " + error.message);

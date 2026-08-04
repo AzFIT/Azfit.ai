@@ -14,6 +14,56 @@ export interface FoodInput {
   protein: number;
   carbs: number;
   fats: number;
+  source?: string | null; // Phase 39 — 'seed-staples' ranks first
+}
+
+/** foods_cache source value for the Phase 39 curated staples. */
+export const STAPLE_SOURCE = "seed-staples";
+
+/** Snack-appropriate categories (compared lower-cased). */
+const SNACK_CATEGORIES = new Set(["fruit", "snacks", "dairy"]);
+
+function carbDensity(f: FoodInput): number {
+  return f.calories > 0 ? (f.carbs * 4) / f.calories : 0;
+}
+
+function proteinDensity(f: FoodInput): number {
+  return f.calories > 0 ? (f.protein * 4) / f.calories : 0;
+}
+
+/**
+ * Rank (NOT filter) a food pool for a meal slot (Phase 39).
+ * Ordering: 1) seed-staples before everything else (non-staple rows only
+ * fill in when the staple pool runs short); 2) for snacks, fruit/snacks/
+ * dairy categories before the rest; 3) diet-fit metric — low_carb prefers
+ * low carb-density, high_carb high carb-density, everything else high
+ * protein-density (the pre-39 mains behavior); 4) name for determinism.
+ */
+export function rankFoodPool(
+  foods: FoodInput[],
+  meal: MealType,
+  diet?: string,
+): FoodInput[] {
+  const metric = (f: FoodInput): number =>
+    diet === "low_carb"
+      ? carbDensity(f)
+      : diet === "high_carb"
+        ? -carbDensity(f)
+        : -proteinDensity(f);
+  return [...foods].sort((a, b) => {
+    const tierDiff =
+      (a.source === STAPLE_SOURCE ? 0 : 1) - (b.source === STAPLE_SOURCE ? 0 : 1);
+    if (tierDiff !== 0) return tierDiff;
+    if (meal === "snacks") {
+      const snackDiff =
+        (SNACK_CATEGORIES.has((a.category ?? "").toLowerCase()) ? 0 : 1) -
+        (SNACK_CATEGORIES.has((b.category ?? "").toLowerCase()) ? 0 : 1);
+      if (snackDiff !== 0) return snackDiff;
+    }
+    const metricDiff = metric(a) - metric(b);
+    if (metricDiff !== 0) return metricDiff;
+    return a.name.localeCompare(b.name);
+  });
 }
 
 export interface MacroTargets {
@@ -183,14 +233,28 @@ export function generateMealPlan(
     return { items, byMeal, totals: { ...empty } };
   }
 
-  // Protein-density sorted pool for main meals; anything goes for snacks.
-  const byProteinDensity = [...filtered].sort(
-    (a, b) => b.protein / b.calories - a.protein / a.calories,
+  // Phase 39: pools are RANKED slices (rankFoodPool), not filters —
+  // staples first, diet-fit within a tier, snack-category preference for
+  // snacks. Pool sizes are capped at the staple count so non-staple rows
+  // only fill in when staples alone can't reach the minimum pool of 4
+  // (or when no staples exist at all — pre-39 behavior for legacy DBs).
+  // buildMeal's seeded shuffle still gives variety within a slice.
+  const stapleCount = filtered.filter((f) => f.source === STAPLE_SOURCE).length;
+  const capAt = (natural: number) =>
+    stapleCount === 0 ? natural : Math.max(4, Math.min(natural, stapleCount));
+  const rankedMains = rankFoodPool(filtered, "lunch", opts.diet);
+  const mainPool = rankedMains.slice(
+    0,
+    capAt(Math.max(4, Math.ceil(rankedMains.length * 0.6))),
   );
-  const mainPool = byProteinDensity.slice(0, Math.max(4, Math.ceil(byProteinDensity.length * 0.6)));
+  const rankedSnacks = rankFoodPool(filtered, "snacks", opts.diet);
+  const snackPool = rankedSnacks.slice(
+    0,
+    capAt(Math.max(4, Math.min(15, rankedSnacks.length))),
+  );
 
   for (const meal of MEAL_ORDER) {
-    const pool = meal === "snacks" ? filtered : mainPool;
+    const pool = meal === "snacks" ? snackPool : mainPool;
     const sliceKcal = targets.calories * MEAL_SPLIT[meal];
     const mealItems = buildMeal(meal, pool, sliceKcal, rng);
     items.push(...mealItems);
