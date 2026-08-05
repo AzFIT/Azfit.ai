@@ -969,7 +969,7 @@ export default function ClientDashboard() {
 
             {/* Sleep */}
             <button
-              onClick={() => navigate("/sheets")}
+              onClick={() => navigate("/workouts")}
               className="flex flex-col items-center justify-center gap-1 rounded-lg border py-3 transition-all hover:-translate-y-0.5 active:scale-95"
               style={{
                 backgroundColor: "var(--card-bg)",
@@ -982,7 +982,7 @@ export default function ClientDashboard() {
 
             {/* Weight */}
             <button
-              onClick={() => navigate("/sheets")}
+              onClick={() => navigate("/workouts")}
               className="flex flex-col items-center justify-center gap-1 rounded-lg border py-3 transition-all hover:-translate-y-0.5 active:scale-95"
               style={{
                 backgroundColor: "var(--card-bg)",

@@ -33,10 +33,7 @@ import NutritionCommandCenter from "./NutritionCommandCenter";
 import { useClientHealth } from "./useClientHealth";
 import { useSessions } from "@/hooks/useSessions";
 import QuickAddClientModal from "@/components/QuickAddClientModal";
-
-function formatDateKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
+import { formatDateKeyLocal } from "@/lib/utils";
 
 function addDays(d: Date, n: number): Date {
   const out = new Date(d);
@@ -123,7 +120,7 @@ export default function TrainerDashboard() {
     let cancelled = false;
     (async () => {
       const now = new Date();
-      const weekStart = formatDateKey(addDays(now, -((now.getDay() + 6) % 7)));
+      const weekStart = formatDateKeyLocal(addDays(now, -((now.getDay() + 6) % 7)));
       const twoWeeksAgo = addDays(now, -14).toISOString();
       const [activeRes, newRes, activeClientsRes] = await Promise.all([
         supabase.from("clients").select("id", { count: "exact", head: true }).eq("trainer_id", user.id).eq("status", "active"),
@@ -159,8 +156,8 @@ export default function TrainerDashboard() {
   const weeklyStats = useMemo(() => {
     const now = new Date();
     const monday = addDays(now, -((now.getDay() + 6) % 7));
-    const weekStart = formatDateKey(monday);
-    const weekEnd = formatDateKey(addDays(monday, 7));
+    const weekStart = formatDateKeyLocal(monday);
+    const weekEnd = formatDateKeyLocal(addDays(monday, 7));
     const inWeek = allSessions.filter((s) => {
       const d = (s.startsAt || "").slice(0, 10);
       return d >= weekStart && d < weekEnd;
@@ -200,8 +197,8 @@ export default function TrainerDashboard() {
         .eq("trainer_id", user.id)
         .eq("status", "on_holiday");
       const out: { id: string; name: string; endDate: string }[] = [];
-      const todayStr = formatDateKey(new Date());
-      const in7 = formatDateKey(addDays(new Date(), 7));
+      const todayStr = formatDateKeyLocal(new Date());
+      const in7 = formatDateKeyLocal(addDays(new Date(), 7));
       for (const c of hc || []) {
         const { data: prof } = await supabase
           .from("profiles")
@@ -230,7 +227,7 @@ export default function TrainerDashboard() {
     };
   }, [user?.id, allSessions]);
 
-  const todayStr = formatDateKey(new Date());
+  const todayStr = formatDateKeyLocal(new Date());
   const holidaysToday = allSessions.filter(
     (s) =>
       s.type === "holiday" &&

@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
+import { formatDateKeyUtc, formatDayMonth } from '@/lib/utils';
 import { useSessions } from '@/hooks/useSessions';
 import type { Session } from '@/hooks/useSessions';
 import { findSessionConflicts, generateWeeklyOccurrences, formatConflictList } from '@/lib/sessionConflicts';
@@ -50,14 +51,6 @@ function addDays(date: Date, days: number): Date {
   return d;
 }
 
-function formatDateKey(d: Date): string {
-  return d.toISOString().split('T')[0];
-}
-
-function formatDisplayDate(d: Date): string {
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number);
   return h * 60 + m;
@@ -79,7 +72,7 @@ function getEventColor(type: string): string {
 function sessionToEvent(session: ReturnType<typeof useSessions>['sessions'][number]): CalendarEvent {
   const start = new Date(session.startsAt);
   const end = new Date(session.endsAt);
-  const dateKey = formatDateKey(start);
+  const dateKey = formatDateKeyUtc(start);
   const startTime = start.toTimeString().slice(0, 5);
   const endTime = end.toTimeString().slice(0, 5);
 
@@ -198,17 +191,17 @@ export default function SchedulePage() {
   }, [weekSessions, weekStart]);
 
   const weekEvents = useMemo(() => {
-    const weekDates = weekDays.map(formatDateKey);
+    const weekDates = weekDays.map(formatDateKeyUtc);
     return events.filter((e) => weekDates.includes(e.date));
   }, [events, weekDays]);
 
   const dayEvents = useMemo(() => {
-    const dateKey = formatDateKey(weekDays[selectedDay]);
+    const dateKey = formatDateKeyUtc(weekDays[selectedDay]);
     return events.filter((e) => e.date === dateKey);
   }, [events, weekDays, selectedDay]);
 
   const stats = useMemo(() => {
-    const weekDates = weekDays.map(formatDateKey);
+    const weekDates = weekDays.map(formatDateKeyUtc);
     const weekEvts = events.filter((e) => weekDates.includes(e.date) && e.type !== 'blocked');
     const totalHours = weekEvts.reduce((sum, e) => {
       const start = timeToMinutes(e.startTime);
@@ -490,8 +483,8 @@ export default function SchedulePage() {
         title: 'Recurring Block',
         type: 'blocked',
         status: 'scheduled',
-        startsAt: new Date(`${formatDateKey(nextDate)}T${time}`).toISOString(),
-        endsAt: new Date(`${formatDateKey(nextDate)}T${parseInt(time.split(':')[0]) + 1}:${time.split(':')[1]}`).toISOString(),
+        startsAt: new Date(`${formatDateKeyUtc(nextDate)}T${time}`).toISOString(),
+        endsAt: new Date(`${formatDateKeyUtc(nextDate)}T${parseInt(time.split(':')[0]) + 1}:${time.split(':')[1]}`).toISOString(),
         location: null,
         notes: 'Auto-blocked by repeat weekly',
       });
@@ -534,7 +527,7 @@ export default function SchedulePage() {
                 </button>
               </div>
               <span className="text-sm text-slate-400">
-                {formatDisplayDate(weekDays[0])} – {formatDisplayDate(weekDays[6])}
+                {formatDayMonth(weekDays[0])} – {formatDayMonth(weekDays[6])}
               </span>
             </div>
 
@@ -775,7 +768,7 @@ function WeekGrid({
 
           {/* Hour slots for each day */}
           {weekDays.map((day, dayIndex) => {
-            const dateKey = formatDateKey(day);
+            const dateKey = formatDateKeyUtc(day);
             const hourEvents = events.filter((e) => {
               if (e.date !== dateKey) return false;
               const startH = parseInt(e.startTime.split(':')[0]);
@@ -829,7 +822,7 @@ function DayGrid({
   onCellRightClick: (e: React.MouseEvent, date: string, time: string) => void;
   currentTimeRef: React.RefObject<HTMLDivElement | null>;
 }) {
-  const dateKey = formatDateKey(day);
+  const dateKey = formatDateKeyUtc(day);
   const now = new Date();
   const currentHour = now.getHours();
   const currentMinute = now.getMinutes();

@@ -115,6 +115,13 @@ function RouteErrorBoundary({ children }: { children: ReactNode }) {
   );
 }
 
+// Phase 46 Item 3: /workouts is canonical; /sheets redirects (preserving
+// query strings like ?workoutLogId= / ?session=).
+function SheetsRedirect() {
+  const location = useLocation();
+  return <Navigate to={{ pathname: "/workouts", search: location.search }} replace />;
+}
+
 export default function App() {
   useAnalytics();
   useEffect(() => {
@@ -176,8 +183,9 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  <Route path="/sheets" element={<SheetsRedirect />} />
                   <Route
-                    path="/sheets"
+                    path="/workouts"
                     element={
                       <ProtectedRoute>
                         <SheetsPage />

@@ -3,16 +3,12 @@ import { AnimatePresence } from "framer-motion";
 import { Video, Play } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
+import { formatDateShort } from "@/lib/utils";
 import { getClientFormChecks, type FormCheck } from "@/lib/formChecks";
 import FormCheckReviewModal from "@/components/formchecks/FormCheckReviewModal";
 
 interface ClientFormChecksTabProps {
   clientEmail: string;
-}
-
-function formatDate(d: string): string {
-  const dt = new Date(d);
-  return Number.isNaN(dt.getTime()) ? "" : dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 /** Trainer view of a client's form-check submissions, with the review modal. */
@@ -111,7 +107,7 @@ export default function ClientFormChecksTab({ clientEmail }: ClientFormChecksTab
               </div>
               <div className="px-3 py-2.5">
                 <p className="truncate text-sm font-semibold" style={{ color: "var(--page-text)" }}>{item.exerciseName}</p>
-                <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>{formatDate(item.createdAt)}</p>
+                <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>{formatDateShort(item.createdAt)}</p>
               </div>
             </button>
           ))}

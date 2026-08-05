@@ -6,6 +6,7 @@ import {
   ArrowLeft, Video, Upload, X, Play, Trash2, ClipboardCheck,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { formatDateShort } from '@/lib/utils';
 import { getAllExercisesFlat } from '@/data/exerciseDatabase';
 import {
   uploadFormCheckVideo,
@@ -22,11 +23,6 @@ function formatTime(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return `${m}:${String(s).padStart(2, "0")}`;
-}
-
-function formatDate(d: string): string {
-  const dt = new Date(d);
-  return Number.isNaN(dt.getTime()) ? '' : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 export default function FormChecksPage() {
@@ -208,7 +204,7 @@ function ClientView({ userId }: { userId: string }) {
               </div>
               <div className="px-3 py-2.5">
                 <p className="truncate text-sm font-semibold text-white">{item.exerciseName}</p>
-                <p className="text-[11px] text-slate-400">{formatDate(item.createdAt)}</p>
+                <p className="text-[11px] text-slate-400">{formatDateShort(item.createdAt)}</p>
               </div>
             </button>
           ))}
@@ -234,7 +230,7 @@ function ClientView({ userId }: { userId: string }) {
               <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
                 <div>
                   <h3 className="text-sm font-bold text-white">{active.exerciseName}</h3>
-                  <p className="text-[11px] text-slate-400">{formatDate(active.createdAt)}</p>
+                  <p className="text-[11px] text-slate-400">{formatDateShort(active.createdAt)}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => handleDelete(active)} className="rounded-lg p-1.5 text-slate-500 hover:bg-red-500/10 hover:text-red-400" aria-label="Delete">
@@ -372,7 +368,7 @@ function TrainerView() {
             >
               <div>
                 <p className="text-sm font-semibold text-white">{item.exerciseName}</p>
-                <p className="text-[11px] text-slate-400">{item.ownerName} • {formatDate(item.createdAt)}</p>
+                <p className="text-[11px] text-slate-400">{item.ownerName} • {formatDateShort(item.createdAt)}</p>
               </div>
               <span className="rounded-full bg-amber-500/20 px-2.5 py-1 text-[10px] font-bold text-amber-400">
                 Review

@@ -125,27 +125,6 @@ export function useGoalMethods(
   }, [goalId, topN]);
 }
 
-// ─── useMethodPrograms: Fetch top program templates for a method ───
-export interface MethodProgramResult {
-  program_template_id: string;
-  program_name: string;
-  score: number;
-}
-
-export function useMethodPrograms(
-  methodId: string | null,
-  topN = 5
-): UseSupabaseQueryResult<MethodProgramResult[]> {
-  return useSupabaseQuery(async () => {
-    if (!methodId) return { data: [], error: null };
-    const { data, error } = await supabase.rpc("get_method_program_templates", {
-      p_method_id: methodId,
-      p_limit: topN,
-    });
-    return { data: data as MethodProgramResult[] | null, error };
-  }, [methodId, topN]);
-}
-
 // ─── useTrainerClients: Fetch clients managed by the current trainer ───
 type ClientRow = Database["public"]["Tables"]["clients"]["Row"];
 

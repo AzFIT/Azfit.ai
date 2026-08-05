@@ -7,6 +7,7 @@ import {
   insertBodyComposition,
 } from "./chatData";
 import { logChatEvent } from "./chatLogging";
+import { formatDateLocale } from "@/lib/utils";
 import type { ChatAction, GuidedFlow } from "./types";
 
 interface FlowResult {
@@ -63,11 +64,6 @@ function findMatchingHabits(text: string, habits: { id: string; name: string }[]
   return habits.filter((h) => lower.includes(h.name.toLowerCase()));
 }
 
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString();
-}
-
 async function handleLogWeight(
   text: string,
   ctx: FlowContext
@@ -118,7 +114,7 @@ async function handleLogWeight(
     if (previous?.weight_kg) {
       const diff = Number((weight - Number(previous.weight_kg)).toFixed(1));
       const diffText = diff === 0 ? "no change" : `${diff > 0 ? "+" : ""}${diff} kg`;
-      responseText += ` That's ${diffText} vs your last entry on ${formatDate(previous.recorded_at)}.`;
+      responseText += ` That's ${diffText} vs your last entry on ${formatDateLocale(previous.recorded_at)}.`;
     }
 
     logChatEvent(ctx.userId, "guided_flow", { flow: "log_weight", result: "success" });

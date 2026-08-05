@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   Dumbbell,
@@ -34,6 +34,7 @@ import {
 } from 'recharts';
 import Layout from '@/components/Layout';
 import { supabase } from '@/lib/supabase';
+import { formatDayMonth } from '@/lib/utils';
 
 /* ------------------------------------------------------------------ */
 /*  Animation helpers                                                  */
@@ -475,11 +476,6 @@ export default function Analytics() {
     });
   }, [timeRange, weightRows, loadedAt]);
 
-  const formatDate = useCallback((dateStr: string) => {
-    const d = new Date(dateStr);
-    return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}`;
-  }, []);
-
   const summaryStats = [
     { value: String(stats.thisMonth), label: 'This Month', icon: Dumbbell, color: 'var(--azfit-primary)' },
     { value: `${stats.totalLiftedKg.toLocaleString()} kg`, label: 'Total Lifted', icon: Weight, color: 'var(--azfit-secondary)' },
@@ -673,7 +669,7 @@ export default function Analytics() {
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--light-border)" opacity={0.4} />
                     <XAxis
                       dataKey="date"
-                      tickFormatter={formatDate}
+                      tickFormatter={formatDayMonth}
                       tick={{ fill: 'var(--light-text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
                       axisLine={{ stroke: 'var(--light-border)' }}
                       tickLine={false}

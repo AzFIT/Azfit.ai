@@ -14,6 +14,7 @@ import {
   Circle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { formatDateShort } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { isInCurrentWeek } from "@/lib/checkinWeek";
 import type { Database } from "@/types/supabase";
@@ -524,7 +525,7 @@ function SubmissionsPanel({
               {selectedSubmission.client?.full_name || selectedSubmission.client?.email || "Submission"}
             </h2>
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-              {formatDate(selectedSubmission.submitted_at)} · {selectedSubmission.reviewed_at ? "Reviewed" : "Pending review"}
+              {formatDateShort(selectedSubmission.submitted_at)} · {selectedSubmission.reviewed_at ? "Reviewed" : "Pending review"}
             </p>
           </div>
           <button onClick={() => onSelectSubmission(null)} className="p-1 rounded hover:bg-white/5" style={{ color: "var(--text-muted)" }}>
@@ -595,7 +596,7 @@ function SubmissionsPanel({
               <p className="font-medium" style={{ color: "var(--page-text)" }}>
                 {sub.client?.full_name || sub.client?.email || "Unknown client"}
               </p>
-              <p className="text-xs" style={{ color: "var(--text-muted)" }}>{formatDate(sub.submitted_at)}</p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>{formatDateShort(sub.submitted_at)}</p>
             </div>
             <div className="flex items-center gap-2">
               {sub.reviewed_at ? (
@@ -918,7 +919,7 @@ function ClientCheckIns() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium" style={{ color: "var(--page-text)" }}>{sub.form?.title || "Check-in"}</p>
-                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>{formatDate(sub.submitted_at)}</p>
+                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>{formatDateShort(sub.submitted_at)}</p>
                   </div>
                   {sub.reviewed_at ? (
                     <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-400">
@@ -947,13 +948,4 @@ function ClientCheckIns() {
       </div>
     </div>
   );
-}
-
-/* ── Helpers ───────────────────────────────────────────── */
-
-function formatDate(dateStr: string): string {
-  if (!dateStr) return "";
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }

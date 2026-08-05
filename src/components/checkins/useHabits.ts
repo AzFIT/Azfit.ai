@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { formatDateKeyUtc } from "@/lib/utils";
 import type { Database } from "@/types/supabase";
 
 export type Habit = Database["public"]["Tables"]["habits"]["Row"];
@@ -10,10 +11,6 @@ export type HabitLog = Database["public"]["Tables"]["habit_logs"]["Row"];
 interface UseHabitsOptions {
   role: "trainer" | "client";
   clientId?: string;
-}
-
-function formatDate(date: Date): string {
-  return date.toISOString().split("T")[0];
 }
 
 export function useHabits({ role, clientId: propClientId }: UseHabitsOptions) {
@@ -88,8 +85,8 @@ export function useHabits({ role, clientId: propClientId }: UseHabitsOptions) {
         .from("habit_logs")
         .select("*")
         .eq("client_id", resolvedClientId)
-        .gte("log_date", formatDate(sevenDaysAgo))
-        .lte("log_date", formatDate(today))
+        .gte("log_date", formatDateKeyUtc(sevenDaysAgo))
+        .lte("log_date", formatDateKeyUtc(today))
         .order("log_date", { ascending: true }),
     ]);
 
@@ -117,7 +114,7 @@ export function useHabits({ role, clientId: propClientId }: UseHabitsOptions) {
         return;
       }
 
-      const today = formatDate(new Date());
+      const today = formatDateKeyUtc(new Date());
       const { error } = await supabase.from("habit_logs").upsert(
         {
           habit_id: habitId,
@@ -154,7 +151,7 @@ export function last7Days(): string[] {
   for (let i = 6; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(today.getDate() - i);
-    days.push(formatDate(d));
+    days.push(formatDateKeyUtc(d));
   }
   return days;
 }
@@ -175,14 +172,14 @@ export function currentStreak(logs: HabitLog[], habitId: string): number {
 
   let streak = 0;
   const d = new Date();
-  const today = formatDate(d);
+  const today = formatDateKeyUtc(d);
 
   // Start from today if done, otherwise from yesterday
   if (!dates.has(today)) {
     d.setDate(d.getDate() - 1);
   }
 
-  while (dates.has(formatDate(d))) {
+  while (dates.has(formatDateKeyUtc(d))) {
     streak++;
     d.setDate(d.getDate() - 1);
   }

@@ -88,7 +88,7 @@ export default function Layout({
           { icon: Users, label: "Clients", path: "/clients" },
         ]
       : []),
-    { icon: Dumbbell, label: "Workouts", path: "/sheets" },
+    { icon: Dumbbell, label: "Workouts", path: "/workouts" },
     { icon: Apple, label: "Nutrition", path: "/nutrition" },
     { icon: BarChart3, label: "Analytics", path: "/analytics" },
   ];
@@ -104,7 +104,7 @@ export default function Layout({
         { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
         { icon: ClipboardCheck, label: "Check-ins", path: "/check-ins" },
         { icon: Users, label: "Clients", path: "/clients" },
-        { icon: Dumbbell, label: "Workouts", path: "/sheets" },
+        { icon: Dumbbell, label: "Workouts", path: "/workouts" },
         { icon: Video, label: "Form Checks", path: "/form-checks" },
         { icon: MessageSquare, label: "Messages", path: "/messages" },
         { icon: Settings, label: "Settings", path: "/settings" },
@@ -112,7 +112,7 @@ export default function Layout({
     : [
         { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
         { icon: ClipboardCheck, label: "Check-ins", path: "/check-ins" },
-        { icon: Dumbbell, label: "Workouts", path: "/sheets" },
+        { icon: Dumbbell, label: "Workouts", path: "/workouts" },
         { icon: Apple, label: "Nutrition", path: "/nutrition" },
         { icon: Video, label: "Form Checks", path: "/form-checks" },
         { icon: MessageSquare, label: "Messages", path: "/messages" },

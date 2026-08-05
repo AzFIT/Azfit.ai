@@ -65,7 +65,7 @@ export function SessionLauncher({
 
       setIsLaunching(false);
       onClose();
-      navigate(`/sheets?workoutLogId=${log.id}`);
+      navigate(`/workouts?workoutLogId=${log.id}`);
     } catch (err) {
       console.error('[SessionLauncher] start failed:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to start workout');

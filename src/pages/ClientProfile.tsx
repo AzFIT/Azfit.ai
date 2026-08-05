@@ -276,7 +276,7 @@ export default function ClientProfile() {
         toast.error(error?.message || "Failed to start workout");
         return;
       }
-      navigate(`/sheets?workoutLogId=${log.id}`);
+      navigate(`/workouts?workoutLogId=${log.id}`);
     },
     [navigate]
   );

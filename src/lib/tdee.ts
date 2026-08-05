@@ -99,29 +99,6 @@ export function activityLabel(key: ActivityLevelKey | string): string {
   return labels[key] ?? key;
 }
 
-/* ── Phase 16: goal adjustments + spec diet presets + macro breakdown ── */
-
-/**
- * Calorie adjustments from TDEE per client goal (kcal/day).
- * @deprecated flat-kcal model — use GOAL_ADJUSTMENTS_PCT + calculateGoalCaloriesPct (Phase 28E).
- */
-export const GOAL_ADJUSTMENTS = {
-  maintenance: 0,
-  fat_loss: -500,
-  aggressive_fat_loss: -750,
-  muscle_gain: 250,
-} as const;
-
-export type GoalKey = keyof typeof GOAL_ADJUSTMENTS;
-
-/**
- * @deprecated flat-kcal model — use calculateGoalCaloriesPct (Phase 28E).
- */
-export function calculateGoalCalories(tdee: number, goal: GoalKey | string): number {
-  const adj = GOAL_ADJUSTMENTS[goal as GoalKey] ?? GOAL_ADJUSTMENTS.maintenance;
-  return Math.max(0, Math.round(tdee + adj));
-}
-
 /* ── Phase 28E: percentage goals, safety guardrails, lean-mass macros ── */
 
 /** Percentage-based goal adjustments (spec Part A). */
@@ -351,29 +328,3 @@ export const DIET_PRESETS = {
 } as const;
 
 export type DietKey = keyof typeof DIET_PRESETS;
-
-export interface MacroBreakdown {
-  protein: number;
-  carbs: number;
-  fats: number;
-}
-
-/**
- * Macro grams for a calorie target + diet split.
- * Protein uses the HIGHER of the percentage-based value or 1.6 g/kg
- * minimum (legacy spec); carbs/fats come from the remaining split.
- * @deprecated simple mode — use calculateMacroTargets (Phase 28E lean-mass algorithm).
- */
-export function calculateMacroBreakdown(
-  calories: number,
-  diet: DietKey | string,
-  weightKg: number
-): MacroBreakdown {
-  const preset = DIET_PRESETS[diet as DietKey] ?? DIET_PRESETS.balanced;
-  const proteinFromPercent = (calories * (preset.protein / 100)) / 4;
-  const minProtein = weightKg * 1.6;
-  const protein = Math.round(Math.max(proteinFromPercent, minProtein));
-  const carbs = Math.round((calories * (preset.carbs / 100)) / 4);
-  const fats = Math.round((calories * (preset.fats / 100)) / 9);
-  return { protein, carbs, fats };
-}

@@ -1234,7 +1234,7 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [] 
   const methodName = resolveMethodName(data.method, dbMethods);
   const methodData = LEGACY_METHODS.find((m) => m.id === data.method);
   const splitName = data.split.filter((d) => d.active).length > 0 ? `${activeDays}-Day Split` : '—';
-  const handleStartWorkout = (workout: GeneratedWorkout) => { if (!program) return; const session = workoutToSession(workout, program.id); setActiveSession(session); navigate(`/sheets?session=${session.id}`); };
+  const handleStartWorkout = (workout: GeneratedWorkout) => { if (!program) return; const session = workoutToSession(workout, program.id); setActiveSession(session); navigate(`/workouts?session=${session.id}`); };
   const { user } = useAuth();
 
   // Phase 34 — WORKING Export PDF: saved programs print from the DB rows;
@@ -1487,7 +1487,7 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [] 
                   <div className="text-[var(--page-text)] text-sm font-semibold">{workout.name}</div>
                   <div className="text-[var(--page-text)]/60 text-xs">{workout.exercises.length} exercises • ~{workout.estimatedMinutes} min</div>
                 </div>
-                <Button size="sm" onClick={() => handleStartWorkout(workout)} className="bg-[#00AEEF] hover:bg-[#0098D1] text-[#0B1120] text-xs font-semibold"><Play className="w-3.5 h-3.5 mr-1 fill-current" />Start</Button>
+                <Button size="sm" onClick={() => handleStartWorkout(workout)} className="bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] text-xs font-semibold"><Play className="w-3.5 h-3.5 mr-1 fill-current" />Start</Button>
               </div>
             ))}
           </div>

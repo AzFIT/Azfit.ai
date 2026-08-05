@@ -111,7 +111,7 @@ export function getPageContext(path: string): PageContext | undefined {
     { pageId: 'analytics', path: '/analytics', primaryContext: 'progress', label: 'Analytics' },
     { pageId: 'coach', path: '/coach', primaryContext: 'client', label: 'Coach' },
     { pageId: 'program-builder', path: '/ai-program-builder', primaryContext: 'workout', label: 'Program Builder' },
-    { pageId: 'sheets', path: '/sheets', primaryContext: 'workout', label: 'Workout Sheets' },
+    { pageId: 'sheets', path: '/workouts', primaryContext: 'workout', label: 'Workout Sheets' },
     { pageId: 'settings', path: '/settings', primaryContext: 'settings', label: 'Settings' },
     { pageId: 'onboarding', path: '/onboarding', primaryContext: 'client', label: 'Onboarding' },
     { pageId: 'bioprint', path: '/bioprint', primaryContext: 'progress', label: 'Bio Print' },

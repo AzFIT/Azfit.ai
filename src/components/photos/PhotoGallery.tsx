@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { formatDateShort } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Camera,
@@ -27,13 +28,6 @@ interface PhotoGalleryProps {
   onUpdateNote?: (id: string, notes: string) => Promise<void>;
   onUpdateTrainerNotes?: (id: string, notes: string) => Promise<void>;
   onSetMilestone?: (id: string, value: boolean) => Promise<void>;
-}
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "";
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 export default function PhotoGallery({
@@ -198,7 +192,7 @@ export default function PhotoGallery({
 
                 {/* Meta overlay */}
                 <div className="absolute inset-x-0 bottom-0 bg-black/60 px-3 py-2 opacity-0 transition-opacity group-hover:opacity-100">
-                  <p className="text-xs font-medium text-white">{formatDate(photo.takenOn)}</p>
+                  <p className="text-xs font-medium text-white">{formatDateShort(photo.takenOn)}</p>
                   {(photo.weightKg != null || photo.bodyFatPct != null) && (
                     <p className="text-[10px] text-slate-300">
                       {photo.weightKg != null && `${photo.weightKg} kg`}
@@ -299,7 +293,7 @@ function Lightbox({
               {photo.category}
             </span>
             {photo.isMilestone && <Star className="h-4 w-4 fill-amber-400 text-amber-400" />}
-            <span className="text-xs text-slate-400">{formatDate(photo.takenOn)}</span>
+            <span className="text-xs text-slate-400">{formatDateShort(photo.takenOn)}</span>
           </div>
           <div className="flex items-center gap-1">
             <button onClick={onPrev} className="rounded-lg p-2 hover:bg-slate-800" aria-label="Previous">
@@ -452,7 +446,7 @@ function ComparisonModal({
                 <span className="rounded-md bg-[#00AEEF]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#00AEEF]">
                   {photo.category}
                 </span>
-                <span>{formatDate(photo.takenOn)}</span>
+                <span>{formatDateShort(photo.takenOn)}</span>
                 {photo.weightKg != null && <span>{photo.weightKg} kg</span>}
                 {photo.bodyFatPct != null && <span>{photo.bodyFatPct}% BF</span>}
                 {i === 0 && days != null && days > 0 && <span className="ml-auto text-slate-500">before</span>}

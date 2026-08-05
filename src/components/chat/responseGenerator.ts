@@ -146,7 +146,7 @@ export async function generateResponse(input: string, ctx: ResponseContext): Pro
       return {
         text: "Here's what I can help you with:",
         actions: [
-          { label: '💪 Start Workout', type: 'navigate', payload: '/sheets' },
+          { label: '💪 Start Workout', type: 'navigate', payload: '/workouts' },
           { label: '🍎 Log Food', type: 'navigate', payload: '/nutrition' },
           { label: '📊 View Progress', type: 'navigate', payload: '/bioprint' },
           { label: '⚙️ Settings', type: 'navigate', payload: '/settings' },
@@ -210,7 +210,7 @@ async function matchFaq(
 }
 
 function faqPathForAnswer(answer: string): string {
-  if (answer.includes('/sheets')) return '/sheets';
+  if (answer.includes('/workouts')) return '/workouts';
   if (answer.includes('/bioprint')) return '/bioprint';
   if (answer.includes('/messages')) return '/messages';
   if (answer.includes('/check-ins')) return '/check-ins';
@@ -436,7 +436,7 @@ async function handleDeload(
   return {
     text,
     actions: [
-      { label: 'Start Workout', type: 'navigate', payload: '/sheets' },
+      { label: 'Start Workout', type: 'navigate', payload: '/workouts' },
       { label: 'View Progress', type: 'navigate', payload: '/bioprint' },
     ],
   };
@@ -542,7 +542,7 @@ async function handleAnalyze(
   return {
     text,
     actions: [
-      { label: 'Start Workout', type: 'navigate', payload: '/sheets' },
+      { label: 'Start Workout', type: 'navigate', payload: '/workouts' },
       { label: 'View Progress', type: 'navigate', payload: '/bioprint' },
     ],
   };
@@ -555,7 +555,7 @@ function handleWorkoutIntent(input: string, _currentPage?: PageContext, userRole
     return {
       text: "Ready to crush a workout? 💪 You can start a session or view your program.",
       actions: [
-        { label: 'Start Workout', type: 'navigate', payload: '/sheets' },
+        { label: 'Start Workout', type: 'navigate', payload: '/workouts' },
         ...(userRole === 'trainer' ? [{ label: 'Program Builder', type: 'navigate', payload: '/ai-program-builder' } as ChatAction] : []),
       ],
     };
@@ -577,7 +577,7 @@ function handleWorkoutIntent(input: string, _currentPage?: PageContext, userRole
   return {
     text: "I can help you start a workout, view your program, or check your workout history.",
     actions: [
-      { label: 'Start Workout', type: 'navigate', payload: '/sheets' },
+      { label: 'Start Workout', type: 'navigate', payload: '/workouts' },
       { label: 'View Dashboard', type: 'navigate', payload: '/dashboard' },
     ],
   };
@@ -696,8 +696,8 @@ function handleNavigationIntent(input: string, _currentPage?: PageContext): Resp
     { name: 'analytics', path: '/analytics' },
     { name: 'coach', path: '/coach' },
     { name: 'settings', path: '/settings' },
-    { name: 'sheets', path: '/sheets' },
-    { name: 'workout', path: '/sheets' },
+    { name: 'sheets', path: '/workouts' },
+    { name: 'workout', path: '/workouts' },
     { name: 'nutrition', path: '/nutrition' },
     { name: 'bioprint', path: '/bioprint' },
     { name: 'program', path: '/ai-program-builder' },
@@ -715,7 +715,7 @@ function handleNavigationIntent(input: string, _currentPage?: PageContext): Resp
     text: "Where would you like to go?",
     actions: [
       { label: '🏠 Dashboard', type: 'navigate', payload: '/dashboard' },
-      { label: '💪 Workouts', type: 'navigate', payload: '/sheets' },
+      { label: '💪 Workouts', type: 'navigate', payload: '/workouts' },
       { label: '🍎 Nutrition', type: 'navigate', payload: '/nutrition' },
       { label: '📊 Progress', type: 'navigate', payload: '/bioprint' },
     ],
@@ -724,7 +724,7 @@ function handleNavigationIntent(input: string, _currentPage?: PageContext): Resp
 
 function quickActions(currentPage?: PageContext): ChatAction[] {
   const actions: ChatAction[] = [
-    { label: '💪 Start Workout', type: 'navigate', payload: '/sheets' },
+    { label: '💪 Start Workout', type: 'navigate', payload: '/workouts' },
     { label: '🍎 Log Food', type: 'navigate', payload: '/nutrition' },
     { label: '📊 Progress', type: 'navigate', payload: '/bioprint' },
   ];

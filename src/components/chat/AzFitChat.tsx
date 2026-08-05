@@ -17,7 +17,7 @@ interface ChipDef {
 }
 
 const CLIENT_CHIPS: ChipDef[] = [
-  { label: "💪 Start workout", type: "navigate", payload: "/sheets" },
+  { label: "💪 Start workout", type: "navigate", payload: "/workouts" },
   { label: "⚖️ Log weight", type: "suggest", payload: "log my weight" },
   { label: "✅ My habits", type: "navigate", payload: "/check-ins" },
   { label: "💬 Message coach", type: "navigate", payload: "/messages" },
