@@ -1335,6 +1335,7 @@ CREATE TABLE IF NOT EXISTS "methods" (
   "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
   "category_id" integer,
   "tags" text,
+  "defaults" jsonb,
   PRIMARY KEY ("id")
 );
 

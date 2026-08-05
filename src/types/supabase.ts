@@ -608,6 +608,7 @@ export type Database = {
           updated_at: string;
           category_id: number | null;
           tags: string | null;
+          defaults: Json | null;
         };
         Insert: {
           id?: string;
@@ -624,6 +625,7 @@ export type Database = {
           updated_at?: string;
           category_id?: number | null;
           tags?: string | null;
+          defaults?: Json | null;
         };
         Update: {
           id?: string;
@@ -640,6 +642,7 @@ export type Database = {
           updated_at?: string;
           category_id?: number | null;
           tags?: string | null;
+          defaults?: Json | null;
         };
         Relationships: [
           {

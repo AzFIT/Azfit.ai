@@ -83,12 +83,16 @@ type ExerciseInsert = Database["public"]["Tables"]["exercises"]["Insert"];
 
 /** programs row — mirrors buildProgramInsert for an assigned program:
  * status active, start today, end today + weeks; phases/progression
- * stay null (manual programs are single-phase, no rules engine). */
+ * stay null (manual programs are single-phase, no rules engine).
+ * Phase 48, Item 4: when a method is chosen, its slug rides in a
+ * single-phase jsonb array (same additive channel as the wizard) so the
+ * Programs-tab badge resolves. */
 export function buildManualProgramInsert(
   draft: ManualProgramDraft,
   trainerId: string,
   clientId: string,
   today: string, // YYYY-MM-DD (injected for testability)
+  methodSlug?: string,
 ): ProgramInsert {
   const weeks = Math.max(1, Math.min(MAX_WEEKS, Math.round(draft.weeks)));
   const [y, m, d] = today.split("-").map(Number);
@@ -104,7 +108,11 @@ export function buildManualProgramInsert(
     status: "active",
     start_date: today,
     end_date: end,
-    phases: null,
+    phases: methodSlug
+      ? ([
+          { id: "p1", name: "Program Phase", weeks, focus: "", color: "#00AEEF", active: true, method: methodSlug },
+        ] as unknown as ProgramInsert["phases"])
+      : null,
     progression_rules: null,
   };
 }

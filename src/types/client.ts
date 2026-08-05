@@ -69,6 +69,8 @@ export interface ClientGeneratedProgram {
   createdAt?: string;
   startDate?: string | null;
   endDate?: string | null;
+  /** Phase 48: 30A method slug persisted in phases jsonb (optional) */
+  methodSlug?: string;
   progressionRules?: Array<{ id?: string; label: string; text: string }>;
   phases: Array<{
     id: string;

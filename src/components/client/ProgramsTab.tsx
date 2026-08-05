@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router";
 import {
@@ -14,6 +14,7 @@ import {
   Printer,
   Plus,
   Copy,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
@@ -24,6 +25,7 @@ import PresetInput from "@/components/ui/PresetInput";
 import ExercisePickerDialog, {
   type LibraryExercise,
 } from "@/components/exercise/ExercisePickerDialog";
+import { parseMethodDefaults, INTENSITY_HEX, type MethodDefaults } from "@/lib/methodDefaults";
 import type { Database } from "@/types/supabase";
 import type { ClientGeneratedProgram } from "@/types/client";
 
@@ -46,6 +48,29 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
   const [phaseDraft, setPhaseDraft] = useState("");
   const [confirmArchiveId, setConfirmArchiveId] = useState<string | null>(null);
   const [busyIds, setBusyIds] = useState<Record<string, boolean>>({});
+  // Phase 48: methods carrying prescription defaults (slug → name + defaults)
+  const [methodCatalog, setMethodCatalog] = useState<Map<string, { name: string; d: MethodDefaults }> | null>(null);
+  const [methodModal, setMethodModal] = useState<{ name: string; d: MethodDefaults } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("methods")
+        .select("slug, name, defaults")
+        .not("defaults", "is", null);
+      if (cancelled || !data) return;
+      const map = new Map<string, { name: string; d: MethodDefaults }>();
+      for (const m of data) {
+        const d = parseMethodDefaults(m.defaults);
+        if (d) map.set(m.slug, { name: m.name, d });
+      }
+      setMethodCatalog(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   // Phase 35 ITEM 3: inline prescription editing (writes future-session
   // targets on the exercises row; never touches workout_log_entries)
   const [rxEditId, setRxEditId] = useState<string | null>(null);
@@ -439,6 +464,23 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
                 >
                   {program.frequency}x/week
                 </span>
+                {/* Phase 48: method badge (only when the program's method tag
+                    resolves to a method WITH prescription defaults) */}
+                {program.methodSlug && methodCatalog?.has(program.methodSlug) && (() => {
+                  const entry = methodCatalog.get(program.methodSlug)!;
+                  const hex = INTENSITY_HEX[entry.d.intensityColor];
+                  return (
+                    <button
+                      onClick={() => setMethodModal(entry)}
+                      className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border transition hover:opacity-80"
+                      style={{ borderColor: `${hex}60`, color: hex, backgroundColor: `${hex}15` }}
+                      title="View method prescription"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: hex }} />
+                      {entry.name}
+                    </button>
+                  );
+                })()}
                 <button
                   onClick={() =>
                     setExpandedProgram(
@@ -924,6 +966,69 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
         onOpenChange={setRxPickerOpen}
         onSelect={handlePickReplacement}
       />
+
+      {/* Phase 48: method prescription modal */}
+      <AnimatePresence>
+        {methodModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+            onClick={() => setMethodModal(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              className="w-full max-w-md rounded-2xl border p-5 shadow-2xl"
+              style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {(() => {
+                const { name, d } = methodModal;
+                const hex = INTENSITY_HEX[d.intensityColor];
+                return (
+                  <>
+                    <div className="mb-3 flex items-start justify-between gap-2">
+                      <div>
+                        <p className="flex items-center gap-1.5 text-sm font-bold" style={{ color: "var(--page-text)" }}>
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: hex }} />
+                          {name}
+                        </p>
+                        <p className="text-[10px] font-semibold mt-0.5" style={{ color: hex }}>{d.goalTag}</p>
+                      </div>
+                      <button onClick={() => setMethodModal(null)} className="p-1 rounded-lg hover:opacity-80" style={{ color: "var(--light-text-muted)" }}>
+                        <X size={15} />
+                      </button>
+                    </div>
+                    {d.description && (
+                      <p className="mb-3 text-xs leading-relaxed" style={{ color: "var(--light-text-muted)" }}>{d.description}</p>
+                    )}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                      <span style={{ color: "var(--light-text-muted)" }}>Sets × Reps</span><span className="font-medium" style={{ color: "var(--page-text)" }}>{d.setsReps}</span>
+                      <span style={{ color: "var(--light-text-muted)" }}>Load</span><span className="font-medium" style={{ color: "var(--page-text)" }}>{d.loadPct}</span>
+                      <span style={{ color: "var(--light-text-muted)" }}>Rest</span><span className="font-medium" style={{ color: "var(--page-text)" }}>{d.rest}</span>
+                      <span style={{ color: "var(--light-text-muted)" }}>Tempo</span><span className="font-medium" style={{ color: "var(--page-text)" }}>{d.tempo}</span>
+                      <span style={{ color: "var(--light-text-muted)" }}>Duration</span><span className="font-medium" style={{ color: "var(--page-text)" }}>{d.durationWeeks}w · {d.frequencyPerWeek}×/week</span>
+                    </div>
+                    {d.idealFor.length > 0 && (
+                      <p className="mt-2.5 text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+                        <span className="font-semibold" style={{ color: "#22C55E" }}>Ideal:</span> {d.idealFor.join(", ")}
+                      </p>
+                    )}
+                    {d.contraindications.length > 0 && (
+                      <p className="mt-1 text-[10px]" style={{ color: "#F59E0B" }}>
+                        <span className="font-semibold">Caution:</span> {d.contraindications.join(", ")}
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

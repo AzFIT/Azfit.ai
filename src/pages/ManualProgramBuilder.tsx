@@ -34,6 +34,12 @@ import {
   type ManualDay,
   type ManualExercise,
 } from "@/lib/manualProgram";
+import {
+  parseMethodDefaults,
+  deriveExerciseDefaults,
+  INTENSITY_HEX,
+  type MethodDefaults,
+} from "@/lib/methodDefaults";
 
 /* ═══════════════════════════════════════════════════════════════════
    Manual Program Builder (Phase 42) — lightweight, trainer-only.
@@ -47,10 +53,6 @@ const uid = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : Math.random().toString(36).slice(2);
-
-function newExercise(name: string): ManualExercise {
-  return { id: uid(), name, sets: "3", reps: "8-12", tempo: "3-0-1-0", group: null };
-}
 
 function newDay(name = ""): ManualDay {
   return { id: uid(), name, exercises: [] };
@@ -79,6 +81,32 @@ export default function ManualProgramBuilder() {
   const [pickerDayId, setPickerDayId] = useState<string | null>(null);
   const [showErrors, setShowErrors] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Phase 48, Item 4: optional method with prescription defaults
+  const [methodOptions, setMethodOptions] = useState<Array<{ slug: string; name: string; d: MethodDefaults }>>([]);
+  const [methodSlug, setMethodSlug] = useState<string>("");
+  const selectedMethod = methodOptions.find((m) => m.slug === methodSlug) ?? null;
+  const exercisePrefill = selectedMethod ? deriveExerciseDefaults(selectedMethod.d) : null;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("methods")
+        .select("slug, name, defaults")
+        .not("defaults", "is", null)
+        .order("display_order");
+      if (cancelled || !data) return;
+      const out: Array<{ slug: string; name: string; d: MethodDefaults }> = [];
+      for (const m of data) {
+        const d = parseMethodDefaults(m.defaults);
+        if (d) out.push({ slug: m.slug, name: m.name, d });
+      }
+      setMethodOptions(out);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!clientId) return;
@@ -158,14 +186,32 @@ export default function ManualProgramBuilder() {
     (picked: { name: string }) => {
       if (!pickerDayId) return;
       setDays((prev) =>
-        prev.map((d) =>
-          d.id === pickerDayId
-            ? { ...d, exercises: [...d.exercises, newExercise(picked.name)] }
-            : d,
-        ),
+        prev.map((d) => {
+          if (d.id !== pickerDayId) return d;
+          const idx = d.exercises.length;
+          // Phase 48: notation-driven group suggestion (superset → pairs,
+          // triset → triples, straight → ungrouped)
+          let group: string | null = null;
+          if (selectedMethod) {
+            if (selectedMethod.d.notation === "superset") {
+              group = GROUP_LETTERS[Math.min(GROUP_LETTERS.length - 1, Math.floor(idx / 2))];
+            } else if (selectedMethod.d.notation === "triset") {
+              group = GROUP_LETTERS[Math.min(GROUP_LETTERS.length - 1, Math.floor(idx / 3))];
+            }
+          }
+          const ex: ManualExercise = {
+            id: uid(),
+            name: picked.name,
+            sets: String(exercisePrefill?.sets ?? 3),
+            reps: exercisePrefill?.reps ?? "8-12",
+            tempo: exercisePrefill?.tempo ?? "3-0-1-0",
+            group,
+          };
+          return { ...d, exercises: [...d.exercises, ex] };
+        }),
       );
     },
-    [pickerDayId],
+    [pickerDayId, selectedMethod, exercisePrefill],
   );
 
   const handleSave = useCallback(async () => {
@@ -179,7 +225,7 @@ export default function ManualProgramBuilder() {
     }
     setSaving(true);
     try {
-      const programRow = buildManualProgramInsert(draft, user.id, clientId, todayLocal());
+      const programRow = buildManualProgramInsert(draft, user.id, clientId, todayLocal(), methodSlug || undefined);
       const { data: program, error: pErr } = await supabase
         .from("programs")
         .insert(programRow)
@@ -214,7 +260,7 @@ export default function ManualProgramBuilder() {
       toast.error("Couldn't save: " + (err instanceof Error ? err.message : "Unknown error"));
       setSaving(false);
     }
-  }, [user?.id, clientId, saving, name, description, weeks, days, navigate]);
+  }, [user?.id, clientId, saving, name, description, weeks, days, methodSlug, navigate]);
 
   const totalExercises = days.reduce((s, d) => s + d.exercises.length, 0);
 
@@ -304,18 +350,58 @@ export default function ManualProgramBuilder() {
             />
           </div>
         </div>
-        <div className="mt-3">
-          <label className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
-            Description (optional)
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={2}
-            placeholder="Goal, focus, notes for the client…"
-            className={`w-full ${inputCls}`}
-            style={inputStyle}
-          />
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr]">
+          <div>
+            <label className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+              Description (optional)
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              placeholder="Goal, focus, notes for the client…"
+              className={`w-full ${inputCls}`}
+              style={inputStyle}
+            />
+          </div>
+          {/* Phase 48, Item 4: optional method (only methods with defaults) */}
+          <div>
+            <label className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+              Training method (optional — prefills new exercises)
+            </label>
+            <select
+              value={methodSlug}
+              onChange={(e) => {
+                const next = e.target.value;
+                if (
+                  next !== methodSlug &&
+                  methodSlug &&
+                  days.some((d) => d.exercises.length > 0)
+                ) {
+                  const ok = window.confirm(
+                    "Change method? Set/rep defaults reset for NEW exercises only — existing rows keep their values.",
+                  );
+                  if (!ok) return;
+                }
+                setMethodSlug(next);
+              }}
+              className={`w-full ${inputCls}`}
+              style={inputStyle}
+            >
+              <option value="">None (free-form)</option>
+              {methodOptions.map((m) => (
+                <option key={m.slug} value={m.slug}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+            {selectedMethod && (
+              <p className="mt-1 flex items-center gap-1.5 text-[10px]" style={{ color: INTENSITY_HEX[selectedMethod.d.intensityColor] }}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: INTENSITY_HEX[selectedMethod.d.intensityColor] }} />
+                {selectedMethod.d.goalTag} · {selectedMethod.d.setsReps} · rest {selectedMethod.d.rest}
+              </p>
+            )}
+          </div>
         </div>
       </motion.section>
 

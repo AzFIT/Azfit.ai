@@ -37,6 +37,13 @@ import {
   type DbMethodCategory,
   type RankedMethod,
 } from '@/lib/methodCatalog';
+import {
+  parseMethodDefaults,
+  notationToPairing,
+  loadHint,
+  deriveExerciseDefaults,
+  INTENSITY_HEX,
+} from '@/lib/methodDefaults';
 import { buildPrintModelFromWizard } from '@/lib/programPrint';
 import { suggestPhasesForMethod } from '@/lib/phaseSuggestions';
 import { pairingStyleForMethod, assignPairGroups } from '@/lib/supersets';
@@ -438,11 +445,21 @@ function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], 
   const goalName = GOALS.find((g) => g.id === data.goal)?.name || '';
   const selectMethod = useCallback(
     (m: DbMethod) =>
-      updateData((prev) => ({
-        method: m.slug,
-        // replace the 'AI Generated' placeholder tag with the method name (Phase 30A)
-        tags: prev.tags.map((t) => (t === 'AI Generated' ? m.name : t)),
-      })),
+      updateData((prev) => {
+        // Phase 48 edge case: switching method mid-build — defaults apply
+        // to NEW exercises only; existing rows keep their values (confirmed).
+        if (prev.method && prev.method !== m.slug && prev.exercises.length > 0) {
+          const ok = window.confirm(
+            "Change method? Set/rep defaults reset for NEW exercises only — existing rows keep their values.",
+          );
+          if (!ok) return {};
+        }
+        return {
+          method: m.slug,
+          // replace the 'AI Generated' placeholder tag with the method name (Phase 30A)
+          tags: prev.tags.map((t) => (t === 'AI Generated' ? m.name : t)),
+        };
+      }),
     [updateData]
   );
   return (
@@ -472,17 +489,30 @@ function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], 
                   const isSelected = data.method === method.slug;
                   const isBest = best?.id === method.id;
                   const labels = templateTagLabels(method.tags);
+                  const d = parseMethodDefaults(method.defaults);
                   return (
-                    <motion.button key={method.id} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setDrawerMethod(method)} className={cn('flex flex-col items-start p-4 rounded-xl border-2 transition-all text-left', isSelected ? 'border-[#8B5CF6] bg-[#8B5CF6]/5 shadow-lg shadow-[#8B5CF6]/10' : 'border-[var(--card-border)] bg-[var(--card-bg)] hover:border-[var(--azfit-primary)]/50')}>
+                    <motion.button key={method.id} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setDrawerMethod(method)} className={cn('flex flex-col items-start p-4 rounded-xl border-2 transition-all text-left', isSelected ? 'border-[#8B5CF6] bg-[#8B5CF6]/5 shadow-lg shadow-[#8B5CF6]/10' : 'border-[var(--card-border)] bg-[var(--card-bg)] hover:border-[var(--azfit-primary)]/50')}
+                      style={d ? { borderLeftColor: INTENSITY_HEX[d.intensityColor], borderLeftWidth: 4 } : undefined}>
                       <div className="flex items-center justify-between w-full mb-2 gap-2">
                         <Badge variant="outline" className="text-[10px] border-[var(--card-border)] text-[var(--page-text)]/60 truncate">{method.category}</Badge>
                         <div className="flex items-center gap-1.5 shrink-0">
+                          {d && (
+                            <span className="flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border" style={{ borderColor: `${INTENSITY_HEX[d.intensityColor]}60`, color: INTENSITY_HEX[d.intensityColor], backgroundColor: `${INTENSITY_HEX[d.intensityColor]}15` }}>
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: INTENSITY_HEX[d.intensityColor] }} />
+                              {d.goalTag}
+                            </span>
+                          )}
                           {isBest && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#22C55E]/15 text-[#22C55E] border border-[#22C55E]/40">Best Match</span>}
                           <div className={cn('w-5 h-5 rounded border flex items-center justify-center transition-colors', isSelected ? 'bg-[#8B5CF6] border-[#8B5CF6]' : 'border-[var(--card-border)] bg-[var(--page-bg)]')}>{isSelected && <Check className="w-3 h-3 text-white" />}</div>
                         </div>
                       </div>
                       <h4 className="text-[var(--page-text)] font-semibold text-sm mb-1">{method.name}</h4>
                       {method.description && <p className="text-[var(--page-text)]/60 text-xs mb-2 line-clamp-2">{method.description}</p>}
+                      {d && (
+                        <p className="text-[var(--page-text)]/50 text-[10px] mb-1">
+                          {d.setsReps} · {d.durationWeeks}w · {d.frequencyPerWeek}×/week
+                        </p>
+                      )}
                       <div className="flex flex-wrap gap-1 mt-auto pt-1">
                         {labels.slice(0, 3).map((l) => (
                           <span key={l} className="px-1.5 py-0.5 rounded-full text-[9px] border border-[var(--card-border)] text-[var(--page-text)]/50">{l}</span>
@@ -527,6 +557,34 @@ function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], 
               ) : (
                 <p className="text-[var(--page-text)]/40 text-xs italic mb-4">No description in the catalog yet.</p>
               )}
+              {/* Phase 48: prescription defaults panel (only when the method has them) */}
+              {(() => {
+                const d = parseMethodDefaults(drawerMethod.defaults);
+                if (!d) return null;
+                return (
+                  <div className="mb-5 rounded-xl border p-3" style={{ borderColor: `${INTENSITY_HEX[d.intensityColor]}50`, backgroundColor: `${INTENSITY_HEX[d.intensityColor]}08` }}>
+                    <p className="flex items-center gap-1.5 text-[11px] font-bold mb-2" style={{ color: INTENSITY_HEX[d.intensityColor] }}>
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: INTENSITY_HEX[d.intensityColor] }} />
+                      {d.goalTag}
+                    </p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                      <span className="text-[var(--page-text)]/50">Sets × Reps</span><span className="text-[var(--page-text)] font-medium">{d.setsReps}</span>
+                      <span className="text-[var(--page-text)]/50">Load</span><span className="text-[var(--page-text)] font-medium">{d.loadPct}</span>
+                      <span className="text-[var(--page-text)]/50">Rest</span><span className="text-[var(--page-text)] font-medium">{d.rest}</span>
+                      <span className="text-[var(--page-text)]/50">Tempo</span><span className="text-[var(--page-text)] font-medium">{d.tempo}</span>
+                      <span className="text-[var(--page-text)]/50">Duration</span><span className="text-[var(--page-text)] font-medium">{d.durationWeeks} weeks · {d.frequencyPerWeek}×/week</span>
+                      <span className="text-[var(--page-text)]/50">Notation</span><span className="text-[var(--page-text)] font-medium capitalize">{d.notation}</span>
+                    </div>
+                    {d.notes && <p className="mt-2 text-[10px] text-[var(--page-text)]/60">{d.notes}</p>}
+                    {d.idealFor.length > 0 && (
+                      <p className="mt-1.5 text-[10px] text-[var(--page-text)]/60"><span className="font-semibold text-[#22C55E]">Ideal:</span> {d.idealFor.join(", ")}</p>
+                    )}
+                    {d.contraindications.length > 0 && (
+                      <p className="mt-1 text-[10px] text-[#F59E0B]"><span className="font-semibold">Caution:</span> {d.contraindications.join(", ")}</p>
+                    )}
+                  </div>
+                );
+              })()}
               <div className="flex flex-wrap gap-1.5 mb-5">
                 {templateTagLabels(drawerMethod.tags).map((l) => (
                   <span key={l} className="px-2 py-0.5 rounded-full text-[10px] border border-[var(--card-border)] text-[var(--page-text)]/60">{l}</span>
@@ -602,9 +660,10 @@ function Step3Context({ data, updateData }: StepProps) {
 
 const PHASE_COLORS = ['#F59E0B', '#EF4444', '#22C55E', '#00AEEF', '#8B5CF6', '#EAB308'];
 
-function Step4Phases({ data, updateData }: StepProps) {
+function Step4Phases({ data, updateData, dbMethods = [] }: StepProps) {
   const [editingPhase, setEditingPhase] = useState<ProgramPhase | null>(null);
   const [suggestionDismissed, setSuggestionDismissed] = useState(false);
+  const [pairingDismissed, setPairingDismissed] = useState(false);
   const togglePhase = useCallback((phaseId: string) => updateData((prev) => ({ phases: prev.phases.map((p) => (p.id === phaseId ? { ...p, active: !p.active } : p)) })), [updateData]);
   const removePhase = useCallback((phaseId: string) => updateData((prev) => ({ phases: prev.phases.filter((p) => p.id !== phaseId) })), [updateData]);
   const addPhase = useCallback(() => updateData((prev) => ({ phases: [...prev.phases, { id: `p${Date.now()}`, name: 'New Phase', weeks: 3, focus: 'Custom focus', color: '#00AEEF', active: true }] })), [updateData]);
@@ -623,6 +682,14 @@ function Step4Phases({ data, updateData }: StepProps) {
   }, [editingPhase, updateData]);
   // Method-aware phase suggestion (Phase 30B) — null when the method has no map
   const suggestion = useMemo(() => suggestPhasesForMethod(data.method), [data.method]);
+  // Phase 48: periodization pairing from the method's defaults (first pairing
+  // slug resolved to a live method name — no fabrication when unresolvable)
+  const pairing = useMemo(() => {
+    const d = parseMethodDefaults(dbMethods.find((m) => m.slug === data.method)?.defaults);
+    const slug = d?.periodizationPairings[0];
+    if (!slug) return null;
+    return dbMethods.find((m) => m.slug === slug)?.name ?? null;
+  }, [dbMethods, data.method]);
   const acceptSuggestion = useCallback(() => {
     if (!suggestion) return;
     updateData({ phases: suggestion.map((s, i) => ({ ...s, id: `p${Date.now()}-${i}`, active: true })) });
@@ -631,14 +698,25 @@ function Step4Phases({ data, updateData }: StepProps) {
   const totalWeeks = useMemo(() => data.phases.filter((p) => p.active).reduce((sum, p) => sum + p.weeks, 0), [data.phases]);
   return (
     <div className="space-y-5">
-      {suggestion && !suggestionDismissed && (
+      {(suggestion || (pairing && !pairingDismissed)) && !suggestionDismissed && (
         <div className="rounded-xl border border-[#00AEEF]/40 bg-[#00AEEF]/10 px-4 py-3 flex flex-wrap items-center gap-3">
           <Sparkles className="w-4 h-4 text-[#00AEEF] shrink-0" />
           <p className="flex-1 min-w-0 text-xs text-[var(--page-text)]">
-            Suggested for this method: <span className="font-semibold text-[#00AEEF]">{suggestion.map((s) => `${s.name} (${s.weeks}w)`).join(' → ')}</span>
+            {suggestion && (
+              <>
+                Suggested for this method: <span className="font-semibold text-[#00AEEF]">{suggestion.map((s) => `${s.name} (${s.weeks}w)`).join(' → ')}</span>
+              </>
+            )}
+            {pairing && !pairingDismissed && (
+              <span className={suggestion ? 'block mt-0.5' : ''}>
+                Recommended next phase: <span className="font-semibold text-[#8B5CF6]">{pairing}</span>
+              </span>
+            )}
           </p>
-          <Button size="sm" onClick={acceptSuggestion} className="bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] text-xs font-bold">Accept</Button>
-          <button onClick={() => setSuggestionDismissed(true)} className="p-1 rounded-lg text-[var(--page-text)]/50 hover:text-[var(--page-text)]"><X className="w-3.5 h-3.5" /></button>
+          {suggestion && (
+            <Button size="sm" onClick={acceptSuggestion} className="bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] text-xs font-bold">Accept</Button>
+          )}
+          <button onClick={() => { setSuggestionDismissed(true); setPairingDismissed(true); }} className="p-1 rounded-lg text-[var(--page-text)]/50 hover:text-[var(--page-text)]"><X className="w-3.5 h-3.5" /></button>
         </div>
       )}
       <div className="space-y-3">
@@ -855,13 +933,24 @@ function Step5Split({ data, updateData }: StepProps) {
 
 const SPLIT_DAY_INDEX: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
 
-function Step6Exercises({ data, updateData, limitations }: StepProps) {
+function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepProps) {
   const [openRows, setOpenRows] = useState<Record<number, boolean>>({});
   const perDay = data.workoutExercises != null;
   const activeDays = data.split.filter((d) => d.active);
   const [selectedDay, setSelectedDay] = useState<number>(() =>
     activeDays[0] ? SPLIT_DAY_INDEX[activeDays[0].day] || 1 : 1
   );
+  // Phase 48: the selected method's prescription defaults (null for the
+  // other 24 methods — no prefill, no hint, exactly as before)
+  const methodDefaults = useMemo(
+    () => parseMethodDefaults(dbMethods.find((m) => m.slug === data.method)?.defaults),
+    [dbMethods, data.method],
+  );
+  const exercisePrefill = useMemo(
+    () => (methodDefaults ? deriveExerciseDefaults(methodDefaults) : null),
+    [methodDefaults],
+  );
+  const [hintDismissed, setHintDismissed] = useState(false);
 
   // In per-day mode (loaded from DB) each active day owns its exercise list;
   // a day without a list yet falls back to the shared `exercises` template.
@@ -902,13 +991,23 @@ function Step6Exercises({ data, updateData, limitations }: StepProps) {
         setList((prev) => prev.map((e, i) => (i === swapIdx ? { ...e, name: ex.name } : e)));
         setSwapIdx(null);
       } else {
+        // Phase 48: new exercises prefill from the method's defaults
+        // (parseable prescriptions only — trainer overrides freely)
         setList((prev) => [
           ...prev,
-          { code: `B${prev.length + 1}`, name: ex.name, sets: 3, reps: '10', pct1RM: 'N/A', tempo: '2-0-1-0', rest: '2:00' },
+          {
+            code: `B${prev.length + 1}`,
+            name: ex.name,
+            sets: exercisePrefill?.sets ?? 3,
+            reps: exercisePrefill?.reps ?? '10',
+            pct1RM: 'N/A',
+            tempo: exercisePrefill?.tempo ?? '2-0-1-0',
+            rest: exercisePrefill?.rest ?? '2:00',
+          },
         ]);
       }
     },
-    [setList, swapIdx]
+    [setList, swapIdx, exercisePrefill]
   );
   const openAddPicker = () => { setSwapIdx(null); setPickerOpen(true); };
   const openSwapPicker = (idx: number) => { setSwapIdx(idx); setPickerOpen(true); };
@@ -968,6 +1067,33 @@ function Step6Exercises({ data, updateData, limitations }: StepProps) {
   );
   return (
     <div className="space-y-4">
+      {/* Phase 48: method load hint (dismissible) */}
+      {methodDefaults && !hintDismissed && (
+        <div
+          className="flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[11px]"
+          style={{
+            borderColor: `${INTENSITY_HEX[methodDefaults.intensityColor]}40`,
+            backgroundColor: `${INTENSITY_HEX[methodDefaults.intensityColor]}0D`,
+            color: "var(--page-text)",
+          }}
+        >
+          <span>
+            <strong style={{ color: INTENSITY_HEX[methodDefaults.intensityColor] }}>
+              {resolveMethodName(data.method, dbMethods)}
+            </strong>
+            {" — "}
+            {loadHint(methodDefaults, /%/.test(methodDefaults.loadPct))}
+            {methodDefaults.notes && <span className="text-[var(--page-text)]/50"> · {methodDefaults.notes}</span>}
+          </span>
+          <button
+            onClick={() => setHintDismissed(true)}
+            className="shrink-0 rounded p-0.5 text-[var(--page-text)]/40 hover:text-[var(--page-text)]"
+            title="Dismiss"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={handleAutoFill} className="border-[#8B5CF6] text-[#8B5CF6] hover:bg-[#8B5CF6]/10 text-xs"><Sparkles className="w-3.5 h-3.5 mr-1" />AI Auto-Fill</Button>
         <Button variant="outline" size="sm" onClick={openAddPicker} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs"><Plus className="w-3.5 h-3.5 mr-1" />Add Exercise</Button>
@@ -1789,7 +1915,7 @@ export default function AIProgramBuilderPage() {
       setMethodsLoading(true);
       setMethodsError(null);
       const [mRes, cRes, gRes] = await Promise.all([
-        supabase.from('methods').select('id, name, slug, category, category_id, description, tags, display_order').eq('is_active', true).order('display_order'),
+        supabase.from('methods').select('id, name, slug, category, category_id, description, tags, display_order, defaults').eq('is_active', true).order('display_order'),
         supabase.from('method_categories').select('id, name, display_order').order('display_order'),
         supabase.from('goals').select('id, name'),
       ]);
@@ -1870,11 +1996,21 @@ export default function AIProgramBuilderPage() {
       const generated = generateProgram(p);
       setProgram(generated);
       const mapped = mapGeneratedToProgramData(generated, p);
-      // Phase 30C: method-aware superset pairing, applied at the wizard layer
-      const style = pairingStyleForMethod(selectedMethod);
+      // Phase 30C/48: method-aware superset pairing — the method's
+      // prescription defaults (notation) win over the 30C name map.
+      const methodDefaults = parseMethodDefaults(
+        dbMethods.find((m) => m.slug === selectedMethod)?.defaults,
+      );
+      const style = methodDefaults
+        ? notationToPairing(methodDefaults.notation)
+        : pairingStyleForMethod(selectedMethod);
+      // Phase 48: keep the 30A selection through generation (mapping
+      // overwrites data.method with the generator's own id) — the Step 6
+      // hint, pairing suggestion, and save-time tag all read the 30A slug.
+      const mappedWithMethod = { ...mapped, method: selectedMethod };
       if (style) {
         setData({
-          ...mapped,
+          ...mappedWithMethod,
           exercises: assignPairGroups(mapped.exercises, style),
           ...(mapped.workoutExercises
             ? {
@@ -1886,7 +2022,7 @@ export default function AIProgramBuilderPage() {
         });
         toast.success(`Supersets configured for ${resolveMethodName(selectedMethod, dbMethods)}`);
       } else {
-        setData(mapped);
+        setData(mappedWithMethod);
       }
       setGenerating(false);
       setCurrentStep(6);

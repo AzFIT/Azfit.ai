@@ -131,6 +131,12 @@ async function fetchClientPrograms(clientId: string): Promise<ClientGeneratedPro
       createdAt: p.created_at,
       startDate: p.start_date,
       endDate: p.end_date,
+      // Phase 48: method tag persisted in phases jsonb[0].method (additive)
+      ...(Array.isArray(p.phases) &&
+      p.phases.length > 0 &&
+      typeof (p.phases[0] as { method?: unknown }).method === "string"
+        ? { methodSlug: (p.phases[0] as { method?: unknown }).method as string }
+        : {}),
       // Phase 30D: progression rules (validated; absent on old rows)
       progressionRules: Array.isArray(p.progression_rules)
         ? (p.progression_rules as unknown[]).filter(

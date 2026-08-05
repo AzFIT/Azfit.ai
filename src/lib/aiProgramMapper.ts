@@ -152,6 +152,15 @@ export function buildProgramInsert(
     ? new Date(startDate.getTime() + durationWeeks * 7 * 24 * 60 * 60 * 1000)
     : null;
 
+  // Phase 48: the 30A method selection (slug) rides in the phases jsonb —
+  // additive key on the first active phase (or the single-phase fallback),
+  // no column changes. programDataFromDb restores it losslessly.
+  const phasesToWrite = activePhases.length > 0
+    ? activePhases.map((p, i) => (i === 0 && data.method ? { ...p, method: data.method } : p))
+    : data.method
+      ? [{ id: "p1", name: "Program Phase", weeks: durationWeeks || 4, focus: "", color: "#00AEEF", active: true, method: data.method }]
+      : [];
+
   return {
     trainer_id: trainerId,
     client_id: assignedClientId || null,
@@ -163,7 +172,7 @@ export function buildProgramInsert(
     start_date: startDate ? startDate.toISOString().split("T")[0] : null,
     end_date: endDate ? endDate.toISOString().split("T")[0] : null,
     // Phase 30B: persist the ACTIVE phase structure (all fields) as jsonb
-    phases: activePhases.length > 0 ? (activePhases as unknown as Json) : null,
+    phases: phasesToWrite.length > 0 ? (phasesToWrite as unknown as Json) : null,
     // Phase 30D: persist progression rules (empty list -> null)
     progression_rules:
       data.progressionRules.length > 0 ? (data.progressionRules as unknown as Json) : null,
@@ -354,6 +363,12 @@ export function programDataFromDb(
     isPublic: false,
     tags: [],
     progressionRules: storedRules,
+    // Phase 48: restore the method tag persisted in the first phase (additive)
+    method:
+      storedPhases.length > 0 &&
+      typeof (storedPhases[0] as { method?: unknown }).method === "string"
+        ? ((storedPhases[0] as { method?: unknown }).method as string)
+        : "",
     phases: storedPhases.length > 0
       ? storedPhases
       : [

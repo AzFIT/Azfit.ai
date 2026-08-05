@@ -17,6 +17,9 @@ export interface DbMethod {
   description: string | null;
   tags: string | null;
   display_order: number;
+  /** Phase 48: Poliquin prescription defaults jsonb (16 methods; null for
+   * the rest — parse via parseMethodDefaults, never render raw). */
+  defaults?: unknown;
 }
 
 export interface DbMethodCategory {

@@ -1,0 +1,124 @@
+#!/usr/bin/env node
+/* ═══════════════════════════════════════════════════════════════════
+   Phase 48, Item 1 — method prescription defaults seed (zero deps).
+   Emits supabase/seed-method-defaults.sql: UPDATEs for the 8 existing
+   rows (by slug) + INSERTs for the 8 new methods, ON CONFLICT (slug)
+   DO UPDATE — idempotent. Content: canonical Poliquin values (see
+   docs/PROGRESS.md Phase 48 for the defaults shape documentation).
+   ═══════════════════════════════════════════════════════════════════ */
+
+import { writeFileSync } from "fs";
+
+// [slug, name, category_id, description, defaults]
+const METHODS = [
+  [
+    "german-volume-training-10x10", null, null,
+    "Charles Poliquin's signature hypertrophy protocol: ten sets of ten on one main lift per session at 60% 1RM. Brutal but proven for breaking size plateaus — add load only when all 100 reps are completed cleanly.",
+    { goalTag: "Hypertrophy / volume", intensityColor: "green", setsReps: "10×10", loadPct: "60% 1RM", rest: "60–90s", tempo: "4-0-1-0", notation: "straight", notes: "One main lift per session; add weight when all 10×10 are hit.", durationWeeks: 4, frequencyPerWeek: 4, idealFor: ["hypertrophy", "work capacity", "plateau break"], contraindications: ["total beginners", "joint issues — the volume is extreme"], periodizationPairings: ["intensification-block"], preferredCategories: ["pressing", "pulling", "bilateral_quad", "posterior"] },
+  ],
+  [
+    "escalating-density-training", null, null,
+    "Antagonistic-pair density training: race the clock in 15–20 minute PR zones, beating your total reps each session. Maximum work in minimum time.",
+    { goalTag: "Density / conditioning", intensityColor: "blue", setsReps: "Antagonistic pairs · AMRAP in 15–20 min", loadPct: "65–75%", rest: "Minimal — race the clock", tempo: "2-0-1-0", notation: "superset", notes: "15–20 min PR zones; increase reps or load next session.", durationWeeks: 4, frequencyPerWeek: 3, idealFor: ["fat loss", "work capacity", "time-poor clients"], contraindications: ["poor cardiovascular base"], periodizationPairings: ["german-body-composition"], preferredCategories: ["pressing", "pulling", "bilateral_quad", "posterior"] },
+  ],
+  [
+    "wave-loading", null, null,
+    "Neural-charge strength work: descending 3/2/1 rep waves, each wave slightly heavier than the last. Teaches the nervous system to produce more force per attempt.",
+    { goalTag: "Max strength", intensityColor: "red", setsReps: "3/2/1 × 3–4 waves", loadPct: "75–95%", rest: "2–4 min", tempo: "3-0-1-0", notation: "straight", notes: "Each wave slightly heavier than the last.", durationWeeks: 3, frequencyPerWeek: 2, idealFor: ["advanced lifters", "strength peaking"], contraindications: ["beginners", "no recent heavy training"], periodizationPairings: ["accumulation-block"], preferredCategories: ["pressing", "pulling", "bilateral_quad", "posterior"] },
+  ],
+  [
+    "cluster-sets", null, null,
+    "Heavy weight without the grind: rack the bar for 10–15 seconds between every rep of a set. Preserves bar speed and quality at 85–90% 1RM.",
+    { goalTag: "Strength / power", intensityColor: "red", setsReps: "4–6 reps in clusters", loadPct: "85–90%", rest: "10–15s intra-set · 2–3 min between", tempo: "2-0-1-0", notation: "straight", notes: "Rack the bar between cluster reps.", durationWeeks: 4, frequencyPerWeek: 3, idealFor: ["strength without grinding", "power maintenance"], contraindications: ["no spotter or safety arms for heavy reps"], periodizationPairings: ["wave-loading"], preferredCategories: ["pressing", "pulling", "bilateral_quad", "posterior"] },
+  ],
+  [
+    "rest-pause", null, null,
+    "Take a set to failure, rest 10–20 seconds, then squeeze out mini-sets of extra reps. One of the most time-efficient hypertrophy intensifiers — one rest-pause set per exercise is enough.",
+    { goalTag: "Hypertrophy / intensity", intensityColor: "red", setsReps: "To failure + 2–3 mini-sets", loadPct: "70–85%", rest: "10–20s between mini-sets", tempo: "3-0-1-0", notation: "straight", notes: "One rest-pause set per exercise is enough.", durationWeeks: 4, frequencyPerWeek: 3, idealFor: ["advanced hypertrophy", "short sessions"], contraindications: ["beginners", "avoid on heavy spine-loaded lifts"], periodizationPairings: ["accumulation-block"], preferredCategories: ["pressing", "pulling", "bilateral_quad", "delt_scap"] },
+  ],
+  [
+    "olympic-lifts", null, null,
+    "Explosive variations of the snatch and clean & jerk for rate of force development. Technique governs everything — the session ends when bar speed drops.",
+    { goalTag: "Power / athleticism", intensityColor: "blue", setsReps: "3–6 reps", loadPct: "70–85%", rest: "2–3 min", tempo: "Explosive", notation: "straight", notes: "Technique first — stop when bar speed drops.", durationWeeks: 6, frequencyPerWeek: 3, idealFor: ["athletes", "rate of force development"], contraindications: ["shoulder/wrist mobility limits", "no coaching available"], periodizationPairings: ["athletic-performance-block"], preferredCategories: ["posterior", "pulling", "pressing"] },
+  ],
+  [
+    "trisets", null, null,
+    "Three exercises for the same muscle group performed back to back from different angles. Deep local fatigue and a serious pump in a short window.",
+    { goalTag: "Hypertrophy / density", intensityColor: "blue", setsReps: "3 exercises × 8–12", loadPct: "60–70%", rest: "10s between exercises · 2 min between rounds", tempo: "3-0-1-0", notation: "triset", notes: "Same muscle group, three angles.", durationWeeks: 4, frequencyPerWeek: 3, idealFor: ["hypertrophy", "short on time"], contraindications: ["poor conditioning"], periodizationPairings: ["giant-sets"], preferredCategories: ["pressing", "pulling", "delt_scap", "biceps", "triceps"] },
+  ],
+  [
+    "giant-sets", null, null,
+    "Four or more exercises chained with minimal rest — a triset taken further. Advanced hypertrophy work that doubles as conditioning.",
+    { goalTag: "Hypertrophy / density", intensityColor: "blue", setsReps: "4+ exercises × 8–12", loadPct: "60–70%", rest: "10s between exercises", tempo: "3-0-1-0", notation: "triset", notes: "Four or more exercises back to back.", durationWeeks: 4, frequencyPerWeek: 3, idealFor: ["advanced hypertrophy", "conditioning"], contraindications: ["poor conditioning", "crowded gym"], periodizationPairings: ["trisets"], preferredCategories: ["pressing", "pulling", "delt_scap", "biceps", "triceps"] },
+  ],
+  /* ── New rows ── */
+  [
+    "german-body-composition", "GBC (German Body Composition)", 2,
+    "Poliquin's fat-loss density system: upper/lower antagonist supersets with short rests to drive a large hormonal and caloric response. High work, short sessions.",
+    { goalTag: "Fat loss / conditioning", intensityColor: "green", setsReps: "3–4 circuits of 8–12", loadPct: "60–70%", rest: "30–60s", tempo: "4-0-1-0", notation: "superset", notes: "Upper/lower antagonist pairs; short rests drive the response.", durationWeeks: 4, frequencyPerWeek: 3, idealFor: ["fat loss", "conditioning", "recomposition"], contraindications: ["very deconditioned clients"], periodizationPairings: ["escalating-density-training"], preferredCategories: ["pressing", "pulling", "bilateral_quad", "posterior"] },
+  ],
+  [
+    "5-4-3-2-1-ladder", "5-4-3-2-1 Ladder", 1,
+    "A descending rep ladder with load added every set — 5, 4, 3, 2, 1. Simple, ruthless neural training for the big lifts.",
+    { goalTag: "Max strength", intensityColor: "red", setsReps: "5/4/3/2/1 ladder", loadPct: "70–95%", rest: "2–3 min", tempo: "3-0-1-0", notation: "straight", notes: "Add weight each set down the ladder.", durationWeeks: 4, frequencyPerWeek: 2, idealFor: ["strength focus", "neural drive"], contraindications: ["beginners"], periodizationPairings: ["wave-loading"], preferredCategories: ["pressing", "pulling", "bilateral_quad", "posterior"] },
+  ],
+  [
+    "accumulation-block", "Accumulation Block", 4,
+    "The volume phase of Poliquin periodization: higher reps, controlled tempos, building muscle and work capacity before any heavy phase.",
+    { goalTag: "Hypertrophy / base", intensityColor: "green", setsReps: "4–6 × 8–12", loadPct: "60–70%", rest: "60–90s", tempo: "4-0-1-0", notation: "straight", notes: "Volume phase — build the base before intensity.", durationWeeks: 4, frequencyPerWeek: 4, idealFor: ["hypertrophy", "base building", "returning clients"], contraindications: [], periodizationPairings: ["intensification-block"], preferredCategories: ["pressing", "pulling", "bilateral_quad", "posterior", "delt_scap"] },
+  ],
+  [
+    "intensification-block", "Intensification Block", 4,
+    "The neural phase of Poliquin periodization: lower reps, heavier loads, longer rests — cashing in the base built during accumulation.",
+    { goalTag: "Strength / neural", intensityColor: "red", setsReps: "4–6 × 3–6", loadPct: "75–95%", rest: "2–3 min", tempo: "3-0-1-0", notation: "straight", notes: "Intensity phase — cash in the accumulated volume.", durationWeeks: 3, frequencyPerWeek: 3, idealFor: ["strength", "advanced lifters"], contraindications: ["no accumulation base first"], periodizationPairings: ["accumulation-block"], preferredCategories: ["pressing", "pulling", "bilateral_quad", "posterior"] },
+  ],
+  [
+    "structural-balance-protocols", "Structural Balance Protocols", 1,
+    "Fix the weak links before chasing intensity: targeted ratios for rotator cuff, scapular control and posterior chain. Prehab that keeps heavy training possible.",
+    { goalTag: "Balance / prehab", intensityColor: "green", setsReps: "3–4 × 6–12", loadPct: "60–70%", rest: "60–90s", tempo: "Controlled", notation: "straight", notes: "Ratios before intensity — fix weak links first.", durationWeeks: 6, frequencyPerWeek: 3, idealFor: ["injury prevention", "posture", "return from layoff"], contraindications: [], periodizationPairings: ["accumulation-block"], preferredCategories: ["delt_scap", "pulling", "posterior", "bracing"] },
+  ],
+  [
+    "modified-strongman", "Modified Strongman", 2,
+    "Gym-safe strongman events: farmer carries, sled pushes and loaded walks. General physical preparedness and conditioning with minimal technical demand.",
+    { goalTag: "Conditioning / GPP", intensityColor: "blue", setsReps: "Carries & sleds — variable", loadPct: "Variable", rest: "60–120s", tempo: "Explosive", notation: "straight", notes: "Gym-safe strongman: farmer carries, sled pushes, loaded walks.", durationWeeks: 4, frequencyPerWeek: 2, idealFor: ["conditioning", "athletes", "mental toughness"], contraindications: ["no open space or sled track"], periodizationPairings: ["german-body-composition"], preferredCategories: ["metcon_bracing", "posterior", "bilateral_quad"] },
+  ],
+  [
+    "5x5-strength", "5x5 Strength", 1,
+    "The classic strength foundation: five sets of five on big lifts with linear load progression. Simple, measurable, effective for intermediates.",
+    { goalTag: "Strength foundation", intensityColor: "red", setsReps: "5×5", loadPct: "80–85%", rest: "2–3 min", tempo: "3-0-1-0", notation: "straight", notes: "Two big lifts per session, linear load progression.", durationWeeks: 6, frequencyPerWeek: 3, idealFor: ["strength foundation", "intermediates"], contraindications: ["total beginners — learn technique first"], periodizationPairings: ["accumulation-block"], preferredCategories: ["pressing", "pulling", "bilateral_quad", "posterior"] },
+  ],
+  [
+    "athletic-performance-block", "Athletic Performance Block", 3,
+    "A sport-performance block blending power, speed and agility work for field and court athletes. Built to transfer, not just to exhaust.",
+    { goalTag: "Sport performance", intensityColor: "blue", setsReps: "Sport-variable", loadPct: "Variable", rest: "60–120s", tempo: "Explosive", notation: "straight", notes: "Power + speed + agility block for field/court athletes.", durationWeeks: 6, frequencyPerWeek: 3, idealFor: ["athletes", "off-season"], contraindications: ["needs a sport context to program well"], periodizationPairings: ["olympic-lifts"], preferredCategories: ["metcon_bracing", "bilateral_quad", "posterior"] },
+  ],
+];
+
+const esc = (v) => (v === null ? "null" : `'${String(v).replace(/'/g, "''")}'`);
+const jsonb = (d) => `'${JSON.stringify(d).replace(/'/g, "''")}'::jsonb`;
+
+const updates = [];
+const inserts = [];
+for (const [slug, name, categoryId, description, defaults] of METHODS) {
+  if (name === null) {
+    updates.push(
+      `update public.methods set description = ${esc(description)}, defaults = ${jsonb(defaults)} where slug = '${slug}';`,
+    );
+  } else {
+    inserts.push(
+      `insert into public.methods (step_number, step_name, category, name, slug, description, is_active, display_order, category_id, defaults)\nvalues (2, 'Method', 'Classic Strength Protocols', ${esc(name)}, '${slug}', ${esc(description)}, true, ${100 + inserts.length}, ${categoryId}, ${jsonb(defaults)})\non conflict (slug) do update set description = excluded.description, defaults = excluded.defaults, category_id = excluded.category_id;`,
+    );
+  }
+}
+
+const sql = `-- Phase 48, Item 1 — Poliquin method prescription defaults.
+-- Generated by scripts/seed-method-defaults.mjs — regenerate, don't hand-edit.
+-- Idempotent: UPDATEs by slug + INSERT ... ON CONFLICT (slug) DO UPDATE.
+
+${updates.join("\n\n")}
+
+${inserts.join("\n\n")}
+`;
+
+writeFileSync("supabase/seed-method-defaults.sql", sql);
+console.log(`wrote supabase/seed-method-defaults.sql — ${updates.length} updates + ${inserts.length} inserts`);
