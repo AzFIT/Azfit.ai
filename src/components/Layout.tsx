@@ -29,6 +29,7 @@ import {
   BookOpen,
   Library,
   ClipboardCheck,
+  CalendarRange,
   Video,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -81,7 +82,12 @@ export default function Layout({
   const primaryNavItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
     { icon: ClipboardCheck, label: "Check-ins", path: "/check-ins" },
-    ...(isTrainer ? [{ icon: Users, label: "Clients", path: "/clients" }] : []),
+    ...(isTrainer
+      ? [
+          { icon: CalendarRange, label: "Weekly Digest", path: "/weekly-digest" },
+          { icon: Users, label: "Clients", path: "/clients" },
+        ]
+      : []),
     { icon: Dumbbell, label: "Workouts", path: "/sheets" },
     { icon: Apple, label: "Nutrition", path: "/nutrition" },
     { icon: BarChart3, label: "Analytics", path: "/analytics" },

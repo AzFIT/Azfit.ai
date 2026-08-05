@@ -58,6 +58,7 @@ const CoachAIPage = lazy(() => import("@/pages/CoachAIPage"));
 const Messages = lazy(() => import("@/pages/Messages"));
 const ExercisesPage = lazy(() => import("@/pages/ExercisesPage"));
 const CheckInsPage = lazy(() => import("@/pages/CheckInsPage"));
+const WeeklyDigestPage = lazy(() => import("@/pages/WeeklyDigest"));
 const FormChecksPage = lazy(() => import("@/pages/FormChecks"));
 const LibraryPage = lazy(() => import("@/pages/Library"));
 const PrintProgramPage = lazy(() => import("@/pages/PrintProgram"));
@@ -252,6 +253,14 @@ export default function App() {
                     element={
                       <ProtectedRoute>
                         <CheckInsPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/weekly-digest"
+                    element={
+                      <ProtectedRoute requireTrainer>
+                        <WeeklyDigestPage />
                       </ProtectedRoute>
                     }
                   />
