@@ -85,7 +85,7 @@ function mapDbExercise(ex: ExerciseRow, normalizedCode?: string): PrintExercise 
     }
   }
   return {
-    order: extra.supersetGroup ?? code,
+    order: code,
     name: ex.name,
     setsReps: `${ex.sets ?? 0} × ${ex.reps || "—"}`,
     tempo: rawTempo && rawTempo !== "N/A" ? rawTempo : null,
@@ -108,8 +108,17 @@ export function buildPrintModel(
       const dayExercises = exercises
         .filter((e) => e.workout_id === w.id)
         .sort((a, b) => a.order_index - b.order_index);
-      // Phase 36: normalize display labels per day (D1 D1 → D1 D2), display only
-      const dayLabels = normalizeOrderLabels(dayExercises.map((e) => codeFromOrderIndex(e.order_index)));
+      // Phase 36/42: normalize the EFFECTIVE display labels per day —
+      // explicit supersetGroup wins over the order-code letter (same
+      // rule as the preview and the session player), then normalize so
+      // pairs number up (A A → A1 A2) and singletons stay plain.
+      const dayLabels = normalizeOrderLabels(
+        dayExercises.map(
+          (e) =>
+            parseExerciseNotes(e.notes).supersetGroup ??
+            codeFromOrderIndex(e.order_index),
+        ),
+      );
       return {
         label: `${DAY_NAMES[w.day_of_week ?? 0] ?? `Day ${w.day_of_week}`} — ${w.name}`,
         exercises: dayExercises.map((e, i) => mapDbExercise(e, dayLabels[i])),

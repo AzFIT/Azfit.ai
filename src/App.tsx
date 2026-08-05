@@ -41,6 +41,7 @@ const OnboardingPage = lazy(() => import("@/pages/OnboardingPage"));
 const BioPrintPage = lazy(() => import("@/pages/BioPrintPage"));
 const NutritionPage = lazy(() => import("@/pages/Nutrition"));
 const AIProgramBuilderPage = lazy(() => import("@/pages/AIProgramBuilder"));
+const ManualProgramBuilderPage = lazy(() => import("@/pages/ManualProgramBuilder"));
 const SchedulePage = lazy(() => import("@/pages/Schedule"));
 const ProgressPhotosPage = lazy(() => import("@/pages/ProgressPhotos"));
 const ExportSharePage = lazy(() => import("@/pages/ExportShare"));
@@ -219,6 +220,14 @@ export default function App() {
                     element={
                       <ProtectedRoute requireTrainer>
                         <AIProgramBuilderPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/manual-program-builder"
+                    element={
+                      <ProtectedRoute requireTrainer>
+                        <ManualProgramBuilderPage />
                       </ProtectedRoute>
                     }
                   />

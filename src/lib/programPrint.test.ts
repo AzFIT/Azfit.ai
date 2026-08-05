@@ -53,8 +53,11 @@ describe("buildPrintModel (saved program)", () => {
     expect(model.days[0].exercises.map((e) => e.name)).toEqual(["Overhead Press", "Bench Press"]);
   });
 
-  it("prefers stored supersetGroup over the order code, carries notes", () => {
-    expect(model.days[0].exercises[1].order).toBe("A"); // supersetGroup wins over B2 code
+  it("normalizes explicit supersetGroup into the day labels (Phase 42 fix)", () => {
+    // e1 has order code A1, e2 explicit group A → the pair normalizes to A1/A2
+    // (pre-42 print showed the inconsistent A1 + bare A)
+    expect(model.days[0].exercises[1].order).toBe("A2");
+    expect(model.days[0].exercises[0].order).toBe("A1");
     expect(model.days[0].exercises[1].setsReps).toBe("4 × 8");
     expect(model.days[0].exercises[1].rest).toBe("1:30");
     expect(model.days[0].exercises[0].notes).toContain("Swapped for safety");
@@ -134,5 +137,29 @@ describe("Phase 36 — label parity between the session player and the print vie
     );
     const printPath = model.days[0].exercises.map((e) => e.order);
     expect(printPath).toEqual(sessionPath);
+  });
+});
+
+describe("explicit supersetGroup labels in print (Phase 42 follow-up)", () => {
+  it("grouped rows print numbered group labels (A1/A2), singletons plain", () => {
+    const w = { id: "w1", program_id: "p1", name: "Push", day_of_week: 1 } as unknown as WorkoutRow;
+    const mk = (i: number, oi: number, group: string | null) => ({
+      id: `e${i}`,
+      workout_id: "w1",
+      name: `Exercise ${i + 1}`,
+      sets: 3,
+      reps: "10",
+      order_index: oi,
+      rest_seconds: 60,
+      notes: JSON.stringify(group ? { supersetGroup: group } : {}),
+    }) as unknown as ExerciseRow;
+    const model = buildPrintModel(
+      { id: "p1", name: "T", client_id: "c", trainer_id: "t", created_at: "2026-01-01", start_date: null, end_date: null, phases: null, progression_rules: null } as unknown as ProgramRow,
+      [w],
+      [mk(0, 0, "A"), mk(1, 1, "A"), mk(2, 2, null)],
+      "Client",
+      "Coach"
+    );
+    expect(model.days[0].exercises.map((e) => e.order)).toEqual(["A1", "A2", "B"]);
   });
 });
