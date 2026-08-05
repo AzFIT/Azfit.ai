@@ -112,6 +112,9 @@ export default function SchedulePage() {
   // sessions.client_id references profiles(id), so clients WITHOUT a linked
   // app account are omitted (they cannot have sessions).
   const [bookableClients, setBookableClients] = useState<{ id: string; name: string; avatar?: string }[]>([]);
+  // Phase 43 Fix 5: real roster size for the header stat (was the count of
+  // clients WITH sessions this week — a meaningless "0 clients" on quiet weeks)
+  const [rosterCount, setRosterCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user?.id || !isTrainer) return;
@@ -133,7 +136,10 @@ export default function SchedulePage() {
           .maybeSingle();
         if (prof) out.push({ id: prof.id, name: c.full_name });
       }
-      if (!cancelled) setBookableClients(out);
+      if (!cancelled) {
+        setBookableClients(out);
+        setRosterCount(rows.length);
+      }
     })();
     return () => {
       cancelled = true;
@@ -209,11 +215,9 @@ export default function SchedulePage() {
       const end = timeToMinutes(e.endTime);
       return sum + (end - start) / 60;
     }, 0);
-    const uniqueClients = new Set(weekEvts.map((e) => e.clientId).filter(Boolean)).size;
     return {
       sessions: weekEvts.length,
       hours: Math.round(totalHours * 10) / 10,
-      clients: uniqueClients,
     };
   }, [events, weekDays]);
 
@@ -546,10 +550,12 @@ export default function SchedulePage() {
                   <Timer className="w-3 h-3 text-violet-400" />
                   {stats.hours}h
                 </span>
-                <span className="flex items-center gap-1">
-                  <Users className="w-3 h-3 text-emerald-400" />
-                  {stats.clients} clients
-                </span>
+                {isTrainer && rosterCount !== null && (
+                  <span className="flex items-center gap-1" title="Active clients on your roster">
+                    <Users className="w-3 h-3 text-emerald-400" />
+                    {rosterCount} clients
+                  </span>
+                )}
               </div>
 
               {/* Download upcoming .ics */}

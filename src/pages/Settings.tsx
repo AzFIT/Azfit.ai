@@ -413,7 +413,7 @@ export default function Settings() {
       <div
         className="relative h-40 w-full overflow-hidden"
         style={{
-          backgroundImage: 'url(/azfit-bg-2.png)',
+          backgroundImage: `url(${import.meta.env.BASE_URL}azfit-bg-2.png)`, // Phase 43 Fix 4: absolute path 404'd under the /Azfit.ai/ subpath
           backgroundSize: 'cover',
           backgroundPosition: 'center 60%',
         }}

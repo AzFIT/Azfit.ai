@@ -13,7 +13,7 @@ export async function resolveClientId(_userId: string, email: string): Promise<s
     .eq("email", email)
     .order("created_at", { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle(); // Phase 43: no clients row → null, not a 406
 
   if (error || !data) return null;
   return data.id;

@@ -32,6 +32,7 @@ import { WorkoutLauncher } from "@/components/WorkoutLauncher";
 import { GlassCard } from "./shared/GlassCard";
 import { ProgressRing } from "./shared/ProgressRing";
 import { CollapsibleSection } from "./shared/CollapsibleSection";
+import TodaysMealsCard from "./TodaysMealsCard";
 
 /* ═══════════════════════════════════════════════════════════════════
    Client Dashboard — Restructured (Phase 1)
@@ -161,6 +162,7 @@ export default function ClientDashboard() {
 
   // Workout checklist (Phase 33B — real program day for today)
   const [exercises, setExercises] = useState<WorkoutExercise[]>([]);
+  const [clientsId, setClientsId] = useState<string | null>(null); // Phase 43: Today's Meals card
   const [workoutName, setWorkoutName] = useState<string | null>(null);
   const [workoutLoading, setWorkoutLoading] = useState(true);
 
@@ -266,6 +268,7 @@ export default function ClientDashboard() {
         setCoachName(coach);
         setCheckinDue(due);
         setUnreadNotifications(unread ?? 0);
+        setClientsId(clientRow?.id ?? null);
         setWorkoutLoading(false);
       }
     })();
@@ -702,6 +705,9 @@ export default function ClientDashboard() {
           )}
         </CollapsibleSection>
       </motion.div>
+
+      {/* TODAY'S MEALS (Phase 43, Item 6) — saved plan day for today's weekday */}
+      {clientsId && <TodaysMealsCard clientId={clientsId} />}
 
       {/* ═══════════════════════════════════════════════════════════
           CHECK-IN DUE CARD (conditional)

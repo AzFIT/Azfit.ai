@@ -6,11 +6,11 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import {
   filterFoods,
-  resolvePlanFood,
   MEAL_ORDER,
   type FoodInput,
   type MealType,
 } from "@/lib/mealPlan";
+import { logPlanItems } from "@/lib/logFromPlan";
 import {
   generateMultiDayPlan,
   regenerateDay,
@@ -20,7 +20,7 @@ import {
   type MultiDayPlan,
   type PlanItemV2,
 } from "@/lib/mealPlanV2";
-import { addFoodToLog, type MacroTotals } from "@/lib/foodApi";
+import type { MacroTotals } from "@/lib/foodApi";
 import type { Database, Json } from "@/types/supabase";
 
 type MealPlanRow = Database["public"]["Tables"]["meal_plans"]["Row"];
@@ -313,26 +313,16 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet, ca
     }
   }, [draft, savedPlan, saving, targets, clientId, user?.id, loadPlan]);
 
-  // Phase 38, Item 1 — log a whole plan meal into today's nutrition_logs.
-  // Items store no food id: resolve names via resolvePlanFood (exact
-  // match only), skip + report anything unmatched, never insert garbage.
+  // Phase 38, Item 1 — log a whole plan meal into today's nutrition_logs
+  // via the shared 43 logPlanItems path (exact-match resolution, never
+  // guesses; skipped items are reported in the toast).
   const handleLogMeal = useCallback(
     async (meal: MealType, items: PlanItem[]) => {
       if (loggingMeal) return;
       setLoggingMeal(meal);
       try {
         const pool = await ensureFoods();
-        let logged = 0;
-        let skipped = 0;
-        for (const it of items) {
-          const food = resolvePlanFood(it.name, pool);
-          if (!food) {
-            skipped++;
-            continue;
-          }
-          await addFoodToLog(meal, food.id, it.serving_g, todayLocal());
-          logged++;
-        }
+        const { logged, skipped } = await logPlanItems(items, meal, todayLocal(), pool);
         if (logged > 0) {
           toast.success(`Logged ${logged} items to ${MEAL_LABELS[meal]} ✅`);
           setLoggedMeals((prev) => new Set(prev).add(meal));

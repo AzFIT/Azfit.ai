@@ -42,7 +42,7 @@ export function useHabits({ role, clientId: propClientId }: UseHabitsOptions) {
         .eq("email", user.email)
         .order("created_at", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle(); // Phase 43: no clients row → null, not a 406
 
       if (cancelled) return;
       if (error || !data) {

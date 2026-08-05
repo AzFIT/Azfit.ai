@@ -191,9 +191,10 @@ export default function ClientProfile() {
   const hasValidId = isValidUUID(clientId);
   const [searchParams, setSearchParams] = useSearchParams();
   const urlTab = searchParams.get("tab");
-  const [activeTab, setActiveTab] = useState<TabId>(
-    (tabs.find((t) => t.id === urlTab)?.id as TabId) || "overview"
-  );
+  // Phase 43 Fix 1: the tab is URL-derived state (?tab=), not a useState
+  // snapshot — deep links from dashboard widgets switch tabs in-session,
+  // tab clicks write the URL (which re-renders), and back/forward works.
+  const activeTab: TabId = (tabs.find((t) => t.id === urlTab)?.id as TabId) || "overview";
   const [client, setClient] = useState<Client | null>(null);
   const [clientRow, setClientRow] = useState<DbClientRow | null>(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -203,12 +204,11 @@ export default function ClientProfile() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // In-page tab navigation for clickable tiles (tabs are state, not routes).
+  // In-page tab navigation for clickable tiles (tabs are URL state).
   // `hint` optionally pre-opens the Bio History quick-add dialog.
   const handleNavigateTab = useCallback(
     (tab: TabId, hint?: "weight" | "bodyFat") => {
       setBioAddHint(hint ?? null);
-      setActiveTab(tab);
       setSearchParams({ tab });
     },
     [setSearchParams],
@@ -371,10 +371,7 @@ export default function ClientProfile() {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => {
-                    setActiveTab(tab.id);
-                    setSearchParams({ tab: tab.id });
-                  }}
+                  onClick={() => setSearchParams({ tab: tab.id })}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
                   style={{
                     backgroundColor: isActive

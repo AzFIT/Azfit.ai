@@ -94,6 +94,8 @@ async function loadSavedPrograms(trainerId: string): Promise<SavedProgram[]> {
     .from('programs')
     .select('*')
     .eq('trainer_id', trainerId)
+    // Phase 43 Fix 2: archived programs stay out of the Load Saved list
+    .neq('status', 'archived')
     .order('updated_at', { ascending: false });
   if (programsError || !programsData) return [];
 

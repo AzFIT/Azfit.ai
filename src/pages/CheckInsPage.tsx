@@ -682,7 +682,7 @@ function ClientCheckIns() {
       .from("clients")
       .select("id")
       .eq("email", user.email)
-      .single();
+      .maybeSingle(); // Phase 43: no clients row → null, not a 406
 
     if (clientError || !clientRow) {
       toast.error("Could not find your client record");

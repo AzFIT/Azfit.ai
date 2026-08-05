@@ -92,20 +92,32 @@ export default function BioPrintPage() {
 
   /* ── Fetch client profile for TDEE defaults ──────────────────────── */
   useEffect(() => {
-    if (!user?.email) return;
+    // Phase 43 Fix 3: trainers land on the client picker — they have no
+    // clients row of their own, so skip this lookup entirely (it 406'd).
+    if (!user?.email || isTrainer) return;
 
     let cancelled = false;
     const fetchProfile = async () => {
+      // activity_level lives in intake_profile (no such top-level column —
+      // the old select 400'd); maybeSingle: users without a clients row
+      // get null instead of a 406.
       const { data } = await supabase
         .from("clients")
-        .select("activity_level, gender, height_cm, date_of_birth, weight_kg")
+        .select("intake_profile, gender, height_cm, date_of_birth, weight_kg")
         .eq("email", user.email)
         .order("created_at", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (!cancelled && data) {
-        setProfile(data as ClientProfileSnapshot);
+        const ip = data.intake_profile as { activity_level?: string } | null;
+        setProfile({
+          activity_level: ip?.activity_level,
+          gender: data.gender,
+          height_cm: data.height_cm,
+          date_of_birth: data.date_of_birth,
+          weight_kg: data.weight_kg,
+        });
       }
     };
 
@@ -113,7 +125,7 @@ export default function BioPrintPage() {
     return () => {
       cancelled = true;
     };
-  }, [user?.email]);
+  }, [user?.email, isTrainer]);
 
   /* ── Goal weight fallback ──────────────────────────────────────────── */
   const goalWeight = useMemo(() => {
