@@ -245,7 +245,9 @@ export default function ClientDashboard() {
           coach = typeof name === "string" && name ? name : null;
         }
 
-        // Check-in due: trainer has an active form AND I haven't submitted in 7 days
+        // Check-in due: trainer has an active form AND I haven't submitted in 7 days.
+        // Phase 44: submissions.client_id is the CLIENTS id — the 33B query
+        // compared it to user.id (profile id), so the badge could never clear.
         const { count: activeForms } = await supabase
           .from("check_in_forms")
           .select("id", { count: "exact", head: true })
@@ -256,7 +258,7 @@ export default function ClientDashboard() {
           const { count: recentSubs } = await supabase
             .from("check_in_submissions")
             .select("id", { count: "exact", head: true })
-            .eq("client_id", user.id)
+            .eq("client_id", clientRow.id)
             .gte("submitted_at", weekAgo);
           due = (recentSubs ?? 0) === 0;
         }
@@ -736,7 +738,7 @@ export default function ClientDashboard() {
               </div>
               <motion.button
                 whileTap={{ scale: 0.95 }}
-                onClick={() => navigate("/bioprint")}
+                onClick={() => navigate("/check-ins")}
                 className="rounded-lg px-4 py-2 text-sm font-medium text-white shrink-0"
                 style={{ backgroundColor: "#F87171" }}
               >

@@ -695,6 +695,36 @@ CREATE POLICY "Trainers can update submission review fields"
     )
   );
 
+-- Phase 44: clients may edit their own (current-week) submission
+CREATE POLICY "Clients can update own submissions"
+  ON check_in_submissions FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM clients c
+      JOIN profiles p ON p.id = auth.uid()
+      WHERE c.id = check_in_submissions.client_id
+        AND c.email = p.email
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM clients c
+      JOIN profiles p ON p.id = auth.uid()
+      WHERE c.id = check_in_submissions.client_id
+        AND c.email = p.email
+    )
+  );
+
+-- Phase 44: trainers may enter a check-in on behalf of a client (account-less entry)
+CREATE POLICY "Trainers can insert submissions for their clients"
+  ON check_in_submissions FOR INSERT
+  WITH CHECK (
+    form_id IN (SELECT id FROM check_in_forms WHERE trainer_id = auth.uid())
+    AND client_id IN (SELECT id FROM clients WHERE trainer_id = auth.uid())
+  );
+
 -- habits: trainers manage; clients see their assigned habits
 CREATE POLICY "Trainers can manage their habits"
   ON habits FOR ALL

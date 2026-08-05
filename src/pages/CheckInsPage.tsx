@@ -15,9 +15,11 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { isInCurrentWeek } from "@/lib/checkinWeek";
 import type { Database } from "@/types/supabase";
 import ClientHabits from "@/components/checkins/ClientHabits";
 import TrainerHabits from "@/components/checkins/TrainerHabits";
+import TrainerCheckInOverview from "@/components/checkins/TrainerCheckInOverview";
 
 /* ── Types ─────────────────────────────────────────────── */
 
@@ -247,6 +249,9 @@ function TrainerCheckIns() {
                 }}
               />
             )}
+            {/* Phase 44 Item 2: per-client weekly status, most-overdue-first,
+                incl. trainer-side entry for account-less clients */}
+            <TrainerCheckInOverview forms={forms} />
             {forms.length === 0 ? (
               <div className="rounded-2xl border p-10 text-center" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}>
                 <FileText className="mx-auto mb-4 h-12 w-12" style={{ color: "var(--light-text-muted)" }} />
@@ -620,6 +625,9 @@ function ClientCheckIns() {
   const [loading, setLoading] = useState(true);
   const [activeForm, setActiveForm] = useState<CheckInForm | null>(null);
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
+  // Phase 44: this week's submission is editable (update, not re-insert)
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const loadForms = useCallback(async () => {
     if (!user) return;
@@ -661,13 +669,14 @@ function ClientCheckIns() {
     loadSubmissions();
   }, [loadForms, loadSubmissions]);
 
-  const startForm = (form: CheckInForm) => {
+  const startForm = (form: CheckInForm, existing?: CheckInSubmission) => {
     setActiveForm(form);
-    setAnswers({});
+    setAnswers(existing ? ({ ...(existing.answers as Record<string, unknown>) }) : {});
+    setEditingId(existing?.id ?? null);
   };
 
   const submitForm = async () => {
-    if (!user || !activeForm) return;
+    if (!user || !activeForm || saving) return;
 
     const missing = activeForm.fields.filter((f) => {
       const v = answers[f.key];
@@ -678,6 +687,27 @@ function ClientCheckIns() {
       return;
     }
 
+    setSaving(true);
+    if (editingId) {
+      // Phase 44: update this week's entry (clients-update-own policy)
+      const { error } = await supabase
+        .from("check_in_submissions")
+        .update({
+          answers: answers as unknown as Database["public"]["Tables"]["check_in_submissions"]["Insert"]["answers"],
+        })
+        .eq("id", editingId);
+      setSaving(false);
+      if (error) {
+        toast.error("Failed to update: " + error.message);
+        return;
+      }
+      toast.success("Check-in updated");
+      setActiveForm(null);
+      setEditingId(null);
+      await loadSubmissions();
+      return;
+    }
+
     const { data: clientRow, error: clientError } = await supabase
       .from("clients")
       .select("id")
@@ -685,6 +715,7 @@ function ClientCheckIns() {
       .maybeSingle(); // Phase 43: no clients row → null, not a 406
 
     if (clientError || !clientRow) {
+      setSaving(false);
       toast.error("Could not find your client record");
       return;
     }
@@ -695,6 +726,7 @@ function ClientCheckIns() {
       answers: answers as unknown as Database["public"]["Tables"]["check_in_submissions"]["Insert"]["answers"],
     });
 
+    setSaving(false);
     if (error) {
       toast.error("Failed to submit: " + error.message);
       return;
@@ -713,7 +745,9 @@ function ClientCheckIns() {
             <button onClick={() => setActiveForm(null)} className="p-2 rounded-lg hover:bg-white/5" style={{ color: "var(--light-text-muted)" }}>
               <ArrowLeft size={20} />
             </button>
-            <h1 className="text-lg font-bold" style={{ color: "var(--page-text)" }}>{activeForm.title}</h1>
+            <h1 className="text-lg font-bold" style={{ color: "var(--page-text)" }}>
+              {editingId ? "Edit this week's check-in" : activeForm.title}
+            </h1>
           </div>
         </header>
 
@@ -792,10 +826,11 @@ function ClientCheckIns() {
             </div>
             <button
               onClick={submitForm}
-              className="mt-6 w-full rounded-lg py-3 text-sm font-semibold text-white"
+              disabled={saving}
+              className="mt-6 w-full rounded-lg py-3 text-sm font-semibold text-white disabled:opacity-50"
               style={{ background: "linear-gradient(90deg, #00AEEF, #8B5CF6)" }}
             >
-              Submit Check-in
+              {saving ? "Saving…" : editingId ? "Save changes" : "Submit Check-in"}
             </button>
           </div>
         </div>
@@ -819,28 +854,66 @@ function ClientCheckIns() {
           <p className="mb-8 text-sm" style={{ color: "var(--text-muted)" }}>No active check-ins from your trainer.</p>
         ) : (
           <div className="mb-10 grid gap-4 md:grid-cols-2">
-            {forms.map((form) => (
-              <div key={form.id} className="rounded-2xl border p-5" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}>
-                <h3 className="font-semibold" style={{ color: "var(--page-text)" }}>{form.title}</h3>
-                <p className="mb-4 text-xs" style={{ color: "var(--text-muted)" }}>{form.frequency} · {form.fields.length} questions</p>
-                <button
-                  onClick={() => startForm(form)}
-                  className="rounded-lg px-4 py-2 text-sm font-semibold text-white"
-                  style={{ background: "linear-gradient(90deg, #00AEEF, #8B5CF6)" }}
-                >
-                  Complete
-                </button>
-              </div>
-            ))}
+            {forms.map((form) => {
+              // Phase 44: this-week awareness — submitted → read-only
+              // summary + Edit; otherwise the Complete CTA
+              const thisWeek = submissions.find(
+                (s) => s.form_id === form.id && isInCurrentWeek(s.submitted_at),
+              );
+              return (
+                <div key={form.id} className="rounded-2xl border p-5" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}>
+                  <h3 className="font-semibold" style={{ color: "var(--page-text)" }}>{form.title}</h3>
+                  <p className="mb-4 text-xs" style={{ color: "var(--text-muted)" }}>{form.frequency} · {form.fields.length} questions</p>
+                  {thisWeek ? (
+                    <>
+                      <div className="mb-4 rounded-xl px-3 py-2.5" style={{ backgroundColor: "rgba(34,197,94,0.08)" }}>
+                        <p className="mb-1 flex items-center gap-1 text-[11px] font-bold text-emerald-400">
+                          <CheckCircle2 size={12} /> Submitted this week
+                        </p>
+                        {form.fields.map((f) => {
+                          const v = (thisWeek.answers as Record<string, unknown>)[f.key];
+                          if (v === undefined || v === null || v === "") return null;
+                          return (
+                            <p key={f.key} className="text-xs" style={{ color: "var(--light-text-muted)" }}>
+                              {f.label}:{" "}
+                              <span className="font-medium" style={{ color: "var(--page-text)" }}>
+                                {String(v)}
+                              </span>
+                            </p>
+                          );
+                        })}
+                      </div>
+                      <button
+                        onClick={() => startForm(form, thisWeek)}
+                        className="rounded-lg border px-4 py-2 text-sm font-semibold transition hover:opacity-80"
+                        style={{ borderColor: "var(--card-border)", color: "var(--azfit-primary)" }}
+                      >
+                        Edit this week
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => startForm(form)}
+                      className="rounded-lg px-4 py-2 text-sm font-semibold text-white"
+                      style={{ background: "linear-gradient(90deg, #00AEEF, #8B5CF6)" }}
+                    >
+                      Complete
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>My Past Check-ins</h2>
-        {submissions.length === 0 ? (
+        {submissions.filter((s) => !isInCurrentWeek(s.submitted_at)).length === 0 ? (
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>No submissions yet.</p>
         ) : (
           <div className="space-y-3">
-            {submissions.map((sub) => (
+            {submissions
+              .filter((s) => !isInCurrentWeek(s.submitted_at))
+              .map((sub) => (
               <div key={sub.id} className="rounded-2xl border p-4" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}>
                 <div className="flex items-center justify-between">
                   <div>
