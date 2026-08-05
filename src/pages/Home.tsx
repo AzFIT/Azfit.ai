@@ -168,7 +168,7 @@ function HeroNav({
         )}
         <button
           onClick={() => onNavigate("/dashboard")}
-          className="rounded-full bg-[#0D9488] px-5 py-2 text-sm font-semibold text-white transition-all duration-200 hover:bg-[#14B8A6] active:scale-[0.97]"
+          className="rounded-full bg-[var(--azfit-primary)] px-5 py-2 text-sm font-semibold text-white transition-all duration-200 hover:bg-[var(--azfit-primary-light)] active:scale-[0.97]"
           style={{ textShadow: "0 1px 3px rgba(0,0,0,0.3)" }}
         >
           View Demo
@@ -259,7 +259,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
           transition={{ duration: 0.4, delay: 0.2, ease: easeDefault }}
           className="mb-4 text-xs font-bold uppercase tracking-[0.15em]"
           style={{
-            color: "#22D3EE",
+            color: "var(--azfit-secondary-light)",
             textShadow:
               "0 0 12px rgba(6,182,212,0.4), 0 2px 4px rgba(0,0,0,0.3)",
           }}
@@ -311,7 +311,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
           transition={{ duration: 0.5, delay: 0.6, ease: easeDefault }}
           className="mx-auto mt-6 max-w-[480px] text-base leading-relaxed lg:text-lg"
           style={{
-            color: "#CBD5E1",
+            color: "var(--dark-text-secondary)",
             textShadow: "0 2px 4px rgba(0,0,0,0.6), 0 0 20px rgba(0,0,0,0.3)",
           }}
         >
@@ -328,7 +328,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
         >
           <button
             onClick={() => onNavigate("/dashboard")}
-            className="rounded-full bg-[#0D9488] px-8 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-[#14B8A6] active:scale-[0.97] lg:px-10 lg:py-4 lg:text-base"
+            className="rounded-full bg-[var(--azfit-primary)] px-8 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-[var(--azfit-primary-light)] active:scale-[0.97] lg:px-10 lg:py-4 lg:text-base"
             style={{
               textShadow: "0 1px 3px rgba(0,0,0,0.3)",
               boxShadow: "0 0 20px rgba(13,148,136,0.4)",
@@ -354,7 +354,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
         >
           <div 
             className="flex items-center gap-2 rounded-full border px-4 py-2 text-sm"
-            style={{ borderColor: '#334155', color: '#94A3B8' }}
+            style={{ borderColor: 'var(--dark-elevated)', color: 'var(--light-text-muted)' }}
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
               <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
@@ -363,7 +363,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
           </div>
           <div 
             className="flex items-center gap-2 rounded-full border px-4 py-2 text-sm"
-            style={{ borderColor: '#334155', color: '#94A3B8' }}
+            style={{ borderColor: 'var(--dark-elevated)', color: 'var(--light-text-muted)' }}
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
               <path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.5,12.92 20.16,13.19L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/>
@@ -384,7 +384,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
         <ChevronDown
           size={28}
           className="animate-bounce-slow"
-          style={{ color: "#22D3EE" }}
+          style={{ color: "var(--azfit-secondary-light)" }}
         />
       </motion.div>
     </section>
@@ -398,7 +398,7 @@ function StatsSection() {
     <section
       id="features"
       className="flex h-auto items-center py-10 lg:h-[140px] lg:py-0"
-      style={{ backgroundColor: "#0F172A" }}
+      style={{ backgroundColor: "var(--dark-bg)" }}
     >
       <div className="mx-auto grid w-full max-w-5xl grid-cols-2 gap-8 px-6 lg:grid-cols-4 lg:gap-0">
         {[
@@ -415,7 +415,7 @@ function StatsSection() {
             <span
               className="text-2xl font-extrabold lg:text-[30px]"
               style={{
-                color: "#22D3EE",
+                color: "var(--azfit-secondary-light)",
                 textShadow:
                   "0 0 12px rgba(6,182,212,0.4), 0 2px 4px rgba(0,0,0,0.3)",
               }}
@@ -434,7 +434,7 @@ function StatsSection() {
             </span>
             <span
               className="mt-1 text-xs font-medium lg:text-sm"
-              style={{ color: "#64748B" }}
+              style={{ color: "var(--dark-text-muted)" }}
             >
               {stat.label}
             </span>
@@ -442,7 +442,7 @@ function StatsSection() {
             {i < 3 && (
               <div
                 className="absolute right-0 top-1/2 hidden h-10 w-px -translate-y-1/2 lg:block"
-                style={{ backgroundColor: "#475569" }}
+                style={{ backgroundColor: "var(--dark-border)" }}
               />
             )}
           </ScrollReveal>
@@ -458,7 +458,7 @@ const features = [
   {
     icon: TrendingUp,
     iconBg: "rgba(13,148,136,0.1)",
-    iconColor: "#0D9488",
+    iconColor: "var(--azfit-primary)",
     title: "Visual Progress Tracking",
     description:
       "See your fitness score, body composition, and performance trends with beautiful charts and circular progress indicators.",
@@ -466,7 +466,7 @@ const features = [
   {
     icon: Dumbbell,
     iconBg: "rgba(6,182,212,0.1)",
-    iconColor: "#06B6D4",
+    iconColor: "var(--azfit-secondary)",
     title: "Smart Workout Logging",
     description:
       "Log sets, reps, and weight with our spreadsheet-style interface. Track RPE, rest times, and exercise history effortlessly.",
@@ -474,7 +474,7 @@ const features = [
   {
     icon: Apple,
     iconBg: "rgba(139,92,246,0.1)",
-    iconColor: "#8B5CF6",
+    iconColor: "var(--azfit-accent)",
     title: "Nutrition Monitoring",
     description:
       "Track macros, calories, and meal timing. Get insights into your protein, carbs, and fat intake to fuel your performance.",
@@ -486,7 +486,7 @@ function FeaturesSection() {
     <section
       id="features"
       className="relative overflow-hidden px-6 py-16 lg:py-24"
-      style={{ backgroundColor: "var(--light-bg, #F8FAFC)" }}
+      style={{ backgroundColor: "var(--light-bg)" }}
     >
       {/* Holographic gym backdrop with a light overlay to preserve readability */}
       <div className="pointer-events-none absolute inset-0">
@@ -506,19 +506,19 @@ function FeaturesSection() {
         <ScrollReveal className="mb-12 text-center lg:mb-16">
           <p
             className="mb-3 text-xs font-bold uppercase tracking-[0.1em]"
-            style={{ color: "#0D9488" }}
+            style={{ color: "var(--azfit-primary)" }}
           >
             FEATURES
           </p>
           <h2
             className="text-3xl font-bold tracking-tight lg:text-[40px]"
-            style={{ color: "#0F172A" }}
+            style={{ color: "var(--light-text-primary)" }}
           >
             Everything You Need to Train Smarter
           </h2>
           <p
             className="mx-auto mt-4 max-w-[560px] text-base leading-relaxed lg:text-lg"
-            style={{ color: "#475569" }}
+            style={{ color: "var(--light-text-secondary)" }}
           >
             From workout logging to nutrition tracking, AzFIT gives you complete
             visibility into your fitness journey.
@@ -533,7 +533,7 @@ function FeaturesSection() {
                 whileHover={{ y: -2 }}
                 transition={{ duration: 0.2 }}
                 className="rounded-2xl border bg-white p-6 transition-shadow duration-200 hover:shadow-lg lg:p-8"
-                style={{ borderColor: "#E2E8F0" }}
+                style={{ borderColor: "var(--light-border)" }}
               >
                 {/* Icon */}
                 <motion.div
@@ -549,13 +549,13 @@ function FeaturesSection() {
 
                 <h3
                   className="mb-3 text-xl font-semibold"
-                  style={{ color: "#0F172A" }}
+                  style={{ color: "var(--light-text-primary)" }}
                 >
                   {feature.title}
                 </h3>
                 <p
                   className="text-sm leading-relaxed lg:text-base"
-                  style={{ color: "#475569" }}
+                  style={{ color: "var(--light-text-secondary)" }}
                 >
                   {feature.description}
                 </p>
@@ -599,20 +599,20 @@ function HowItWorksSection() {
     <section
       id="how-it-works"
       className="px-6 py-16 lg:py-24"
-      style={{ backgroundColor: "#F1F5F9" }}
+      style={{ backgroundColor: "var(--light-elevated)" }}
     >
       <div className="mx-auto max-w-4xl">
         {/* Section header */}
         <ScrollReveal className="mb-12 text-center lg:mb-16">
           <p
             className="mb-3 text-xs font-bold uppercase tracking-[0.1em]"
-            style={{ color: "#0D9488" }}
+            style={{ color: "var(--azfit-primary)" }}
           >
             HOW IT WORKS
           </p>
           <h2
             className="text-3xl font-bold tracking-tight lg:text-[40px]"
-            style={{ color: "#0F172A" }}
+            style={{ color: "var(--light-text-primary)" }}
           >
             Three Steps to Better Training
           </h2>
@@ -624,7 +624,7 @@ function HowItWorksSection() {
           <div className="absolute top-5 left-0 hidden h-0.5 w-full md:block">
             <motion.div
               className="h-full origin-left"
-              style={{ backgroundColor: "#E2E8F0" }}
+              style={{ backgroundColor: "var(--light-border)" }}
               initial={{ scaleX: 0 }}
               animate={inView ? { scaleX: 1 } : { scaleX: 0 }}
               transition={{ duration: 1, ease: easeDefault, delay: 0.3 }}
@@ -647,7 +647,7 @@ function HowItWorksSection() {
                     ease: easeBounce,
                     delay: i * 0.2,
                   }}
-                  className="mb-5 flex h-10 w-10 items-center justify-center rounded-full bg-[#0D9488] text-sm font-bold text-white"
+                  className="mb-5 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--azfit-primary)] text-sm font-bold text-white"
                   style={{ textShadow: "0 1px 3px rgba(0,0,0,0.3)" }}
                 >
                   {step.number}
@@ -664,7 +664,7 @@ function HowItWorksSection() {
                     delay: i * 0.2,
                   }}
                   className="mb-3 text-xl font-semibold"
-                  style={{ color: "#0F172A" }}
+                  style={{ color: "var(--light-text-primary)" }}
                 >
                   {step.title}
                 </motion.h3>
@@ -680,7 +680,7 @@ function HowItWorksSection() {
                     delay: i * 0.2 + 0.1,
                   }}
                   className="text-sm leading-relaxed lg:text-base"
-                  style={{ color: "#475569" }}
+                  style={{ color: "var(--light-text-secondary)" }}
                 >
                   {step.description}
                 </motion.p>
@@ -724,20 +724,20 @@ function TestimonialsSection() {
     <section
       id="testimonials"
       className="px-6 py-16 lg:py-24"
-      style={{ backgroundColor: "var(--light-bg, #F8FAFC)" }}
+      style={{ backgroundColor: "var(--light-bg)" }}
     >
       <div className="mx-auto max-w-6xl">
         {/* Section header */}
         <ScrollReveal className="mb-12 text-center lg:mb-16">
           <p
             className="mb-3 text-xs font-bold uppercase tracking-[0.1em]"
-            style={{ color: "#0D9488" }}
+            style={{ color: "var(--azfit-primary)" }}
           >
             TESTIMONIALS
           </p>
           <h2
             className="text-3xl font-bold tracking-tight lg:text-[40px]"
-            style={{ color: "#0F172A" }}
+            style={{ color: "var(--light-text-primary)" }}
           >
             Built with Coaches, For Clients
           </h2>
@@ -753,20 +753,20 @@ function TestimonialsSection() {
             >
               <div
                 className="relative rounded-2xl border bg-white p-6 lg:p-8"
-                style={{ borderColor: "#E2E8F0" }}
+                style={{ borderColor: "var(--light-border)" }}
               >
                 {/* Quote icon */}
                 <Quote
                   size={24}
                   className="mb-4 opacity-30"
-                  style={{ color: "#0D9488" }}
+                  style={{ color: "var(--azfit-primary)" }}
                 />
 
                 {/* Quote text */}
                 <p
                   className="mb-6 text-base italic leading-relaxed lg:text-lg"
                   style={{
-                    color: "#0F172A",
+                    color: "var(--light-text-primary)",
                     textShadow: "0 1px 2px rgba(255,255,255,0.8)",
                   }}
                 >
@@ -783,11 +783,11 @@ function TestimonialsSection() {
                   <div className="flex-1">
                     <p
                       className="text-sm font-semibold"
-                      style={{ color: "#0F172A" }}
+                      style={{ color: "var(--light-text-primary)" }}
                     >
                       {t.name}
                     </p>
-                    <p className="text-xs" style={{ color: "#94A3B8" }}>
+                    <p className="text-xs" style={{ color: "var(--light-text-muted)" }}>
                       {t.role}
                     </p>
                   </div>
@@ -799,8 +799,8 @@ function TestimonialsSection() {
                     <Star
                       key={j}
                       size={14}
-                      fill="#F59E0B"
-                      style={{ color: "#F59E0B" }}
+                      fill="var(--warning)"
+                      style={{ color: "var(--warning)" }}
                     />
                   ))}
                 </div>
@@ -826,10 +826,10 @@ function TrustedBySection() {
   ];
 
   return (
-    <section className="px-6 py-12 lg:py-16" style={{ backgroundColor: "#0F172A" }}>
+    <section className="px-6 py-12 lg:py-16" style={{ backgroundColor: "var(--dark-bg)" }}>
       <div className="mx-auto max-w-6xl">
         <ScrollReveal className="mb-8 text-center">
-          <p className="text-xs font-bold uppercase tracking-[0.1em]" style={{ color: "#64748B" }}>
+          <p className="text-xs font-bold uppercase tracking-[0.1em]" style={{ color: "var(--dark-text-muted)" }}>
             Trusted by leading fitness brands
           </p>
         </ScrollReveal>
@@ -838,7 +838,7 @@ function TrustedBySection() {
             <div
               key={partner}
               className="text-sm font-semibold opacity-40 transition-opacity hover:opacity-70"
-              style={{ color: "#94A3B8" }}
+              style={{ color: "var(--light-text-muted)" }}
             >
               {partner}
             </div>
@@ -900,12 +900,12 @@ function PricingSection({ onNavigate }: { onNavigate: (path: string) => void }) 
   ];
 
   return (
-    <section id="pricing" className="px-6 py-16 lg:py-24" style={{ backgroundColor: "#0F172A" }}>
+    <section id="pricing" className="px-6 py-16 lg:py-24" style={{ backgroundColor: "var(--dark-bg)" }}>
       <div className="mx-auto max-w-6xl">
         <ScrollReveal className="mb-12 text-center lg:mb-16">
           <p
             className="mb-3 text-xs font-bold uppercase tracking-[0.1em]"
-            style={{ color: "#0D9488" }}
+            style={{ color: "var(--azfit-primary)" }}
           >
             Pricing
           </p>
@@ -914,7 +914,7 @@ function PricingSection({ onNavigate }: { onNavigate: (path: string) => void }) 
           >
             Simple, Transparent Pricing
           </h2>
-          <p className="mt-3 text-sm" style={{ color: "#94A3B8" }}>
+          <p className="mt-3 text-sm" style={{ color: "var(--light-text-muted)" }}>
             Start free, upgrade when you need more power
           </p>
         </ScrollReveal>
@@ -925,15 +925,15 @@ function PricingSection({ onNavigate }: { onNavigate: (path: string) => void }) 
               <div
                 className="relative rounded-2xl border p-6 lg:p-8"
                 style={{
-                  backgroundColor: plan.highlighted ? "#1E293B" : "#0F172A",
-                  borderColor: plan.highlighted ? "#0D9488" : "#334155",
+                  backgroundColor: plan.highlighted ? "var(--dark-surface)" : "var(--dark-bg)",
+                  borderColor: plan.highlighted ? "var(--azfit-primary)" : "var(--dark-elevated)",
                   boxShadow: plan.highlighted ? "0 0 30px rgba(13,148,136,0.15)" : "none",
                 }}
               >
                 {plan.highlighted && (
                   <div
                     className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-xs font-bold text-white"
-                    style={{ backgroundColor: "#0D9488" }}
+                    style={{ backgroundColor: "var(--azfit-primary)" }}
                   >
                     Most Popular
                   </div>
@@ -941,13 +941,13 @@ function PricingSection({ onNavigate }: { onNavigate: (path: string) => void }) 
                 <h3 className="text-lg font-semibold text-white">{plan.name}</h3>
                 <div className="mt-2 flex items-baseline gap-1">
                   <span className="text-3xl font-bold text-white">{plan.price}</span>
-                  <span className="text-sm" style={{ color: "#64748B" }}>{plan.period}</span>
+                  <span className="text-sm" style={{ color: "var(--dark-text-muted)" }}>{plan.period}</span>
                 </div>
-                <p className="mt-2 text-sm" style={{ color: "#94A3B8" }}>{plan.description}</p>
+                <p className="mt-2 text-sm" style={{ color: "var(--light-text-muted)" }}>{plan.description}</p>
                 <ul className="mt-6 space-y-3">
                   {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-sm" style={{ color: "#CBD5E1" }}>
-                      <svg className="mt-0.5 h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="#0D9488" strokeWidth={2}>
+                    <li key={feature} className="flex items-start gap-2 text-sm" style={{ color: "var(--dark-text-secondary)" }}>
+                      <svg className="mt-0.5 h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="var(--azfit-primary)" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                       {feature}
@@ -958,8 +958,8 @@ function PricingSection({ onNavigate }: { onNavigate: (path: string) => void }) 
                   onClick={() => onNavigate(plan.name === "Coach" ? "/login" : "/signup")}
                   className="mt-6 w-full rounded-lg py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:opacity-90"
                   style={{
-                    backgroundColor: plan.highlighted ? "#0D9488" : "transparent",
-                    border: plan.highlighted ? "none" : "1px solid #475569",
+                    backgroundColor: plan.highlighted ? "var(--azfit-primary)" : "transparent",
+                    border: plan.highlighted ? "none" : "1px solid var(--dark-border)",
                   }}
                 >
                   {plan.cta}
@@ -1004,7 +1004,7 @@ function DownloadCTA({ onNavigate }: { onNavigate: (path: string) => void }) {
           <p
             className="mt-6 text-base leading-relaxed lg:text-lg"
             style={{
-              color: "#CBD5E1",
+              color: "var(--dark-text-secondary)",
               textShadow: "0 2px 4px rgba(0,0,0,0.6), 0 0 20px rgba(0,0,0,0.3)",
             }}
           >
@@ -1014,7 +1014,7 @@ function DownloadCTA({ onNavigate }: { onNavigate: (path: string) => void }) {
           {/* CTA Button */}
           <button
             onClick={() => onNavigate("/demo")}
-            className="mt-8 rounded-full bg-[#0D9488] px-10 py-4 text-base font-semibold text-white transition-all duration-200 hover:bg-[#14B8A6] active:scale-[0.97]"
+            className="mt-8 rounded-full bg-[var(--azfit-primary)] px-10 py-4 text-base font-semibold text-white transition-all duration-200 hover:bg-[var(--azfit-primary-light)] active:scale-[0.97]"
             style={{
               textShadow: "0 1px 3px rgba(0,0,0,0.3)",
               boxShadow: "0 0 24px rgba(13,148,136,0.5)",
@@ -1028,7 +1028,7 @@ function DownloadCTA({ onNavigate }: { onNavigate: (path: string) => void }) {
             <div className="flex items-center gap-3">
               <div
                 className="flex items-center gap-2 rounded-full border px-4 py-2 text-sm opacity-70"
-                style={{ borderColor: "#334155", color: "#94A3B8" }}
+                style={{ borderColor: "var(--dark-elevated)", color: "var(--light-text-muted)" }}
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
@@ -1037,7 +1037,7 @@ function DownloadCTA({ onNavigate }: { onNavigate: (path: string) => void }) {
               </div>
               <div
                 className="flex items-center gap-2 rounded-full border px-4 py-2 text-sm opacity-70"
-                style={{ borderColor: "#334155", color: "#94A3B8" }}
+                style={{ borderColor: "var(--dark-elevated)", color: "var(--light-text-muted)" }}
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.5,12.92 20.16,13.19L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/>
@@ -1045,7 +1045,7 @@ function DownloadCTA({ onNavigate }: { onNavigate: (path: string) => void }) {
                 <span>Google Play — Coming Soon</span>
               </div>
             </div>
-            <p className="text-xs" style={{ color: "#64748B" }}>
+            <p className="text-xs" style={{ color: "var(--dark-text-muted)" }}>
               PWA install available on mobile browsers now.
             </p>
           </div>
@@ -1088,7 +1088,7 @@ function MobileDrawer({
             transition={{ duration: 0.3, ease: easeDefault }}
             className="fixed left-0 top-0 z-[70] h-full w-[280px] overflow-y-auto"
             style={{
-              backgroundColor: "var(--dark-surface, #1E293B)",
+              backgroundColor: "var(--dark-surface)",
               boxShadow:
                 theme === "dark"
                   ? "0 0 40px rgba(0,0,0,0.4)"
@@ -1128,14 +1128,14 @@ function MobileDrawer({
               )}
               <div
                 className="my-2 h-px"
-                style={{ backgroundColor: "var(--dark-border, #475569)" }}
+                style={{ backgroundColor: "var(--dark-border)" }}
               />
               <button
                 onClick={() => {
                   onNavigate("/dashboard");
                   onClose();
                 }}
-                className="flex h-12 items-center gap-4 rounded-lg bg-[#0D9488] px-3 text-sm font-semibold text-white active:scale-[0.98]"
+                className="flex h-12 items-center gap-4 rounded-lg bg-[var(--azfit-primary)] px-3 text-sm font-semibold text-white active:scale-[0.98]"
               >
                 Go to Dashboard
               </button>
@@ -1210,7 +1210,7 @@ export default function Home() {
       <DownloadCTA onNavigate={handleNavigate} />
 
       {/* Footer */}
-      <div style={{ backgroundColor: "#0F172A" }}>
+      <div style={{ backgroundColor: "var(--dark-bg)" }}>
         <Footer />
       </div>
     </div>

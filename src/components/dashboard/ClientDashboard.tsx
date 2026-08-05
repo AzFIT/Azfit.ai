@@ -393,7 +393,7 @@ export default function ClientDashboard() {
               {unreadNotifications > 0 && (
                 <span
                   className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
-                  style={{ backgroundColor: "#F87171" }}
+                  style={{ backgroundColor: "var(--danger)" }}
                 >
                   {unreadNotifications}
                 </span>
@@ -428,7 +428,7 @@ export default function ClientDashboard() {
         <GlassCard
           glass
           hover
-          accentColor="#0D9488"
+          accentColor="var(--azfit-primary)"
           className="!p-5"
         >
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -437,7 +437,7 @@ export default function ClientDashboard() {
               <div className="relative">
                 <div
                   className="flex h-14 w-14 items-center justify-center rounded-full text-lg font-bold text-white"
-                  style={{ border: "2px solid var(--card-border)", background: "linear-gradient(135deg, #00AEEF, #8B5CF6)" }}
+                  style={{ border: "2px solid var(--card-border)", background: "linear-gradient(135deg, #00AEEF, var(--azfit-accent))" }}
                 >
                   {(coachName || "?")
                     .split(/\s+/)
@@ -465,10 +465,10 @@ export default function ClientDashboard() {
                   borderColor: "rgba(13,148,136,0.2)",
                 }}
               >
-                <div className="h-4 w-4 rounded-full bg-slate-700" />
+                <div className="h-4 w-4 rounded-full bg-[var(--dark-elevated)]" />
                 <div className="space-y-1">
-                  <div className="h-3 w-16 rounded bg-slate-700" />
-                  <div className="h-4 w-40 rounded bg-slate-700" />
+                  <div className="h-3 w-16 rounded bg-[var(--dark-elevated)]" />
+                  <div className="h-4 w-40 rounded bg-[var(--dark-elevated)]" />
                 </div>
               </div>
             ) : nextSession ? (
@@ -569,12 +569,12 @@ export default function ClientDashboard() {
           title={workoutName ? `Today's Workout — ${workoutName}` : "Today's Workout"}
           icon={<Dumbbell className="h-4 w-4" />}
           defaultExpanded
-          accentColor="#0D9488"
+          accentColor="var(--azfit-primary)"
           badge={
             exercises.length > 0 ? (
               <span
                 className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
-                style={{ backgroundColor: workoutProgress === 100 ? "#84CC16" : "#0D9488" }}
+                style={{ backgroundColor: workoutProgress === 100 ? "var(--success)" : "var(--azfit-primary)" }}
               >
                 {completedExercises}/{exercises.length}
               </span>
@@ -605,7 +605,7 @@ export default function ClientDashboard() {
           {/* Honest states (Phase 33B): loading / nothing scheduled / real list */}
           {workoutLoading ? (
             <div className="flex justify-center py-4">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#0D9488] border-t-transparent" />
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--azfit-primary)] border-t-transparent" />
             </div>
           ) : exercises.length === 0 ? (
             <p className="py-3 text-center text-xs" style={{ color: "var(--light-text-muted)" }}>
@@ -623,14 +623,14 @@ export default function ClientDashboard() {
                 {workoutProgress}%
               </span>
             </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-700">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--dark-elevated)]">
               <motion.div
                 className="h-full rounded-full"
                 initial={{ width: 0 }}
                 animate={{ width: `${workoutProgress}%` }}
                 transition={{ duration: 0.8, ease: "easeOut" }}
                 style={{
-                  background: "linear-gradient(90deg, #0D9488, #14B8A6)",
+                  background: "linear-gradient(90deg, var(--azfit-primary), var(--azfit-primary-light))",
                   boxShadow: workoutProgress > 0 ? "0 0 8px rgba(13,148,136,0.4)" : "none",
                 }}
               />
@@ -694,7 +694,7 @@ export default function ClientDashboard() {
 
                 {/* Status */}
                 {exercise.completed ? (
-                  <span className="text-[10px] font-semibold" style={{ color: "#84CC16" }}>
+                  <span className="text-[10px] font-semibold" style={{ color: "var(--success)" }}>
                     Done
                   </span>
                 ) : (
@@ -724,12 +724,12 @@ export default function ClientDashboard() {
           <GlassCard
             glass
             hover
-            accentColor="#F87171"
+            accentColor="var(--danger)"
             className="!p-5"
           >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-medium" style={{ color: "#F87171" }}>
+                <p className="text-sm font-medium" style={{ color: "var(--danger)" }}>
                   Check-in Due
                 </p>
                 <p className="text-sm" style={{ color: "var(--light-text-muted)" }}>
@@ -740,7 +740,7 @@ export default function ClientDashboard() {
                 whileTap={{ scale: 0.95 }}
                 onClick={() => navigate("/check-ins")}
                 className="rounded-lg px-4 py-2 text-sm font-medium text-white shrink-0"
-                style={{ backgroundColor: "#F87171" }}
+                style={{ backgroundColor: "var(--danger)" }}
               >
                 Complete Now
               </motion.button>
@@ -765,7 +765,7 @@ export default function ClientDashboard() {
             titleIcon={<Footprints className="h-4 w-4" />}
             glass
             glow
-            accentColor="#0D9488"
+            accentColor="var(--azfit-primary)"
             hover
             onClick={() => navigate("/analytics")}
           >
@@ -774,8 +774,8 @@ export default function ClientDashboard() {
                 size={160}
                 strokeWidth={12}
                 percentage={stepsPct}
-                color="#0D9488"
-                gradientEndColor="#14B8A6"
+                color="var(--azfit-primary)"
+                gradientEndColor="var(--azfit-primary-light)"
                 label="of goal"
                 value={formatNumber(stepsCurrent)}
                 subtitle={`Goal: ${formatNumber(stepsTarget)}`}
@@ -813,7 +813,7 @@ export default function ClientDashboard() {
             titleIcon={<Utensils className="h-4 w-4" />}
             glass
             glow
-            accentColor="#06B6D4"
+            accentColor="var(--azfit-secondary)"
             hover
             onClick={() => navigate("/nutrition")}
           >
@@ -822,8 +822,8 @@ export default function ClientDashboard() {
                 size={160}
                 strokeWidth={12}
                 percentage={caloriesPct}
-                color="#06B6D4"
-                gradientEndColor="#22D3EE"
+                color="var(--azfit-secondary)"
+                gradientEndColor="var(--azfit-secondary-light)"
                 label="calories"
                 value={`${formatNumber(macros.calories.current)}`}
                 subtitle={`/ ${formatNumber(macros.calories.target)} kcal`}
@@ -834,9 +834,9 @@ export default function ClientDashboard() {
             {/* Macro Breakdown */}
             <div className="grid grid-cols-3 gap-2 border-t pt-4" style={{ borderColor: "var(--card-border)" }}>
               {[
-                { key: "protein" as const, label: "Protein", color: "#0D9488", pct: proteinPct, current: macros.protein.current, target: macros.protein.target },
-                { key: "carbs" as const, label: "Carbs", color: "#8B5CF6", pct: carbsPct, current: macros.carbs.current, target: macros.carbs.target },
-                { key: "fats" as const, label: "Fats", color: "#F59E0B", pct: fatsPct, current: macros.fats.current, target: macros.fats.target },
+                { key: "protein" as const, label: "Protein", color: "var(--azfit-primary)", pct: proteinPct, current: macros.protein.current, target: macros.protein.target },
+                { key: "carbs" as const, label: "Carbs", color: "var(--azfit-accent)", pct: carbsPct, current: macros.carbs.current, target: macros.carbs.target },
+                { key: "fats" as const, label: "Fats", color: "var(--warning)", pct: fatsPct, current: macros.fats.current, target: macros.fats.target },
               ].map((m) => (
                 <div key={m.key} className="text-center">
                   <div className="relative mx-auto mb-1 h-10 w-10">
@@ -871,7 +871,7 @@ export default function ClientDashboard() {
             titleIcon={<Moon className="h-4 w-4" />}
             glass
             glow
-            accentColor="#8B5CF6"
+            accentColor="var(--azfit-accent)"
             hover
             onClick={() => navigate("/deload")}
           >
@@ -880,8 +880,8 @@ export default function ClientDashboard() {
                 size={160}
                 strokeWidth={12}
                 percentage={qualityPct}
-                color="#8B5CF6"
-                gradientEndColor="#A78BFA"
+                color="var(--azfit-accent)"
+                gradientEndColor="var(--azfit-accent-light)"
                 label="sleep quality"
                 value={`${recovery.quality.current}`}
                 subtitle={`/ ${recovery.quality.target} rating`}
@@ -892,16 +892,16 @@ export default function ClientDashboard() {
             {/* Recovery Breakdown */}
             <div className="grid grid-cols-3 gap-2 border-t pt-4" style={{ borderColor: "var(--card-border)" }}>
               {[
-                { label: "Sleep", value: `${recovery.sleep.current}h`, target: `${recovery.sleep.target}h`, pct: sleepPct, color: "#8B5CF6" },
-                { label: "Quality", value: `${recovery.quality.current}/10`, target: `${recovery.quality.target}/10`, pct: qualityPct, color: "#A78BFA" },
-                { label: "HRV", value: `${recovery.hrv.current}ms`, target: `${recovery.hrv.target}ms`, pct: hrvPct, color: "#22D3EE" },
+                { label: "Sleep", value: `${recovery.sleep.current}h`, target: `${recovery.sleep.target}h`, pct: sleepPct, color: "var(--azfit-accent)" },
+                { label: "Quality", value: `${recovery.quality.current}/10`, target: `${recovery.quality.target}/10`, pct: qualityPct, color: "var(--azfit-accent-light)" },
+                { label: "HRV", value: `${recovery.hrv.current}ms`, target: `${recovery.hrv.target}ms`, pct: hrvPct, color: "var(--azfit-secondary-light)" },
               ].map((r) => (
                 <div key={r.label} className="text-center">
                   <p className="text-sm font-semibold font-mono" style={{ color: r.color }}>{r.value}</p>
                   <p className="text-[9px]" style={{ color: "var(--light-text-muted)" }}>
                     Goal: {r.target}
                   </p>
-                  <div className="mx-auto mt-1 h-1 w-12 overflow-hidden rounded-full bg-slate-700">
+                  <div className="mx-auto mt-1 h-1 w-12 overflow-hidden rounded-full bg-[var(--dark-elevated)]">
                     <motion.div
                       className="h-full rounded-full"
                       initial={{ width: 0 }}
@@ -926,7 +926,7 @@ export default function ClientDashboard() {
         animate={mounted ? "visible" : "hidden"}
         className="mb-6"
       >
-        <GlassCard glass hover accentColor="#84CC16" className="!p-4">
+        <GlassCard glass hover accentColor="var(--success)" className="!p-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {/* Water */}
             <div className="space-y-2">
@@ -942,7 +942,7 @@ export default function ClientDashboard() {
                     style={{
                       backgroundColor: "rgba(34,211,238,0.08)",
                       borderColor: "rgba(34,211,238,0.2)",
-                      color: "#22D3EE",
+                      color: "var(--azfit-secondary-light)",
                     }}
                   >
                     +{amount}L
@@ -976,7 +976,7 @@ export default function ClientDashboard() {
                 borderColor: "var(--card-border)",
               }}
             >
-              <BedDouble className="h-4 w-4" style={{ color: "#8B5CF6" }} />
+              <BedDouble className="h-4 w-4" style={{ color: "var(--azfit-accent)" }} />
               <span className="text-[11px] font-medium" style={{ color: "var(--page-text)" }}>Sleep</span>
             </button>
 
@@ -989,7 +989,7 @@ export default function ClientDashboard() {
                 borderColor: "var(--card-border)",
               }}
             >
-              <Scale className="h-4 w-4" style={{ color: "#F59E0B" }} />
+              <Scale className="h-4 w-4" style={{ color: "var(--warning)" }} />
               <span className="text-[11px] font-medium" style={{ color: "var(--page-text)" }}>Weight</span>
             </button>
           </div>
@@ -1010,7 +1010,7 @@ export default function ClientDashboard() {
           titleIcon={<Footprints className="h-4 w-4" />}
           glass
           hover
-          accentColor="#0D9488"
+          accentColor="var(--azfit-primary)"
           className="!p-4"
         >
           {habitsLoading ? (
@@ -1048,7 +1048,7 @@ export default function ClientDashboard() {
           titleIcon={<TrendingUp className="h-4 w-4" />}
           glass
           hover
-          accentColor="#84CC16"
+          accentColor="var(--success)"
         >
           <div className="py-4">
             {/* Bar chart */}
@@ -1066,12 +1066,12 @@ export default function ClientDashboard() {
                         transition={{ duration: 0.6, delay: i * 0.08, ease: "easeOut" }}
                         style={{
                           background: isToday
-                            ? "linear-gradient(180deg, #0D9488, #14B8A6)"
+                            ? "linear-gradient(180deg, var(--azfit-primary), var(--azfit-primary-light))"
                             : day.value >= 80
-                              ? "linear-gradient(180deg, #84CC16, #65A30D)"
+                              ? "linear-gradient(180deg, var(--success), #65A30D)"
                               : day.value >= 50
-                                ? "linear-gradient(180deg, #F59E0B, #D97706)"
-                                : "linear-gradient(180deg, #64748B, #475569)",
+                                ? "linear-gradient(180deg, var(--warning), #D97706)"
+                                : "linear-gradient(180deg, var(--dark-text-muted), var(--dark-border))",
                           boxShadow: isToday
                             ? "0 0 12px rgba(13,148,136,0.3)"
                             : day.value >= 80
@@ -1086,7 +1086,7 @@ export default function ClientDashboard() {
                         transition={{ delay: 0.6 + i * 0.08 }}
                         className="absolute -top-5 text-[10px] font-bold font-mono"
                         style={{
-                          color: isToday ? "#0D9488" : "var(--page-text)",
+                          color: isToday ? "var(--azfit-primary)" : "var(--page-text)",
                         }}
                       >
                         {day.value}%
@@ -1109,9 +1109,9 @@ export default function ClientDashboard() {
             {/* Legend */}
             <div className="mt-4 flex flex-wrap items-center justify-center gap-4 border-t pt-3" style={{ borderColor: "var(--card-border)" }}>
               {[
-                { color: "#84CC16", label: "On Track (≥80%)" },
-                { color: "#F59E0B", label: "At Risk (50-79%)" },
-                { color: "#64748B", label: "Off Track (<50%)" },
+                { color: "var(--success)", label: "On Track (≥80%)" },
+                { color: "var(--warning)", label: "At Risk (50-79%)" },
+                { color: "var(--dark-text-muted)", label: "Off Track (<50%)" },
               ].map((item) => (
                 <div key={item.label} className="flex items-center gap-1.5">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />

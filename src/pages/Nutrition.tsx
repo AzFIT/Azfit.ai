@@ -392,13 +392,13 @@ export default function NutritionPage() {
               label="Protein"
               current={totals.protein}
               target={targets.protein}
-              color="#0D9488"
+              color="var(--azfit-primary)"
             />
             <MacroRing
               label="Fats"
               current={totals.fats}
               target={targets.fats}
-              color="#F59E0B"
+              color="var(--warning)"
             />
             <MacroRing
               label="Carbs"
@@ -484,7 +484,7 @@ export default function NutritionPage() {
                 <Button
                   onClick={handleSaveTargets}
                   className="flex-1"
-                  style={{ background: "linear-gradient(135deg, #00AEEF, #8B5CF6)" }}
+                  style={{ background: "linear-gradient(135deg, #00AEEF, var(--azfit-accent))" }}
                 >
                   Save targets
                 </Button>
@@ -680,7 +680,7 @@ export default function NutritionPage() {
               {log.waterIntake} / {targets.water} ml
             </span>
           </div>
-          <div className="mt-2 h-2 w-full rounded-full bg-slate-800">
+          <div className="mt-2 h-2 w-full rounded-full bg-[var(--dark-surface)]">
             <div
               className="h-full rounded-full transition-all"
               style={{
@@ -725,13 +725,13 @@ export default function NutritionPage() {
             label="P"
             current={totals.protein}
             target={targets.protein}
-            color="#0D9488"
+            color="var(--azfit-primary)"
           />
           <MacroBar
             label="F"
             current={totals.fats}
             target={targets.fats}
-            color="#F59E0B"
+            color="var(--warning)"
           />
           <MacroBar
             label="C"
@@ -810,7 +810,7 @@ function MacroBar({
           {current}/{target}
         </span>
       </div>
-      <div className="mt-0.5 h-1.5 w-full rounded-full bg-slate-800">
+      <div className="mt-0.5 h-1.5 w-full rounded-full bg-[var(--dark-surface)]">
         <div
           className="h-full rounded-full transition-all"
           style={{ width: `${pct}%`, backgroundColor: color }}
@@ -910,7 +910,7 @@ function FoodSearchModal({
           </h3>
           <button
             onClick={onClose}
-            className="rounded-lg p-1 hover:bg-slate-800"
+            className="rounded-lg p-1 hover:bg-[var(--dark-surface)]"
           >
             <X className="h-5 w-5" style={{ color: "var(--text-muted)" }} />
           </button>
@@ -952,7 +952,7 @@ function FoodSearchModal({
                           setSelectedFood(food);
                           setQuantity(food.servingSize);
                         }}
-                        className="flex w-full items-center justify-between rounded-xl border p-3 text-left transition-colors hover:bg-slate-800"
+                        className="flex w-full items-center justify-between rounded-xl border p-3 text-left transition-colors hover:bg-[var(--dark-surface)]"
                         style={{ borderColor: "var(--card-border)" }}
                       >
                         <div>
@@ -1040,7 +1040,7 @@ function FoodSearchModal({
                     onClick={handleAddCustom}
                     disabled={customSaving || !custom.name.trim() || !custom.calories}
                     className="flex-1"
-                    style={{ background: "linear-gradient(135deg, #00AEEF, #8B5CF6)" }}
+                    style={{ background: "linear-gradient(135deg, #00AEEF, var(--azfit-accent))" }}
                   >
                     {customSaving ? "Saving…" : "Save food"}
                   </Button>
@@ -1087,7 +1087,7 @@ function FoodSearchModal({
                 onClick={() => onAdd(selectedFood.id, quantity)}
                 className="flex-1"
                 style={{
-                  background: "linear-gradient(135deg, #00AEEF, #8B5CF6)",
+                  background: "linear-gradient(135deg, #00AEEF, var(--azfit-accent))",
                 }}
               >
                 Add

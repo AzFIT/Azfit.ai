@@ -259,7 +259,7 @@ export default function OnboardingPage() {
         <div className="mx-auto max-w-2xl px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'linear-gradient(135deg, #00AEEF, #8B5CF6)' }}>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'linear-gradient(135deg, #00AEEF, var(--azfit-accent))' }}>
                 <StepIcon className="h-5 w-5 text-white" />
               </div>
               <div>
@@ -333,7 +333,7 @@ export default function OnboardingPage() {
                 onClick={() => setStep((s) => s + 1)}
                 disabled={!canProceed}
                 className="flex items-center gap-1 rounded-xl px-6 py-2.5 text-sm font-bold text-white transition-all disabled:opacity-40"
-                style={{ background: 'linear-gradient(135deg, #00AEEF, #8B5CF6)' }}
+                style={{ background: 'linear-gradient(135deg, #00AEEF, var(--azfit-accent))' }}
               >
                 Next <ChevronRight className="h-4 w-4" />
               </button>
@@ -342,7 +342,7 @@ export default function OnboardingPage() {
                 onClick={handleComplete}
                 disabled={isSubmitting}
                 className="flex items-center gap-1 rounded-xl px-6 py-2.5 text-sm font-bold text-white transition-all disabled:opacity-40"
-                style={{ background: 'linear-gradient(135deg, #00AEEF, #8B5CF6)' }}
+                style={{ background: 'linear-gradient(135deg, #00AEEF, var(--azfit-accent))' }}
               >
                 {isSubmitting ? (
                   <>
@@ -549,7 +549,7 @@ function Step3Body({ data, updateData }: { data: OnboardingData; updateData: (u:
               <Input type="number" placeholder="Hip (cm)" value={data.navyHip || ''} onChange={(e) => updateData({ navyHip: Number(e.target.value) })} />
             )}
           </div>
-          <Button onClick={calculateNavyBF} className="w-full" style={{ background: 'linear-gradient(135deg, #00AEEF, #8B5CF6)' }}>
+          <Button onClick={calculateNavyBF} className="w-full" style={{ background: 'linear-gradient(135deg, #00AEEF, var(--azfit-accent))' }}>
             Calculate Body Fat %
           </Button>
           {data.bodyFatPercentage !== undefined && data.bodyFatPercentage > 0 && (
@@ -924,8 +924,8 @@ function Step6TDEE({ data, updateData, age, bmi, bmr, tdee, calorieGoal, macros,
 
       {/* Macro Display */}
       <div className="grid grid-cols-3 gap-3">
-        <MacroCard label="Protein" value={macros.protein} color="#0D9488" />
-        <MacroCard label="Fats" value={macros.fats} color="#F59E0B" />
+        <MacroCard label="Protein" value={macros.protein} color="var(--azfit-primary)" />
+        <MacroCard label="Fats" value={macros.fats} color="var(--warning)" />
         <MacroCard label="Carbs" value={macros.carbs} color="#22C55E" />
       </div>
 
@@ -1037,9 +1037,9 @@ function Step8Review({ data, age, bmi, tdee, calorieGoal, macros, waterGoal }: {
     const bf = data.bodyFatPercentage;
     if (!bf) return null;
     if (bf < 10) return { label: 'Lean', color: '#22C55E' };
-    if (bf < 15) return { label: 'Athletic', color: '#0D9488' };
+    if (bf < 15) return { label: 'Athletic', color: 'var(--azfit-primary)' };
     if (bf < 20) return { label: 'Fit', color: '#00AEEF' };
-    if (bf < 25) return { label: 'Average', color: '#F59E0B' };
+    if (bf < 25) return { label: 'Average', color: 'var(--warning)' };
     return { label: 'Higher', color: '#EF4444' };
   }, [data.bodyFatPercentage]);
 
@@ -1048,8 +1048,8 @@ function Step8Review({ data, age, bmi, tdee, calorieGoal, macros, waterGoal }: {
       {/* Profile Card */}
       <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--card-border)' }}>
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-800">
-            <User className="h-6 w-6 text-slate-400" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--dark-surface)]">
+            <User className="h-6 w-6 text-[var(--dark-text-muted)]" />
           </div>
           <div>
             <p className="font-bold" style={{ color: 'var(--text-primary)' }}>{data.fullName}</p>
@@ -1084,9 +1084,9 @@ function Step8Review({ data, age, bmi, tdee, calorieGoal, macros, waterGoal }: {
           <span style={{ color: 'var(--text-muted)' }}>Calories:</span>
           <span className="font-bold" style={{ color: '#00AEEF' }}>{calorieGoal.toLocaleString()} kcal</span>
           <span style={{ color: 'var(--text-muted)' }}>Protein:</span>
-          <span className="font-bold" style={{ color: '#0D9488' }}>{macros.protein}g</span>
+          <span className="font-bold" style={{ color: 'var(--azfit-primary)' }}>{macros.protein}g</span>
           <span style={{ color: 'var(--text-muted)' }}>Fats:</span>
-          <span className="font-bold" style={{ color: '#F59E0B' }}>{macros.fats}g</span>
+          <span className="font-bold" style={{ color: 'var(--warning)' }}>{macros.fats}g</span>
           <span style={{ color: 'var(--text-muted)' }}>Carbs:</span>
           <span className="font-bold" style={{ color: '#22C55E' }}>{macros.carbs}g</span>
           <span style={{ color: 'var(--text-muted)' }}>Water:</span>
@@ -1121,7 +1121,7 @@ function Step9Complete({ data, navigate }: { data: OnboardingData; navigate: (pa
         animate={{ scale: 1 }}
         transition={{ type: 'spring', stiffness: 200, damping: 15 }}
         className="flex h-20 w-20 items-center justify-center rounded-full"
-        style={{ background: 'linear-gradient(135deg, #00AEEF, #8B5CF6)' }}
+        style={{ background: 'linear-gradient(135deg, #00AEEF, var(--azfit-accent))' }}
       >
         <Check className="h-10 w-10 text-white" />
       </motion.div>
@@ -1165,7 +1165,7 @@ function Step9Complete({ data, navigate }: { data: OnboardingData; navigate: (pa
         <button
           onClick={() => navigate('/dashboard')}
           className="w-full rounded-xl py-3 text-sm font-bold text-white transition-all"
-          style={{ background: 'linear-gradient(135deg, #00AEEF, #8B5CF6)' }}
+          style={{ background: 'linear-gradient(135deg, #00AEEF, var(--azfit-accent))' }}
         >
           Explore Dashboard
         </button>

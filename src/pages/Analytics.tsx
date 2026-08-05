@@ -103,7 +103,7 @@ interface SummaryStats {
   trainingDaysPct: number;
 }
 
-const MUSCLE_PALETTE = ['#0D9488', '#06B6D4', '#8B5CF6', '#F59E0B', '#A78BFA', '#84CC16', '#F87171'];
+const MUSCLE_PALETTE = ['var(--azfit-primary)', 'var(--azfit-secondary)', 'var(--azfit-accent)', 'var(--warning)', 'var(--azfit-accent-light)', 'var(--success)', 'var(--danger)'];
 
 const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -119,7 +119,7 @@ function heatmapColor(level: number, isDark: boolean): string {
   if (level === -1) return 'transparent';
   if (level === 0) return isDark ? 'var(--dark-elevated)' : 'var(--light-elevated)';
   if (level < 1) return 'rgba(132,204,22,0.25)';
-  return '#84CC16';
+  return 'var(--success)';
 }
 
 /* ------------------------------------------------------------------ */
@@ -353,9 +353,9 @@ export default function Analytics() {
         const macroCalories = protein * 4 + carbs * 4 + fats * 9;
         if (macroCalories > 0) {
           setMacros([
-            { name: 'Protein', value: Math.round(((protein * 4) / macroCalories) * 100), grams: protein, color: '#0D9488' },
-            { name: 'Carbs', value: Math.round(((carbs * 4) / macroCalories) * 100), grams: carbs, color: '#06B6D4' },
-            { name: 'Fats', value: Math.round(((fats * 9) / macroCalories) * 100), grams: fats, color: '#F59E0B' },
+            { name: 'Protein', value: Math.round(((protein * 4) / macroCalories) * 100), grams: protein, color: 'var(--azfit-primary)' },
+            { name: 'Carbs', value: Math.round(((carbs * 4) / macroCalories) * 100), grams: carbs, color: 'var(--azfit-secondary)' },
+            { name: 'Fats', value: Math.round(((fats * 9) / macroCalories) * 100), grams: fats, color: 'var(--warning)' },
           ]);
           setTargetCalories(targets.calories ?? macroCalories);
         }
@@ -593,7 +593,7 @@ export default function Analytics() {
         </motion.div>
 
         {error && (
-          <p className="mb-6 text-center text-xs" style={{ color: '#F59E0B' }}>
+          <p className="mb-6 text-center text-xs" style={{ color: 'var(--warning)' }}>
             Some analytics couldn't be loaded ({error}).
           </p>
         )}
@@ -662,8 +662,8 @@ export default function Analytics() {
                   <AreaChart data={filteredWeightData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <defs>
                       <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#0D9488" stopOpacity={0.2} />
-                        <stop offset="100%" stopColor="#0D9488" stopOpacity={0} />
+                        <stop offset="0%" stopColor="var(--azfit-primary)" stopOpacity={0.2} />
+                        <stop offset="100%" stopColor="var(--azfit-primary)" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--light-border)" opacity={0.4} />
@@ -685,17 +685,17 @@ export default function Analytics() {
                     <Area
                       type="monotone"
                       dataKey="weight"
-                      stroke="#0D9488"
+                      stroke="var(--azfit-primary)"
                       strokeWidth={2.5}
                       fill="url(#weightGradient)"
                       dot={false}
-                      activeDot={{ r: 4, fill: '#0D9488', strokeWidth: 0 }}
+                      activeDot={{ r: 4, fill: 'var(--azfit-primary)', strokeWidth: 0 }}
                       animationDuration={1200}
                     />
                     <Area
                       type="monotone"
                       dataKey="movingAvg"
-                      stroke="#06B6D4"
+                      stroke="var(--azfit-secondary)"
                       strokeWidth={1.5}
                       strokeDasharray="6 4"
                       fill="none"
