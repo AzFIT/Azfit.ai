@@ -79,3 +79,18 @@ export function labelsForPairAdd(labels: string[]): { updated: string[]; newLabe
 export function labelsAfterRemove(labels: string[], removedIndex: number): string[] {
   return normalizeOrderLabels(labels.filter((_, i) => i !== removedIndex));
 }
+
+/**
+ * Next free order_index for a workout day (Phase 41 duplicate):
+ * one past the highest existing index; null/undefined entries are
+ * ignored, an empty/legacy day starts at 0.
+ */
+export function nextOrderIndex(
+  indices: Array<number | null | undefined>,
+): number {
+  let max = -1;
+  for (const i of indices) {
+    if (typeof i === "number" && Number.isFinite(i)) max = Math.max(max, i);
+  }
+  return max + 1;
+}

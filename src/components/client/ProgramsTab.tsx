@@ -13,10 +13,18 @@ import {
   SquarePen,
   Printer,
   Plus,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { formatDate } from "@/lib/utils";
+import { nextOrderIndex } from "@/lib/exerciseLabels";
+import { SETS_PRESETS, REPS_PRESETS, TEMPO_PRESETS } from "@/lib/presets";
+import PresetInput from "@/components/ui/PresetInput";
+import ExercisePickerDialog, {
+  type LibraryExercise,
+} from "@/components/exercise/ExercisePickerDialog";
+import type { Database } from "@/types/supabase";
 import type { ClientGeneratedProgram } from "@/types/client";
 
 interface ProgramsTabProps {
@@ -43,11 +51,32 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
   const [rxEditId, setRxEditId] = useState<string | null>(null);
   const [rxDraft, setRxDraft] = useState<{ sets: string; reps: string; tempo: string }>({ sets: "", reps: "", tempo: "" });
   const [rxBusy, setRxBusy] = useState(false);
+  // Phase 41: exercise replacement via the 31B picker (pending name,
+  // applied on Save; notes JSON/order_index untouched)
+  const [rxNewName, setRxNewName] = useState<string | null>(null);
+  const [rxPickerOpen, setRxPickerOpen] = useState(false);
+  const [rxDayNames, setRxDayNames] = useState<string[]>([]);
+  // Phase 41 Item 3: duplicate exercise
+  const [dupBusyId, setDupBusyId] = useState<string | null>(null);
 
   const startRxEdit = (ex: { id?: string; sets: number; reps: string; tempo: string }) => {
     if (!ex.id) return;
     setRxEditId(ex.id);
     setRxDraft({ sets: String(ex.sets), reps: ex.reps, tempo: ex.tempo });
+    setRxNewName(null);
+  };
+
+  const closeRxEdit = () => {
+    setRxEditId(null);
+    setRxNewName(null);
+  };
+
+  // Picker selection: duplicate-name guard, then hold as pending rename
+  const handlePickReplacement = (picked: LibraryExercise) => {
+    if (rxDayNames.includes(picked.name)) {
+      if (!window.confirm(`"${picked.name}" is already on this day — swap anyway?`)) return;
+    }
+    setRxNewName(picked.name);
   };
 
   const savePrescription = async (ex: { id?: string; name: string; sets: number; reps: string; notesRaw?: string | null }) => {
@@ -64,18 +93,72 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
         notes = {};
       }
       if (tempo) notes.tempo = tempo;
+      const payload: Database["public"]["Tables"]["exercises"]["Update"] = {
+        sets,
+        reps,
+        notes: JSON.stringify(notes),
+      };
+      // Phase 41: name only changes when a replacement was picked —
+      // order_index and the notes JSON stay untouched otherwise.
+      if (rxNewName && rxNewName !== ex.name) payload.name = rxNewName;
       const { error } = await supabase
         .from("exercises")
-        .update({ sets, reps, notes: JSON.stringify(notes) })
+        .update(payload)
         .eq("id", ex.id);
       if (error) throw error;
-      toast.success(`Prescription updated for ${ex.name}`);
-      setRxEditId(null);
+      toast.success(
+        rxNewName && rxNewName !== ex.name
+          ? `Replaced ${ex.name} → ${rxNewName}`
+          : `Prescription updated for ${ex.name}`,
+      );
+      closeRxEdit();
       onChanged?.();
     } catch (err) {
       toast.error("Couldn't save: " + (err instanceof Error ? err.message : "Unknown error"));
     } finally {
       setRxBusy(false);
+    }
+  };
+
+  // Phase 41 Item 3 — copy the exercises row to the end of its day with
+  // a fresh id and the next order_index (notes JSON copied verbatim;
+  // 33C/36 label normalization applies at every renderer).
+  const handleDuplicate = async (ex: { id?: string; name: string }) => {
+    if (!ex.id || dupBusyId) return;
+    setDupBusyId(ex.id);
+    try {
+      const { data: src, error: srcErr } = await supabase
+        .from("exercises")
+        .select("workout_id, name, sets, reps, weight_kg, rest_seconds, rpe, order_index, notes")
+        .eq("id", ex.id)
+        .single();
+      if (srcErr) throw srcErr;
+      const { data: rows, error: idxErr } = await supabase
+        .from("exercises")
+        .select("order_index")
+        .eq("workout_id", src.workout_id);
+      if (idxErr) throw idxErr;
+      const order_index = nextOrderIndex(
+        (rows || []).map((r: { order_index: number | null }) => r.order_index),
+      );
+      const { error } = await supabase.from("exercises").insert({
+        workout_id: src.workout_id,
+        name: src.name,
+        sets: src.sets,
+        reps: src.reps,
+        weight_kg: src.weight_kg,
+        rest_seconds: src.rest_seconds,
+        rpe: src.rpe,
+        notes: src.notes,
+        order_index,
+      });
+      if (error) throw error;
+      toast.success(`Duplicated ${ex.name}`);
+      onChanged?.();
+    } catch (err) {
+      toast.error("Couldn't duplicate: " + (err instanceof Error ? err.message : "Unknown error"));
+    } finally {
+      setDupBusyId(null);
     }
   };
   // Optimistic display overrides (reverted on error)
@@ -646,33 +729,59 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
                                                   className="rounded-md px-2 py-2 space-y-2"
                                                   style={{ backgroundColor: "var(--light-elevated)", border: "1px solid var(--azfit-primary)" }}
                                                 >
-                                                  <p className="text-xs font-medium truncate" style={{ color: "var(--page-text)" }}>{ex.name}</p>
+                                                  {/* Phase 41: name is a button — opens the 31B picker to
+                                                      replace the exercise (pending until Save) */}
+                                                  <button
+                                                    onClick={() => {
+                                                      setRxDayNames(
+                                                        workout.exercises
+                                                          .filter((x) => x.id !== ex.id)
+                                                          .map((x) => x.name),
+                                                      );
+                                                      setRxPickerOpen(true);
+                                                    }}
+                                                    className="flex items-center gap-1.5 text-left"
+                                                    title="Replace exercise…"
+                                                  >
+                                                    <span className="text-xs font-medium truncate" style={{ color: rxNewName ? "#8B5CF6" : "var(--page-text)" }}>
+                                                      {rxNewName ?? ex.name}
+                                                    </span>
+                                                    <SquarePen size={10} style={{ color: "var(--azfit-primary)" }} />
+                                                  </button>
+                                                  {rxNewName && (
+                                                    <p className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+                                                      replaces {ex.name} — Save to apply, Cancel to keep
+                                                    </p>
+                                                  )}
                                                   <div className="flex items-center gap-2 flex-wrap">
                                                     <label className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>Sets</label>
-                                                    <input
+                                                    <PresetInput
                                                       type="number"
                                                       min={1}
                                                       max={20}
+                                                      ariaLabel="Sets"
                                                       value={rxDraft.sets}
-                                                      onChange={(e) => setRxDraft((d) => ({ ...d, sets: e.target.value }))}
-                                                      className="w-14 rounded-md border px-2 py-1 text-xs"
-                                                      style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)", color: "var(--page-text)" }}
+                                                      onChange={(v) => setRxDraft((d) => ({ ...d, sets: v }))}
+                                                      presets={SETS_PRESETS}
+                                                      className="w-16"
                                                     />
                                                     <label className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>Reps</label>
-                                                    <input
+                                                    <PresetInput
+                                                      ariaLabel="Reps"
                                                       value={rxDraft.reps}
-                                                      onChange={(e) => setRxDraft((d) => ({ ...d, reps: e.target.value }))}
+                                                      onChange={(v) => setRxDraft((d) => ({ ...d, reps: v }))}
+                                                      presets={REPS_PRESETS}
                                                       placeholder="8-12"
-                                                      className="w-16 rounded-md border px-2 py-1 text-xs"
-                                                      style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)", color: "var(--page-text)" }}
+                                                      className="w-20"
                                                     />
                                                     <label className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>Tempo</label>
-                                                    <input
+                                                    <PresetInput
+                                                      ariaLabel="Tempo"
                                                       value={rxDraft.tempo}
-                                                      onChange={(e) => setRxDraft((d) => ({ ...d, tempo: e.target.value }))}
+                                                      onChange={(v) => setRxDraft((d) => ({ ...d, tempo: v }))}
+                                                      presets={TEMPO_PRESETS}
                                                       placeholder="3-0-1-0"
-                                                      className="w-20 rounded-md border px-2 py-1 text-xs"
-                                                      style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)", color: "var(--page-text)" }}
+                                                      className="w-24"
                                                     />
                                                     <button
                                                       onClick={() => savePrescription(ex)}
@@ -683,7 +792,7 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
                                                       {rxBusy ? "Saving…" : "Save"}
                                                     </button>
                                                     <button
-                                                      onClick={() => setRxEditId(null)}
+                                                      onClick={closeRxEdit}
                                                       className="rounded-md px-2 py-1 text-[11px]"
                                                       style={{ color: "var(--light-text-muted)" }}
                                                     >
@@ -735,13 +844,23 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
                                                     {ex.load ? ` @ ${ex.load}kg` : ""}
                                                   </span>
                                                   {ex.id && (
-                                                    <button
-                                                      onClick={() => startRxEdit(ex)}
-                                                      className="p-0.5 rounded hover:opacity-80"
-                                                      title="Edit prescription"
-                                                    >
-                                                      <Pencil size={10} style={{ color: "var(--azfit-primary)" }} />
-                                                    </button>
+                                                    <>
+                                                      <button
+                                                        onClick={() => startRxEdit(ex)}
+                                                        className="p-0.5 rounded hover:opacity-80"
+                                                        title="Edit prescription"
+                                                      >
+                                                        <Pencil size={10} style={{ color: "var(--azfit-primary)" }} />
+                                                      </button>
+                                                      <button
+                                                        onClick={() => handleDuplicate(ex)}
+                                                        disabled={dupBusyId === ex.id}
+                                                        className="p-0.5 rounded hover:opacity-80 disabled:opacity-40"
+                                                        title="Duplicate exercise (appends a copy to this day)"
+                                                      >
+                                                        <Copy size={10} style={{ color: "#8B5CF6" }} />
+                                                      </button>
+                                                    </>
                                                   )}
                                                 </span>
                                               </div>
@@ -779,6 +898,13 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
           </motion.div>
         );
       })}
+
+      {/* Phase 41: exercise replacement picker (shared 31B dialog) */}
+      <ExercisePickerDialog
+        open={rxPickerOpen}
+        onOpenChange={setRxPickerOpen}
+        onSelect={handlePickReplacement}
+      />
     </div>
   );
 }
