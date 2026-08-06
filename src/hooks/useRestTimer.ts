@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { safeVibrate } from "@/lib/haptics";
 
 interface TimerState {
   active: boolean;
@@ -29,6 +30,8 @@ export function useRestTimer() {
             clearInterval(intervals.current[exerciseId]);
             delete intervals.current[exerciseId];
           }
+          // Phase 49: rest over — double buzz (feature-detected, toggle-gated)
+          safeVibrate([200, 100, 200]);
           return {
             ...prev,
             [exerciseId]: {
@@ -39,6 +42,8 @@ export function useRestTimer() {
             },
           };
         }
+        // Phase 49: 10-seconds-left warning buzz
+        if (current.remaining - 1 === 10) safeVibrate(200);
         return {
           ...prev,
           [exerciseId]: { ...current, remaining: current.remaining - 1 },

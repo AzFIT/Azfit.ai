@@ -25,6 +25,9 @@ export interface SessionExercise {
   restSeconds: number;
   prescribedRpe?: number;
   equipment?: string; // Phase 33C Fix 5: barbell-only plate hint
+  /** Phase 49: false when restSeconds came from the 60s fallback, not the
+   * exercises row — only then may the method's default rest apply. */
+  hasExplicitRest?: boolean;
   sets: SessionSet[];
   notes: string;
 }
@@ -186,6 +189,7 @@ export function buildSessionExercise(
     targetLoad,
     tempo: DEFAULT_TEMPO,
     restSeconds,
+    hasExplicitRest: dbExercise.rest_seconds != null,
     prescribedRpe: dbExercise.rpe ?? undefined,
     sets,
     notes: dbExercise.notes ?? "",

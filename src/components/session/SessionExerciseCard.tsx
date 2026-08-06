@@ -97,6 +97,14 @@ interface SessionExerciseCardProps {
   lastLoad: number;
   unit?: 'kg' | 'lbs';
   workoutExerciseNames?: string[];
+  /** Phase 49 Item 1: "Last: 22.5 kg × 10 @ RPE 8" ghost line (null = render nothing) */
+  ghost?: string | null;
+  /** Phase 49 Item 2: per-exercise method chip ("Set 3 of 10" / "Wave 2/4") */
+  methodChip?: string | null;
+  /** Phase 49 Item 3: method default rest (applies only when the row has no explicit rest) */
+  methodRestSeconds?: number | null;
+  /** Phase 49 Item 3: rest-pause mode — failure sets preset the intra-set rest */
+  isRestPause?: boolean;
 }
 
 export function SessionExerciseCard({
@@ -117,6 +125,10 @@ export function SessionExerciseCard({
   lastLoad,
   unit = 'kg',
   workoutExerciseNames,
+  ghost,
+  methodChip,
+  methodRestSeconds,
+  isRestPause,
 }: SessionExerciseCardProps) {
   const [focusedSet, setFocusedSet] = useState<number | null>(null);
   const [noteSet, setNoteSet] = useState<number | null>(null);
@@ -192,10 +204,24 @@ export function SessionExerciseCard({
       const hint = getRpeHint(s.rpe, s.reps, targetReps, s.load || s.clientLoad || exercise.targetLoad || 0, unit);
       setRpeHint(hint ? { setIndex: setIdx, text: hint } : null);
 
-      const restSeconds = lastPresetSeconds[exercise.id] ?? s.restSeconds ?? 60;
+      const restSeconds = (() => {
+        const rowRest = lastPresetSeconds[exercise.id] ?? s.restSeconds ?? 60;
+        // Phase 49 Item 3 — rest-pause: a set done at failure (reps hit the
+        // top of the target range) presets the intra-set rest (10–20s → 15s).
+        if (isRestPause) {
+          const top = parseTargetReps(exercise.targetReps);
+          if (top > 0 && s.reps >= top) return 15;
+        }
+        // Phase 49 Item 3 — the method's default rest applies only when the
+        // exercise row carries no explicit rest (row value always wins).
+        if (lastPresetSeconds[exercise.id] == null && exercise.hasExplicitRest === false && methodRestSeconds) {
+          return methodRestSeconds;
+        }
+        return rowRest;
+      })();
       onStartRest(exercise.id, setIdx, restSeconds);
     },
-    [exercise, onToggleDone, onStartRest, onSkipRest, restTimer, unit, lastPresetSeconds, rpeHint]
+    [exercise, onToggleDone, onStartRest, onSkipRest, restTimer, unit, lastPresetSeconds, rpeHint, isRestPause, methodRestSeconds]
   );
 
   const handleSwap = useCallback(
@@ -319,6 +345,13 @@ export function SessionExerciseCard({
 
         <span className="text-[var(--text-primary)] font-semibold text-[15px] truncate">{exercise.name}</span>
 
+        {/* Phase 49: method counter chip (GVT set count / wave indicator) */}
+        {methodChip && (
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ backgroundColor: "rgba(0,174,239,0.12)", color: "#00AEEF" }}>
+            {methodChip}
+          </span>
+        )}
+
         <span className="text-[#00AEEF] font-semibold text-sm tabular-nums ml-auto">
           {exercise.sets.length}×{exercise.targetReps}
         </span>
@@ -367,6 +400,12 @@ export function SessionExerciseCard({
         }`}
       >
         <div className="px-4 pb-4 overflow-x-auto">
+          {/* Phase 49 Item 1: last-session ghost values (display only) */}
+          {ghost && (
+            <p className="pb-2 text-[11px]" style={{ color: "var(--light-text-muted)" }}>
+              {ghost}
+            </p>
+          )}
           <table className="w-full min-w-[600px] text-[13px]">
             <thead>
               <tr className="text-left">

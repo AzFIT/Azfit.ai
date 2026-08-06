@@ -26,6 +26,8 @@ import {
   nextSeriesLetter,
   labelsAfterRemove,
 } from "@/lib/exerciseLabels";
+import { latestGhostByExercise, type GhostSet } from "@/lib/workoutIntel";
+import { parseMethodDefaults, type MethodDefaults } from "@/lib/methodDefaults";
 
 type WorkoutLogRow = Database["public"]["Tables"]["workout_logs"]["Row"];
 type WorkoutRow = Database["public"]["Tables"]["workouts"]["Row"];
@@ -67,6 +69,10 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
   const [isPaused, setIsPaused] = useState(false);
   const [historyPbs, setHistoryPbs] = useState<Record<string, { volume: number; oneRepMax: number }>>({});
   const [lastLoadPerExercise, setLastLoadPerExercise] = useState<Record<string, number>>({});
+  // Phase 49: ghost data (latest previous set per exercise) + the program's
+  // method defaults (drives player chrome + rest defaults)
+  const [ghostByExercise, setGhostByExercise] = useState<Map<string, GhostSet>>(new Map());
+  const [method, setMethod] = useState<{ slug: string; name: string; d: MethodDefaults } | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(Date.now());
@@ -158,6 +164,53 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
         .single();
 
       setProgram(programData || null);
+
+      // Phase 49: resolve the program's method (48 phases-jsonb channel)
+      // to its prescription defaults — drives player chrome + rest defaults
+      {
+        const slug =
+          programData && Array.isArray(programData.phases) && programData.phases.length > 0
+            ? (programData.phases[0] as { method?: unknown })?.method
+            : undefined;
+        if (typeof slug === "string" && slug) {
+          const { data: m } = await supabase
+            .from("methods")
+            .select("slug, name, defaults")
+            .eq("slug", slug)
+            .maybeSingle();
+          const d = parseMethodDefaults(m?.defaults);
+          if (m && d) setMethod({ slug: m.slug, name: m.name, d });
+          else setMethod(null);
+        } else {
+          setMethod(null);
+        }
+      }
+
+      // Phase 49 Item 1: ghost data — latest PREVIOUS set per exercise from
+      // completed logs before today (one pair of queries per session load).
+      if (log.client_id) {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const { data: completedLogs } = await supabase
+          .from("workout_logs")
+          .select("id")
+          .eq("client_id", log.client_id)
+          .not("completed_at", "is", null)
+          .neq("id", workoutLogId);
+        const logIds = (completedLogs || []).map((l) => l.id);
+        if (logIds.length > 0) {
+          const { data: ghostRows } = await supabase
+            .from("workout_log_entries")
+            .select("exercise_name, weight_per_set, reps_per_set, rpe_per_set")
+            .in("workout_log_id", logIds)
+            .lt("created_at", todayStart.toISOString())
+            .order("created_at", { ascending: false })
+            .limit(1000);
+          setGhostByExercise(latestGhostByExercise(ghostRows || []));
+        } else {
+          setGhostByExercise(new Map());
+        }
+      }
 
       const { data: exercisesData, error: exercisesError } = await supabase
         .from("exercises")
@@ -631,5 +684,7 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
     setPaused,
     historyPbs,
     lastLoadPerExercise,
+    ghostByExercise,
+    method,
   };
 }

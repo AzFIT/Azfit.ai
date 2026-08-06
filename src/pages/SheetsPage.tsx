@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router';
-import { ArrowLeft, Clock, Dumbbell, Target, TrendingUp, CheckCircle2, Pause, Play, Plus, X } from 'lucide-react';
+import { ArrowLeft, Clock, Dumbbell, Target, TrendingUp, CheckCircle2, Pause, Play, Plus, X, Vibrate, Timer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SessionExerciseCard } from '@/components/session/SessionExerciseCard';
 import { SessionSummaryModal } from '@/components/session/SessionSummaryModal';
@@ -8,6 +8,9 @@ import { useActiveWorkoutSession } from '@/hooks/useActiveWorkoutSession';
 import { useRestTimer } from '@/hooks/useRestTimer';
 import { formatElapsed, splitProgramIntoPhases, getCurrentPhase } from '@/lib/workoutSession';
 import { labelsForPairAdd, nextSeriesLetter } from '@/lib/exerciseLabels';
+import { INTENSITY_HEX } from '@/lib/methodDefaults';
+import { highVolumeSets, waveProgress, parseRestSeconds, ghostText } from '@/lib/workoutIntel';
+import { hapticsEnabled, setHapticsEnabled } from '@/lib/haptics';
 import { supabase } from '@/lib/supabase';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -30,11 +33,61 @@ export default function SheetsPage() {
     setPaused,
     lastLoadPerExercise,
     updateExerciseTargetLoad,
+    ghostByExercise,
+    method,
   } = useActiveWorkoutSession(workoutLogId);
 
   const { timers, startTimer, skipTimer, addTime } = useRestTimer();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showSummary, setShowSummary] = useState(false);
+
+  // Phase 49 Item 3: rest-timer haptics toggle (persisted per device)
+  const [hapticsOn, setHapticsOn] = useState<boolean>(() => hapticsEnabled());
+  const toggleHaptics = useCallback(() => {
+    setHapticsOn((prev) => {
+      setHapticsEnabled(!prev);
+      return !prev;
+    });
+  }, []);
+
+  // Phase 49 Item 2: EDT block countdown (escalating-density-training only)
+  const isEdt = method?.slug === 'escalating-density-training';
+  const [edtRemaining, setEdtRemaining] = useState(15 * 60);
+  const [edtRunning, setEdtRunning] = useState(false);
+  const edtDoneRef = useRef(false);
+  useEffect(() => {
+    if (!edtRunning) return;
+    const iv = setInterval(() => {
+      setEdtRemaining((r) => {
+        if (r <= 1) {
+          if (!edtDoneRef.current) {
+            edtDoneRef.current = true;
+            toast.success('Block complete — log your rounds');
+          }
+          setEdtRunning(false);
+          return 0;
+        }
+        return r - 1;
+      });
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [edtRunning]);
+  const edtFmt = `${Math.floor(edtRemaining / 60)}:${String(edtRemaining % 60).padStart(2, '0')}`;
+
+  // Phase 49 Item 2: per-exercise method chip (GVT set counter / wave index)
+  const methodChipFor = useCallback(
+    (ex: { sets: { done: boolean }[] }) => {
+      if (!method) return null;
+      const done = ex.sets.filter((s) => s.done).length;
+      const hv = highVolumeSets(method.d.setsReps);
+      if (hv) return `Set ${Math.min(done + 1, hv)} of ${hv}`;
+      const wave = waveProgress(method.d.setsReps, done);
+      if (wave) return `Wave ${wave.wave}/${wave.maxWaves}`;
+      return null;
+    },
+    [method],
+  );
+  const methodRestSeconds = method ? parseRestSeconds(method.d.rest) : null;
 
   // Phase 35 ITEM 1: RPE prompt + blocking finish UX
   const [showRpePrompt, setShowRpePrompt] = useState(false);
@@ -176,6 +229,45 @@ export default function SheetsPage() {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Phase 49: method badge (intensity dot + name) */}
+              {method && (
+                <span
+                  className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold"
+                  style={{
+                    borderColor: `${INTENSITY_HEX[method.d.intensityColor]}50`,
+                    color: INTENSITY_HEX[method.d.intensityColor],
+                    backgroundColor: `${INTENSITY_HEX[method.d.intensityColor]}12`,
+                  }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: INTENSITY_HEX[method.d.intensityColor] }} />
+                  {method.name}
+                </span>
+              )}
+              {/* Phase 49: EDT block countdown chip */}
+              {isEdt && (
+                <button
+                  onClick={() => setEdtRunning((r) => !r)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-mono font-bold"
+                  style={{
+                    borderColor: 'var(--card-border)',
+                    color: edtRunning ? '#00AEEF' : 'var(--text-muted)',
+                    backgroundColor: 'var(--card-bg)',
+                  }}
+                  title={edtRunning ? 'Pause EDT block' : 'Start EDT block'}
+                >
+                  <Timer className="w-3.5 h-3.5" />
+                  {edtFmt}
+                </button>
+              )}
+              <button
+                onClick={toggleHaptics}
+                className="p-2 rounded-lg bg-[var(--card-bg)] border border-[var(--card-border)] hover:bg-[var(--card-border)] transition-colors"
+                style={{ color: hapticsOn ? '#00AEEF' : 'var(--text-muted)' }}
+                title={hapticsOn ? 'Rest-timer vibration: on' : 'Rest-timer vibration: off'}
+                aria-label="Toggle rest-timer vibration"
+              >
+                <Vibrate className="w-4 h-4" />
+              </button>
               <span className="px-2 py-1 rounded-lg bg-[#00AEEF]/10 text-[#00AEEF] text-[10px] font-bold uppercase tracking-wider">
                 Active
               </span>
@@ -274,6 +366,10 @@ export default function SheetsPage() {
             restTimer={timers[exercise.id]}
             lastLoad={lastLoadPerExercise[exercise.name] || 0}
             workoutExerciseNames={exercises.map((e) => e.name)}
+            ghost={ghostText(ghostByExercise.get(exercise.name))}
+            methodChip={methodChipFor(exercise)}
+            methodRestSeconds={methodRestSeconds}
+            isRestPause={method?.slug === 'rest-pause'}
           />
         ))}
 
