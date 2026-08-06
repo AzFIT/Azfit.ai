@@ -9,6 +9,7 @@ import {
   Apple,
   FileSpreadsheet,
   ClipboardList,
+  Ticket,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -19,6 +20,7 @@ import {
   type DigestRowInput,
 } from "@/lib/weeklyDigest";
 import { aggregateWeek, targetPercents, type AdherenceLogRow } from "@/lib/weeklyAdherence";
+import { remainingCredits } from "@/lib/creditsAvailability";
 
 /* ═══════════════════════════════════════════════════════════════════
    Trainer Weekly Digest (Phase 45) — every client's week at a glance.
@@ -29,6 +31,7 @@ interface Row extends DigestRowInput {
   clientId: string;
   name: string;
   programName: string | null;
+  creditsRemaining: number | null; // Phase 50: null when the client has no package
 }
 
 const DAY_MS = 86400000;
@@ -80,7 +83,7 @@ export default function WeeklyDigest() {
       const startDate = dateStr(window.start);
       const endDate = dateStr(sunday);
 
-      const [subsRes, priorRes, logsRes, sessRes, foodRes, targetsRes, progRes] =
+      const [subsRes, priorRes, logsRes, sessRes, foodRes, targetsRes, progRes, pkgRes, pkgSessRes] =
         await Promise.all([
           // check-ins this week
           supabase
@@ -133,6 +136,17 @@ export default function WeeklyDigest() {
             .in("client_id", clientIds)
             .eq("status", "active")
             .order("created_at", { ascending: false }),
+          // Phase 50: packages + the sessions feeding the derivative count
+          supabase
+            .from("session_packages")
+            .select("id, client_id, total_credits, created_at")
+            .in("client_id", clientIds),
+          supabase
+            .from("sessions")
+            .select("client_record_id, status, created_at")
+            .in("client_record_id", clientIds)
+            .in("status", ["scheduled", "completed"])
+            .limit(1000),
         ]);
       if (cancelled) return;
 
@@ -196,6 +210,23 @@ export default function WeeklyDigest() {
         }
       }
 
+      // Phase 50: derivative credits per client (pool of their packages)
+      const pkgSessionsByClient = new Map<string, Array<{ status: string | null; created_at: string | null }>>();
+      for (const s of pkgSessRes.data || []) {
+        if (!s.client_record_id) continue;
+        if (!pkgSessionsByClient.has(s.client_record_id)) pkgSessionsByClient.set(s.client_record_id, []);
+        pkgSessionsByClient.get(s.client_record_id)!.push({ status: s.status, created_at: s.created_at });
+      }
+      const creditsByClient = new Map<string, number>();
+      const pkgsByClient = new Map<string, Array<{ id: string; total_credits: number; created_at: string | null }>>();
+      for (const p of pkgRes.data || []) {
+        if (!pkgsByClient.has(p.client_id)) pkgsByClient.set(p.client_id, []);
+        pkgsByClient.get(p.client_id)!.push(p);
+      }
+      for (const [cid, pkgs] of pkgsByClient) {
+        creditsByClient.set(cid, remainingCredits(pkgs, pkgSessionsByClient.get(cid) ?? []));
+      }
+
       const sundayStr = dateStr(sunday);
       const built: Row[] = clients.map((c) => {
         const pid = profileIdByEmail.get(c.email);
@@ -220,6 +251,7 @@ export default function WeeklyDigest() {
           kcalPct: pct?.kcalPct ?? null,
           hasProgram: programByClient.has(c.id),
           programName: programByClient.get(c.id) ?? null,
+          creditsRemaining: creditsByClient.get(c.id) ?? null,
         };
       });
 
@@ -382,6 +414,21 @@ export default function WeeklyDigest() {
                     >
                       No program
                     </span>
+                  )}
+                </span>
+
+                {/* Phase 50: credits (red at ≤1, dash without a package) */}
+                <span className="flex items-center gap-1" title="Session credits remaining">
+                  <Ticket size={11} style={{ color: r.creditsRemaining !== null ? (r.creditsRemaining <= 1 ? "#EF4444" : "#8B5CF6") : "var(--light-text-muted)" }} />
+                  {r.creditsRemaining !== null ? (
+                    <span
+                      className="font-semibold"
+                      style={{ color: r.creditsRemaining <= 1 ? "#EF4444" : "var(--page-text)" }}
+                    >
+                      {r.creditsRemaining} cr
+                    </span>
+                  ) : (
+                    <span style={{ color: "var(--light-text-muted)" }}>—</span>
                   )}
                 </span>
               </span>

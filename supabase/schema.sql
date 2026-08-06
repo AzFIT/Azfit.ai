@@ -2014,5 +2014,63 @@ CREATE POLICY "Invited clients can create own record"
   );
 
 -- ============================================================
+-- Phase 50: session_packages + trainer_availability
+-- Credits are DERIVATIVE (no counter column): remaining = total_credits −
+-- sessions (scheduled|completed) created on/after the earliest package.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.session_packages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+  trainer_id UUID NOT NULL REFERENCES public.profiles(id),
+  name TEXT NOT NULL,
+  total_credits INT NOT NULL CHECK (total_credits > 0),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.trainer_availability (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  trainer_id UUID NOT NULL REFERENCES public.profiles(id),
+  weekday INT CHECK (weekday BETWEEN 1 AND 7),
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  blocked_date DATE,
+  UNIQUE (trainer_id, weekday, start_time)
+);
+
+ALTER TABLE public.session_packages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.trainer_availability ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Trainers can manage session packages"
+  ON public.session_packages FOR ALL
+  USING (client_id IN (SELECT id FROM public.clients WHERE trainer_id = auth.uid()))
+  WITH CHECK (client_id IN (SELECT id FROM public.clients WHERE trainer_id = auth.uid()));
+
+CREATE POLICY "Clients can read own session packages"
+  ON public.session_packages FOR SELECT
+  USING (
+    client_id IN (
+      SELECT c.id FROM public.clients c
+      JOIN public.profiles p ON p.id = auth.uid()
+      WHERE c.email = p.email
+    )
+  );
+
+CREATE POLICY "Trainers manage own availability"
+  ON public.trainer_availability FOR ALL
+  USING (trainer_id = auth.uid())
+  WITH CHECK (trainer_id = auth.uid());
+
+CREATE POLICY "Clients can read trainer availability"
+  ON public.trainer_availability FOR SELECT
+  USING (
+    trainer_id IN (
+      SELECT c.trainer_id FROM public.clients c
+      JOIN public.profiles p ON p.id = auth.uid()
+      WHERE c.email = p.email
+    )
+  );
+
+-- ============================================================
 -- DONE! Your AzFIT database is ready.
 -- ============================================================

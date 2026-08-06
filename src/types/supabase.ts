@@ -459,6 +459,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      session_packages: {
+        Row: {
+          id: string;
+          client_id: string;
+          trainer_id: string;
+          name: string;
+          total_credits: number;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          trainer_id: string;
+          name: string;
+          total_credits: number;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          client_id?: string;
+          trainer_id?: string;
+          name?: string;
+          total_credits?: number;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
       sessions: {
         Row: {
           id: string;
@@ -1860,6 +1890,33 @@ export type Database = {
           notes: string | null;
           is_milestone: boolean | null;
           created_at: string;
+        };
+        Relationships: [];
+      };
+      trainer_availability: {
+        Row: {
+          id: string;
+          trainer_id: string;
+          weekday: number | null;
+          start_time: string;
+          end_time: string;
+          blocked_date: string | null;
+        };
+        Insert: {
+          id?: string;
+          trainer_id: string;
+          weekday?: number | null;
+          start_time: string;
+          end_time: string;
+          blocked_date?: string | null;
+        };
+        Update: {
+          id?: string;
+          trainer_id?: string;
+          weekday?: number | null;
+          start_time?: string;
+          end_time?: string;
+          blocked_date?: string | null;
         };
         Relationships: [];
       };

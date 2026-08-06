@@ -32,6 +32,11 @@ interface BookSessionDialogProps {
   /** When provided, the client is preselected and locked (booking from a
    * client's profile is always for that client). Default unchanged. */
   initialClientId?: string;
+  /** Phase 50: session-package credit state for the selected client */
+  credits?: { remaining: number; total: number } | null;
+  /** Phase 50: start-time containment check vs the trainer's availability
+   * template (windows + blocked dates). Only called when a template exists. */
+  availabilityCheck?: (date: string, startTime: string) => boolean;
 }
 
 const SESSION_TYPES = [
@@ -55,6 +60,8 @@ export function BookSessionDialog({
   clients,
   initialDate,
   initialClientId,
+  credits,
+  availabilityCheck,
 }: BookSessionDialogProps) {
   const [step, setStep] = useState(1);
   const [clientId, setClientId] = useState(initialClientId || '');
@@ -189,6 +196,12 @@ export function BookSessionDialog({
                   className="mt-1 border-[#2A3447] bg-[#111827] text-[#F0F0F0]"
                 />
               </div>
+              {/* Phase 50: outside-availability hint (never a hard block) */}
+              {availabilityCheck && date && startTime && !availabilityCheck(date, startTime) && (
+                <div className="rounded-lg border border-[#F59E0B]/40 bg-[#F59E0B]/10 px-3 py-2 text-[11px] font-medium text-[#F59E0B]">
+                  Outside your availability template
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm text-[#94A3B8]">Start Time</Label>
@@ -331,6 +344,29 @@ export function BookSessionDialog({
                   <div className="flex justify-between">
                     <span className="text-[#94A3B8]">Notes</span>
                     <span className="max-w-[200px] truncate font-medium text-[#F0F0F0]">{notes}</span>
+                  </div>
+                )}
+                {/* Phase 50: package credits after this booking (warn, never block) */}
+                {credits && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-[#94A3B8]">Credits</span>
+                    <span
+                      className="font-medium"
+                      style={{
+                        color:
+                          credits.remaining - 1 <= 0
+                            ? "#EF4444"
+                            : credits.remaining - 1 === 1
+                              ? "#F59E0B"
+                              : "#F0F0F0",
+                      }}
+                    >
+                      {credits.remaining - 1 <= 0
+                        ? "No credits left after this booking"
+                        : credits.remaining - 1 === 1
+                          ? "Last credit — prompt renewal?"
+                          : `${credits.remaining - 1} of ${credits.total} remaining after this booking`}
+                    </span>
                   </div>
                 )}
               </div>

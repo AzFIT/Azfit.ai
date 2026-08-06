@@ -21,6 +21,12 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  remainingCredits,
+  isWithinAvailability,
+  hasAvailabilityTemplate,
+  type AvailabilityWindow,
+} from "@/lib/creditsAvailability";
 import { generateWeeklyOccurrences } from "@/lib/sessionConflicts";
 import { BookSessionDialog } from "@/components/schedule/BookSessionDialog";
 import {
@@ -67,6 +73,58 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
   const [reminderPreset, setReminderPreset] = useState<string | null>(null); // null = closed
   const [reminderIsCustom, setReminderIsCustom] = useState(false);
   const [actionSaving, setActionSaving] = useState(false);
+  // Phase 50: credits + availability state for the booking dialog hints
+  const [credits, setCredits] = useState<{ remaining: number; total: number } | null>(null);
+  const [availability, setAvailability] = useState<{ windows: AvailabilityWindow[]; blockedDates: string[] } | null>(null);
+
+  // Phase 50: load packages (derivative remaining) + the trainer's template
+  const loadExtras = useCallback(async () => {
+    if (!user?.id || !clientsId) return;
+    const { data: pkgs } = await supabase
+      .from("session_packages")
+      .select("id, total_credits, created_at")
+      .eq("client_id", clientsId);
+    if (pkgs && pkgs.length > 0) {
+      const { data: sess } = await supabase
+        .from("sessions")
+        .select("status, created_at")
+        .eq("client_record_id", clientsId)
+        .in("status", ["scheduled", "completed"]);
+      const total = pkgs.reduce((s, p) => s + p.total_credits, 0);
+      setCredits({ remaining: remainingCredits(pkgs, sess || []), total });
+    } else {
+      setCredits(null);
+    }
+
+    const { data: avail } = await supabase
+      .from("trainer_availability")
+      .select("weekday, start_time, end_time, blocked_date")
+      .eq("trainer_id", user.id);
+    const windows: AvailabilityWindow[] = (avail || [])
+      .filter((r) => r.weekday != null)
+      .map((r) => ({ weekday: r.weekday as number, start_time: r.start_time, end_time: r.end_time }));
+    const blockedDates = (avail || [])
+      .filter((r) => r.blocked_date != null)
+      .map((r) => r.blocked_date as string);
+    setAvailability(hasAvailabilityTemplate(windows, blockedDates) ? { windows, blockedDates } : null);
+  }, [user?.id, clientsId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await loadExtras();
+      if (cancelled) return;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadExtras]);
+
+  const availabilityCheck = useCallback(
+    (date: string, startTime: string) =>
+      availability ? isWithinAvailability(availability.windows, availability.blockedDates, date, startTime) : true,
+    [availability],
+  );
 
   const load = useCallback(async () => {
     if (!clientEmail && !clientsId) return;
@@ -222,6 +280,7 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
       );
       setBookOpen(false);
       await load();
+      await loadExtras(); // Phase 50: refresh the credits hint after booking
     } catch (err) {
       toast.error(
         "Failed to book session: " +
@@ -704,6 +763,8 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
           clients={[{ id: profileId ?? clientsId!, name: profileId ? profileName : recordName }]}
           initialDate={selectedDateStr || undefined}
           initialClientId={profileId ?? clientsId!}
+          credits={credits}
+          availabilityCheck={availability ? availabilityCheck : undefined}
         />
       )}
 

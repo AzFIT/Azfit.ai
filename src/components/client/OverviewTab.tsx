@@ -29,6 +29,7 @@ import {
   type ClientGoalRow,
 } from "@/lib/clientGoals";
 import ClientGoalsDialog from "@/components/client/ClientGoalsDialog";
+import SessionPackageCard from "@/components/client/SessionPackageCard";
 import { useBodyComposition } from "@/components/bodycomp/useBodyComposition";
 import { AssessmentWizard } from "@/components/bodycomp/AssessmentWizard";
 
@@ -104,6 +105,9 @@ export default function OverviewTab({
 
   return (
     <div className="space-y-4">
+      {/* Phase 50: session credit packages (trainer view) */}
+      <SessionPackageCard clientId={clientId} />
+
       {/* Quick Stats Row */}
       <motion.div {...fadeUp} className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard

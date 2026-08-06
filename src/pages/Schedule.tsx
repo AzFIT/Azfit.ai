@@ -21,6 +21,11 @@ import { useSessions } from '@/hooks/useSessions';
 import type { Session } from '@/hooks/useSessions';
 import { findSessionConflicts, generateWeeklyOccurrences, formatConflictList } from '@/lib/sessionConflicts';
 import { generateICSBundle, downloadICS } from '@/lib/ics';
+import {
+  isWithinAvailability,
+  hasAvailabilityTemplate,
+  type AvailabilityWindow,
+} from '@/lib/creditsAvailability';
 import type { CalendarEvent } from '@/types';
 import { CellContextMenu } from '@/components/schedule/CellContextMenu';
 import { BookSessionDialog } from '@/components/schedule/BookSessionDialog';
@@ -138,6 +143,36 @@ export default function SchedulePage() {
       cancelled = true;
     };
   }, [user?.id, isTrainer]);
+
+  // Phase 50: availability template for the booking-dialog hint
+  const [availability, setAvailability] = useState<{ windows: AvailabilityWindow[]; blockedDates: string[] } | null>(null);
+  useEffect(() => {
+    if (!user?.id || !isTrainer) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('trainer_availability')
+        .select('weekday, start_time, end_time, blocked_date')
+        .eq('trainer_id', user.id);
+      if (cancelled) return;
+      const windows: AvailabilityWindow[] = (data || [])
+        .filter((r) => r.weekday != null)
+        .map((r) => ({ weekday: r.weekday as number, start_time: r.start_time, end_time: r.end_time }));
+      const blockedDates = (data || [])
+        .filter((r) => r.blocked_date != null)
+        .map((r) => r.blocked_date as string);
+      setAvailability(hasAvailabilityTemplate(windows, blockedDates) ? { windows, blockedDates } : null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, isTrainer]);
+
+  const availabilityCheck = useCallback(
+    (date: string, startTime: string) =>
+      availability ? isWithinAvailability(availability.windows, availability.blockedDates, date, startTime) : true,
+    [availability],
+  );
 
   // Context menu
   const [contextMenu, setContextMenu] = useState<{
@@ -680,6 +715,7 @@ export default function SchedulePage() {
         isTrainer={isTrainer}
         clients={bookableClients}
         initialDate={contextMenu.date}
+        availabilityCheck={availability ? availabilityCheck : undefined}
       />
       <BlockTimeDialog
         open={blockOpen}

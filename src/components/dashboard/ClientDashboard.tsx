@@ -33,6 +33,7 @@ import { GlassCard } from "./shared/GlassCard";
 import { ProgressRing } from "./shared/ProgressRing";
 import { CollapsibleSection } from "./shared/CollapsibleSection";
 import TodaysMealsCard from "./TodaysMealsCard";
+import SessionsRemainingCard from "./SessionsRemainingCard";
 
 /* ═══════════════════════════════════════════════════════════════════
    Client Dashboard — Restructured (Phase 1)
@@ -710,6 +711,9 @@ export default function ClientDashboard() {
 
       {/* TODAY'S MEALS (Phase 43, Item 6) — saved plan day for today's weekday */}
       {clientsId && <TodaysMealsCard clientId={clientsId} />}
+
+      {/* SESSIONS REMAINING (Phase 50) — only when a package exists */}
+      {clientsId && <SessionsRemainingCard clientId={clientsId} />}
 
       {/* ═══════════════════════════════════════════════════════════
           CHECK-IN DUE CARD (conditional)
