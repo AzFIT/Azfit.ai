@@ -1842,6 +1842,7 @@ export type Database = {
           name: string;
           targets: Json | null;
           items: Json;
+          grocery_state: Json | null;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -1852,6 +1853,7 @@ export type Database = {
           name?: string;
           targets?: Json | null;
           items: Json;
+          grocery_state?: Json | null;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -1862,6 +1864,7 @@ export type Database = {
           name?: string;
           targets?: Json | null;
           items?: Json;
+          grocery_state?: Json | null;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;

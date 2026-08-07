@@ -62,6 +62,7 @@ const WeeklyDigestPage = lazy(() => import("@/pages/WeeklyDigest"));
 const FormChecksPage = lazy(() => import("@/pages/FormChecks"));
 const LibraryPage = lazy(() => import("@/pages/Library"));
 const PrintProgramPage = lazy(() => import("@/pages/PrintProgram"));
+const PrintGroceryPage = lazy(() => import("@/pages/PrintGrocery"));
 
 // Loading fallback
 function PageLoader() {
@@ -373,6 +374,14 @@ export default function App() {
                     element={
                       <ProtectedRoute>
                         <PrintProgramPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/print/grocery/:planId"
+                    element={
+                      <ProtectedRoute>
+                        <PrintGroceryPage />
                       </ProtectedRoute>
                     }
                   />

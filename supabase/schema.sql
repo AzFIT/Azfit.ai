@@ -1955,6 +1955,7 @@ CREATE TABLE IF NOT EXISTS public.meal_plans (
   name TEXT NOT NULL DEFAULT 'Daily Meal Plan',
   targets JSONB,
   items JSONB NOT NULL,
+  grocery_state JSONB,
   created_by UUID,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

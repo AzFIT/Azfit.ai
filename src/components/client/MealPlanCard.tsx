@@ -11,6 +11,7 @@ import {
   type MealType,
 } from "@/lib/mealPlan";
 import { logPlanItems } from "@/lib/logFromPlan";
+import GroceryListCard from "@/components/client/GroceryListCard";
 import {
   generateMultiDayPlan,
   regenerateDay,
@@ -88,6 +89,8 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet, ca
   const [loading, setLoading] = useState(true);
   const [loggedMeals, setLoggedMeals] = useState<Set<string>>(new Set());
   const [loggingMeal, setLoggingMeal] = useState<string | null>(null);
+  // Phase 51: plan / grocery-list view toggle (saved plans only)
+  const [view, setView] = useState<"plan" | "grocery">("plan");
 
   // Day count of the SAVED plan (legacy plans without day → 1)
   const savedDaysCount = savedPlan
@@ -376,6 +379,25 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet, ca
           <span className="text-sm font-semibold" style={{ color: "var(--page-text)" }}>
             Meal Plan
           </span>
+          {/* Phase 51: Plan / Grocery list toggle (saved plans only) */}
+          {savedPlan && !draft && (
+            <span className="flex items-center gap-1 rounded-lg p-0.5" style={{ backgroundColor: "var(--light-elevated)" }}>
+              {(["plan", "grocery"] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setView(v)}
+                  className="rounded-md px-2 py-0.5 text-[10px] font-semibold transition"
+                  style={
+                    view === v
+                      ? { background: "linear-gradient(135deg, #00AEEF, #8B5CF6)", color: "#fff" }
+                      : { color: "var(--light-text-muted)" }
+                  }
+                >
+                  {v === "plan" ? "Plan" : "Grocery list"}
+                </button>
+              ))}
+            </span>
+          )}
           {savedPlan && !draft && (
             <span
               className="rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
@@ -449,6 +471,15 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet, ca
             </div>
           </div>
         )
+      ) : view === "grocery" && savedPlan ? (
+        <GroceryListCard
+          planId={savedPlan.id}
+          items={(savedPlan.items as unknown as PlanItem[]) || []}
+          initialState={
+            savedPlan.grocery_state as { checked: string[]; multiplier: number; days: number | null } | null
+          }
+          canWriteShared={!canLog}
+        />
       ) : (
         <>
           {/* Day tabs (multi-day plans, Phase 40) */}
