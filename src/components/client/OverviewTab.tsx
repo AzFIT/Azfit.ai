@@ -23,6 +23,12 @@ import { supabase } from "@/lib/supabase";
 import { getDayTotals, type MacroTotals } from "@/lib/foodApi";
 import { formatDate } from "@/lib/utils";
 import {
+  parseLifestyleTargets,
+  lifestyleChips,
+  hasLifestyleTargets,
+  type LifestyleTargets,
+} from "@/lib/lifestyleTargets";
+import {
   goalLabel,
   nearestToDate,
   progressPercent,
@@ -55,6 +61,8 @@ export default function OverviewTab({
   const [showWizard, setShowWizard] = useState(false);
   const [goals, setGoals] = useState<ClientGoalRow[]>([]);
   const [goalsOpen, setGoalsOpen] = useState(false);
+  // Phase 55: client's self-set lifestyle targets (read-only for trainers)
+  const [lifestyle, setLifestyle] = useState<LifestyleTargets>({});
   const {
     loading,
     latestBodyComposition,
@@ -83,6 +91,22 @@ export default function OverviewTab({
       cancelled = true;
     };
   }, [fetchGoals]);
+
+  // Phase 55: lifestyle targets are client-owned; the trainer reads them here
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("clients")
+        .select("lifestyle_targets")
+        .eq("id", clientId)
+        .maybeSingle();
+      if (!cancelled) setLifestyle(parseLifestyleTargets(data?.lifestyle_targets));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId]);
 
   // Live values: prefer the newest body-composition data over the static
   // clients-row snapshot so quick-add entries show up on the tiles.
@@ -317,6 +341,43 @@ export default function OverviewTab({
             <Progress value={client.compliance || 0} className="h-2" />
           </div>
         </div>
+      </motion.div>
+
+      {/* Lifestyle Targets (Phase 55) — client-owned, read-only for the trainer */}
+      <motion.div
+        {...fadeUp}
+        className="rounded-2xl border p-4"
+        style={{
+          backgroundColor: "var(--card-bg)",
+          borderColor: "var(--card-border)",
+        }}
+      >
+        <div className="mb-2 flex items-center gap-2">
+          <Target size={14} style={{ color: "var(--azfit-primary)" }} />
+          <h3 className="text-sm font-semibold" style={{ color: "var(--page-text)" }}>
+            Lifestyle Targets
+          </h3>
+          <span className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+            set by the client
+          </span>
+        </div>
+        {hasLifestyleTargets(lifestyle) ? (
+          <div className="flex flex-wrap gap-2">
+            {lifestyleChips(lifestyle).map((c) => (
+              <span
+                key={c}
+                className="rounded-full border px-3 py-1 text-xs font-semibold"
+                style={{ borderColor: "var(--card-border)", color: "var(--page-text)" }}
+              >
+                {c}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs" style={{ color: "var(--light-text-muted)" }}>
+            No lifestyle targets set — the client can add steps, sleep and water goals from their dashboard.
+          </p>
+        )}
       </motion.div>
 
       {/* Profile Info + Nutrition Side by Side */}

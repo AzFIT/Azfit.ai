@@ -18,8 +18,6 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import {
-  AreaChart,
-  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -34,7 +32,8 @@ import {
 } from 'recharts';
 import Layout from '@/components/Layout';
 import { supabase } from '@/lib/supabase';
-import { formatDayMonth } from '@/lib/utils';
+import WeightTrendChart from '@/components/shared/WeightTrendChart';
+import { withMovingAverage, type WeightPoint } from '@/lib/weightTrend';
 
 /* ------------------------------------------------------------------ */
 /*  Animation helpers                                                  */
@@ -63,11 +62,9 @@ const RANGE_DAYS: Record<TimeRange, number> = { '7D': 7, '30D': 30, '90D': 90, '
 
 const DAY_MS = 86_400_000;
 
-interface WeightPoint {
-  date: string; // recorded_at (ISO)
-  weight: number;
-  movingAvg?: number;
-}
+// Phase 55: WeightPoint + moving average + the chart itself are shared
+// (src/lib/weightTrend.ts + src/components/shared/WeightTrendChart.tsx) —
+// the client dashboard mini-chart renders the same pieces.
 
 interface MacroSlice {
   name: string;
@@ -160,30 +157,6 @@ function EmptyState({ icon: Icon, message }: { icon: LucideIcon; message: string
 /* ------------------------------------------------------------------ */
 /*  Chart tooltips                                                     */
 /* ------------------------------------------------------------------ */
-
-function WeightTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; dataKey: string }>; label?: string }) {
-  if (!active || !payload || payload.length === 0) return null;
-  const w = payload.find((p) => p.dataKey === 'weight');
-  const ma = payload.find((p) => p.dataKey === 'movingAvg');
-  const dateLabel = label
-    ? new Date(label).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    : '';
-  return (
-    <div style={tooltipStyle()}>
-      <p className="text-[11px] font-medium" style={{ color: 'var(--light-text-muted)' }}>{dateLabel}</p>
-      {w && (
-        <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--azfit-primary)' }}>
-          {w.value} kg
-        </p>
-      )}
-      {ma && (
-        <p className="text-xs" style={{ color: 'var(--azfit-secondary)' }}>
-          {ma.value} kg avg
-        </p>
-      )}
-    </div>
-  );
-}
 
 function VolumeTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
   if (!active || !payload || payload.length === 0) return null;
@@ -469,11 +442,7 @@ export default function Analytics() {
   const filteredWeightData = useMemo(() => {
     const cutoff = loadedAt - RANGE_DAYS[timeRange] * DAY_MS;
     const inRange = weightRows.filter((p) => new Date(p.date).getTime() >= cutoff);
-    return inRange.map((p, i) => {
-      const windowPts = inRange.slice(Math.max(0, i - 2), i + 1);
-      const avg = windowPts.reduce((s, x) => s + x.weight, 0) / windowPts.length;
-      return { ...p, movingAvg: +avg.toFixed(1) };
-    });
+    return withMovingAverage(inRange);
   }, [timeRange, weightRows, loadedAt]);
 
   const summaryStats = [
@@ -657,54 +626,10 @@ export default function Analytics() {
                 }
               />
             ) : (
-              <div style={{ width: '100%', height: window?.innerWidth >= 1024 ? 360 : 300 }}>
-                <ResponsiveContainer>
-                  <AreaChart data={filteredWeightData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--azfit-primary)" stopOpacity={0.2} />
-                        <stop offset="100%" stopColor="var(--azfit-primary)" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--light-border)" opacity={0.4} />
-                    <XAxis
-                      dataKey="date"
-                      tickFormatter={formatDayMonth}
-                      tick={{ fill: 'var(--light-text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
-                      axisLine={{ stroke: 'var(--light-border)' }}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      domain={['dataMin - 2', 'dataMax + 2']}
-                      tick={{ fill: 'var(--light-text-muted)', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={50}
-                    />
-                    <Tooltip content={<WeightTooltip />} />
-                    <Area
-                      type="monotone"
-                      dataKey="weight"
-                      stroke="var(--azfit-primary)"
-                      strokeWidth={2.5}
-                      fill="url(#weightGradient)"
-                      dot={false}
-                      activeDot={{ r: 4, fill: 'var(--azfit-primary)', strokeWidth: 0 }}
-                      animationDuration={1200}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="movingAvg"
-                      stroke="var(--azfit-secondary)"
-                      strokeWidth={1.5}
-                      strokeDasharray="6 4"
-                      fill="none"
-                      dot={false}
-                      animationDuration={1200}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
+              <WeightTrendChart
+                data={filteredWeightData}
+                height={window?.innerWidth >= 1024 ? 360 : 300}
+              />
             )}
           </motion.div>
 

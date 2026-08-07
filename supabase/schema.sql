@@ -2143,5 +2143,30 @@ CREATE POLICY "Clients can read own trial assessment items"
   );
 
 -- ============================================================
+-- Phase 55: clients.lifestyle_targets jsonb (steps/sleep/water)
+-- + narrow client self-UPDATE policy (row-scoped via the
+-- profiles-email identity path; the app updates ONLY the
+-- lifestyle_targets column — Postgres has no column-level RLS).
+-- ============================================================
+
+ALTER TABLE public.clients
+  ADD COLUMN IF NOT EXISTS lifestyle_targets jsonb NULL;
+
+CREATE POLICY "Clients can update own lifestyle targets"
+  ON public.clients FOR UPDATE TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid() AND profiles.email = clients.email
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid() AND profiles.email = clients.email
+    )
+  );
+
+-- ============================================================
 -- DONE! Your AzFIT database is ready.
 -- ============================================================

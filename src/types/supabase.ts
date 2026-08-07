@@ -58,6 +58,7 @@ export type Database = {
           notes: string | null;
           intake_profile: Json | null;
           equipment_access: string[] | null;
+          lifestyle_targets: Json | null;
           created_at: string;
           updated_at: string;
         };
@@ -78,6 +79,7 @@ export type Database = {
           notes?: string | null;
           intake_profile?: Json | null;
           equipment_access?: string[] | null;
+          lifestyle_targets?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -98,6 +100,7 @@ export type Database = {
           notes?: string | null;
           intake_profile?: Json | null;
           equipment_access?: string[] | null;
+          lifestyle_targets?: Json | null;
           created_at?: string;
           updated_at?: string;
         };

@@ -34,6 +34,8 @@ import { ProgressRing } from "./shared/ProgressRing";
 import { CollapsibleSection } from "./shared/CollapsibleSection";
 import TodaysMealsCard from "./TodaysMealsCard";
 import SessionsRemainingCard from "./SessionsRemainingCard";
+import MyProgressSection from "./MyProgressSection";
+import MyTargetsCard from "./MyTargetsCard";
 
 /* ═══════════════════════════════════════════════════════════════════
    Client Dashboard — Restructured (Phase 1)
@@ -1128,6 +1130,21 @@ export default function ClientDashboard() {
           </div>
         </GlassCard>
       </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          MY PROGRESS + MY TARGETS (Phase 55)
+          ═══════════════════════════════════════════════════════════ */}
+      {clientsId && user?.id && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={mounted ? { opacity: 1, y: 0 } : {}}
+          transition={{ delay: 0.32, duration: 0.5 }}
+          className="space-y-6"
+        >
+          <MyProgressSection clientsId={clientsId} userId={user.id} />
+          <MyTargetsCard clientsId={clientsId} />
+        </motion.div>
+      )}
 
       <WorkoutLauncher isOpen={launcherOpen} onClose={() => setLauncherOpen(false)} />
     </div>

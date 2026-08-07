@@ -22,6 +22,8 @@ import {
 } from "@/lib/planPackPrint";
 import { phaseNamesFromJson, progressionRulesFromJson } from "@/lib/programPrint";
 import { supplementsForGoals, type Supplement } from "@/lib/supplements";
+import { parseLifestyleTargets } from "@/lib/lifestyleTargets";
+import { formatNumber } from "@/lib/utils";
 import type { Database } from "@/types/supabase";
 
 type ClientRow = Database["public"]["Tables"]["clients"]["Row"];
@@ -57,6 +59,7 @@ interface PackModel {
   mealDays: DayPlan[];
   steps: string | null;
   sleep: string | null;
+  waterMl: number | null; // Phase 55: lifestyle_targets.water_ml (54 omission resolved)
   supplements: Supplement[];
 }
 
@@ -203,6 +206,7 @@ export default function PrintPlanPackPage() {
         mealDays: mealPlanDays(planItems),
         steps,
         sleep,
+        waterMl: parseLifestyleTargets(c.lifestyle_targets).water_ml ?? null,
         supplements: supplementsForGoals(goalKeysForSupplements(goals, c.fitness_goal)),
       });
       setLoading(false);
@@ -441,12 +445,15 @@ export default function PrintPlanPackPage() {
           ) : (
             <p className="mt-2 text-xs text-gray-500">Nutrition targets to be set after assessment.</p>
           )}
-          {(m.steps || m.sleep) && (
-            <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-              {m.steps && <span className="rounded-full border border-gray-300 px-2.5 py-0.5">Steps: {m.steps}</span>}
-              {m.sleep && <span className="rounded-full border border-gray-300 px-2.5 py-0.5">Sleep: {m.sleep}</span>}
-            </div>
-          )}
+          {/* Lifestyle targets: steps/sleep only when set (habits); water chip
+              always renders — "—" when the client hasn't set one (Phase 55) */}
+          <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+            {m.steps && <span className="rounded-full border border-gray-300 px-2.5 py-0.5">Steps: {m.steps}</span>}
+            {m.sleep && <span className="rounded-full border border-gray-300 px-2.5 py-0.5">Sleep: {m.sleep}</span>}
+            <span className="rounded-full border border-gray-300 px-2.5 py-0.5">
+              Water: {m.waterMl != null ? `${formatNumber(m.waterMl)} ml` : "—"}
+            </span>
+          </div>
         </section>
 
         {/* 7 ── Supplement guidance ── */}
