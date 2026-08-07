@@ -1,0 +1,225 @@
+# Exercise Library Dedup Review (Phase 52B)
+
+**Generated:** 2026-08-07 · **Library:** 628 rows · **READ-ONLY — no rows were merged or deleted.**
+
+Method: exact normalized-name collisions (lowercase, punctuation collapsed, barbell→bb / dumbbell→db / kettlebell→kb / bodyweight→bw), variant-base grouping ("X - Paused" → "X"), and token-subset near-matches within the same primary muscle. "Keep" = the row with the most complete metadata (description / safety / video / MET), ties broken by lower code.
+
+## Summary
+
+- Exact normalized-name collisions: **87 groups** (188 rows)
+- Variant-base near-matches: **44 pairs**
+- Token-subset near-matches: **54 pairs**
+
+## SAFE to auto-merge (exact collisions; keep row is strictly the most complete)
+
+| Keep | Absorb | Canon name | Notes |
+|---|---|---|---|
+| EX0018 Dips | EX0267 Dips | dips | keep has 0/4 metadata, absorb has 0/4 |
+| EX0030 Reverse Machine Shoulder Press | EX0228 Reverse Machine Shoulder Press | reverse machine shoulder press | keep has 0/4 metadata, absorb has 0/4 |
+| EX0030 Reverse Machine Shoulder Press | EX0456 Reverse Machine Shoulder Press | reverse machine shoulder press | keep has 0/4 metadata, absorb has 0/4 |
+| EX0053 Seated Cable Fly - Lower Fibres | EX0305 Seated Cable Fly - Lower fibres | seated cable fly lower fibres | keep has 0/4 metadata, absorb has 0/4 |
+| EX0054 Seated Cable Fly - Mid Fibres | EX0306 Seated Cable Fly - Mid fibres | seated cable fly mid fibres | keep has 0/4 metadata, absorb has 0/4 |
+| EX0055 Seated Cable Fly - Upper Fibres | EX0307 Seated Cable Fly - Upper fibres | seated cable fly upper fibres | keep has 0/4 metadata, absorb has 0/4 |
+| EX0060 Stretch Push Ups | EX0320 Stretch Push Ups | stretch push ups | keep has 0/4 metadata, absorb has 0/4 |
+| EX0067 Lat Pulldown - Pronated Mid Grip | EX0289 Lat Pulldown - Pronated Mid Grip | lat pulldown pronated mid grip | keep has 0/4 metadata, absorb has 0/4 |
+| EX0068 Lat Pulldown - Pronated Wide Grip | EX0290 Lat Pulldown - Pronated Wide Grip | lat pulldown pronated wide grip | keep has 0/4 metadata, absorb has 0/4 |
+| EX0069 Lat Pulldown - Semi Supinated | EX0291 Lat Pulldown - Semi Supinated | lat pulldown semi supinated | keep has 0/4 metadata, absorb has 0/4 |
+| EX0071 Lat Pulldown - Single Arm | EX0292 Lat Pulldown - Single Arm | lat pulldown single arm | keep has 0/4 metadata, absorb has 0/4 |
+| EX0072 Lat Pulldown - Supinated | EX0293 Lat Pulldown - Supinated | lat pulldown supinated | keep has 0/4 metadata, absorb has 0/4 |
+| EX0079 Seated Cable Row - Diverging Handles | EX0308 Seated Cable Row - Diverging Handles | seated cable row diverging handles | keep has 0/4 metadata, absorb has 0/4 |
+| EX0080 Seated Cable Row - Neutral Grip | EX0309 Seated Cable Row - Neutral Grip | seated cable row neutral grip | keep has 0/4 metadata, absorb has 0/4 |
+| EX0081 Seated Cable Row - Single Arm | EX0310 Seated Cable Row - Single Arm | seated cable row single arm | keep has 0/4 metadata, absorb has 0/4 |
+| EX0082 Seated Cable Row - Wide Grip | EX0311 Seated Cable Row - Wide Grip | seated cable row wide grip | keep has 0/4 metadata, absorb has 0/4 |
+| EX0084 1/2 Kneeling Cable Pulldown | EX0231 1/2 Kneeling Cable Pulldown | 1 2 kneeling cable pulldown | keep has 0/4 metadata, absorb has 0/4 |
+| EX0086 1/2 Kneeling Rope Pulldown | EX0232 1/2 Kneeling Rope Pulldown | 1 2 kneeling rope pulldown | keep has 0/4 metadata, absorb has 0/4 |
+| EX0094 Chest Supported Straight Arm Pulldown | EX0248 Chest supported Straight Arm Pulldown | chest supported straight arm pulldown | keep has 0/4 metadata, absorb has 0/4 |
+| EX0097 Dual Cable Pulldown | EX0270 Dual Cable Pulldown | dual cable pulldown | keep has 0/4 metadata, absorb has 0/4 |
+| EX0098 Football Bar Pullover | EX0280 Football Bar Pullover | football bar pullover | keep has 0/4 metadata, absorb has 0/4 |
+| EX0104 Standing Straight Arm Pulldown | EX0319 Standing Straight Arm pulldown | standing straight arm pulldown | keep has 0/4 metadata, absorb has 0/4 |
+| EX0135 Reverse Sled Drag | EX0302 Reverse Sled Drag | reverse sled drag | keep has 1/4 metadata, absorb has 1/4 |
+| EX0135 Reverse Sled Drag | EX0351 Reverse Sled Drag | reverse sled drag | keep has 1/4 metadata, absorb has 1/4 |
+| EX0215 Cable Lateral raise - Lying | EX0440 Cable Lateral raise - Lying | cable lateral raise lying | keep has 0/4 metadata, absorb has 0/4 |
+| EX0216 Cable Lateral raise - Standing | EX0441 Cable Lateral raise - Standing | cable lateral raise standing | keep has 0/4 metadata, absorb has 0/4 |
+| EX0217 Cable Rear Delt Fly | EX0444 Cable Rear Delt Fly | cable rear delt fly | keep has 0/4 metadata, absorb has 0/4 |
+| EX0218 DB External Rotation - Seated | EX0445 DB External Rotation - Seated | db external rotation seated | keep has 0/4 metadata, absorb has 0/4 |
+| EX0219 DB Lateral Raise - Chest supported | EX0447 DB Lateral Raise - Chest supported | db lateral raise chest supported | keep has 0/4 metadata, absorb has 0/4 |
+| EX0220 DB Lateral Raise - Seated | EX0448 DB Lateral Raise - Seated | db lateral raise seated | keep has 0/4 metadata, absorb has 0/4 |
+| EX0221 DB Lateral Raise - Single Arm | EX0449 DB Lateral Raise - Single Arm | db lateral raise single arm | keep has 0/4 metadata, absorb has 0/4 |
+| EX0222 DB Lateral Raise - Standing | EX0450 DB Lateral Raise - Standing | db lateral raise standing | keep has 0/4 metadata, absorb has 0/4 |
+| EX0223 DB Prone Y Raise | EX0451 DB Prone Y Raise | db prone y raise | keep has 0/4 metadata, absorb has 0/4 |
+| EX0224 DB Rear Delt Fly | EX0452 DB Rear Delt Fly | db rear delt fly | keep has 0/4 metadata, absorb has 0/4 |
+| EX0225 Face Pull | EX0453 Face Pull | face pull | keep has 0/4 metadata, absorb has 0/4 |
+| EX0226 Face pull with External Rotation | EX0454 Face pull with External Rotation | face pull with external rotation | keep has 0/4 metadata, absorb has 0/4 |
+| EX0227 Machine Rear Delt Fly | EX0455 Machine Rear Delt Fly | machine rear delt fly | keep has 0/4 metadata, absorb has 0/4 |
+| EX0229 Unilateral SOTs Press | EX0457 Unilateral SOTs Press | unilateral sots press | keep has 0/4 metadata, absorb has 0/4 |
+| EX0230 Upper Back Cable Row - Wide Grip | EX0458 Upper Back Cable Row - Wide Grip | upper back cable row wide grip | keep has 0/4 metadata, absorb has 0/4 |
+| EX0233 30° DB Incline Spider Curl | EX0392 30° DB Incline Spider Curl | 30 db incline spider curl | keep has 0/4 metadata, absorb has 0/4 |
+| EX0234 50° EZ Bar Incline Spider Curl | EX0396 50° EZ Bar Incline Spider Curl | 50 ez bar incline spider curl | keep has 0/4 metadata, absorb has 0/4 |
+| EX0235 60° DB Incline Curl | EX0397 60° DB Incline Curl | 60 db incline curl | keep has 0/4 metadata, absorb has 0/4 |
+| EX0236 80° DB Incline Curl | EX0398 80° DB Incline Curl | 80 db incline curl | keep has 0/4 metadata, absorb has 0/4 |
+| EX0237 Banded Palof Press | EX0335 Banded Palof Press | banded palof press | keep has 0/4 metadata, absorb has 0/4 |
+| EX0237 Banded Palof Press | EX0366 Banded Palof Press | banded palof press | keep has 0/4 metadata, absorb has 0/4 |
+| EX0239 Bear Crawl | EX0367 Bear Crawl | bear crawl | keep has 0/4 metadata, absorb has 0/4 |
+| EX0240 Bike Sprints | EX0337 Bike Sprints | bike sprints | keep has 1/4 metadata, absorb has 1/4 |
+| EX0241 Bilateral SOTs Press | EX0439 Bilateral SOTs Press | bilateral sots press | keep has 0/4 metadata, absorb has 0/4 |
+| EX0243 Cable Drag Curl | EX0400 Cable Drag Curl | cable drag curl | keep has 0/4 metadata, absorb has 0/4 |
+| EX0245 Cable Palof Press | EX0338 Cable Palof Press | cable palof press | keep has 0/4 metadata, absorb has 0/4 |
+| EX0245 Cable Palof Press | EX0368 Cable Palof Press | cable palof press | keep has 0/4 metadata, absorb has 0/4 |
+| EX0246 Cable Preacher Curl - Single Arm | EX0401 Cable Preacher Curl- Single Arm | cable preacher curl single arm | keep has 0/4 metadata, absorb has 0/4 |
+| EX0247 Cable Tricep Extension - Single Arm | EX0423 Cable Tricep Extension - Single Arm | cable tricep extension single arm | keep has 0/4 metadata, absorb has 0/4 |
+| EX0249 Cross Cable Tricep Extension- Standing | EX0426 Cross Cable Tricep Extension- Standing | cross cable tricep extension standing | keep has 0/4 metadata, absorb has 0/4 |
+| EX0251 DB Concentration Curl | EX0405 DB Concentration Curl | db concentration curl | keep has 0/4 metadata, absorb has 0/4 |
+| EX0253 DB Hammer Curl | EX0406 DB Hammer Curl | db hammer curl | keep has 0/4 metadata, absorb has 0/4 |
+| EX0254 DB Lying Tricep Extention - Decline | EX0428 DB Lying Tricep Extention - Decline | db lying tricep extention decline | keep has 0/4 metadata, absorb has 0/4 |
+| EX0255 DB Lying Tricep Extention - Flat | EX0429 DB Lying Tricep Extention - Flat | db lying tricep extention flat | keep has 0/4 metadata, absorb has 0/4 |
+| EX0256 DB Lying Tricep Extention - Incline | EX0430 DB Lying Tricep Extention - Incline | db lying tricep extention incline | keep has 0/4 metadata, absorb has 0/4 |
+| EX0257 DB Preacher Curl | EX0408 DB Preacher Curl | db preacher curl | keep has 0/4 metadata, absorb has 0/4 |
+| EX0258 DB Preacher Curl - Single Arm | EX0410 DB Preacher Curl - Single Arm | db preacher curl single arm | keep has 0/4 metadata, absorb has 0/4 |
+| EX0259 DB Scott Curl | EX0412 DB Scott Curl | db scott curl | keep has 0/4 metadata, absorb has 0/4 |
+| EX0260 DB Scott Curl- Fat Grip | EX0413 DB Scott Curl- Fat Grip | db scott curl fat grip | keep has 0/4 metadata, absorb has 0/4 |
+| EX0261 DB Scott Curl- Single Arm | EX0414 DB Scott Curl- Single Arm | db scott curl single arm | keep has 0/4 metadata, absorb has 0/4 |
+| EX0262 DB Zottman Curl | EX0415 DB Zottman Curl | db zottman curl | keep has 0/4 metadata, absorb has 0/4 |
+| EX0263 Deadbug | EX0339 Deadbug | deadbug | keep has 0/4 metadata, absorb has 0/4 |
+| EX0264 Deadmill | EX0361 Deadmill | deadmill | keep has 0/4 metadata, absorb has 0/4 |
+| EX0266 Decline Leg Raise | EX0340 Decline Leg Raise | decline leg raise | keep has 0/4 metadata, absorb has 0/4 |
+| EX0266 Decline Leg Raise | EX0375 Decline Leg Raise | decline leg raise | keep has 0/4 metadata, absorb has 0/4 |
+| EX0268 Dish Hold | EX0341 Dish Hold | dish hold | keep has 0/4 metadata, absorb has 0/4 |
+| EX0268 Dish Hold | EX0376 Dish hold | dish hold | keep has 0/4 metadata, absorb has 0/4 |
+| EX0271 Dual Rope Overhead Tricep Extension | EX0432 Dual Rope Overhead Tricep Extension | dual rope overhead tricep extension | keep has 0/4 metadata, absorb has 0/4 |
+| EX0272 Dual Rope Tricep Extension- Kneeling | EX0433 Dual Rope Tricep Extension- Kneeling | dual rope tricep extension kneeling | keep has 0/4 metadata, absorb has 0/4 |
+| EX0273 Dual Rope Tricep Extension- Standing | EX0434 Dual Rope Tricep Extension- Standing | dual rope tricep extension standing | keep has 0/4 metadata, absorb has 0/4 |
+| EX0274 EZ Bar Preacher Curl | EX0417 EZ Bar Preacher Curl | ez bar preacher curl | keep has 0/4 metadata, absorb has 0/4 |
+| EX0275 EZ Bar Scott Curl | EX0419 EZ Bar Scott Curl | ez bar scott curl | keep has 0/4 metadata, absorb has 0/4 |
+| EX0276 Explosive Sled Row | EX0342 Explosive Sled Row | explosive sled row | keep has 1/4 metadata, absorb has 1/4 |
+| EX0278 Flat Leg Raise | EX0344 Flat Leg Raise | flat leg raise | keep has 0/4 metadata, absorb has 0/4 |
+| EX0278 Flat Leg Raise | EX0378 Flat Leg Raise | flat leg raise | keep has 0/4 metadata, absorb has 0/4 |
+| EX0279 Floor Crunch | EX0345 Floor Crunch | floor crunch | keep has 0/4 metadata, absorb has 0/4 |
+| EX0279 Floor Crunch | EX0379 Floor Crunch | floor crunch | keep has 0/4 metadata, absorb has 0/4 |
+| EX0281 Forward Sled Drag | EX0346 Forward Sled Drag | forward sled drag | keep has 1/4 metadata, absorb has 1/4 |
+| EX0282 Front Plank | EX0347 Front Plank | front plank | keep has 0/4 metadata, absorb has 0/4 |
+| EX0282 Front Plank | EX0380 Front Plank | front plank | keep has 0/4 metadata, absorb has 0/4 |
+| EX0283 Gironda Drag Back Curl | EX0421 Gironda Drag Back Curl | gironda drag back curl | keep has 0/4 metadata, absorb has 0/4 |
+| EX0285 Hanging Leg Raise | EX0348 Hanging Leg Raise | hanging leg raise | keep has 0/4 metadata, absorb has 0/4 |
+| EX0285 Hanging Leg Raise | EX0381 Hanging Leg Raise | hanging leg raise | keep has 0/4 metadata, absorb has 0/4 |
+| EX0295 Overhead Extension - Single Arm | EX0436 Overhead Extension - Single Arm | overhead extension single arm | keep has 0/4 metadata, absorb has 0/4 |
+| EX0297 Parallel bar Leg Raise | EX0349 Parallel Bar Leg Raise | parallel bar leg raise | keep has 0/4 metadata, absorb has 0/4 |
+| EX0297 Parallel bar Leg Raise | EX0382 Parallel Bar Leg Raise | parallel bar leg raise | keep has 0/4 metadata, absorb has 0/4 |
+| EX0300 Prowler Sprint | EX0350 Prowler Sprint | prowler sprint | keep has 1/4 metadata, absorb has 1/4 |
+| EX0313 Seated Sled Pull | EX0362 Seated Sled Pull | seated sled pull | keep has 1/4 metadata, absorb has 1/4 |
+| EX0315 Side Plank - Feet | EX0385 Side plank- Feet | side plank feet | keep has 0/4 metadata, absorb has 0/4 |
+| EX0323 Swiss ball crunch | EX0354 Swiss Ball Crunch | swiss ball crunch | keep has 0/4 metadata, absorb has 0/4 |
+| EX0323 Swiss ball crunch | EX0387 Swiss ball crunch | swiss ball crunch | keep has 0/4 metadata, absorb has 0/4 |
+| EX0324 Swiss ball stir the pot | EX0355 Swiss Ball Stir the Pot | swiss ball stir the pot | keep has 0/4 metadata, absorb has 0/4 |
+| EX0324 Swiss ball stir the pot | EX0386 Swiss Ball Stir the Pot | swiss ball stir the pot | keep has 0/4 metadata, absorb has 0/4 |
+| EX0327 Waiters Walk | EX0356 Waiters Walk | waiters walk | keep has 0/4 metadata, absorb has 0/4 |
+| EX0329 Weighted Cable Crunch | EX0357 Weighted Cable Crunch | weighted cable crunch | keep has 0/4 metadata, absorb has 0/4 |
+| EX0329 Weighted Cable Crunch | EX0389 Weighted Cable Crunch | weighted cable crunch | keep has 0/4 metadata, absorb has 0/4 |
+| EX0333 Zercher Carry | EX0359 Zercher Carry | zercher carry | keep has 0/4 metadata, absorb has 0/4 |
+
+## NEEDS OWNER REVIEW (near-matches — variant suffixes may be intentional)
+
+| Row A | Row B | Relationship |
+|---|---|---|
+| EX0018 Dips | EX0019 Dips (forward lean) | variant of same base exercise |
+| EX0252 DB Fly | EX0042 DB Fly - Loaded Stretch | variant of same base exercise |
+| EX0317 Standing Cable Fly | EX0057 Standing Cable Fly - Lower fibres | variant of same base exercise |
+| EX0317 Standing Cable Fly | EX0058 Standing Cable Fly - Mid fibres | variant of same base exercise |
+| EX0317 Standing Cable Fly | EX0059 Standing Cable Fly - Upper fibres | variant of same base exercise |
+| EX0467 Pull-Up | EX0077 Pull up - Pronated Grip | variant of same base exercise |
+| EX0084 1/2 Kneeling Cable Pulldown | EX0085 1/2 Kneeling Cable Pulldown - Single Arm | variant of same base exercise |
+| EX0105 BB Back Squat | EX0106 BB Back Squat - Paused | variant of same base exercise |
+| EX0105 BB Back Squat | EX0107 BB Back Squat - from Pins | variant of same base exercise |
+| EX0105 BB Back Squat | EX0108 BB Back Squat - with Chains | variant of same base exercise |
+| EX0472 Leg Press | EX0117 Leg Press - 45 Degree | variant of same base exercise |
+| EX0472 Leg Press | EX0118 Leg Press - High Stance | variant of same base exercise |
+| EX0472 Leg Press | EX0119 Leg Press - Horizontal | variant of same base exercise |
+| EX0472 Leg Press | EX0131 Leg Press - Paused Reps | variant of same base exercise |
+| EX0472 Leg Press | EX0132 Leg press - Narrow stance | variant of same base exercise |
+| EX0472 Leg Press | EX0133 Leg press - Staggered Stance | variant of same base exercise |
+| EX0472 Leg Press | EX0161 Leg Press - Single Leg | variant of same base exercise |
+| EX0130 Leg Extension | EX0160 Leg Extension - Single Leg | variant of same base exercise |
+| EX0136 Sissy Squat | EX0137 Sissy Squat - Chair | variant of same base exercise |
+| EX0136 Sissy Squat | EX0138 Sissy Squat - Loaded Stretch | variant of same base exercise |
+| EX0140 BB Split Squat | EX0141 BB Split Squat - FFE | variant of same base exercise |
+| EX0140 BB Split Squat | EX0142 BB Split Squat - RFE | variant of same base exercise |
+| EX0146 DB Reverse Lunge | EX0147 DB Reverse Lunge - Deficit | variant of same base exercise |
+| EX0148 DB Split Squat | EX0149 DB Split Squat - FFE | variant of same base exercise |
+| EX0148 DB Split Squat | EX0150 DB Split Squat - RFE | variant of same base exercise |
+| EX0154 Goblet Split Squat | EX0155 Goblet Split Squat - FFE | variant of same base exercise |
+| EX0154 Goblet Split Squat | EX0156 Goblet Split Squat - RFE | variant of same base exercise |
+| EX0535 Step-Up | EX0168 Step Up - Above Knee Height | variant of same base exercise |
+| EX0169 Smith Machine Split Squat | EX0170 Smith Machine Split Squat - FFE | variant of same base exercise |
+| EX0169 Smith Machine Split Squat | EX0171 Smith Machine Split Squat - RFE | variant of same base exercise |
+| EX0176 BB Hip Thrust | EX0177 BB Hip Thrust - Single Leg | variant of same base exercise |
+| EX0176 BB Hip Thrust | EX0205 BB Hip Thrust - Feet Elevated | variant of same base exercise |
+| EX0182 DB Hip Thrust | EX0183 DB Hip Thrust - Single Leg | variant of same base exercise |
+| EX0209 Smith Machine Hip Thrust | EX0210 Smith Machine Hip Thrust - Single Leg | variant of same base exercise |
+| EX0510 Cable Lateral Raise | EX0215 Cable Lateral raise - Lying | variant of same base exercise |
+| EX0510 Cable Lateral Raise | EX0216 Cable Lateral raise - Standing | variant of same base exercise |
+| EX0510 Cable Lateral Raise | EX0440 Cable Lateral raise - Lying | variant of same base exercise |
+| EX0510 Cable Lateral Raise | EX0441 Cable Lateral raise - Standing | variant of same base exercise |
+| EX0253 DB Hammer Curl | EX0407 DB Hammer curl - Fat Grip | variant of same base exercise |
+| EX0257 DB Preacher Curl | EX0258 DB Preacher Curl - Single Arm | variant of same base exercise |
+| EX0257 DB Preacher Curl | EX0409 DB Preacher Curl - Fat Grip | variant of same base exercise |
+| EX0257 DB Preacher Curl | EX0410 DB Preacher Curl - Single Arm | variant of same base exercise |
+| EX0353 Side Plank | EX0315 Side Plank - Feet | variant of same base exercise |
+| EX0479 Plank | EX0383 Plank - Alternating Shoulder Taps | variant of same base exercise |
+| EX0011 BB Floor Press | EX0040 Banded BB Floor Press | token-subset near-match (same muscle) |
+| EX0021 Flat DB Press | EX0045 Flat Banded DB Press | token-subset near-match (same muscle) |
+| EX0027 Machine Shoulder Press | EX0030 Reverse Machine Shoulder Press | token-subset near-match (same muscle) |
+| EX0062 BB Pendlay Row | EX0468 Barbell Row | token-subset near-match (same muscle) |
+| EX0063 Chin Up - Supinated | EX0064 Chin up - Semi supinated | token-subset near-match (same muscle) |
+| EX0069 Lat Pulldown - Semi Supinated | EX0072 Lat Pulldown - Supinated | token-subset near-match (same muscle) |
+| EX0071 Lat Pulldown - Single Arm | EX0093 Cable Lat Pulldown - Single Arm | token-subset near-match (same muscle) |
+| EX0075 Prime Chest Supported Row | EX0487 Chest-Supported Row | token-subset near-match (same muscle) |
+| EX0077 Pull up - Pronated Grip | EX0092 Assisted Pull Up - Pronated Grip | token-subset near-match (same muscle) |
+| EX0104 Standing Straight Arm Pulldown | EX0515 Straight-Arm Pulldown | token-subset near-match (same muscle) |
+| EX0105 BB Back Squat | EX0106 BB Back Squat - Paused | token-subset near-match (same muscle) |
+| EX0115 Goblet Squat | EX0154 Goblet Split Squat | token-subset near-match (same muscle) |
+| EX0125 Safety Bar Back Squat | EX0127 Safety Bar Squat | token-subset near-match (same muscle) |
+| EX0126 Safety Bar Box Squat | EX0127 Safety Bar Squat | token-subset near-match (same muscle) |
+| EX0127 Safety Bar Squat | EX0166 Safety Bar Split Squat | token-subset near-match (same muscle) |
+| EX0130 Leg Extension | EX0160 Leg Extension - Single Leg | token-subset near-match (same muscle) |
+| EX0136 Sissy Squat | EX0137 Sissy Squat - Chair | token-subset near-match (same muscle) |
+| EX0140 BB Split Squat | EX0141 BB Split Squat - FFE | token-subset near-match (same muscle) |
+| EX0140 BB Split Squat | EX0142 BB Split Squat - RFE | token-subset near-match (same muscle) |
+| EX0146 DB Reverse Lunge | EX0147 DB Reverse Lunge - Deficit | token-subset near-match (same muscle) |
+| EX0148 DB Split Squat | EX0149 DB Split Squat - FFE | token-subset near-match (same muscle) |
+| EX0148 DB Split Squat | EX0150 DB Split Squat - RFE | token-subset near-match (same muscle) |
+| EX0154 Goblet Split Squat | EX0155 Goblet Split Squat - FFE | token-subset near-match (same muscle) |
+| EX0154 Goblet Split Squat | EX0156 Goblet Split Squat - RFE | token-subset near-match (same muscle) |
+| EX0169 Smith Machine Split Squat | EX0170 Smith Machine Split Squat - FFE | token-subset near-match (same muscle) |
+| EX0169 Smith Machine Split Squat | EX0171 Smith Machine Split Squat - RFE | token-subset near-match (same muscle) |
+| EX0172 BB Deadlift - Conventional | EX0566 Conventional Deadlift | token-subset near-match (same muscle) |
+| EX0173 BB Deadlift - Sumo | EX0517 Sumo Deadlift | token-subset near-match (same muscle) |
+| EX0175 BB Good Morning | EX0180 BB Seated Good Morning | token-subset near-match (same muscle) |
+| EX0252 DB Fly | EX0265 Decline DB Fly | token-subset near-match (same muscle) |
+| EX0252 DB Fly | EX0287 Incline DB Fly | token-subset near-match (same muscle) |
+| EX0281 Forward Sled Drag | EX0598 Sled Drag | token-subset near-match (same muscle) |
+| EX0291 Lat Pulldown - Semi Supinated | EX0293 Lat Pulldown - Supinated | token-subset near-match (same muscle) |
+| EX0301 Push Ups | EX0320 Stretch Push Ups | token-subset near-match (same muscle) |
+| EX0302 Reverse Sled Drag | EX0598 Sled Drag | token-subset near-match (same muscle) |
+| EX0313 Seated Sled Pull | EX0599 Sled Pull | token-subset near-match (same muscle) |
+| EX0334 Air Dyne Sprints- TABATA | EX0360 Air Dyne Sprints- REVERSE TABATA | token-subset near-match (same muscle) |
+| EX0353 Side Plank | EX0384 Side Plank- Knees | token-subset near-match (same muscle) |
+| EX0353 Side Plank | EX0385 Side plank- Feet | token-subset near-match (same muscle) |
+| EX0365 Band Resisted Deadbug | EX0377 Double Band Resisted Deadbug | token-subset near-match (same muscle) |
+| EX0406 DB Hammer Curl | EX0478 Hammer Curl | token-subset near-match (same muscle) |
+| EX0440 Cable Lateral raise - Lying | EX0510 Cable Lateral Raise | token-subset near-match (same muscle) |
+| EX0441 Cable Lateral raise - Standing | EX0510 Cable Lateral Raise | token-subset near-match (same muscle) |
+| EX0464 Romanian Deadlift | EX0567 Romanian Deadlift v2 | token-subset near-match (same muscle) |
+| EX0465 Bench Press | EX0493 Dumbbell Bench Press | token-subset near-match (same muscle) |
+| EX0467 Pull-Up | EX0583 Scap Pull-Up | token-subset near-match (same muscle) |
+| EX0472 Leg Press | EX0545 Leg Press 45 | token-subset near-match (same muscle) |
+| EX0472 Leg Press | EX0546 Vertical Leg Press | token-subset near-match (same muscle) |
+| EX0475 Lateral Raise | EX0510 Cable Lateral Raise | token-subset near-match (same muscle) |
+| EX0480 Hip Thrust | EX0622 Banded Hip Thrust | token-subset near-match (same muscle) |
+| EX0491 Turkish Get-Up | EX0617 Kettlebell Turkish Get-Up | token-subset near-match (same muscle) |
+| EX0520 Nordic Curl | EX0547 Nordic Hamstring Curl | token-subset near-match (same muscle) |
+| EX0526 Cable Pull-Through | EX0628 Cable Glute Pull-Through | token-subset near-match (same muscle) |
+| EX0532 Frog Pump | EX0624 Frog Pump v2 | token-subset near-match (same muscle) |
+
+## Recommendation
+
+- The SAFE list mostly pairs a 52A plain-name insert ("Barbell Back Squat") with a 31A prefixed variant ("BB Back Squat") — the SAME movement under two naming conventions. Execution phase should merge descriptions/safety/video/MET into the keep row, repoint any references, then delete the absorb rows.
+- The REVIEW list contains legitimate training variants (paused/pin/chain/grip variants are distinct prescriptions) — most should be KEPT as-is; only merge where the owner confirms they are the same movement.
