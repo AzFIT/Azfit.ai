@@ -64,6 +64,7 @@ const LibraryPage = lazy(() => import("@/pages/Library"));
 const PrintProgramPage = lazy(() => import("@/pages/PrintProgram"));
 const PrintGroceryPage = lazy(() => import("@/pages/PrintGrocery"));
 const PrintPlanPackPage = lazy(() => import("@/pages/PrintPlanPack"));
+const PrivacyPage = lazy(() => import("@/pages/Privacy"));
 
 // Loading fallback
 function PageLoader() {
@@ -147,6 +148,7 @@ export default function App() {
                 <RouteErrorBoundary>
                 <Routes>
                   <Route path="/demo" element={<DemoDashboard />} />
+                  <Route path="/privacy" element={<PrivacyPage />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/" element={<Home />} />

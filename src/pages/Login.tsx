@@ -282,6 +282,18 @@ export default function Login() {
             </button>
           </p>
         </div>
+
+        {/* Privacy link (Phase 57) */}
+        <p className="mt-4 text-center text-xs" style={{ color: '#94A3B8' }}>
+          By signing in you agree to our{' '}
+          <button
+            onClick={() => navigate('/privacy')}
+            className="font-medium transition-colors hover:underline"
+            style={{ color: '#0D9488' }}
+          >
+            Privacy Policy
+          </button>
+        </p>
       </motion.div>
     </div>
   );

@@ -81,10 +81,12 @@ export function GlassCard({
       className={cn(
         // Base shape
         "rounded-xl overflow-hidden relative",
-        // Background — translucent in dark mode, solid in light
+        // Background — theme tokens (Phase 57: the old dark: classes never
+        // fired — the app themes via data-theme, not the .dark class — so
+        // dark mode showed light cards with unreadable muted text)
         glass
-          ? "bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl border border-white/20 dark:border-white/10"
-          : "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700",
+          ? "backdrop-blur-xl border"
+          : "border",
         // Glow on hover
         glow &&
           "hover:shadow-[0_0_24px_rgba(13,148,136,0.15)] dark:hover:shadow-[0_0_24px_rgba(13,148,136,0.25)]",
@@ -97,7 +99,11 @@ export function GlassCard({
         padding,
         className
       )}
-      style={accentStyle}
+      style={{
+        backgroundColor: "var(--card-bg)",
+        borderColor: "var(--card-border)",
+        ...accentStyle,
+      }}
       onClick={onClick}
     >
       {/* Accent top border strip */}
@@ -113,12 +119,12 @@ export function GlassCard({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             {titleIcon && (
-              <span className="text-slate-500 dark:text-slate-400">
+              <span style={{ color: "var(--light-text-muted)" }}>
                 {titleIcon}
               </span>
             )}
             {title && (
-              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100 tracking-wide">
+              <h3 className="text-sm font-semibold tracking-wide" style={{ color: "var(--page-text)" }}>
                 {title}
               </h3>
             )}

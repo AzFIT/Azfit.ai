@@ -6,8 +6,6 @@ import {
   Dumbbell,
   Apple,
   ChevronDown,
-  Star,
-  Quote,
   Menu,
   X,
   Sun,
@@ -15,6 +13,7 @@ import {
 } from "lucide-react";
 import Footer from "@/components/Footer";
 import { useTheme } from "@/hooks/useTheme";
+import { supabase } from "@/lib/supabase";
 import AIShowcase from "@/components/AIShowcase";
 
 /* ──────────────────────── Animation helpers ──────────────────────── */
@@ -154,7 +153,7 @@ function HeroNav({
 
       {/* Desktop nav links */}
       <div className="hidden items-center gap-8 md:flex">
-        {["Features", "How It Works", "Testimonials", "Download"].map(
+        {["Features", "How It Works", "Pricing", "Waitlist"].map(
           (item) => (
             <a
               key={item}
@@ -167,7 +166,7 @@ function HeroNav({
           ),
         )}
         <button
-          onClick={() => onNavigate("/dashboard")}
+          onClick={() => onNavigate("/demo")}
           className="rounded-full bg-[var(--azfit-primary)] px-5 py-2 text-sm font-semibold text-white transition-all duration-200 hover:bg-[var(--azfit-primary-light)] active:scale-[0.97]"
           style={{ textShadow: "0 1px 3px rgba(0,0,0,0.3)" }}
         >
@@ -327,49 +326,22 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
           className="mt-8 flex flex-col items-center gap-4 sm:flex-row"
         >
           <button
-            onClick={() => onNavigate("/dashboard")}
+            onClick={() => onNavigate("/demo")}
             className="rounded-full bg-[var(--azfit-primary)] px-8 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-[var(--azfit-primary-light)] active:scale-[0.97] lg:px-10 lg:py-4 lg:text-base"
             style={{
               textShadow: "0 1px 3px rgba(0,0,0,0.3)",
               boxShadow: "0 0 20px rgba(13,148,136,0.4)",
             }}
           >
-            Download AzFIT
+            Try the Live Demo
           </button>
-          <button
-            onClick={() => onNavigate("/demo")}
+          <a
+            href="#waitlist"
             className="rounded-full border-2 border-white/40 px-8 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:border-white/60 hover:bg-white/10 active:scale-[0.97] lg:px-10 lg:py-4 lg:text-base"
             style={{ textShadow: "0 1px 3px rgba(0,0,0,0.3)" }}
           >
-            View Dashboard Demo
-          </button>
-        </motion.div>
-
-        {/* App Store Coming Soon */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.4, delay: 1.0, ease: easeDefault }}
-          className="mt-6 flex items-center gap-3"
-        >
-          <div 
-            className="flex items-center gap-2 rounded-full border px-4 py-2 text-sm"
-            style={{ borderColor: 'var(--dark-elevated)', color: 'var(--light-text-muted)' }}
-          >
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-            </svg>
-            <span>App Store — Coming Soon</span>
-          </div>
-          <div 
-            className="flex items-center gap-2 rounded-full border px-4 py-2 text-sm"
-            style={{ borderColor: 'var(--dark-elevated)', color: 'var(--light-text-muted)' }}
-          >
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.5,12.92 20.16,13.19L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/>
-            </svg>
-            <span>Google Play — Coming Soon</span>
-          </div>
+            Join the Waitlist
+          </a>
         </motion.div>
         </div>
       </div>
@@ -404,7 +376,7 @@ function StatsSection() {
         {[
           { value: 270, suffix: "+", label: "Exercise Movements", prefix: "" },
           { value: 3, suffix: "", label: "Simple Tiers", prefix: "" },
-          { value: 116, suffix: "+", label: "Clients Coached by AzTechFit", prefix: "" },
+          { value: 116, suffix: "+", label: "Clients Coached by AzFIT", prefix: "" },
           { value: 1, suffix: "/5", label: "Built for Coaches First", prefix: "" },
         ].map((stat, i) => (
           <ScrollReveal
@@ -693,161 +665,6 @@ function HowItWorksSection() {
   );
 }
 
-/* ──────────────────────── Section 5: Testimonials ──────────────────────── */
-
-const testimonials = [
-  {
-    name: "Coach in Hong Kong",
-    role: "Personal Trainer",
-    quote:
-      "AzFIT transformed how I program for my clients. The spreadsheet mode is fast — I can build a full week in minutes, and the progress rings keep my clients accountable for sleep and habits.",
-    avatar: "./avatar-alex.jpg",
-  },
-  {
-    name: "Client in Hong Kong",
-    role: "Strength Trainee",
-    quote:
-      "My coach uses the coach view to program my workouts and track my progress remotely. The achievement badges are surprisingly motivating, and the BioPrint tracking is something no other app gave me.",
-    avatar: "./avatar-sarah.jpg",
-  },
-  {
-    name: "Competitive Athlete",
-    role: "Powerlifter",
-    quote:
-      "I've tried dozens of fitness apps. AzFIT is the first one that actually understands how serious lifters track data. The RPE logging, rest timer, and volume charts are exactly what I needed.",
-    avatar: "./avatar-marcus.jpg",
-  },
-];
-
-function TestimonialsSection() {
-  return (
-    <section
-      id="testimonials"
-      className="px-6 py-16 lg:py-24"
-      style={{ backgroundColor: "var(--light-bg)" }}
-    >
-      <div className="mx-auto max-w-6xl">
-        {/* Section header */}
-        <ScrollReveal className="mb-12 text-center lg:mb-16">
-          <p
-            className="mb-3 text-xs font-bold uppercase tracking-[0.1em]"
-            style={{ color: "var(--azfit-primary)" }}
-          >
-            TESTIMONIALS
-          </p>
-          <h2
-            className="text-3xl font-bold tracking-tight lg:text-[40px]"
-            style={{ color: "var(--light-text-primary)" }}
-          >
-            Built with Coaches, For Clients
-          </h2>
-        </ScrollReveal>
-
-        {/* Testimonial cards */}
-        <div className="flex snap-x snap-mandatory gap-5 overflow-x-auto pb-4 md:grid md:grid-cols-3 md:overflow-visible">
-          {testimonials.map((t, i) => (
-            <ScrollReveal
-              key={t.name}
-              delay={i * 0.15}
-              className="w-[85vw] flex-shrink-0 snap-start md:w-auto"
-            >
-              <div
-                className="relative rounded-2xl border bg-white p-6 lg:p-8"
-                style={{ borderColor: "var(--light-border)" }}
-              >
-                {/* Quote icon */}
-                <Quote
-                  size={24}
-                  className="mb-4 opacity-30"
-                  style={{ color: "var(--azfit-primary)" }}
-                />
-
-                {/* Quote text */}
-                <p
-                  className="mb-6 text-base italic leading-relaxed lg:text-lg"
-                  style={{
-                    color: "var(--light-text-primary)",
-                    textShadow: "0 1px 2px rgba(255,255,255,0.8)",
-                  }}
-                >
-                  "{t.quote}"
-                </p>
-
-                {/* Author row */}
-                <div className="flex items-center gap-3">
-                  <img
-                    src={t.avatar}
-                    alt={t.name}
-                    className="h-10 w-10 rounded-full object-cover"
-                  />
-                  <div className="flex-1">
-                    <p
-                      className="text-sm font-semibold"
-                      style={{ color: "var(--light-text-primary)" }}
-                    >
-                      {t.name}
-                    </p>
-                    <p className="text-xs" style={{ color: "var(--light-text-muted)" }}>
-                      {t.role}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Star rating */}
-                <div className="mt-4 flex gap-0.5">
-                  {Array.from({ length: 5 }).map((_, j) => (
-                    <Star
-                      key={j}
-                      size={14}
-                      fill="var(--warning)"
-                      style={{ color: "var(--warning)" }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </ScrollReveal>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ──────────────────────── Section 5.5: Trusted By ──────────────────────── */
-
-function TrustedBySection() {
-  const partners = [
-    "Elite Fitness Academy",
-    "CrossFit Central",
-    "Iron Gym",
-    "FitLife Pro",
-    "PowerHouse Training",
-    "Velocity Athletics",
-  ];
-
-  return (
-    <section className="px-6 py-12 lg:py-16" style={{ backgroundColor: "var(--dark-bg)" }}>
-      <div className="mx-auto max-w-6xl">
-        <ScrollReveal className="mb-8 text-center">
-          <p className="text-xs font-bold uppercase tracking-[0.1em]" style={{ color: "var(--dark-text-muted)" }}>
-            Trusted by leading fitness brands
-          </p>
-        </ScrollReveal>
-        <div className="flex flex-wrap items-center justify-center gap-8 lg:gap-12">
-          {partners.map((partner) => (
-            <div
-              key={partner}
-              className="text-sm font-semibold opacity-40 transition-opacity hover:opacity-70"
-              style={{ color: "var(--light-text-muted)" }}
-            >
-              {partner}
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
 
 /* ──────────────────────── Section 5.7: Pricing ──────────────────────── */
 
@@ -973,12 +790,87 @@ function PricingSection({ onNavigate }: { onNavigate: (path: string) => void }) 
   );
 }
 
+/* ──────────────────────── Waitlist form (Phase 57) ──────────────────────── */
+
+function WaitlistForm() {
+  const [email, setEmail] = useState("");
+  const [website, setWebsite] = useState(""); // honeypot — bots only
+  const [state, setState] = useState<"idle" | "saving" | "done" | "error">("idle");
+
+  const submit = async () => {
+    const trimmed = email.trim();
+    if (website) {
+      // honeypot filled → bot: pretend success, write nothing
+      setState("done");
+      return;
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmed)) {
+      setState("error");
+      return;
+    }
+    setState("saving");
+    const { error } = await supabase.from("waitlist_emails").insert({ email: trimmed });
+    setState(error ? "error" : "done");
+  };
+
+  if (state === "done") {
+    return (
+      <p className="mt-6 text-sm font-semibold" style={{ color: "var(--success)" }}>
+        You're on the list — we'll be in touch.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-6">
+      <div className="mx-auto flex max-w-md items-center gap-2">
+        {/* honeypot: hidden from humans, irresistible to bots */}
+        <input
+          type="text"
+          value={website}
+          onChange={(e) => setWebsite(e.target.value)}
+          tabIndex={-1}
+          autoComplete="off"
+          aria-hidden="true"
+          className="absolute -left-[9999px] h-0 w-0 opacity-0"
+          placeholder="Website"
+        />
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setState("idle");
+          }}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          placeholder="you@email.com"
+          aria-label="Email address"
+          className="flex-1 rounded-full border px-5 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none focus:border-[var(--azfit-primary)]"
+          style={{ borderColor: "var(--dark-elevated)", backgroundColor: "rgba(255,255,255,0.06)" }}
+        />
+        <button
+          onClick={submit}
+          disabled={state === "saving"}
+          className="rounded-full bg-[var(--azfit-primary)] px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-[var(--azfit-primary-light)] active:scale-[0.97] disabled:opacity-60"
+        >
+          {state === "saving" ? "Joining…" : "Join"}
+        </button>
+      </div>
+      {state === "error" && (
+        <p className="mt-2 text-xs" style={{ color: "var(--warning)" }}>
+          Enter a valid email address.
+        </p>
+      )}
+    </div>
+  );
+}
+
 /* ──────────────────────── Section 6: Download CTA + Footer ──────────────────────── */
 
 function DownloadCTA({ onNavigate }: { onNavigate: (path: string) => void }) {
   return (
     <section
-      id="download"
+      id="waitlist"
       className="relative overflow-hidden px-6 py-16 lg:py-24"
     >
       {/* Background */}
@@ -1023,31 +915,13 @@ function DownloadCTA({ onNavigate }: { onNavigate: (path: string) => void }) {
             Try AzFIT Free
           </button>
 
-          {/* App Store badges — disabled until native apps ship */}
-          <div className="mt-6 flex flex-col items-center gap-2">
-            <div className="flex items-center gap-3">
-              <div
-                className="flex items-center gap-2 rounded-full border px-4 py-2 text-sm opacity-70"
-                style={{ borderColor: "var(--dark-elevated)", color: "var(--light-text-muted)" }}
-              >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-                </svg>
-                <span>App Store — Coming Soon</span>
-              </div>
-              <div
-                className="flex items-center gap-2 rounded-full border px-4 py-2 text-sm opacity-70"
-                style={{ borderColor: "var(--dark-elevated)", color: "var(--light-text-muted)" }}
-              >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.5,12.92 20.16,13.19L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/>
-                </svg>
-                <span>Google Play — Coming Soon</span>
-              </div>
-            </div>
-            <p className="text-xs" style={{ color: "var(--dark-text-muted)" }}>
-              PWA install available on mobile browsers now.
+          {/* Waitlist — replaces the Coming Soon store badges (Phase 57) */}
+          <div className="mt-8">
+            <p className="text-sm font-semibold text-white">Join the waitlist</p>
+            <p className="mt-1 text-xs" style={{ color: "var(--dark-text-muted)" }}>
+              Native iOS and Android apps are on the roadmap — leave your email and we'll tell you when they land.
             </p>
+            <WaitlistForm />
           </div>
         </ScrollReveal>
       </div>
@@ -1114,7 +988,7 @@ function MobileDrawer({
 
             {/* Nav items */}
             <nav className="flex flex-col gap-1 p-3">
-              {["Features", "How It Works", "Testimonials", "Download"].map(
+              {["Features", "How It Works", "Pricing", "Waitlist"].map(
                 (item) => (
                   <a
                     key={item}
@@ -1204,8 +1078,6 @@ export default function Home() {
       <StatsSection />
       <FeaturesSection />
       <HowItWorksSection />
-      <TestimonialsSection />
-      <TrustedBySection />
       <PricingSection onNavigate={handleNavigate} />
       <DownloadCTA onNavigate={handleNavigate} />
 

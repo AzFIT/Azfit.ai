@@ -64,14 +64,18 @@ const Footer = memo(function Footer() {
           </a>
         </div>
 
-        {/* Company Column — removed until pages exist */}
+        {/* Company Column */}
         <div className="flex flex-col gap-3">
           <h4 className="text-sm font-semibold" style={{ color: 'var(--dark-text-primary)' }}>
             Company
           </h4>
-          <span className="text-sm" style={{ color: 'var(--dark-text-muted)' }}>
-            Coming soon
-          </span>
+          <a
+            href="#/privacy"
+            className="text-sm transition-colors hover:opacity-80"
+            style={{ color: 'var(--dark-text-muted)' }}
+          >
+            Privacy Policy
+          </a>
         </div>
       </div>
 

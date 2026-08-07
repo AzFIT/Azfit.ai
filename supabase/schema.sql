@@ -2168,5 +2168,27 @@ CREATE POLICY "Clients can update own lifestyle targets"
   );
 
 -- ============================================================
+-- Phase 57: waitlist_emails — landing email capture. Anon INSERT
+-- (format-checked), no anon read, trainer-only SELECT via
+-- public.is_trainer().
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.waitlist_emails (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  email text NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE public.waitlist_emails ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can join the waitlist"
+  ON public.waitlist_emails FOR INSERT TO anon, authenticated
+  WITH CHECK (email ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$');
+
+CREATE POLICY "Trainers can read waitlist"
+  ON public.waitlist_emails FOR SELECT TO authenticated
+  USING (public.is_trainer());
+
+-- ============================================================
 -- DONE! Your AzFIT database is ready.
 -- ============================================================

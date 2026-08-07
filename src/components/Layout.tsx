@@ -47,8 +47,10 @@ interface LayoutProps {
 }
 
 // Base secondary navigation (without Coach - added conditionally)
+// Phase 57: "AI Builder" moved to the primary trainer nav (it was buried in
+// More — and it never belonged in the client nav at all: the route is
+// requireTrainer, so clients clicking it just got bounced).
 const baseSecondaryNavItems = [
-  { icon: Sparkles, label: "AI Builder", path: "/ai-program-builder" },
   { icon: BookOpen, label: "Exercises", path: "/exercises" },
   { icon: CalendarIcon, label: "Schedule", path: "/schedule" },
   { icon: Scale, label: "Bio Print", path: "/bioprint" },
@@ -86,6 +88,7 @@ export default function Layout({
       ? [
           { icon: CalendarRange, label: "Weekly Digest", path: "/weekly-digest" },
           { icon: Users, label: "Clients", path: "/clients" },
+          { icon: Sparkles, label: "AI Builder", path: "/ai-program-builder" },
         ]
       : []),
     { icon: Dumbbell, label: "Workouts", path: "/workouts" },

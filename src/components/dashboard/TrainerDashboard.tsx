@@ -8,7 +8,6 @@ import {
   ChevronRight,
   Activity,
   Zap,
-  MoreHorizontal,
   Bell,
   UserPlus,
   AlertTriangle,
@@ -924,39 +923,8 @@ export default function TrainerDashboard() {
         </div>
       </motion.section>
 
-      {/* ═══════════════════════════════════════════════════════════
-          WEEKLY SCHEDULE OVERVIEW
-          ═══════════════════════════════════════════════════════════ */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={mounted ? { opacity: 1, y: 0 } : {}}
-        transition={{ delay: 0.4, duration: 0.5 }}
-      >
-        <GlassCard
-          title="Weekly Schedule Overview"
-          titleIcon={<Clock className="h-4 w-4" />}
-          glass
-          hover
-          accentColor="#F59E0B"
-          className="min-h-[120px] flex items-center justify-center"
-        >
-          <div className="text-center py-8">
-            <div
-              className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full"
-              style={{ backgroundColor: "rgba(245,158,11,0.12)" }}
-            >
-              <MoreHorizontal className="h-6 w-6" style={{ color: "#F59E0B" }} />
-            </div>
-            <p className="text-sm font-medium" style={{ color: "var(--page-text)" }}>
-              Schedule Timeline
-            </p>
-            <p className="mt-1 text-[11px]" style={{ color: "var(--light-text-muted)" }}>
-              Coming in Phase A4 — hourly timeline with session blocks
-            </p>
-          </div>
-        </GlassCard>
-      </motion.div>
-
+      {/* Phase 57: the placeholder "Weekly Schedule Overview / Phase A4" card
+          was removed — the real Schedule page already covers this. */}
       {/* ═══════════════════════════════════════════════════════════
           QUICK ADD CLIENT MODAL
           ═══════════════════════════════════════════════════════════ */}

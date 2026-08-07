@@ -77,11 +77,10 @@ export function CollapsibleSection({
   return (
     <div
       className={cn(
-        "rounded-xl border border-slate-200 dark:border-slate-700/50",
-        "bg-white/60 dark:bg-slate-900/40 backdrop-blur-md",
-        "overflow-hidden",
+        "rounded-xl border overflow-hidden backdrop-blur-md",
         className
       )}
+      style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}
     >
       {/* Header — always visible */}
       <button
@@ -91,7 +90,7 @@ export function CollapsibleSection({
         className={cn(
           "w-full flex items-center justify-between px-5 py-4",
           "text-left transition-colors duration-200",
-          "hover:bg-slate-50/50 dark:hover:bg-slate-800/30",
+          "hover:bg-[var(--light-elevated)]/60",
           disabled && "opacity-50 cursor-not-allowed",
           accentColor && "border-l-[3px]",
           accentColor && isExpanded && "border-l-[3px]"
@@ -105,11 +104,11 @@ export function CollapsibleSection({
       >
         <div className="flex items-center gap-3">
           {icon && (
-            <span className="text-slate-500 dark:text-slate-400 flex-shrink-0">
+            <span className="flex-shrink-0" style={{ color: "var(--light-text-muted)" }}>
               {icon}
             </span>
           )}
-          <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+          <span className="text-sm font-semibold" style={{ color: "var(--page-text)" }}>
             {title}
           </span>
           {badge && <div className="flex-shrink-0">{badge}</div>}
@@ -124,7 +123,7 @@ export function CollapsibleSection({
                 ? { duration: 0.25, ease: "easeInOut" }
                 : { duration: 0 }
             }
-            className="text-slate-400 dark:text-slate-500"
+            style={{ color: "var(--light-text-muted)" }}
           >
             <ChevronDown className="h-4 w-4" />
           </motion.div>
