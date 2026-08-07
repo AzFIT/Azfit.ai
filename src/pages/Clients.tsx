@@ -363,7 +363,7 @@ export default function ClientsPage() {
 
         <div className="grid gap-4">
           <div
-            className="flex flex-col gap-3 rounded-2xl border bg-[var(--card-bg)] p-4"
+            className="flex min-w-0 flex-col gap-3 rounded-2xl border bg-[var(--card-bg)] p-4"
             style={{ borderColor: "var(--card-border)" }}
           >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -460,7 +460,11 @@ export default function ClientsPage() {
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-[var(--card-border)]">
+            {/* Phase 58: on narrow screens the table scrolls INSIDE the card
+                instead of pushing the page wide (no inner min-width — that
+                itself became the overflow driver) */}
+            <div className="overflow-x-auto rounded-2xl border border-[var(--card-border)]">
+              <div>
               <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-0 bg-[var(--light-elevated)] px-4 py-3 text-xs uppercase tracking-[0.2em] text-[var(--light-text-muted)]">
                 <span>Name</span>
                 <span>Email</span>
@@ -629,12 +633,16 @@ export default function ClientsPage() {
                         >
                           <User size={22} style={{ color: "var(--azfit-primary)" }} />
                         </div>
-                        <p className="text-sm font-medium text-[var(--page-text)]">
-                          No clients yet — add your first client.
+                        {/* Phase 58: headline + guidance + CTA */}
+                        <p className="text-sm font-semibold text-[var(--page-text)]">
+                          Add your first client
+                        </p>
+                        <p className="mx-auto mt-1 max-w-xs text-xs" style={{ color: "var(--light-text-muted)" }}>
+                          Thirty seconds to their profile — programs, nutrition targets and check-ins all start from here.
                         </p>
                         <button
                           onClick={openAddClient}
-                          className="mt-3 inline-flex items-center gap-2 rounded-full bg-[var(--azfit-primary)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0b776d]"
+                          className="mt-3 inline-flex items-center gap-2 rounded-full bg-[var(--azfit-primary)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
                         >
                           <Plus size={16} />
                           Add New Client
@@ -643,6 +651,7 @@ export default function ClientsPage() {
                     )}
                   </>
                 )}
+              </div>
               </div>
             </div>
           </div>

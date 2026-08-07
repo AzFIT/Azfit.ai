@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import FAB from "@/components/FAB";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import ProgressRing from "@/components/ProgressRing";
+import PulseRing from "@/components/ui/PulseRing";
 import {
   searchFoods,
   addCustomFood,
@@ -769,13 +769,13 @@ function MacroRing({
   const pct = Math.min(100, Math.round((current / target) * 100));
   return (
     <div className="flex flex-col items-center">
-      <ProgressRing
-        percentage={pct}
+      <PulseRing
+        percent={pct}
         size={64}
         strokeWidth={5}
-        color={color}
-        label={label}
-        value={`${current}`}
+        gradient={[color, color]}
+        centerLabel={`${current}`}
+        ariaLabel={`${label}: ${current} of ${target}`}
       />
       <span
         className="mt-1 text-[10px] font-medium"

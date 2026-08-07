@@ -621,7 +621,7 @@ export default function Analytics() {
                 icon={Scale}
                 message={
                   weightRows.length === 0
-                    ? 'No weight data yet — log your first measurement'
+                    ? 'No weight data yet — your first measurement unlocks the trend chart (Quick Log on your dashboard, or your coach can record one)'
                     : 'Not enough measurements in this range — try a wider one'
                 }
               />

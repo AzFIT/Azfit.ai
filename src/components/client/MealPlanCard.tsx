@@ -434,13 +434,24 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet, ca
         <div className="h-16 animate-pulse rounded-xl" style={{ backgroundColor: "var(--light-elevated)" }} />
       ) : !allItems ? (
         canLog ? (
-          <p className="py-4 text-center text-xs" style={{ color: "var(--light-text-muted)" }}>
-            No meal plan yet — your trainer can create one from your Nutrition tab.
-          </p>
+          /* Phase 58: warmer honest empty state (client view) */
+          <div className="flex flex-col items-center py-5 text-center">
+            <ChefHat size={22} style={{ color: "var(--light-text-muted)" }} />
+            <p className="mt-2 text-sm font-semibold" style={{ color: "var(--page-text)" }}>
+              No meal plan yet
+            </p>
+            <p className="mt-1 max-w-xs text-xs" style={{ color: "var(--light-text-muted)" }}>
+              Your coach is putting one together — once it's saved, your meals and grocery list will appear here.
+            </p>
+          </div>
         ) : (
-          <div className="flex flex-col items-center py-4">
-            <p className="text-xs" style={{ color: "var(--light-text-muted)" }}>
-              No meal plan yet — generate one from {targets.calories} kcal of targets.
+          <div className="flex flex-col items-center py-4 text-center">
+            <ChefHat size={22} style={{ color: "var(--light-text-muted)" }} />
+            <p className="mt-2 text-sm font-semibold" style={{ color: "var(--page-text)" }}>
+              No meal plan yet
+            </p>
+            <p className="mt-1 max-w-xs text-xs" style={{ color: "var(--light-text-muted)" }}>
+              Generate one from {targets.calories} kcal of targets — plate-balanced days, ready to log against.
             </p>
             <div className="mt-3 flex items-center gap-2">
               <select

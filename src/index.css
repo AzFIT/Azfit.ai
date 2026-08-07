@@ -34,40 +34,51 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
 
     /* AzFIT Design Tokens - Light Mode */
-    --azfit-primary: #0D9488;
-    --azfit-primary-light: #14B8A6;
+    /* Phase 58 (Pulse): brand primary is the signature cyan (owner-approved;
+       the teal #0D9488 was a leftover) */
+    --azfit-primary: #00AEEF;
+    --azfit-primary-light: #22D3EE;
     --azfit-secondary: #06B6D4;
     --azfit-secondary-light: #22D3EE;
     --azfit-accent: #8B5CF6;
     --azfit-accent-light: #A78BFA;
 
-    --light-bg: #F8FAFC;
+    /* Phase 58: additive structure tokens (both themes) */
+    --radius-control: 8px;
+    --radius-card: 14px;
+    --radius-panel: 20px;
+    --radius-pill: 999px;
+    --ai-violet: #8B7CF6; /* reserved for AI surfaces ONLY (see PROGRESS Phase 58) */
+    --shadow-card: 0 4px 14px rgba(15, 23, 42, 0.08);
+
+    --light-bg: #F3F5F8;
     --light-surface: #FFFFFF;
     --light-elevated: #F1F5F9;
     --light-border: #E2E8F0;
     --light-text-primary: #0F172A;
-    --light-text-secondary: #475569;
+    --light-text-secondary: #5A6B7F;
     --light-text-muted: #94A3B8;
 
-    --dark-bg: #0F172A;
-    --dark-surface: #1E293B;
-    --dark-elevated: #334155;
-    --dark-border: #475569;
-    --dark-text-primary: #F8FAFC;
-    --dark-text-secondary: #CBD5E1;
+    --dark-bg: #0A0E13;
+    --dark-surface: #151D27;
+    --dark-elevated: #1C2632;
+    --dark-border: rgba(255, 255, 255, 0.08);
+    --dark-text-primary: #F2F6FA;
+    --dark-text-secondary: #93A1B2;
     --dark-text-muted: #64748B;
 
-    --success: #84CC16;
+    /* Light-theme semantics — WCAG 4.5:1 on white (dark theme overrides below) */
+    --success: #059669;
     --success-bg: #ECFCCB;
-    --warning: #F59E0B;
-    --danger: #F87171;
+    --warning: #D97706;
+    --danger: #DC2626;
     --danger-bg: #FEF2F2;
     --info: #06B6D4;
 
     --glow-teal: rgba(13, 148, 136, 0.4);
     --glow-cyan: rgba(6, 182, 212, 0.3);
     --glow-purple: rgba(139, 92, 246, 0.3);
-    --backdrop: rgba(15, 23, 42, 0.6);
+    --backdrop: rgba(10, 14, 19, 0.6);
 
     /* Text shadows */
     --text-shadow-dark: 0 1px 2px rgba(255, 255, 255, 0.8);
@@ -76,7 +87,7 @@
     --text-shadow-glow: 0 0 6px currentColor, 0 1px 2px rgba(0, 0, 0, 0.2);
 
     /* Page background */
-    --page-bg: #F8FAFC;
+    --page-bg: #F3F5F8;
     --page-text: #0F172A;
     --card-bg: #FFFFFF;
     --card-border: #E2E8F0;
@@ -114,13 +125,19 @@
     --success-bg: #1A2E05;
     --danger-bg: #450A0A;
 
+    /* Dark theme keeps the brighter semantic steps (Phase 58) */
+    --success: #84CC16;
+    --warning: #F59E0B;
+    --danger: #F87171;
+    --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.45);
+
     --text-shadow-dark: 0 1px 3px rgba(0, 0, 0, 0.5);
     --text-shadow-light: 0 1px 2px rgba(255, 255, 255, 0.8);
 
-    --page-bg: #0F172A;
-    --page-text: #F8FAFC;
-    --card-bg: #1E293B;
-    --card-border: #475569;
+    --page-bg: #0A0E13;
+    --page-text: #F2F6FA;
+    --card-bg: #151D27;
+    --card-border: rgba(255, 255, 255, 0.08);
   }
 
   /* Smooth theme transitions */
@@ -181,9 +198,16 @@
   }
 
   [data-theme="dark"] .glass {
-    background: rgba(15, 23, 42, 0.8);
+    background: rgba(10, 14, 19, 0.8);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
+  }
+
+  /* Phase 58: hero/dashboard numeral treatment (no external fonts) */
+  .stat-numeral {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    letter-spacing: -0.01em;
   }
 
   /* Glow effects for progress rings */

@@ -1,7 +1,7 @@
 import { Sparkles, BarChart3, Dumbbell, Apple, RefreshCw, TrendingDown } from "lucide-react";
 
 const QUICK_ACTIONS = [
-  { label: "Gen Program", icon: Sparkles, color: "#8B5CF6", prompt: "Generate a 4-week hypertrophy program" },
+  { label: "Gen Program", icon: Sparkles, color: "var(--ai-violet)", prompt: "Generate a 4-week hypertrophy program" },
   { label: "Analyze", icon: BarChart3, color: "#00AEEF", prompt: "Analyze my client progress" },
   { label: "Check Form", icon: Dumbbell, color: "#22C55E", prompt: "Check form for deadlift" },
   { label: "Meal Plan", icon: Apple, color: "#F59E0B", prompt: "Create a meal plan" },

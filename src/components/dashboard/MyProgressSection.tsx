@@ -15,8 +15,8 @@ import { withMovingAverage, type WeightPoint } from "@/lib/weightTrend";
 import { compliancePct } from "@/lib/lifestyleTargets";
 import WeightTrendChart from "@/components/shared/WeightTrendChart";
 import WeeklyAdherenceStrip from "@/components/nutrition/WeeklyAdherenceStrip";
+import PulseRing from "@/components/ui/PulseRing";
 import { GlassCard } from "./shared/GlassCard";
-import { ProgressRing } from "./shared/ProgressRing";
 
 interface Props {
   clientsId: string; // clients.id
@@ -152,16 +152,13 @@ export default function MyProgressSection({ clientsId, userId }: Props) {
                 </p>
               </div>
             ) : (
-              <ProgressRing
+              <PulseRing
                 size={120}
                 strokeWidth={10}
-                percentage={pct}
-                color="#00AEEF"
-                gradientEndColor="#8B5CF6"
-                label="this week"
-                value={`${pct}%`}
-                subtitle={ring ? `${ring.completed}/${ring.planned} sessions` : undefined}
-                glowClass="glow-cyan"
+                percent={pct}
+                centerLabel={`${pct}%`}
+                subLabel={ring ? `${ring.completed}/${ring.planned} sessions` : "this week"}
+                ariaLabel={`Weekly compliance: ${pct}%`}
               />
             )}
           </div>

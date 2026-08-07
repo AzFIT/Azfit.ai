@@ -167,6 +167,7 @@ export default function ClientDashboard() {
   const [exercises, setExercises] = useState<WorkoutExercise[]>([]);
   const [clientsId, setClientsId] = useState<string | null>(null); // Phase 43: Today's Meals card
   const [workoutName, setWorkoutName] = useState<string | null>(null);
+  const [hasActiveProgram, setHasActiveProgram] = useState<boolean | null>(null);
   const [workoutLoading, setWorkoutLoading] = useState(true);
 
   // Weekly compliance (Phase 33B — computed from real sessions:
@@ -204,6 +205,7 @@ export default function ClientDashboard() {
       let wName: string | null = null;
       let coach: string | null = null;
       let due = false;
+      let hasProgram = false;
 
       if (clientRow) {
         // Today's program workout (active program, today's weekday, Mon=1..Sun=7)
@@ -217,6 +219,7 @@ export default function ClientDashboard() {
           .limit(1)
           .maybeSingle();
         if (prog) {
+          hasProgram = true;
           const { data: w } = await supabase
             .from("workouts")
             .select("id, name")
@@ -274,6 +277,7 @@ export default function ClientDashboard() {
         setCheckinDue(due);
         setUnreadNotifications(unread ?? 0);
         setClientsId(clientRow?.id ?? null);
+        setHasActiveProgram(hasProgram);
         setWorkoutLoading(false);
       }
     })();
@@ -611,9 +615,27 @@ export default function ClientDashboard() {
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--azfit-primary)] border-t-transparent" />
             </div>
           ) : exercises.length === 0 ? (
-            <p className="py-3 text-center text-xs" style={{ color: "var(--light-text-muted)" }}>
-              Nothing scheduled today — enjoy the calm.
-            </p>
+            hasActiveProgram === false ? (
+              /* Phase 58: honest no-program empty state */
+              <div className="flex flex-col items-center py-4 text-center">
+                <Dumbbell className="h-6 w-6" style={{ color: "var(--light-text-muted)" }} />
+                <p className="mt-2 text-sm font-semibold" style={{ color: "var(--page-text)" }}>
+                  Your coach is building your plan
+                </p>
+                <p className="mt-1 max-w-xs text-xs" style={{ color: "var(--light-text-muted)" }}>
+                  Once your first program lands, today's session will appear here with one-tap start.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center py-4 text-center">
+                <p className="text-sm font-semibold" style={{ color: "var(--page-text)" }}>
+                  Rest day — recovery is part of the program
+                </p>
+                <p className="mt-1 text-xs" style={{ color: "var(--light-text-muted)" }}>
+                  Nothing scheduled today. Sleep, hydrate, come back stronger.
+                </p>
+              </div>
+            )
           ) : (
             <>
           {/* Workout progress bar */}

@@ -866,6 +866,18 @@ function DayGrid({
 
   return (
     <div className="space-y-1">
+      {events.length === 0 && (
+        /* Phase 58: supportive empty-day framing (was: silently empty grid) */
+        <div
+          className="mb-2 flex items-center gap-2 rounded-xl border px-4 py-3"
+          style={{ borderColor: "var(--card-border)", backgroundColor: "var(--card-bg)" }}
+        >
+          <p className="text-xs" style={{ color: "var(--light-text-muted)" }}>
+            <span className="font-semibold" style={{ color: "var(--page-text)" }}>Nothing scheduled</span>{" "}
+            — a clear day. Book a session or enjoy the breathing room.
+          </p>
+        </div>
+      )}
       {HOURS.map((hour) => {
         const hourEvents = events.filter((e) => {
           if (e.date !== dateKey) return false;

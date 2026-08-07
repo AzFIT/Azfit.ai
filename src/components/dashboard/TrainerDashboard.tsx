@@ -24,7 +24,7 @@ import { useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { GlassCard } from "./shared/GlassCard";
-import { ProgressRing } from "./shared/ProgressRing";
+import PulseRing from "@/components/ui/PulseRing";
 import { CollapsibleSection } from "./shared/CollapsibleSection";
 import { ClientHealthGrid } from "./ClientHealthGrid";
 import FollowUpsWidget from "./FollowUpsWidget";
@@ -682,16 +682,13 @@ export default function TrainerDashboard() {
             onClick={() => navigate("/analytics")}
           >
             <div className="flex items-center justify-center py-4">
-              <ProgressRing
+              <PulseRing
                 size={160}
                 strokeWidth={12}
-                percentage={healthClients.length > 0 ? Math.round((healthClients.filter((c) => c.status === "on_track").length / healthClients.length) * 100) : 0}
-                color="#06B6D4"
-                gradientEndColor="#22D3EE"
-                label="compliance"
-                value={`${healthClients.length > 0 ? Math.round((healthClients.filter((c) => c.status === "on_track").length / healthClients.length) * 100) : 0}%`}
-                subtitle="this week"
-                glowClass="glow-cyan"
+                percent={healthClients.length > 0 ? Math.round((healthClients.filter((c) => c.status === "on_track").length / healthClients.length) * 100) : 0}
+                centerLabel={`${healthClients.length > 0 ? Math.round((healthClients.filter((c) => c.status === "on_track").length / healthClients.length) * 100) : 0}%`}
+                subLabel="compliance this week"
+                ariaLabel="Client compliance this week"
               />
             </div>
             <div className="grid grid-cols-3 gap-2 border-t pt-4" style={{ borderColor: "var(--card-border)" }}>
@@ -800,7 +797,7 @@ export default function TrainerDashboard() {
                     {metric.label}
                   </span>
                 </div>
-                <p className="text-xl font-bold font-mono" style={{ color: "var(--page-text)" }}>
+                <p className="stat-numeral text-2xl" style={{ color: "var(--page-text)" }}>
                   {metric.value}
                 </p>
                 <div className="mt-1 flex items-center gap-1">

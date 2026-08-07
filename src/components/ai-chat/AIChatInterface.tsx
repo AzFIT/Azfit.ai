@@ -84,7 +84,7 @@ function MessageBubble({
       <div
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
         style={{
-          backgroundColor: isUser ? "#8B5CF6" : "#00AEEF",
+          backgroundColor: isUser ? "var(--ai-violet)" : "#00AEEF",
         }}
       >
         {isUser ? <User className="h-4 w-4 text-white" /> : <Bot className="h-4 w-4 text-white" />}
@@ -95,7 +95,7 @@ function MessageBubble({
         <div
           className="rounded-2xl px-4 py-3"
           style={{
-            backgroundColor: isUser ? "#8B5CF6" : "var(--card-bg)",
+            backgroundColor: isUser ? "var(--ai-violet)" : "var(--card-bg)",
             border: isUser ? "none" : "1px solid var(--card-border)",
             color: isUser ? "#fff" : "var(--text-primary)",
           }}
@@ -300,7 +300,7 @@ export function AIChatInterface({ onClose }: AIChatInterfaceProps) {
         <div className="flex items-center gap-3">
           <div
             className="flex h-10 w-10 items-center justify-center rounded-xl"
-            style={{ background: "linear-gradient(135deg, #00AEEF, #8B5CF6)" }}
+            style={{ background: "linear-gradient(135deg, #00AEEF, var(--ai-violet))" }}
           >
             <Sparkles className="h-5 w-5 text-white" />
           </div>
@@ -384,7 +384,7 @@ export function AIChatInterface({ onClose }: AIChatInterfaceProps) {
               onClick={handleSend}
               disabled={!input.trim() || isTyping}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white transition-all disabled:opacity-40"
-              style={{ background: "linear-gradient(135deg, #00AEEF, #8B5CF6)" }}
+              style={{ background: "linear-gradient(135deg, #00AEEF, var(--ai-violet))" }}
             >
               <Send className="h-5 w-5" />
             </button>

@@ -202,7 +202,7 @@ export default function AzFitChat() {
         onClick={toggleChat}
         className="fixed bottom-20 left-4 z-[60] flex h-14 w-14 items-center justify-center rounded-full shadow-lg lg:bottom-6"
         style={{
-          background: "linear-gradient(135deg, #00AEEF, #8B5CF6)",
+          background: "linear-gradient(135deg, #00AEEF, var(--ai-violet))",
           boxShadow: "0 4px 20px rgba(0, 174, 239, 0.4)",
         }}
       >
@@ -254,7 +254,7 @@ export default function AzFitChat() {
                   <div
                     className="flex h-8 w-8 items-center justify-center rounded-full"
                     style={{
-                      background: "linear-gradient(135deg, #00AEEF, #8B5CF6)",
+                      background: "linear-gradient(135deg, #00AEEF, var(--ai-violet))",
                     }}
                   >
                     <Bot className="h-4 w-4 text-white" />
@@ -313,7 +313,7 @@ export default function AzFitChat() {
                         msg.role === "assistant"
                           ? {
                               background:
-                                "linear-gradient(135deg, #00AEEF, #8B5CF6)",
+                                "linear-gradient(135deg, #00AEEF, var(--ai-violet))",
                             }
                           : undefined
                       }
@@ -405,7 +405,7 @@ export default function AzFitChat() {
                     <div
                       className="flex h-7 w-7 items-center justify-center rounded-full"
                       style={{
-                        background: "linear-gradient(135deg, #00AEEF, #8B5CF6)",
+                        background: "linear-gradient(135deg, #00AEEF, var(--ai-violet))",
                       }}
                     >
                       <Bot className="h-3.5 w-3.5 text-white" />
@@ -481,7 +481,7 @@ export default function AzFitChat() {
                     style={{
                       background:
                         input.trim() && !isTyping
-                          ? "linear-gradient(135deg, #00AEEF, #8B5CF6)"
+                          ? "linear-gradient(135deg, #00AEEF, var(--ai-violet))"
                           : "var(--light-elevated)",
                     }}
                   >

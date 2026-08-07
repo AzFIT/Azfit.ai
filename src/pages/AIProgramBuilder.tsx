@@ -461,7 +461,7 @@ function Step1Goal({ data, updateData, customGoals = [], onAddGoal, onArchiveGoa
             <div className="flex items-center justify-between w-full mb-2">
               <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${goal.color}20`, border: `1px solid ${goal.color}40` }}><Icon className="w-5 h-5" style={{ color: goal.color }} /></div>
               <div className="flex items-center gap-1.5">
-                {isPrimary && <span className="text-[8px] font-bold uppercase tracking-wide text-[#8B5CF6]">Primary</span>}
+                {isPrimary && <span className="text-[8px] font-bold uppercase tracking-wide text-[var(--ai-violet)]">Primary</span>}
                 <div className={cn('w-5 h-5 rounded border flex items-center justify-center transition-colors', isSelected ? 'bg-[#00AEEF] border-[#00AEEF]' : 'border-[var(--card-border)] bg-[var(--page-bg)]')}>{isSelected && <Check className="w-3 h-3 text-white" />}</div>
               </div>
             </div>
@@ -476,7 +476,7 @@ function Step1Goal({ data, updateData, customGoals = [], onAddGoal, onArchiveGoa
               <div className="flex items-center justify-between w-full mb-2">
                 <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#00AEEF20', border: '1px solid #00AEEF40' }}><Target className="w-5 h-5" style={{ color: '#00AEEF' }} /></div>
                 <div className="flex items-center gap-1.5">
-                  {isPrimary && <span className="text-[8px] font-bold uppercase tracking-wide text-[#8B5CF6]">Primary</span>}
+                  {isPrimary && <span className="text-[8px] font-bold uppercase tracking-wide text-[var(--ai-violet)]">Primary</span>}
                   <div className={cn('w-5 h-5 rounded border flex items-center justify-center transition-colors', isSelected ? 'bg-[#00AEEF] border-[#00AEEF]' : 'border-[var(--card-border)] bg-[var(--page-bg)]')}>{isSelected && <Check className="w-3 h-3 text-white" />}</div>
                 </div>
               </div>
@@ -587,7 +587,7 @@ function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], 
               {Object.keys(EQUIPMENT_FILTERS).map((chip) => {
                 const active = eqChips.includes(chip);
                 return (
-                  <button key={chip} onClick={() => toggleChip(eqChips, setEqChips, chip)} className={cn('rounded-full border px-2.5 py-1 text-[10px] font-semibold transition', active ? 'border-[#8B5CF6] bg-[#8B5CF6]/10 text-[#8B5CF6]' : 'border-[var(--card-border)] text-[var(--light-text-muted)] hover:border-[#8B5CF6]/50')}>
+                  <button key={chip} onClick={() => toggleChip(eqChips, setEqChips, chip)} className={cn('rounded-full border px-2.5 py-1 text-[10px] font-semibold transition', active ? 'border-[var(--ai-violet)] bg-[var(--ai-violet)]/10 text-[var(--ai-violet)]' : 'border-[var(--card-border)] text-[var(--light-text-muted)] hover:border-[var(--ai-violet)]/50')}>
                     {chip}
                   </button>
                 );
@@ -623,7 +623,7 @@ function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], 
                   const labels = templateTagLabels(method.tags);
                   const d = parseMethodDefaults(method.defaults);
                   return (
-                    <motion.button key={method.id} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setDrawerMethod(method)} className={cn('flex flex-col items-start p-4 rounded-xl border-2 transition-all text-left', isSelected ? 'border-[#8B5CF6] bg-[#8B5CF6]/5 shadow-lg shadow-[#8B5CF6]/10' : 'border-[var(--card-border)] bg-[var(--card-bg)] hover:border-[var(--azfit-primary)]/50')}
+                    <motion.button key={method.id} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setDrawerMethod(method)} className={cn('flex flex-col items-start p-4 rounded-xl border-2 transition-all text-left', isSelected ? 'border-[var(--ai-violet)] bg-[var(--ai-violet)]/5 shadow-lg shadow-[var(--ai-violet)]/10' : 'border-[var(--card-border)] bg-[var(--card-bg)] hover:border-[var(--azfit-primary)]/50')}
                       style={d ? { borderLeftColor: INTENSITY_HEX[d.intensityColor], borderLeftWidth: 4 } : undefined}>
                       <div className="flex items-center justify-between w-full mb-2 gap-2">
                         <Badge variant="outline" className="text-[10px] border-[var(--card-border)] text-[var(--page-text)]/60 truncate">{method.category}</Badge>
@@ -635,7 +635,7 @@ function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], 
                             </span>
                           )}
                           {isBest && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#22C55E]/15 text-[#22C55E] border border-[#22C55E]/40">Best Match</span>}
-                          <div className={cn('w-5 h-5 rounded border flex items-center justify-center transition-colors', isSelected ? 'bg-[#8B5CF6] border-[#8B5CF6]' : 'border-[var(--card-border)] bg-[var(--page-bg)]')}>{isSelected && <Check className="w-3 h-3 text-white" />}</div>
+                          <div className={cn('w-5 h-5 rounded border flex items-center justify-center transition-colors', isSelected ? 'bg-[var(--ai-violet)] border-[var(--ai-violet)]' : 'border-[var(--card-border)] bg-[var(--page-bg)]')}>{isSelected && <Check className="w-3 h-3 text-white" />}</div>
                         </div>
                       </div>
                       <h4 className="text-[var(--page-text)] font-semibold text-sm mb-1">{method.name}</h4>
@@ -722,7 +722,7 @@ function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], 
                   <span key={l} className="px-2 py-0.5 rounded-full text-[10px] border border-[var(--card-border)] text-[var(--page-text)]/60">{l}</span>
                 ))}
               </div>
-              <Button onClick={() => { selectMethod(drawerMethod); setDrawerMethod(null); }} className="w-full bg-gradient-to-r from-[#00AEEF] to-[#8B5CF6] text-white font-semibold">
+              <Button onClick={() => { selectMethod(drawerMethod); setDrawerMethod(null); }} className="w-full bg-gradient-to-r from-[#00AEEF] to-[var(--ai-violet)] text-white font-semibold">
                 Select This Method
               </Button>
             </motion.div>
@@ -781,12 +781,12 @@ function Step3Context({ data, updateData }: StepProps) {
           <span className="text-xs font-mono font-bold" style={{ color: aiRiskScore > 50 ? '#EF4444' : aiRiskScore > 25 ? '#F59E0B' : '#22C55E' }}>{aiRiskScore}%</span>
         </div>
       </div>
-      <Button variant="outline" size="sm" onClick={() => updateData({ clientContext: { experience: '1-3 years', availability: '4 days', limitations: ['None (healthy)'], otherLimitation: '' } })} className="border-[#8B5CF6] text-[#8B5CF6] hover:bg-[#8B5CF6]/10 text-xs"><Bot className="w-3.5 h-3.5 mr-1" />Recommend Context</Button>
+      <Button variant="outline" size="sm" onClick={() => updateData({ clientContext: { experience: '1-3 years', availability: '4 days', limitations: ['None (healthy)'], otherLimitation: '' } })} className="border-[var(--ai-violet)] text-[var(--ai-violet)] hover:bg-[var(--ai-violet)]/10 text-xs"><Bot className="w-3.5 h-3.5 mr-1" />Recommend Context</Button>
     </div>
   );
 }
 
-const PHASE_COLORS = ['#F59E0B', '#EF4444', '#22C55E', '#00AEEF', '#8B5CF6', '#EAB308'];
+const PHASE_COLORS = ['#F59E0B', '#EF4444', '#22C55E', '#00AEEF', 'var(--ai-violet)', '#EAB308'];
 
 function Step4Phases({ data, updateData, dbMethods = [] }: StepProps) {
   const [editingPhase, setEditingPhase] = useState<ProgramPhase | null>(null);
@@ -837,7 +837,7 @@ function Step4Phases({ data, updateData, dbMethods = [] }: StepProps) {
             )}
             {pairing && !pairingDismissed && (
               <span className={suggestion ? 'block mt-0.5' : ''}>
-                Recommended next phase: <span className="font-semibold text-[#8B5CF6]">{pairing}</span>
+                Recommended next phase: <span className="font-semibold text-[var(--ai-violet)]">{pairing}</span>
               </span>
             )}
           </p>
@@ -858,7 +858,7 @@ function Step4Phases({ data, updateData, dbMethods = [] }: StepProps) {
                   <h4 className={cn('text-sm font-semibold', phase.active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40 line-through')}>{phase.name}</h4>
                   <Badge variant="outline" className="text-[10px] border-[var(--card-border)] text-[var(--page-text)]/60">{phase.weeks} weeks</Badge>
                   {phase.intensityTarget && <Badge variant="outline" className="text-[10px] border-[#F59E0B]/40 text-[#F59E0B]">{phase.intensityTarget}</Badge>}
-                  {phase.volumeTarget && <Badge variant="outline" className="text-[10px] border-[#8B5CF6]/40 text-[#8B5CF6]">{phase.volumeTarget}</Badge>}
+                  {phase.volumeTarget && <Badge variant="outline" className="text-[10px] border-[var(--ai-violet)]/40 text-[var(--ai-violet)]">{phase.volumeTarget}</Badge>}
                 </div>
                 <p className={cn('text-xs mt-0.5', phase.active ? 'text-[var(--page-text)]/60' : 'text-[var(--page-text)]/40')}>{phase.focus}</p>
               </div>
@@ -1064,7 +1064,7 @@ function Step5Split({ data, updateData }: StepProps) {
           })}
         </div>
 
-        <Button variant="outline" size="sm" onClick={() => applySplit('Upper/Lower')} className="border-[#8B5CF6] text-[#8B5CF6] hover:bg-[#8B5CF6]/10 text-xs"><Bot className="w-3.5 h-3.5 mr-1" />Recommend Split</Button>
+        <Button variant="outline" size="sm" onClick={() => applySplit('Upper/Lower')} className="border-[var(--ai-violet)] text-[var(--ai-violet)] hover:bg-[var(--ai-violet)]/10 text-xs"><Bot className="w-3.5 h-3.5 mr-1" />Recommend Split</Button>
       </div>
 
       {/* Right: Split Summary panel (below grid on mobile) */}
@@ -1265,7 +1265,7 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
         </div>
       )}
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" onClick={handleAutoFill} className="border-[#8B5CF6] text-[#8B5CF6] hover:bg-[#8B5CF6]/10 text-xs"><Sparkles className="w-3.5 h-3.5 mr-1" />AI Auto-Fill</Button>
+        <Button variant="outline" size="sm" onClick={handleAutoFill} className="border-[var(--ai-violet)] text-[var(--ai-violet)] hover:bg-[var(--ai-violet)]/10 text-xs"><Sparkles className="w-3.5 h-3.5 mr-1" />AI Auto-Fill</Button>
         <Button variant="outline" size="sm" onClick={openAddPicker} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs"><Plus className="w-3.5 h-3.5 mr-1" />Add Exercise</Button>
       </div>
 
@@ -1323,7 +1323,7 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
                   {activeFlag && <ShieldAlert className={cn('w-3 h-3 shrink-0', activeFlag.severity === 'exclude' ? 'text-[#EF4444]' : 'text-[#F59E0B]')} />}
                   <span className="truncate">{exercise.name}</span>
                   {groupBadge && (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border border-[#8B5CF6]/50 text-[#8B5CF6] text-[9px] font-bold shrink-0">
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border border-[var(--ai-violet)]/50 text-[var(--ai-violet)] text-[9px] font-bold shrink-0">
                       <Link2 className="w-2.5 h-2.5" />{groupBadge}
                     </span>
                   )}
@@ -1331,7 +1331,7 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
                 <span className="text-[var(--page-text)]/60">{exercise.sets}</span>
                 <span className="text-[var(--page-text)]/60">{exercise.reps}</span>
                 <span className="text-[var(--page-text)]/60 font-mono">{exercise.pct1RM}</span>
-                <span className="text-[#8B5CF6] font-mono">{exercise.tempo}</span>
+                <span className="text-[var(--ai-violet)] font-mono">{exercise.tempo}</span>
                 <span className="text-[#F59E0B] font-mono">
                   {exercise.rest}
                   {isLastOfGroup && groupBadge && <span className="block text-[8px] font-sans">Rest after group</span>}
@@ -1425,10 +1425,10 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
       <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-3">
         <h5 className="text-[var(--page-text)] text-xs font-semibold mb-1.5">Tempo Legend (Poliquin Notation)</h5>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]">
-          <div className="text-[var(--page-text)]/60"><span className="text-[#8B5CF6] font-mono font-bold">Eccentric</span> — Lowering</div>
-          <div className="text-[var(--page-text)]/60"><span className="text-[#8B5CF6] font-mono font-bold">Pause Bottom</span> — Hold</div>
-          <div className="text-[var(--page-text)]/60"><span className="text-[#8B5CF6] font-mono font-bold">Concentric</span> — Lifting</div>
-          <div className="text-[var(--page-text)]/60"><span className="text-[#8B5CF6] font-mono font-bold">Pause Top</span> — Squeeze</div>
+          <div className="text-[var(--page-text)]/60"><span className="text-[var(--ai-violet)] font-mono font-bold">Eccentric</span> — Lowering</div>
+          <div className="text-[var(--page-text)]/60"><span className="text-[var(--ai-violet)] font-mono font-bold">Pause Bottom</span> — Hold</div>
+          <div className="text-[var(--page-text)]/60"><span className="text-[var(--ai-violet)] font-mono font-bold">Concentric</span> — Lifting</div>
+          <div className="text-[var(--page-text)]/60"><span className="text-[var(--ai-violet)] font-mono font-bold">Pause Top</span> — Squeeze</div>
         </div>
         <p className="text-[var(--page-text)]/40 text-[10px] mt-1.5">Example: 4-0-1-0 = 4s down, no pause, 1s up, no pause</p>
       </div>
@@ -1600,7 +1600,7 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [],
               <button
                 onClick={handleExportPdf}
                 className="mt-2 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-white transition hover:opacity-90"
-                style={{ background: 'linear-gradient(135deg, #00AEEF, #8B5CF6)' }}
+                style={{ background: 'linear-gradient(135deg, #00AEEF, var(--ai-violet))' }}
               >
                 <Printer className="w-3.5 h-3.5" /> Export PDF
               </button>
@@ -1608,7 +1608,7 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [],
           </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-          {[{ v: `${intensity}%`, l: 'Avg Intensity', c: '#EF4444' }, { v: totalSets, l: 'Total Sets / Week', c: '#00AEEF' }, { v: totalExercises, l: 'Exercises', c: '#F59E0B' }, { v: `${data.weeklyHours}h`, l: 'Weekly Time', c: '#8B5CF6' }].map((s) => (
+          {[{ v: `${intensity}%`, l: 'Avg Intensity', c: '#EF4444' }, { v: totalSets, l: 'Total Sets / Week', c: '#00AEEF' }, { v: totalExercises, l: 'Exercises', c: '#F59E0B' }, { v: `${data.weeklyHours}h`, l: 'Weekly Time', c: 'var(--ai-violet)' }].map((s) => (
             <div key={s.l} className="bg-[var(--page-bg)] border border-[var(--card-border)] rounded-lg p-3 text-center">
               <div className="text-lg font-bold font-mono" style={{ color: s.c }}>{s.v}</div>
               <div className="text-[var(--page-text)]/60 text-[10px]">{s.l}</div>
@@ -1663,7 +1663,7 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [],
                     <span className="text-[var(--page-text)]/60 font-mono">{row.sets} · {row.pct}%</span>
                   </div>
                   <div className="h-2 rounded-full bg-[var(--page-bg)] overflow-hidden">
-                    <motion.div initial={{ width: 0 }} animate={{ width: `${row.pct}%` }} transition={{ duration: 0.5 }} className="h-full rounded-full" style={{ background: 'linear-gradient(90deg, #00AEEF, #8B5CF6)' }} />
+                    <motion.div initial={{ width: 0 }} animate={{ width: `${row.pct}%` }} transition={{ duration: 0.5 }} className="h-full rounded-full" style={{ background: 'linear-gradient(90deg, #00AEEF, var(--ai-violet))' }} />
                   </div>
                 </div>
               ))}
@@ -1672,7 +1672,7 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [],
 
           {/* Equipment checklist */}
           <Card className="bg-[var(--card-bg)] border-[var(--card-border)] p-5">
-            <h4 className="text-[var(--page-text)] text-sm font-bold mb-3 flex items-center gap-2"><Dumbbell className="w-4 h-4 text-[#8B5CF6]" />Equipment Checklist</h4>
+            <h4 className="text-[var(--page-text)] text-sm font-bold mb-3 flex items-center gap-2"><Dumbbell className="w-4 h-4 text-[var(--ai-violet)]" />Equipment Checklist</h4>
             {clientEquipment == null && (
               <p className="text-[10px] text-[var(--page-text)]/50 mb-2">No client equipment profile — Full Gym assumed.</p>
             )}
@@ -1791,7 +1791,7 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [],
       )}
 
       <Card className="bg-[var(--card-bg)] border-[var(--card-border)] p-5">
-        <h4 className="text-[var(--page-text)] text-sm font-bold mb-3 flex items-center gap-2"><Dumbbell className="w-4 h-4 text-[#8B5CF6]" />Exercise Breakdown — {totalExercises} exercises, {totalSets} sets/week</h4>
+        <h4 className="text-[var(--page-text)] text-sm font-bold mb-3 flex items-center gap-2"><Dumbbell className="w-4 h-4 text-[var(--ai-violet)]" />Exercise Breakdown — {totalExercises} exercises, {totalSets} sets/week</h4>
         <div className="grid grid-cols-12 gap-2 text-[10px] text-[var(--page-text)]/60 font-semibold border-b border-[var(--card-border)] pb-2 mb-2">
           <div className="col-span-1">Code</div><div className="col-span-4">Exercise</div><div className="col-span-1 text-center">Sets</div><div className="col-span-1 text-center">Reps</div><div className="col-span-2 text-center">%1RM</div><div className="col-span-1 text-center">Tempo</div><div className="col-span-1 text-center">Rest</div>{!data.workoutExercises && <div className="col-span-1 text-center">Sets/Wk</div>}
         </div>
@@ -1814,7 +1814,7 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [],
                   <div className="col-span-1 text-center text-[var(--page-text)]/60">{ex.sets}</div>
                   <div className="col-span-1 text-center text-[var(--page-text)]/60">{ex.reps}</div>
                   <div className="col-span-2 text-center text-[#EF4444] font-mono">{ex.pct1RM}</div>
-                  <div className="col-span-1 text-center text-[#8B5CF6] font-mono text-[10px]">{ex.tempo}</div>
+                  <div className="col-span-1 text-center text-[var(--ai-violet)] font-mono text-[10px]">{ex.tempo}</div>
                   <div className="col-span-1 text-center text-[var(--page-text)]/60">{ex.rest}s</div>
                   {!data.workoutExercises && <div className="col-span-1 text-center text-[#00AEEF] font-mono">{ex.sets * activeDays}</div>}
                 </div>
@@ -1840,7 +1840,7 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [],
       <Card className="bg-[var(--card-bg)] border-[var(--card-border)] p-5">
         <h4 className="text-[var(--page-text)] text-sm font-bold mb-3 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-[#00AEEF]" />Summary Statistics</h4>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {[{ l: 'Total Weeks', v: totalWeeks, c: 'text-[var(--page-text)]' }, { l: 'Training Days', v: `${activeDays}/wk`, c: 'text-[var(--page-text)]' }, { l: 'Total Sets', v: `${totalSets * activeDays}/wk`, c: 'text-[#00AEEF]' }, { l: 'Avg Rest', v: `${avgRest}s`, c: 'text-[#F59E0B]' }, { l: 'Est. Duration', v: `~${Math.round(totalWeeks * activeDays * (data.weeklyHours / activeDays))}h`, c: 'text-[#8B5CF6]' }].map((s) => (
+          {[{ l: 'Total Weeks', v: totalWeeks, c: 'text-[var(--page-text)]' }, { l: 'Training Days', v: `${activeDays}/wk`, c: 'text-[var(--page-text)]' }, { l: 'Total Sets', v: `${totalSets * activeDays}/wk`, c: 'text-[#00AEEF]' }, { l: 'Avg Rest', v: `${avgRest}s`, c: 'text-[#F59E0B]' }, { l: 'Est. Duration', v: `~${Math.round(totalWeeks * activeDays * (data.weeklyHours / activeDays))}h`, c: 'text-[var(--ai-violet)]' }].map((s) => (
             <div key={s.l} className="bg-[var(--page-bg)] rounded-lg p-3 border border-[var(--card-border)]">
               <div className="text-[var(--page-text)]/60 text-[10px]">{s.l}</div>
               <div className={cn('font-mono font-bold text-lg', s.c)}>{s.v}</div>
@@ -2418,7 +2418,7 @@ export default function AIProgramBuilderPage() {
             <div className="flex items-center gap-3">
               <button onClick={() => navigate('/dashboard')} className="p-2 rounded-lg hover:bg-[var(--page-bg)] transition-colors"><ArrowLeft className="w-5 h-5 text-[var(--page-text)]/60" /></button>
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#8B5CF6] to-[#00AEEF] flex items-center justify-center"><Zap className="w-4 h-4 text-white" /></div>
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--ai-violet)] to-[#00AEEF] flex items-center justify-center"><Zap className="w-4 h-4 text-white" /></div>
                 <h1 className="text-lg sm:text-xl font-bold">All-in-One Program Creator</h1>
               </div>
             </div>
