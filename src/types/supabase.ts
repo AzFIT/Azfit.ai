@@ -57,6 +57,7 @@ export type Database = {
           status: "active" | "inactive" | "paused" | "on_holiday" | "on_break" | "pending_start" | "trial" | "cancelled" | "unavailable" | "transferred" | "archived";
           notes: string | null;
           intake_profile: Json | null;
+          equipment_access: string[] | null;
           created_at: string;
           updated_at: string;
         };
@@ -76,6 +77,7 @@ export type Database = {
           status?: "active" | "inactive" | "paused" | "on_holiday" | "on_break" | "pending_start" | "trial" | "cancelled" | "unavailable" | "transferred" | "archived";
           notes?: string | null;
           intake_profile?: Json | null;
+          equipment_access?: string[] | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -95,6 +97,7 @@ export type Database = {
           status?: "active" | "inactive" | "paused" | "on_holiday" | "on_break" | "pending_start" | "trial" | "cancelled" | "unavailable" | "transferred" | "archived";
           notes?: string | null;
           intake_profile?: Json | null;
+          equipment_access?: string[] | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -1875,6 +1878,104 @@ export type Database = {
             columns: ["client_id"];
             isOneToOne: false;
             referencedRelation: "clients";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      trial_assessments: {
+        Row: {
+          id: string;
+          client_record_id: string;
+          trainer_id: string;
+          title: string;
+          assessed_on: string;
+          general_notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          client_record_id: string;
+          trainer_id: string;
+          title?: string;
+          assessed_on?: string;
+          general_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          client_record_id?: string;
+          trainer_id?: string;
+          title?: string;
+          assessed_on?: string;
+          general_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "trial_assessments_client_record_id_fkey";
+            columns: ["client_record_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      trial_assessment_items: {
+        Row: {
+          id: string;
+          assessment_id: string;
+          exercise_library_id: string | null;
+          exercise_name: string;
+          equipment: string | null;
+          sets: number | null;
+          reps: string | null;
+          tempo: string | null;
+          verdict: "can_do" | "needs_modification" | "cannot_do" | null;
+          notes: string | null;
+          order_index: number | null;
+        };
+        Insert: {
+          id?: string;
+          assessment_id: string;
+          exercise_library_id?: string | null;
+          exercise_name: string;
+          equipment?: string | null;
+          sets?: number | null;
+          reps?: string | null;
+          tempo?: string | null;
+          verdict?: "can_do" | "needs_modification" | "cannot_do" | null;
+          notes?: string | null;
+          order_index?: number | null;
+        };
+        Update: {
+          id?: string;
+          assessment_id?: string;
+          exercise_library_id?: string | null;
+          exercise_name?: string;
+          equipment?: string | null;
+          sets?: number | null;
+          reps?: string | null;
+          tempo?: string | null;
+          verdict?: "can_do" | "needs_modification" | "cannot_do" | null;
+          notes?: string | null;
+          order_index?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "trial_assessment_items_assessment_id_fkey";
+            columns: ["assessment_id"];
+            isOneToOne: false;
+            referencedRelation: "trial_assessments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "trial_assessment_items_exercise_library_id_fkey";
+            columns: ["exercise_library_id"];
+            isOneToOne: false;
+            referencedRelation: "exercise_library";
             referencedColumns: ["id"];
           }
         ];

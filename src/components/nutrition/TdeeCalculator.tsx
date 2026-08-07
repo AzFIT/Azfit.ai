@@ -69,6 +69,7 @@ export default function TdeeCalculator({
   const [weight, setWeight] = useState(80);
   const [height, setHeight] = useState(175);
   const [age, setAge] = useState(30);
+  const [dobMissing, setDobMissing] = useState(false);
   const [gender, setGender] = useState<"male" | "female">("male");
   const [activity, setActivity] = useState<ActivityLevelKey>("moderate");
   const [goal, setGoal] = useState<GoalKeyPct>("maintenance");
@@ -98,6 +99,8 @@ export default function TdeeCalculator({
       if (client?.height_cm) setHeight(client.height_cm);
       if (client?.gender === "female" || client?.gender === "male") setGender(client.gender);
       if (client?.date_of_birth) setAge(ageFromDob(client.date_of_birth));
+      // Phase 53: DOB is optional now — surface the age fallback honestly
+      setDobMissing(!!client && !client.date_of_birth);
       if (bc?.weight_kg) setWeight(bc.weight_kg);
       setLoading(false);
     })();
@@ -234,6 +237,15 @@ export default function TdeeCalculator({
               </select>
             </div>
           </div>
+
+          {dobMissing && (
+            <p
+              className="rounded-lg border px-3 py-2 text-[11px] font-medium"
+              style={{ borderColor: "rgba(245, 158, 11, 0.4)", backgroundColor: "rgba(245, 158, 11, 0.12)", color: "#F59E0B" }}
+            >
+              No date of birth on file — age is estimated. Set date of birth for accurate targets.
+            </p>
+          )}
 
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <div>

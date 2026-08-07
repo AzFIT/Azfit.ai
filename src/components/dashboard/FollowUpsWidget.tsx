@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { profileGaps, profileGapReason } from "@/lib/trialIntake";
 import { CollapsibleSection } from "./shared/CollapsibleSection";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -23,6 +24,10 @@ interface ClientRow {
   email: string;
   status: string;
   created_at: string;
+  weight_kg: number | null;
+  height_cm: number | null;
+  date_of_birth: string | null;
+  fitness_goal: string | null;
 }
 
 interface FollowUpRow {
@@ -37,6 +42,7 @@ interface Groups {
   noSession: FollowUpRow[];
   bioprint: FollowUpRow[];
   noProgram: FollowUpRow[];
+  profileIncomplete: FollowUpRow[];
 }
 
 const DAY_MS = 86400000;
@@ -54,13 +60,13 @@ export default function FollowUpsWidget() {
     (async () => {
       const { data: clients } = await supabase
         .from("clients")
-        .select("id, full_name, email, status, created_at")
+        .select("id, full_name, email, status, created_at, weight_kg, height_cm, date_of_birth, fitness_goal")
         .eq("trainer_id", user.id)
         .neq("status", "archived")
         .order("full_name", { ascending: true });
       if (cancelled) return;
       if (!clients || clients.length === 0) {
-        setGroups({ noSession: [], bioprint: [], noProgram: [] });
+        setGroups({ noSession: [], bioprint: [], noProgram: [], profileIncomplete: [] });
         return;
       }
 
@@ -118,6 +124,7 @@ export default function FollowUpsWidget() {
       const noSession: FollowUpRow[] = [];
       const bioprint: FollowUpRow[] = [];
       const noProgram: FollowUpRow[] = [];
+      const profileIncomplete: FollowUpRow[] = [];
 
       for (const c of clients as ClientRow[]) {
         // ── No session in 5+ days (needs a linked profile to have sessions)
@@ -160,12 +167,25 @@ export default function FollowUpsWidget() {
             action: `/ai-program-builder?clientId=${c.id}`,
           });
         }
+
+        // ── Phase 53: profile incomplete (missing body metrics / goal)
+        const gaps = profileGaps(c);
+        if (gaps.length) {
+          profileIncomplete.push({
+            clientId: c.id,
+            name: c.full_name,
+            detail: profileGapReason(gaps),
+            actionLabel: "Complete",
+            action: `/client/${c.id}?tab=overview`,
+          });
+        }
       }
 
       setGroups({
         noSession: noSession.slice(0, CAP),
         bioprint: bioprint.slice(0, CAP),
         noProgram: noProgram.slice(0, CAP),
+        profileIncomplete: profileIncomplete.slice(0, CAP),
       });
     })();
 
@@ -175,7 +195,7 @@ export default function FollowUpsWidget() {
   }, [user?.id]);
 
   if (!groups) return null;
-  const total = groups.noSession.length + groups.bioprint.length + groups.noProgram.length;
+  const total = groups.noSession.length + groups.bioprint.length + groups.noProgram.length + groups.profileIncomplete.length;
   if (total === 0) return null; // render nothing when zero follow-ups
 
   const sections: {
@@ -188,6 +208,7 @@ export default function FollowUpsWidget() {
     { key: "noSession", title: "No session in 5+ days", color: "#F59E0B", Icon: CalendarX, rows: groups.noSession },
     { key: "bioprint", title: "BioPrint overdue (30+ days)", color: "#8B5CF6", Icon: Ruler, rows: groups.bioprint },
     { key: "noProgram", title: "No active program", color: "#00AEEF", Icon: FileSpreadsheet, rows: groups.noProgram },
+    { key: "profileIncomplete", title: "Profile incomplete", color: "#F59E0B", Icon: AlertTriangle, rows: groups.profileIncomplete },
   ];
 
   return (

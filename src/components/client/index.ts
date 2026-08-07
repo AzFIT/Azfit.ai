@@ -7,3 +7,4 @@ export { default as ProgramsTab } from './ProgramsTab';
 export { default as NotesTab } from './NotesTab';
 export { default as ClientPhotosTab } from './ClientPhotosTab';
 export { default as ClientFormChecksTab } from './ClientFormChecksTab';
+export { default as AssessmentsTab } from './AssessmentsTab';

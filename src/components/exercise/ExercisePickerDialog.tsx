@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { findContraindications } from "@/data/exerciseSafety";
 
 export interface LibraryExercise {
+  id: string;
   code: string;
   name: string;
   equipment: string;
@@ -62,7 +63,7 @@ export default function ExercisePickerDialog({
       setError(null);
       const { data, error: err } = await supabase
         .from("exercise_library")
-        .select("code, name, equipment, primary_muscle, difficulty, exercise_type, safety_notes")
+        .select("id, code, name, equipment, primary_muscle, difficulty, exercise_type, safety_notes")
         .eq("is_active", true)
         .order("name");
       if (cancelled) return;

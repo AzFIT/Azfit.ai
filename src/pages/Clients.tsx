@@ -3,11 +3,12 @@ import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
-import { Search, Plus, Edit3, Upload, X, User, ChevronDown, Link2 } from "lucide-react";
+import { Search, Plus, Edit3, Upload, X, User, ChevronDown, Link2, AlertTriangle } from "lucide-react";
 import Layout from "@/components/Layout";
 import QuickAddClientModal from "@/components/QuickAddClientModal";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { profileGaps, profileGapReason } from "@/lib/trialIntake";
 import {
   CLIENT_STATUSES,
   CLIENT_STATUS_VALUES,
@@ -512,6 +513,20 @@ export default function ClientsPage() {
                             <p className="truncate text-sm text-[var(--light-text-muted)]">
                               {client.email}
                             </p>
+                            {(() => {
+                              // Phase 53: "Profile incomplete" — derived, no schema
+                              const gaps = profileGaps(client);
+                              if (!gaps.length) return null;
+                              return (
+                                <span
+                                  className="mt-1 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                                  style={{ backgroundColor: "rgba(245,158,11,0.12)", color: "#F59E0B" }}
+                                  title={profileGapReason(gaps)}
+                                >
+                                  <AlertTriangle size={10} /> Profile incomplete
+                                </span>
+                              );
+                            })()}
                           </div>
                           <div
                             className="w-1/4 relative"

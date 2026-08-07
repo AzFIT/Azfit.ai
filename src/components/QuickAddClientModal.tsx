@@ -11,6 +11,8 @@ import { useAuth } from '@/hooks/useAuth';
 import ClientIntakeWizard from '@/components/ClientIntakeWizard';
 import type { Database } from '@/types/supabase';
 import { CLIENT_STATUSES, CLIENT_STATUS_VALUES } from '@/lib/clientStatus';
+import { GOAL_TYPE_LABELS } from '@/lib/clientGoals';
+import { EQUIPMENT_OPTIONS, type ClientGoalType } from '@/lib/trialIntake';
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -53,6 +55,11 @@ export default function QuickAddClientModal({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  /* Phase 53: multi-goal + equipment editing (edit mode only) */
+  const [goalTypes, setGoalTypes] = useState<ClientGoalType[]>([]);
+  const [existingGoalRows, setExistingGoalRows] = useState<{ id: string; goal_type: ClientGoalType; custom_label: string | null }[]>([]);
+  const [equipment, setEquipment] = useState<string[]>([]);
+
   /* Success state */
   const [createdClient, setCreatedClient] = useState<DbClient | null>(null);
 
@@ -64,11 +71,29 @@ export default function QuickAddClientModal({
       setEmail(clientToEdit.email || '');
       setPhone(clientToEdit.phone || '');
       setStatus(clientToEdit.status);
+      // Phase 53: equipment — column first, legacy intake_profile mirror as fallback
+      const legacy = (clientToEdit.intake_profile as { equipment?: unknown } | null)?.equipment;
+      setEquipment(clientToEdit.equipment_access ?? (Array.isArray(legacy) ? (legacy as string[]) : []));
+      // Phase 53: goals — canonical store is client_goals rows
+      setGoalTypes([]);
+      setExistingGoalRows([]);
+      supabase
+        .from('client_goals')
+        .select('id, goal_type, custom_label')
+        .eq('client_id', clientToEdit.id)
+        .then(({ data }) => {
+          const rows = (data as { id: string; goal_type: ClientGoalType; custom_label: string | null }[] | null) ?? [];
+          setExistingGoalRows(rows);
+          setGoalTypes(rows.filter((r) => r.goal_type !== 'custom').map((r) => r.goal_type));
+        });
     } else {
       setFullName('');
       setEmail('');
       setPhone('');
       setStatus('active');
+      setGoalTypes([]);
+      setExistingGoalRows([]);
+      setEquipment([]);
     }
     setCreatedClient(null);
     setErrors({});
@@ -80,6 +105,9 @@ export default function QuickAddClientModal({
     setEmail('');
     setPhone('');
     setStatus('active');
+    setGoalTypes([]);
+    setExistingGoalRows([]);
+    setEquipment([]);
     setErrors({});
     setCreatedClient(null);
     setShowStatusDropdown(false);
@@ -114,13 +142,39 @@ export default function QuickAddClientModal({
 
     try {
       if (clientToEdit) {
+        // Phase 53: keep fitness_goal (first selected goal) + equipment_access
+        // (+ legacy intake_profile.equipment mirror) consistent with the chips.
+        const customLabels = existingGoalRows.filter((r) => r.goal_type === 'custom' && r.custom_label).map((r) => r.custom_label as string);
+        const intakeProfile = {
+          ...((clientToEdit.intake_profile as Record<string, unknown> | null) ?? {}),
+          equipment,
+        };
         const { error } = await supabase
           .from('clients')
-          .update({ ...payload, updated_at: new Date().toISOString() })
+          .update({
+            ...payload,
+            fitness_goal: goalTypes[0] ?? customLabels[0] ?? null,
+            equipment_access: equipment,
+            intake_profile: intakeProfile,
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', clientToEdit.id)
           .eq('trainer_id', user.id);
 
         if (error) throw error;
+
+        // Reconcile client_goals rows: add newly selected types, remove
+        // deselected non-custom rows. Custom-labeled rows are preserved
+        // (managed via the Overview goals dialog).
+        const toAdd = goalTypes.filter((t) => !existingGoalRows.some((r) => r.goal_type === t));
+        const toRemove = existingGoalRows.filter((r) => r.goal_type !== 'custom' && !goalTypes.includes(r.goal_type));
+        if (toAdd.length) {
+          await supabase.from('client_goals').insert(toAdd.map((t) => ({ client_id: clientToEdit.id, goal_type: t })));
+        }
+        if (toRemove.length) {
+          await supabase.from('client_goals').delete().in('id', toRemove.map((r) => r.id));
+        }
+
         setCreatedClient({ ...clientToEdit, ...payload });
         toast.success('Client updated');
         onSuccess?.();
@@ -344,9 +398,72 @@ export default function QuickAddClientModal({
                     )}
                   </AnimatePresence>
                 </div>
-              </div>
 
-              {/* Actions */}
+                {/* Goals (Phase 53 — multi-select, client_goals rows) */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                    Goals <span className="text-slate-400 font-normal">(multi-select — first selected is primary)</span>
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {(Object.keys(GOAL_TYPE_LABELS) as ClientGoalType[])
+                      .filter((t) => t !== 'custom')
+                      .map((t) => {
+                        const active = goalTypes.includes(t);
+                        return (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => setGoalTypes((p) => (active ? p.filter((x) => x !== t) : [...p, t]))}
+                            className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${
+                              active
+                                ? 'border-[#0D9488] bg-[#0D9488]/10 text-[#0D9488]'
+                                : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[#0D9488]/50'
+                            }`}
+                          >
+                            {GOAL_TYPE_LABELS[t]}
+                          </button>
+                        );
+                      })}
+                    {existingGoalRows
+                      .filter((r) => r.goal_type === 'custom' && r.custom_label)
+                      .map((r) => (
+                        <span
+                          key={r.id}
+                          title="Custom goal — managed from the client's Overview tab"
+                          className="px-3 py-1.5 rounded-full border border-dashed border-slate-300 dark:border-slate-600 text-xs font-medium text-slate-500 dark:text-slate-400"
+                        >
+                          {r.custom_label}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Equipment (Phase 53 — multi-select, equipment_access) */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                    Available equipment
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {[...new Set([...EQUIPMENT_OPTIONS, ...equipment])].map((eq) => {
+                      const active = equipment.includes(eq);
+                      return (
+                        <button
+                          key={eq}
+                          type="button"
+                          onClick={() => setEquipment((p) => (active ? p.filter((x) => x !== eq) : [...p, eq]))}
+                          className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${
+                            active
+                              ? 'border-[#0D9488] bg-[#0D9488]/10 text-[#0D9488]'
+                              : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[#0D9488]/50'
+                          }`}
+                        >
+                          {eq}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
               <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
                 <button
                   onClick={handleClose}

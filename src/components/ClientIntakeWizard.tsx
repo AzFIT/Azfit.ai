@@ -28,6 +28,7 @@ import {
 } from "@/lib/tdee";
 import { calculateBodyFat, PROTOCOL_SITES, type SkinfoldSite } from "@/lib/bodyfat";
 import { saveNutritionTargets } from "@/lib/foodApi";
+import { WIZARD_GOALS, wizardGoalToClientGoal, intakeTargetsEligible, EQUIPMENT_OPTIONS } from "@/lib/trialIntake";
 
 /* ═══════════════════════════════════════════════════════════════
    5-Step Client Intake Wizard (legacy PHASE_2 spec → Supabase)
@@ -47,17 +48,7 @@ const STEPS = [
   { id: 5, label: "Review", icon: ClipboardCheck },
 ];
 
-const PRIMARY_GOALS = [
-  { value: "lose_weight", label: "Lose Weight" },
-  { value: "build_muscle", label: "Build Muscle" },
-  { value: "strength", label: "Strength" },
-  { value: "endurance", label: "Endurance" },
-  { value: "athletic_performance", label: "Athletic Performance" },
-  { value: "rehab_mobility", label: "Rehab & Mobility" },
-  { value: "general_fitness", label: "General Fitness" },
-];
-
-const EQUIPMENT_OPTIONS = ["Full Gym", "Dumbbells Only", "Bodyweight", "Home Gym", "Commercial Gym"];
+const PRIMARY_GOALS = WIZARD_GOALS; // single source: src/lib/trialIntake.ts
 
 const ACTIVITY_LABELS: Record<string, string> = {
   sedentary: "Sedentary",
@@ -90,7 +81,8 @@ interface IntakeData {
   gender: "male" | "female" | "other";
   emergencyName: string;
   emergencyPhone: string;
-  primaryGoal: string;
+  /** Phase 53: multi-select goals — goals[0] is the primary (fitness_goal). */
+  goals: string[];
   secondaryGoal: string;
   experience: "beginner" | "intermediate" | "advanced";
   equipment: string[];
@@ -117,7 +109,7 @@ const INITIAL: IntakeData = {
   gender: "male",
   emergencyName: "",
   emergencyPhone: "",
-  primaryGoal: "",
+  goals: [],
   secondaryGoal: "",
   experience: "beginner",
   equipment: [],
@@ -201,10 +193,10 @@ export default function ClientIntakeWizard({ open, onClose, onSuccess }: ClientI
     if (s === 1) {
       if (!data.fullName.trim()) e.fullName = "Full name is required";
       if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = "Invalid email";
-      if (!data.dob) e.dob = "Date of birth is required";
+      // Phase 53: DOB is optional (trial fast intake) — age displays show "—"
     }
     if (s === 2) {
-      if (!data.primaryGoal) e.primaryGoal = "Select a primary goal";
+      if (data.goals.length === 0) e.goals = "Select at least one goal";
       if (data.equipment.length === 0) e.equipment = "Select at least one";
     }
     if (s === 3) {
@@ -236,7 +228,10 @@ export default function ClientIntakeWizard({ open, onClose, onSuccess }: ClientI
     }
     setSaving(true);
     try {
-      const computedTargets = macros
+      // Phase 53: targets ONLY when the body step was completed — a skipped
+      // Body step must finish cleanly with zero pipeline/targets writes.
+      const targetsOK = intakeTargetsEligible({ weightKg: weightNum, heightCm: heightNum, dob: data.dob });
+      const computedTargets = targetsOK && macros
         ? { calories: goalCalories, protein: macros.protein, carbs: macros.carbs, fats: macros.fats }
         : null;
 
@@ -270,14 +265,23 @@ export default function ClientIntakeWizard({ open, onClose, onSuccess }: ClientI
           height_cm: heightNum || null,
           weight_kg: weightNum || null,
           body_fat_percentage: bodyFatPct != null ? Math.round(bodyFatPct * 10) / 10 : null,
-          fitness_goal: data.primaryGoal || null,
+          fitness_goal: data.goals[0] || null,
           experience_level: data.experience,
           status: "active",
           intake_profile: intakeProfile,
+          equipment_access: data.equipment,
         })
         .select()
         .single();
       if (clientErr || !client) throw clientErr || new Error("Failed to create client");
+
+      // 1b) Phase 53: one client_goals row per selected goal (first = primary,
+      //     already on clients.fitness_goal above)
+      if (data.goals.length) {
+        await supabase.from("client_goals").insert(
+          data.goals.map((g) => ({ client_id: client.id, ...wizardGoalToClientGoal(g) })),
+        );
+      }
 
       // 2) body_composition row (weight/height/bf)
       if (weightNum) {
@@ -417,7 +421,7 @@ export default function ClientIntakeWizard({ open, onClose, onSuccess }: ClientI
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label className={labelCls}>
-                        Date of Birth * {age > 0 && <span className="text-[#00AEEF]">({age} yrs)</span>}
+                        Date of Birth {age > 0 && <span className="text-[#00AEEF]">({age} yrs)</span>}
                       </label>
                       <input type="date" className={inputCls} value={data.dob} onChange={(e) => set("dob", e.target.value)} />
                       {errors.dob && <p className="mt-1 text-xs text-red-500">{errors.dob}</p>}
@@ -454,19 +458,26 @@ export default function ClientIntakeWizard({ open, onClose, onSuccess }: ClientI
               {step === 2 && (
                 <div className="space-y-4">
                   <div>
-                    <label className={labelCls}>Primary Goal *</label>
+                    <label className={labelCls}>Goals * <span className="font-normal">(multi-select — first selected is the primary)</span></label>
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                      {PRIMARY_GOALS.map((g) => (
-                        <button
-                          key={g.value}
-                          onClick={() => set("primaryGoal", g.value)}
-                          className={`rounded-lg border px-2 py-2.5 text-xs font-medium transition ${data.primaryGoal === g.value ? "border-[#00AEEF] bg-[#00AEEF]/10 text-[#00AEEF]" : "border-[var(--card-border)] text-[var(--page-text)]"}`}
-                        >
-                          {g.label}
-                        </button>
-                      ))}
+                      {PRIMARY_GOALS.map((g) => {
+                        const active = data.goals.includes(g.value);
+                        const isPrimary = data.goals[0] === g.value;
+                        return (
+                          <button
+                            key={g.value}
+                            onClick={() =>
+                              set("goals", active ? data.goals.filter((x) => x !== g.value) : [...data.goals, g.value])
+                            }
+                            className={`relative rounded-lg border px-2 py-2.5 text-xs font-medium transition ${active ? "border-[#00AEEF] bg-[#00AEEF]/10 text-[#00AEEF]" : "border-[var(--card-border)] text-[var(--page-text)]"}`}
+                          >
+                            {g.label}
+                            {isPrimary && <span className="absolute right-1.5 top-1 text-[8px] font-bold uppercase tracking-wide text-[#8B5CF6]">Primary</span>}
+                          </button>
+                        );
+                      })}
                     </div>
-                    {errors.primaryGoal && <p className="mt-1 text-xs text-red-500">{errors.primaryGoal}</p>}
+                    {errors.goals && <p className="mt-1 text-xs text-red-500">{errors.goals}</p>}
                   </div>
                   <div>
                     <label className={labelCls}>Experience Level *</label>
@@ -667,13 +678,22 @@ export default function ClientIntakeWizard({ open, onClose, onSuccess }: ClientI
                     {data.phone && <p>{data.phone}</p>}
                   </ReviewSection>
                   <ReviewSection title="Goals" onEdit={() => setStep(2)}>
-                    <p>{PRIMARY_GOALS.find((g) => g.value === data.primaryGoal)?.label} • {data.experience}</p>
+                    <p>
+                      {data.goals
+                        .map((g, i) => `${PRIMARY_GOALS.find((x) => x.value === g)?.label ?? g}${i === 0 ? " (primary)" : ""}`)
+                        .join(", ")}{" "}
+                      • {data.experience}
+                    </p>
                     <p>{data.sessionsPerWeek}×/week • {data.sessionDuration} min • {data.equipment.join(", ")}</p>
                   </ReviewSection>
                   <ReviewSection title="Body Assessment" onEdit={() => setStep(3)}>
-                    <p>
-                      {weightNum} kg • {heightNum} cm {bmi > 0 && `• BMI ${bmi.toFixed(1)}`}
-                    </p>
+                    {!weightNum && !heightNum ? (
+                      <p style={{ color: "var(--light-text-muted)" }}>Skipped — add later from the client's profile. No nutrition targets calculated.</p>
+                    ) : (
+                      <p>
+                        {weightNum} kg • {heightNum} cm {bmi > 0 && `• BMI ${bmi.toFixed(1)}`}
+                      </p>
+                    )}
                     {tdee > 0 && (
                       <p>
                         TDEE {tdee.toLocaleString()} • Target {goalCalories.toLocaleString()} kcal — P {macros?.protein}g / C {macros?.carbs}g / F {macros?.fats}g
@@ -703,9 +723,21 @@ export default function ClientIntakeWizard({ open, onClose, onSuccess }: ClientI
               </button>
             )}
             {step < 5 ? (
-              <button onClick={next} className="flex items-center gap-1 rounded-lg px-4 py-2 text-xs font-semibold text-white" style={{ background: "linear-gradient(135deg, #00AEEF, #8B5CF6)" }}>
-                Next <ChevronRight size={14} />
-              </button>
+              <>
+                {step === 3 && (
+                  <button
+                    onClick={() => setStep(4)}
+                    className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-medium"
+                    style={{ borderColor: "var(--card-border)", color: "var(--light-text-muted)" }}
+                    title="Skip body metrics for now — no nutrition targets will be calculated"
+                  >
+                    Skip
+                  </button>
+                )}
+                <button onClick={next} className="flex items-center gap-1 rounded-lg px-4 py-2 text-xs font-semibold text-white" style={{ background: "linear-gradient(135deg, #00AEEF, #8B5CF6)" }}>
+                  Next <ChevronRight size={14} />
+                </button>
+              </>
             ) : (
               <button
                 onClick={handleSave}
