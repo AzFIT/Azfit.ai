@@ -122,3 +122,107 @@ export function resolveMethodName(method: string, dbMethods: DbMethod[]): string
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Phase 56 — multi-goal scoring + Step 2 metadata filters
+   ═══════════════════════════════════════════════════════════════ */
+
+/** A DB-backed custom goal row surfaced as a Step 1 tile. */
+export interface DbGoal {
+  id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+}
+
+/** Tile ids for custom goals are namespaced so they never collide with the
+ * six hardcoded wizard goal ids. */
+export const CUSTOM_GOAL_PREFIX = "db:";
+export const customGoalId = (slug: string) => `${CUSTOM_GOAL_PREFIX}${slug}`;
+export const isCustomGoalId = (id: string) => id.startsWith(CUSTOM_GOAL_PREFIX);
+
+/** DB goal names already represented by the six hardcoded Step 1 tiles. */
+export const COVERED_DB_GOAL_NAMES: ReadonlySet<string> = new Set(Object.values(WIZARD_GOAL_TO_DB).flat());
+
+/** Custom Step 1 tiles: active DB goals NOT already covered by a hardcoded
+ * tile (archived goals hide; covered names would duplicate the fixed tiles). */
+export function customGoalTiles(goals: DbGoal[]): DbGoal[] {
+  return goals.filter((g) => g.is_active && !COVERED_DB_GOAL_NAMES.has(g.name));
+}
+
+/**
+ * Score-lookup goal NAMES for a set of selected tile ids: hardcoded tiles map
+ * via WIZARD_GOAL_TO_DB; custom tiles contribute their own DB name. Union,
+ * deduped. rankMethods already takes the max score per method across all
+ * rows — that is the documented multi-goal aggregation.
+ */
+export function dbNamesForGoalSelection(selectedIds: string[], customGoals: DbGoal[]): string[] {
+  const names = new Set<string>();
+  for (const id of selectedIds) {
+    if (isCustomGoalId(id)) {
+      const slug = id.slice(CUSTOM_GOAL_PREFIX.length);
+      const g = customGoals.find((c) => c.slug === slug);
+      if (g) names.add(g.name);
+    } else {
+      for (const n of WIZARD_GOAL_TO_DB[id] ?? []) names.add(n);
+    }
+  }
+  return [...names];
+}
+
+/** Hashtag set of a method's tags text ("#a #b" → {"a","b"}), lowercase. */
+export function methodTagSet(tags: string | null | undefined): Set<string> {
+  if (!tags) return new Set();
+  return new Set(
+    tags
+      .split(/\s+/)
+      .map((t) => t.replace(/^#/, "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+/* Step 2 metadata filters (Phase 56, Item 2). Verified live vocabulary:
+   experience tags exist (#beginner-friendly #intermediate #advanced
+   #all-levels); #elite and ALL equipment tags are absent from the catalog
+   today — chips still work, equipment simply never narrows until such
+   metadata exists (positive-match-only semantics below). */
+export const EXPERIENCE_FILTERS: Record<string, string> = {
+  Beginner: "beginner-friendly",
+  Intermediate: "intermediate",
+  Advanced: "advanced",
+  Elite: "elite",
+};
+export const EQUIPMENT_FILTERS: Record<string, string> = {
+  "Full Gym": "full-gym",
+  Dumbbells: "dumbbells",
+  Bodyweight: "bodyweight",
+  Minimal: "minimal",
+};
+
+/**
+ * Positive-match-only filtering per dimension: a method WITHOUT metadata for
+ * that dimension always stays visible; a method WITH such tags must match at
+ * least one selected chip. #all-levels satisfies any experience selection.
+ * No chips selected → no filtering for that dimension.
+ */
+export function matchesMetadataFilters(
+  tags: string | null | undefined,
+  experienceSel: string[],
+  equipmentSel: string[],
+): boolean {
+  const set = methodTagSet(tags);
+  if (experienceSel.length) {
+    const expTags = [...Object.values(EXPERIENCE_FILTERS), "all-levels"];
+    const hasExpMeta = expTags.some((t) => set.has(t));
+    const expPass =
+      set.has("all-levels") || experienceSel.some((chip) => set.has(EXPERIENCE_FILTERS[chip]));
+    if (hasExpMeta && !expPass) return false;
+  }
+  if (equipmentSel.length) {
+    const eqTags = Object.values(EQUIPMENT_FILTERS);
+    const hasEqMeta = eqTags.some((t) => set.has(t));
+    const eqPass = equipmentSel.some((chip) => set.has(EQUIPMENT_FILTERS[chip]));
+    if (hasEqMeta && !eqPass) return false;
+  }
+  return true;
+}

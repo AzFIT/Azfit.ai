@@ -82,7 +82,7 @@ describe("buildPrintModelFromWizard (draft)", () => {
         id: undefined,
         goal: "hypertrophy",
         method: "german-volume",
-        clientContext: { ageRange: "", experience: "", bodyType: "", availability: "", limitations: [], otherLimitation: "" },
+        clientContext: { experience: "", availability: "", limitations: [], otherLimitation: "" },
         phases: [{ id: "p1", name: "Accumulation", weeks: 4, focus: "", color: "#F59E0B", active: true }],
         weeklyHours: 4,
         split: [

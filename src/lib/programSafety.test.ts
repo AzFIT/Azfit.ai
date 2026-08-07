@@ -54,9 +54,7 @@ describe("normalizeLimitation", () => {
 describe("collectClientLimitations", () => {
   const ctx = (limitations: string[], otherLimitation = "") => ({
     clientContext: {
-      ageRange: "",
       experience: "",
-      bodyType: "",
       availability: "",
       limitations,
       otherLimitation,

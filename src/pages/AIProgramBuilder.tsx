@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Zap, Bot, Save, RotateCcw, Check,
   Dumbbell, TrendingUp, Flame, Wind, HeartPulse, Pencil, Trash2,
-  Plus, BarChart3, X, Target, Award, Sparkles,
+  Plus, BarChart3, X, Target, Award, Sparkles, GripVertical,
   AlertTriangle, Layers, Calendar, Users, Play, ArrowLeft, Upload, ShieldAlert, Loader2, Copy, Link2, Printer,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -32,7 +32,15 @@ import {
   rankMethods,
   groupByCategory,
   resolveMethodName,
-  WIZARD_GOAL_TO_DB,
+  customGoalId,
+  isCustomGoalId,
+  customGoalTiles,
+  CUSTOM_GOAL_PREFIX,
+  dbNamesForGoalSelection,
+  matchesMetadataFilters,
+  EXPERIENCE_FILTERS,
+  EQUIPMENT_FILTERS,
+  type DbGoal,
   type DbMethod,
   type DbMethodCategory,
   type RankedMethod,
@@ -46,6 +54,8 @@ import {
 } from '@/lib/methodDefaults';
 import { buildPrintModelFromWizard } from '@/lib/programPrint';
 import { suggestPhasesForMethod } from '@/lib/phaseSuggestions';
+import { swapSplitContent } from '@/lib/wizardSplit';
+import { nextSeriesLetter } from '@/lib/exerciseLabels';
 import { pairingStyleForMethod, assignPairGroups } from '@/lib/supersets';
 import ExercisePickerDialog, { type LibraryExercise } from '@/components/exercise/ExercisePickerDialog';
 import {
@@ -79,13 +89,14 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 
 // TYPES
-export interface ClientContext { ageRange: string; experience: string; bodyType: string; availability: string; limitations: string[]; otherLimitation: string; }
+export interface ClientContext { experience: string; availability: string; limitations: string[]; otherLimitation: string; }
 export interface ProgramPhase { id: string; name: string; weeks: number; focus: string; color: string; active: boolean; intensityTarget?: string; volumeTarget?: string; }
 export interface ProgramSplit { day: string; active: boolean; workout: string; dbId?: string; }
 export interface ProgramExercise { code: string; name: string; sets: number; reps: string; pct1RM: string; tempo: string; rest: string; dbId?: string; isSubstituted?: boolean; safetyNote?: string; supersetGroup?: string; }
-export interface ProgramData { id?: string; goal: string; method: string; clientContext: ClientContext; phases: ProgramPhase[]; weeklyHours: number; split: ProgramSplit[]; exercises: ProgramExercise[]; workoutExercises?: Record<number, ProgramExercise[]>; progressionRules: ProgressionRule[]; programName: string; description: string; tags: string[]; isPublic: boolean; assignedClient: string; }
+// Phase 56: goal → goals (multi-select; goals[0] is the primary for generation mapping)
+export interface ProgramData { id?: string; goals: string[]; method: string; clientContext: ClientContext; phases: ProgramPhase[]; weeklyHours: number; split: ProgramSplit[]; exercises: ProgramExercise[]; workoutExercises?: Record<number, ProgramExercise[]>; progressionRules: ProgressionRule[]; programName: string; description: string; tags: string[]; isPublic: boolean; assignedClient: string; }
 export interface SavedProgram { id: string; createdAt: string; updatedAt: string; data: ProgramData; }
-interface StepProps { data: ProgramData; updateData: (partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => void; onSave?: () => void; onSaveAndAssign?: () => void; program?: GeneratedProgram | null; clientName?: string; clients?: ClientRow[]; saving?: boolean; limitations?: string[]; dbMethods?: DbMethod[]; methodCategories?: DbMethodCategory[]; goalScores?: { method_id: string; score: number }[]; methodsLoading?: boolean; methodsError?: string | null; }
+interface StepProps { data: ProgramData; updateData: (partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => void; onSave?: () => void; onSaveAndAssign?: () => void; program?: GeneratedProgram | null; clientName?: string; clients?: ClientRow[]; saving?: boolean; limitations?: string[]; dbMethods?: DbMethod[]; methodCategories?: DbMethodCategory[]; goalScores?: { method_id: string; score: number }[]; methodsLoading?: boolean; methodsError?: string | null; customGoals?: DbGoal[]; onAddGoal?: (name: string) => Promise<void>; onArchiveGoal?: (id: string) => Promise<void>; }
 
 type ClientRow = Database['public']['Tables']['clients']['Row'];
 type ProgramRow = Database['public']['Tables']['programs']['Row'];
@@ -350,7 +361,7 @@ const METHOD_MAP: Record<string, string> = { strength: '5x5', hypertrophy: 'germ
 const PCT_MAP: Record<string, string> = { strength: '82.5%', hypertrophy: '75%', fatloss: '65%', power: '70%', endurance: '60%', rehab: '50%' };
 // eslint-disable-next-line react-refresh/only-export-components
 export function mapGeneratedToProgramData(gen: GeneratedProgram, profile: ClientProfile | null): ProgramData { const genGoal = GOAL_MAP[gen.goal] || 'hypertrophy'; const genMethod = METHOD_MAP[genGoal] || 'german-volume'; const activeWorkouts = gen.phases[0]?.workouts || []; const totalWeeks = gen.totalWeeks || 4; let phases: ProgramPhase[]; if (totalWeeks >= 12) { const w1 = Math.round(totalWeeks * 0.33); const w2 = Math.round(totalWeeks * 0.33); const w3 = totalWeeks - w1 - w2; phases = [{ id: 'p1', name: 'Accumulation', weeks: w1, focus: 'Build work capacity and aerobic base with higher volume', color: '#F59E0B', active: true }, { id: 'p2', name: 'Intensification', weeks: w2, focus: 'Increase intensity with moderate volume reduction', color: '#EF4444', active: true }, { id: 'p3', name: 'Realization', weeks: w3, focus: 'Peak intensity with sport-specific demands', color: '#22C55E', active: true }]; } else { phases = [{ id: 'p1', name: 'Adaptation', weeks: totalWeeks, focus: 'Build foundational fitness and work capacity', color: '#00AEEF', active: true }]; } const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']; const split: ProgramSplit[] = dayNames.map((day, idx) => { const workout = activeWorkouts[idx]; return { day, active: !!workout, workout: workout ? `${workout.name} — ${workout.focus}` : 'Rest Day' }; }); const toProgramExercise = (ex: GeneratedExercise): ProgramExercise => { const restMins = Math.floor(ex.restSeconds / 60); const restSecs = ex.restSeconds % 60; return { code: ex.order, name: ex.name, sets: ex.sets, reps: ex.reps, pct1RM: PCT_MAP[genGoal] || 'N/A', tempo: ex.tempo, rest: `${restMins}:${String(restSecs).padStart(2, '0')}` }; }; // Phase 29A: each generated day keeps its OWN exercise list (workouts are day-indexed: Mon idx 0 → key 1 … Sun idx 6 → key 7)
-const workoutExercises: Record<number, ProgramExercise[]> = {}; activeWorkouts.forEach((workout, idx) => { if (workout && workout.exercises?.length) workoutExercises[idx + 1] = workout.exercises.map(toProgramExercise); }); const firstDayList = Object.values(workoutExercises)[0]; const exercises: ProgramExercise[] = firstDayList ? firstDayList.map((e) => ({ ...e })) : []; const clientContext: ClientContext = profile ? { ageRange: '', experience: profile.trainingExperience === 'beginner' ? '<1 year' : profile.trainingExperience === 'advanced' ? '5-10 years' : '1-3 years', bodyType: 'Mesomorph', availability: `${profile.trainingFrequency} days`, limitations: profile.injuries ? ['Other'] : ['None (healthy)'], otherLimitation: profile.injuries || '' } : { ageRange: '', experience: '', bodyType: '', availability: '', limitations: [], otherLimitation: '' }; return { goal: genGoal, method: genMethod, clientContext, phases, weeklyHours: 4.5, split, exercises, workoutExercises, progressionRules: [], programName: gen.name, description: gen.description, tags: ['AI Generated', GOALS.find((g) => g.id === genGoal)?.name || 'Custom'], isPublic: false, assignedClient: '' }; }
+const workoutExercises: Record<number, ProgramExercise[]> = {}; activeWorkouts.forEach((workout, idx) => { if (workout && workout.exercises?.length) workoutExercises[idx + 1] = workout.exercises.map(toProgramExercise); }); const firstDayList = Object.values(workoutExercises)[0]; const exercises: ProgramExercise[] = firstDayList ? firstDayList.map((e) => ({ ...e })) : []; const clientContext: ClientContext = profile ? { experience: profile.trainingExperience === 'beginner' ? '<1 year' : profile.trainingExperience === 'advanced' ? '5-10 years' : '1-3 years', availability: `${profile.trainingFrequency} days`, limitations: profile.injuries ? ['Other'] : ['None (healthy)'], otherLimitation: profile.injuries || '' } : { experience: '', availability: '', limitations: [], otherLimitation: '' }; return { goals: [genGoal], method: genMethod, clientContext, phases, weeklyHours: 4.5, split, exercises, workoutExercises, progressionRules: [], programName: gen.name, description: gen.description, tags: ['AI Generated', GOALS.find((g) => g.id === genGoal)?.name || 'Custom'], isPublic: false, assignedClient: '' }; }
 
 function createEmptySet(setNumber: number, restSeconds: number): LoggedSet { return { setNumber, load: 0, reps: 0, rpe: 0, done: false, restSeconds, type: 'Normal' }; }
 function workoutToSession(workout: GeneratedWorkout, programId: string): WorkoutLog { const exercises: LoggedExercise[] = workout.exercises.map((ex) => ({ order: ex.order, name: ex.name, category: ex.category, targetSets: ex.sets, targetReps: ex.reps, targetLoad: 0, tempo: ex.tempo, sets: Array.from({ length: ex.sets }, (_, i) => createEmptySet(i + 1, ex.restSeconds)), notes: '' })); const totalSets = exercises.reduce((sum, ex) => sum + ex.targetSets, 0); return { id: crypto.randomUUID(), programId, clientId: 'self', clientName: 'You', workoutName: workout.name, phaseName: 'Phase 1: Adaptation', weekNumber: 1, dayNumber: workout.dayNumber, exercises, startTime: new Date().toISOString(), durationSeconds: 0, totalVolume: totalSets * 10 * 20, totalSets, completedSets: 0, avgRpe: 0, status: 'in_progress', createdAt: new Date().toISOString() }; }
@@ -406,43 +417,120 @@ const STEPS = [
   { title: 'Program Preview', component: Step7Preview },
   { title: 'Save & Assign', component: Step8Save },
 ];
-const defaultData: ProgramData = { goal: '', method: '', clientContext: { ageRange: '', experience: '', bodyType: '', availability: '', limitations: [], otherLimitation: '' }, phases: PHASES_DEFAULT.map((p) => ({ ...p })), weeklyHours: 4.5, split: SPLIT_DEFAULTS['Upper/Lower'].map((d) => ({ ...d })), exercises: DEFAULT_EXERCISES.map((e) => ({ ...e })), progressionRules: [], programName: '', description: '', tags: [], isPublic: false, assignedClient: '' };
+const defaultData: ProgramData = { goals: [], method: '', clientContext: { experience: '', availability: '', limitations: [], otherLimitation: '' }, phases: PHASES_DEFAULT.map((p) => ({ ...p })), weeklyHours: 4.5, split: SPLIT_DEFAULTS['Upper/Lower'].map((d) => ({ ...d })), exercises: DEFAULT_EXERCISES.map((e) => ({ ...e })), progressionRules: [], programName: '', description: '', tags: [], isPublic: false, assignedClient: '' };
 
-function Step1Goal({ data, updateData }: StepProps) {
-  const [dropdownGoal, setDropdownGoal] = useState(data.goal || '');
-  const selectGoal = useCallback((goalId: string) => updateData({ goal: goalId }), [updateData]);
+// Phase 56: display names for all selected goal tiles (hardcoded + custom DB goals)
+function goalNamesFor(goals: string[], customGoals: DbGoal[]): string[] {
+  return goals
+    .map((id) =>
+      isCustomGoalId(id)
+        ? customGoals.find((c) => c.slug === id.slice(CUSTOM_GOAL_PREFIX.length))?.name
+        : GOALS.find((g) => g.id === id)?.name,
+    )
+    .filter((n): n is string => !!n);
+}
+
+function Step1Goal({ data, updateData, customGoals = [], onAddGoal, onArchiveGoal }: StepProps) {
+  // Phase 56: multi-select tiles — goals[0] is the primary (generation mapping).
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const toggleGoal = useCallback(
+    (goalId: string) =>
+      updateData((prev) => ({
+        goals: prev.goals.includes(goalId) ? prev.goals.filter((g) => g !== goalId) : [...prev.goals, goalId],
+      })),
+    [updateData],
+  );
+  const activeCustom = customGoalTiles(customGoals);
+  const submitNew = async () => {
+    const name = newName.trim();
+    if (!name || !onAddGoal || busy) return;
+    setBusy(true);
+    await onAddGoal(name);
+    setBusy(false);
+    setNewName('');
+    setAdding(false);
+  };
   return (
     <div className="space-y-4">
+      <p className="text-[var(--page-text)]/60 text-xs">Select one or more goals — the first selected is the primary.</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {GOALS.map((goal) => { const Icon = goal.icon; const isSelected = data.goal === goal.id; return (
-          <motion.button key={goal.id} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => selectGoal(goal.id)} className={cn('relative flex flex-col items-start p-4 rounded-xl border-2 transition-all text-left', isSelected ? 'border-[#00AEEF] bg-[#00AEEF]/5 shadow-lg shadow-[#00AEEF]/10' : 'border-[var(--card-border)] bg-[var(--card-bg)] hover:border-[var(--azfit-primary)]/50 hover:bg-[var(--page-bg)]')}>
+        {GOALS.map((goal) => { const Icon = goal.icon; const isSelected = data.goals.includes(goal.id); const isPrimary = data.goals[0] === goal.id; return (
+          <motion.button key={goal.id} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => toggleGoal(goal.id)} className={cn('relative flex flex-col items-start p-4 rounded-xl border-2 transition-all text-left', isSelected ? 'border-[#00AEEF] bg-[#00AEEF]/5 shadow-lg shadow-[#00AEEF]/10' : 'border-[var(--card-border)] bg-[var(--card-bg)] hover:border-[var(--azfit-primary)]/50 hover:bg-[var(--page-bg)]')}>
             <div className="flex items-center justify-between w-full mb-2">
               <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${goal.color}20`, border: `1px solid ${goal.color}40` }}><Icon className="w-5 h-5" style={{ color: goal.color }} /></div>
-              <div className={cn('w-5 h-5 rounded border flex items-center justify-center transition-colors', isSelected ? 'bg-[#00AEEF] border-[#00AEEF]' : 'border-[var(--card-border)] bg-[var(--page-bg)]')}>{isSelected && <Check className="w-3 h-3 text-white" />}</div>
+              <div className="flex items-center gap-1.5">
+                {isPrimary && <span className="text-[8px] font-bold uppercase tracking-wide text-[#8B5CF6]">Primary</span>}
+                <div className={cn('w-5 h-5 rounded border flex items-center justify-center transition-colors', isSelected ? 'bg-[#00AEEF] border-[#00AEEF]' : 'border-[var(--card-border)] bg-[var(--page-bg)]')}>{isSelected && <Check className="w-3 h-3 text-white" />}</div>
+              </div>
             </div>
             <h4 className="text-[var(--page-text)] font-semibold text-sm mb-1">{goal.name}</h4>
             <p className="text-[var(--page-text)]/60 text-xs leading-relaxed">{goal.desc}</p>
           </motion.button>
         ); })}
+        {/* Custom DB goals (is_active) — visible to all trainers */}
+        {activeCustom.map((g) => { const tid = customGoalId(g.slug); const isSelected = data.goals.includes(tid); const isPrimary = data.goals[0] === tid; return (
+          <div key={g.id} className="relative">
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => toggleGoal(tid)} className={cn('relative flex w-full flex-col items-start p-4 rounded-xl border-2 transition-all text-left', isSelected ? 'border-[#00AEEF] bg-[#00AEEF]/5 shadow-lg shadow-[#00AEEF]/10' : 'border-[var(--card-border)] bg-[var(--card-bg)] hover:border-[var(--azfit-primary)]/50 hover:bg-[var(--page-bg)]')}>
+              <div className="flex items-center justify-between w-full mb-2">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#00AEEF20', border: '1px solid #00AEEF40' }}><Target className="w-5 h-5" style={{ color: '#00AEEF' }} /></div>
+                <div className="flex items-center gap-1.5">
+                  {isPrimary && <span className="text-[8px] font-bold uppercase tracking-wide text-[#8B5CF6]">Primary</span>}
+                  <div className={cn('w-5 h-5 rounded border flex items-center justify-center transition-colors', isSelected ? 'bg-[#00AEEF] border-[#00AEEF]' : 'border-[var(--card-border)] bg-[var(--page-bg)]')}>{isSelected && <Check className="w-3 h-3 text-white" />}</div>
+                </div>
+              </div>
+              <h4 className="text-[var(--page-text)] font-semibold text-sm mb-1">{g.name}</h4>
+              <p className="text-[var(--page-text)]/60 text-xs leading-relaxed">Custom goal</p>
+            </motion.button>
+            {onArchiveGoal && (
+              <button
+                onClick={() => onArchiveGoal(g.id)}
+                aria-label={`Archive ${g.name}`}
+                className="absolute bottom-2 right-3 text-[10px] font-medium text-[var(--light-text-muted)] hover:text-[#EF4444] underline underline-offset-2"
+              >
+                Archive
+              </button>
+            )}
+          </div>
+        ); })}
       </div>
-      <div className="flex items-center gap-3">
-        <span className="text-[var(--page-text)]/60 text-sm">Or select from dropdown:</span>
-        <select value={dropdownGoal} onChange={(e) => { setDropdownGoal(e.target.value); if (e.target.value) selectGoal(e.target.value); }} className="bg-[var(--card-bg)] border border-[var(--card-border)] text-[var(--page-text)] text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#00AEEF]">
-          <option value="">— Select Goal —</option>
-          {GOALS.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-        </select>
-        <Button variant="outline" size="sm" onClick={() => selectGoal('hypertrophy')} className="border-[#8B5CF6] text-[#8B5CF6] hover:bg-[#8B5CF6]/10 text-xs"><Bot className="w-3.5 h-3.5 mr-1" />Recommend</Button>
-      </div>
+      {/* Custom goal creation — writes the shared goals table */}
+      {onAddGoal && (
+        adding ? (
+          <div className="flex items-center gap-2">
+            <Input value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitNew()} placeholder="e.g. Marathon Prep" className="bg-[var(--card-bg)] border-[var(--card-border)] text-[var(--page-text)] text-sm max-w-xs" />
+            <Button size="sm" onClick={submitNew} disabled={!newName.trim() || busy} className="bg-[#00AEEF] text-white hover:bg-[#00AEEF]/90 text-xs">{busy ? 'Adding…' : 'Add'}</Button>
+            <Button variant="outline" size="sm" onClick={() => { setAdding(false); setNewName(''); }} className="border-[var(--card-border)] text-xs">Cancel</Button>
+          </div>
+        ) : (
+          <Button variant="outline" size="sm" onClick={() => setAdding(true)} className="border-[#00AEEF]/50 text-[#00AEEF] hover:bg-[#00AEEF]/10 text-xs"><Plus className="w-3.5 h-3.5 mr-1" />Add goal</Button>
+        )
+      )}
     </div>
   );
 }
 
-function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], goalScores = [], methodsLoading, methodsError }: StepProps) {
+function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], goalScores = [], methodsLoading, methodsError, customGoals = [] }: StepProps) {
   const [drawerMethod, setDrawerMethod] = useState<RankedMethod | null>(null);
+  // Phase 56 Item 2: metadata filter chips (positive-match-only — a method
+  // lacking that metadata dimension always stays visible)
+  const [expChips, setExpChips] = useState<string[]>([]);
+  const [eqChips, setEqChips] = useState<string[]>([]);
+  const toggleChip = (list: string[], setList: (v: string[]) => void, v: string) =>
+    setList(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
+
   const ranked = useMemo(() => rankMethods(dbMethods, goalScores), [dbMethods, goalScores]);
-  const groups = useMemo(() => groupByCategory(ranked, methodCategories), [ranked, methodCategories]);
-  const best = useMemo(() => ranked.find((m) => m.score != null) ?? null, [ranked]);
-  const goalName = GOALS.find((g) => g.id === data.goal)?.name || '';
+  const filtered = useMemo(
+    () => ranked.filter((m) => matchesMetadataFilters(m.tags, expChips, eqChips)),
+    [ranked, expChips, eqChips],
+  );
+  const groups = useMemo(() => groupByCategory(filtered, methodCategories), [filtered, methodCategories]);
+  const best = useMemo(() => filtered.find((m) => m.score != null) ?? null, [filtered]);
+  // Multi-goal: display names across ALL selected tiles (hardcoded + custom)
+  const selectedGoalNames = goalNamesFor(data.goals, customGoals);
+  const goalName = selectedGoalNames.join(' + ');
+  const noScores = data.goals.length > 0 && goalScores.length === 0;
   const selectMethod = useCallback(
     (m: DbMethod) =>
       updateData((prev) => {
@@ -470,8 +558,47 @@ function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], 
         <div className="rounded-xl border border-[#EF4444]/40 bg-[#EF4444]/10 px-4 py-3 text-xs text-[#EF4444]">
           Couldn't load the method catalog ({methodsError}). Check your connection and reopen this step.
         </div>
+      ) : dbMethods.length === 0 ? (
+        // Phase 56 Item 0: an empty catalog previously rendered a blank panel
+        // (e.g. an expired session silently returning 0 rows) — honest state now
+        <div className="rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-10 text-center">
+          <p className="text-sm font-medium text-[var(--page-text)]">No training methods available right now.</p>
+          <p className="mt-1 text-xs text-[var(--light-text-muted)]">
+            The catalog couldn't be read — try signing out and back in, then reopen this step.
+          </p>
+        </div>
       ) : (
         <>
+          {/* Phase 56 Item 2: filter chips */}
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--light-text-muted)] w-20">Experience</span>
+              {Object.keys(EXPERIENCE_FILTERS).map((chip) => {
+                const active = expChips.includes(chip);
+                return (
+                  <button key={chip} onClick={() => toggleChip(expChips, setExpChips, chip)} className={cn('rounded-full border px-2.5 py-1 text-[10px] font-semibold transition', active ? 'border-[#00AEEF] bg-[#00AEEF]/10 text-[#00AEEF]' : 'border-[var(--card-border)] text-[var(--light-text-muted)] hover:border-[#00AEEF]/50')}>
+                    {chip}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--light-text-muted)] w-20">Equipment</span>
+              {Object.keys(EQUIPMENT_FILTERS).map((chip) => {
+                const active = eqChips.includes(chip);
+                return (
+                  <button key={chip} onClick={() => toggleChip(eqChips, setEqChips, chip)} className={cn('rounded-full border px-2.5 py-1 text-[10px] font-semibold transition', active ? 'border-[#8B5CF6] bg-[#8B5CF6]/10 text-[#8B5CF6]' : 'border-[var(--card-border)] text-[var(--light-text-muted)] hover:border-[#8B5CF6]/50')}>
+                    {chip}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {noScores && (
+            <p className="rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-[11px] text-[var(--light-text-muted)]">
+              No scoring data for this goal yet — methods are listed unranked.
+            </p>
+          )}
           {best && (
             <div className="bg-[#22C55E]/5 border border-[#22C55E]/30 rounded-xl p-3 flex items-center gap-3">
               <Award className="w-5 h-5 text-[#22C55E] shrink-0" />
@@ -480,6 +607,11 @@ function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], 
                 <span className="text-[var(--page-text)] text-sm ml-2">{best.name} ({best.score?.toFixed(1)})</span>
               </div>
             </div>
+          )}
+          {groups.length === 0 && (
+            <p className="py-8 text-center text-xs text-[var(--light-text-muted)]">
+              No methods match these filters — widen the selection.
+            </p>
           )}
           {groups.map((group) => (
             <div key={group.category}>
@@ -609,9 +741,7 @@ function Step3Context({ data, updateData }: StepProps) {
     <div className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {[
-          { label: 'Age Range', field: 'ageRange' as const, options: ['', '18-25', '26-35', '36-45', '46-55', '55+'] },
           { label: 'Training Experience', field: 'experience' as const, options: ['', '<1 year', '1-3 years', '3-5 years', '5-10 years', '10+ years'] },
-          { label: 'Body Type', field: 'bodyType' as const, options: ['', 'Ectomorph', 'Mesomorph', 'Endomorph', 'Mixed'] },
           { label: 'Weekly Availability', field: 'availability' as const, options: ['', '2 days', '3 days', '4 days', '5 days', '6 days'] },
         ].map((f) => (
           <div key={f.field}>
@@ -641,9 +771,7 @@ function Step3Context({ data, updateData }: StepProps) {
       <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 space-y-3">
         <h4 className="text-[var(--page-text)] text-sm font-semibold">Context Summary</h4>
         <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="text-[var(--page-text)]/60">Age: <span className="text-[var(--page-text)]">{data.clientContext.ageRange || '—'}</span></div>
           <div className="text-[var(--page-text)]/60">Experience: <span className="text-[var(--page-text)]">{data.clientContext.experience || '—'}</span></div>
-          <div className="text-[var(--page-text)]/60">Body Type: <span className="text-[var(--page-text)]">{data.clientContext.bodyType || '—'}</span></div>
           <div className="text-[var(--page-text)]/60">Availability: <span className="text-[var(--page-text)]">{data.clientContext.availability || '—'}</span></div>
         </div>
         <div className="flex items-center gap-3 pt-2 border-t border-[var(--card-border)]">
@@ -653,7 +781,7 @@ function Step3Context({ data, updateData }: StepProps) {
           <span className="text-xs font-mono font-bold" style={{ color: aiRiskScore > 50 ? '#EF4444' : aiRiskScore > 25 ? '#F59E0B' : '#22C55E' }}>{aiRiskScore}%</span>
         </div>
       </div>
-      <Button variant="outline" size="sm" onClick={() => updateData({ clientContext: { ageRange: '26-35', experience: '1-3 years', bodyType: 'Mesomorph', availability: '4 days', limitations: ['None (healthy)'], otherLimitation: '' } })} className="border-[#8B5CF6] text-[#8B5CF6] hover:bg-[#8B5CF6]/10 text-xs"><Bot className="w-3.5 h-3.5 mr-1" />Recommend Context</Button>
+      <Button variant="outline" size="sm" onClick={() => updateData({ clientContext: { experience: '1-3 years', availability: '4 days', limitations: ['None (healthy)'], otherLimitation: '' } })} className="border-[#8B5CF6] text-[#8B5CF6] hover:bg-[#8B5CF6]/10 text-xs"><Bot className="w-3.5 h-3.5 mr-1" />Recommend Context</Button>
     </div>
   );
 }
@@ -834,9 +962,24 @@ function muscleTagsFor(workout: string): string[] {
 
 function Step5Split({ data, updateData }: StepProps) {
   const [splitType, setSplitType] = useState('Upper/Lower');
+  // Phase 56 Item 5: drag-to-swap state (native HTML5 DnD — no dependency)
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dropIdx, setDropIdx] = useState<number | null>(null);
   const toggleDay = useCallback((dayIdx: number) => updateData((prev) => ({ split: prev.split.map((d, i) => (i === dayIdx ? { ...d, active: !d.active } : d)) })), [updateData]);
   const updateDayWorkout = useCallback((dayIdx: number, value: string) => updateData((prev) => ({ split: prev.split.map((d, i) => (i === dayIdx ? { ...d, workout: value } : d)) })), [updateData]);
   const applySplit = useCallback((type: string) => { setSplitType(type); if (SPLIT_DEFAULTS[type]) updateData({ split: SPLIT_DEFAULTS[type].map((d) => ({ ...d })) }); }, [updateData]);
+  // Swap workout assignments between two days — calendar labels stay fixed,
+  // exercise lists follow their content (rest-day swaps included).
+  const swapDays = useCallback(
+    (i: number, j: number) =>
+      updateData((prev) => {
+        const r = swapSplitContent(prev.split, prev.workoutExercises, i, j, (d) => SPLIT_DAY_INDEX[d] ?? 0);
+        return r.workoutExercises
+          ? { split: r.split, workoutExercises: r.workoutExercises as Record<number, ProgramExercise[]> }
+          : { split: r.split };
+      }),
+    [updateData],
+  );
 
   const activeDays = useMemo(() => data.split.filter((d) => d.active).length, [data.split]);
   const restDays = useMemo(() => data.split.filter((d) => !d.active).length, [data.split]);
@@ -862,13 +1005,38 @@ function Step5Split({ data, updateData }: StepProps) {
               <motion.div
                 key={day.day}
                 layout
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (dragIdx !== null && dragIdx !== idx) setDropIdx(idx);
+                }}
+                onDragLeave={() => setDropIdx((d) => (d === idx ? null : d))}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragIdx !== null && dragIdx !== idx) swapDays(dragIdx, idx);
+                  setDragIdx(null);
+                  setDropIdx(null);
+                }}
                 className={cn('rounded-xl border overflow-hidden transition-all',
                   active
                     ? 'border-l-4 border-l-[#00AEEF] border-[var(--card-border)] bg-[var(--card-bg)]'
-                    : 'border-[var(--card-border)] bg-[var(--page-bg)] opacity-60')}
+                    : 'border-[var(--card-border)] bg-[var(--page-bg)] opacity-60',
+                  dragIdx === idx && 'opacity-40',
+                  dropIdx === idx && 'ring-2 ring-[#00AEEF] border-[#00AEEF]')}
               >
-                <div className="flex items-center justify-between px-3 pt-3">
-                  <span className={cn('text-sm font-bold', active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40')}>{day.day.toUpperCase()}</span>
+                <div
+                  className="flex items-center justify-between px-3 pt-3 cursor-grab active:cursor-grabbing"
+                  draggable
+                  onDragStart={(e) => {
+                    setDragIdx(idx);
+                    e.dataTransfer.effectAllowed = 'move';
+                }}
+                  onDragEnd={() => { setDragIdx(null); setDropIdx(null); }}
+                  title="Drag onto another day to swap workouts"
+                >
+                  <span className="flex items-center gap-1">
+                    <GripVertical size={12} className="text-[var(--light-text-muted)]" />
+                    <span className={cn('text-sm font-bold', active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40')}>{day.day.toUpperCase()}</span>
+                  </span>
                   <input type="checkbox" checked={day.active} onChange={() => toggleDay(idx)} className="w-4 h-4 rounded accent-[#00AEEF]" />
                 </div>
                 {active ? (
@@ -991,12 +1159,14 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
         setList((prev) => prev.map((e, i) => (i === swapIdx ? { ...e, name: ex.name } : e)));
         setSwapIdx(null);
       } else {
+        // Phase 56 Item 6: label from the shared 33C/41 logic — a new exercise
+        // starts the NEXT series letter (continues past H), never a fake "B<n>".
         // Phase 48: new exercises prefill from the method's defaults
         // (parseable prescriptions only — trainer overrides freely)
         setList((prev) => [
           ...prev,
           {
-            code: `B${prev.length + 1}`,
+            code: nextSeriesLetter(prev.map((e) => e.code)),
             name: ex.name,
             sets: exercisePrefill?.sets ?? 3,
             reps: exercisePrefill?.reps ?? '10',
@@ -1340,7 +1510,7 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
   );
 }
 
-function Step7Preview({ data, program, clientName, dbMethods = [], clients = [] }: StepProps) {
+function Step7Preview({ data, program, clientName, dbMethods = [], clients = [], customGoals = [] }: StepProps) {
   const navigate = useNavigate();
   const totalWeeks = useMemo(() => data.phases.filter((p) => p.active).reduce((s, p) => s + p.weeks, 0), [data.phases]);
   // Per-day lists (loaded programs) are the source of truth when present.
@@ -1355,8 +1525,8 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [] 
   const restDays = data.split.filter((d) => !d.active).length;
   const intensity = useMemo(() => { const avgPct = allExercises.reduce((sum, e) => { const num = parseFloat(e.pct1RM); return sum + (isNaN(num) ? 70 : num); }, 0) / totalExercises || 70; return Math.round(avgPct); }, [allExercises, totalExercises]);
   const avgRest = useMemo(() => { const rests = allExercises.map((e) => parseInt(e.rest) || 90); return Math.round(rests.reduce((a, b) => a + b, 0) / rests.length); }, [allExercises]);
-  const aiConfidence = useMemo(() => { let score = 70; if (data.goal) score += 10; if (data.method) score += 10; if (data.clientContext.ageRange) score += 5; if (data.phases.length > 0) score += 5; return Math.min(score, 98); }, [data]);
-  const goalName = GOALS.find((g) => g.id === data.goal)?.name || '—';
+  const aiConfidence = useMemo(() => { let score = 70; if (data.goals.length) score += 10; if (data.method) score += 10; if (data.phases.length > 0) score += 10; return Math.min(score, 98); }, [data]);
+  const goalName = goalNamesFor(data.goals, customGoals).join(' + ') || '—';
   const methodName = resolveMethodName(data.method, dbMethods);
   const methodData = LEGACY_METHODS.find((m) => m.id === data.method);
   const splitName = data.split.filter((d) => d.active).length > 0 ? `${activeDays}-Day Split` : '—';
@@ -1576,7 +1746,7 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [] 
         <Card className="bg-[var(--card-bg)] border-[var(--card-border)] p-5">
           <h4 className="text-[var(--page-text)] text-sm font-bold mb-3 flex items-center gap-2"><Users className="w-4 h-4 text-[#22C55E]" />Client Context</h4>
           <div className="space-y-2 text-sm">
-            {[{ k: 'Age Range', v: data.clientContext.ageRange }, { k: 'Experience', v: data.clientContext.experience }, { k: 'Body Type', v: data.clientContext.bodyType }, { k: 'Availability', v: data.clientContext.availability }].map((r) => (
+            {[{ k: 'Experience', v: data.clientContext.experience }, { k: 'Availability', v: data.clientContext.availability }].map((r) => (
               <div key={r.k} className="flex justify-between"><span className="text-[var(--page-text)]/60">{r.k}</span><span className="text-[var(--page-text)]">{r.v || '—'}</span></div>
             ))}
             {data.clientContext.limitations.length > 0 && (
@@ -1682,7 +1852,7 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [] 
   );
 }
 
-function Step8Save({ data, updateData, onSave, clients, saving, dbMethods = [] }: StepProps) {
+function Step8Save({ data, updateData, onSave, clients, saving, dbMethods = [], customGoals = [] }: StepProps) {
   const [showDetails, setShowDetails] = useState(true);
   const toggleTag = useCallback((tag: string) => updateData((prev) => { const next = prev.tags.includes(tag) ? prev.tags.filter((t) => t !== tag) : [...prev.tags, tag]; return { tags: next }; }), [updateData]);
   const selectedClient = clients?.find((c) => c.id === data.assignedClient);
@@ -1696,7 +1866,7 @@ function Step8Save({ data, updateData, onSave, clients, saving, dbMethods = [] }
     const lists = data.workoutExercises ? Object.values(data.workoutExercises) : [data.exercises];
     return lists.flat().filter((e) => e.isSubstituted).length;
   }, [data.workoutExercises, data.exercises]);
-  const goalName = GOALS.find((g) => g.id === data.goal)?.name || '—';
+  const goalName = goalNamesFor(data.goals, customGoals).join(' + ') || '—';
   const methodName = resolveMethodName(data.method, dbMethods);
   const clientName = selectedClient?.full_name || data.clientContext.experience || 'Unassigned';
   const activePhases = data.phases.filter((p) => p.active);
@@ -1902,12 +2072,45 @@ export default function AIProgramBuilderPage() {
   }, [user]);
 
   // Phase 30A — live method catalog + goals for the Step 2 browser
+  // Phase 56 — goals also power Step 1 custom tiles (slug/is_active; the
+  // generated types predate those columns, hence the cast)
   const [dbMethods, setDbMethods] = useState<DbMethod[]>([]);
   const [methodCategories, setMethodCategories] = useState<DbMethodCategory[]>([]);
-  const [dbGoals, setDbGoals] = useState<{ id: string; name: string }[]>([]);
+  const [dbGoals, setDbGoals] = useState<DbGoal[]>([]);
   const [goalScores, setGoalScores] = useState<{ method_id: string; score: number }[]>([]);
   const [methodsLoading, setMethodsLoading] = useState(true);
   const [methodsError, setMethodsError] = useState<string | null>(null);
+
+  // Phase 56 Item 1 — custom goals live in the shared goals table
+  const reloadGoals = useCallback(async () => {
+    const { data } = await supabase.from('goals').select('id, name, slug, is_active').order('display_order');
+    setDbGoals(((data as unknown) as DbGoal[] | null) ?? []);
+  }, []);
+  const handleAddGoal = useCallback(
+    async (name: string) => {
+      const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      const { error } = await supabase.from('goals').insert({ name: name.trim(), slug } as never);
+      if (error) {
+        toast.error(error.message.includes('duplicate') ? 'That goal already exists' : `Couldn't add goal: ${error.message}`);
+        return;
+      }
+      toast.success(`Goal "${name.trim()}" added — visible to all trainers`);
+      await reloadGoals();
+    },
+    [reloadGoals],
+  );
+  const handleArchiveGoal = useCallback(
+    async (id: string) => {
+      const { error } = await supabase.from('goals').update({ is_active: false } as never).eq('id', id);
+      if (error) {
+        toast.error(`Couldn't archive goal: ${error.message}`);
+        return;
+      }
+      toast.success('Goal archived — existing programs keep working');
+      await reloadGoals();
+    },
+    [reloadGoals],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -1917,25 +2120,27 @@ export default function AIProgramBuilderPage() {
       const [mRes, cRes, gRes] = await Promise.all([
         supabase.from('methods').select('id, name, slug, category, category_id, description, tags, display_order, defaults').eq('is_active', true).order('display_order'),
         supabase.from('method_categories').select('id, name, display_order').order('display_order'),
-        supabase.from('goals').select('id, name'),
+        supabase.from('goals').select('id, name, slug, is_active').order('display_order'),
       ]);
       if (cancelled) return;
       if (mRes.error) setMethodsError(mRes.error.message);
       else setDbMethods((mRes.data as DbMethod[] | null) ?? []);
       if (!cRes.error) setMethodCategories((cRes.data as DbMethodCategory[] | null) ?? []);
-      if (!gRes.error) setDbGoals((gRes.data as { id: string; name: string }[] | null) ?? []);
+      if (!gRes.error) setDbGoals(((gRes.data as unknown) as DbGoal[] | null) ?? []);
       setMethodsLoading(false);
     })();
     return () => { cancelled = true; };
   }, []);
 
-  // Rank the catalog by the selected goal's pre-computed scores (Phase 30A).
-  // Graceful degradation: any failure leaves an empty list → unranked alphabetical.
-  const selectedGoal = data.goal;
+  // Rank the catalog by the SELECTED GOALS' pre-computed scores (Phase 30A,
+  // multi-goal in Phase 56): union of mapped goal names across the selection,
+  // rankMethods aggregates max score per method. Graceful degradation: any
+  // failure leaves an empty list → unranked alphabetical + honest note.
+  const selectedGoalsKey = data.goals.join(',');
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const names = WIZARD_GOAL_TO_DB[selectedGoal] ?? [];
+      const names = dbNamesForGoalSelection(selectedGoalsKey ? selectedGoalsKey.split(',') : [], dbGoals);
       const ids = dbGoals.filter((g) => names.includes(g.name)).map((g) => g.id);
       if (ids.length === 0) {
         if (!cancelled) setGoalScores([]);
@@ -1946,7 +2151,7 @@ export default function AIProgramBuilderPage() {
       setGoalScores(error ? [] : ((rows as { method_id: string; score: number }[] | null) ?? []));
     })();
     return () => { cancelled = true; };
-  }, [selectedGoal, dbGoals]);
+  }, [selectedGoalsKey, dbGoals]);
 
   // Pre-select a client when arriving via /ai-program-builder?clientId=…
   const [searchParams] = useSearchParams();
@@ -2170,7 +2375,7 @@ export default function AIProgramBuilderPage() {
         programName: tpl.name,
         description: labels.slice(0, 3).join(' · '),
         tags: rawTags.slice(0, 5),
-        ...(goalId ? { goal: goalId } : {}),
+        ...(goalId ? { goals: [goalId] } : {}),
         ...(methodId ? { method: methodId } : {}),
       });
       toast.success(`Template "${tpl.name}" loaded`);
@@ -2183,7 +2388,7 @@ export default function AIProgramBuilderPage() {
     const exerciseCount = data.workoutExercises
       ? Object.values(data.workoutExercises).flat().length
       : data.exercises.length;
-    return [!!data.goal, !!data.method, !!(data.clientContext.ageRange && data.clientContext.experience), data.phases.some((p) => p.active), data.split.some((d) => d.active), exerciseCount > 0, !!(data.goal && data.method), !!data.programName];
+    return [data.goals.length > 0, !!data.method, !!data.clientContext.experience, data.phases.some((p) => p.active), data.split.some((d) => d.active), exerciseCount > 0, data.goals.length > 0 && !!data.method, !!data.programName];
   }, [data]);
   const completionPercent = useMemo(() => Math.round((stepComplete.filter(Boolean).length / stepComplete.length) * 100), [stepComplete]);
 
@@ -2307,7 +2512,7 @@ export default function AIProgramBuilderPage() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
         <AnimatePresence mode="wait">
           <motion.div key={currentStep} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.2 }}>
-            <CurrentComponent data={data} updateData={updateData} program={program} onSave={handleSave} onSaveAndAssign={handleSaveAndAssign} clientName={selectedClientName} clients={clients} saving={saving} limitations={wizardLimitations} dbMethods={dbMethods} methodCategories={methodCategories} goalScores={goalScores} methodsLoading={methodsLoading} methodsError={methodsError} />
+            <CurrentComponent data={data} updateData={updateData} program={program} onSave={handleSave} onSaveAndAssign={handleSaveAndAssign} clientName={selectedClientName} clients={clients} saving={saving} limitations={wizardLimitations} dbMethods={dbMethods} methodCategories={methodCategories} goalScores={goalScores} methodsLoading={methodsLoading} methodsError={methodsError} customGoals={dbGoals} onAddGoal={handleAddGoal} onArchiveGoal={handleArchiveGoal} />
           </motion.div>
         </AnimatePresence>
 

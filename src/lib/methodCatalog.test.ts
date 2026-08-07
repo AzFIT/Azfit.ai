@@ -4,6 +4,12 @@ import {
   groupByCategory,
   resolveMethodName,
   WIZARD_GOAL_TO_DB,
+  customGoalId,
+  isCustomGoalId,
+  dbNamesForGoalSelection,
+  methodTagSet,
+  matchesMetadataFilters,
+  customGoalTiles,
   type DbMethod,
   type DbMethodCategory,
 } from "@/lib/methodCatalog";
@@ -100,5 +106,91 @@ describe("resolveMethodName", () => {
   it("unknown -> humanized raw value; empty -> dash", () => {
     expect(resolveMethodName("wave-loading", [])).toBe("Wave Loading");
     expect(resolveMethodName("", [])).toBe("—");
+  });
+});
+
+describe("Phase 56 — multi-goal selection", () => {
+  const custom = [
+    { id: "g1", name: "Marathon Prep", slug: "marathon-prep", is_active: true },
+    { id: "g2", name: "Archived Thing", slug: "archived-thing", is_active: false },
+  ];
+
+  it("customGoalId / isCustomGoalId round-trip + namespace", () => {
+    expect(customGoalId("marathon-prep")).toBe("db:marathon-prep");
+    expect(isCustomGoalId("db:marathon-prep")).toBe(true);
+    expect(isCustomGoalId("strength")).toBe(false);
+  });
+
+  it("dbNamesForGoalSelection unions hardcoded + custom goal names, deduped", () => {
+    const names = dbNamesForGoalSelection(["strength", "hypertrophy", "db:marathon-prep"], custom);
+    expect(names).toEqual(expect.arrayContaining(["Strength", "Hypertrophy", "Build Muscle", "Marathon Prep"]));
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("archived custom goals still resolve (existing programs keep working)", () => {
+    expect(dbNamesForGoalSelection(["db:archived-thing"], custom)).toEqual(["Archived Thing"]);
+  });
+
+  it("unknown tile id → empty (unranked, no crash)", () => {
+    expect(dbNamesForGoalSelection(["nonsense"], [])).toEqual([]);
+  });
+
+  it("rankMethods takes max score per method across multi-goal rows (documented aggregation)", () => {
+    const methods = [m("a", "GVT"), m("b", "5x5")];
+    const scores = [
+      { method_id: "a", score: 60 }, // goal 1
+      { method_id: "a", score: 85 }, // goal 2 — max wins
+      { method_id: "b", score: 70 },
+    ];
+    const ranked = rankMethods(methods, scores);
+    expect(ranked[0].id).toBe("a");
+    expect(ranked[0].score).toBe(85);
+  });
+});
+
+describe("Phase 56 — Step 2 metadata filters", () => {
+  it("methodTagSet parses hashtags lowercase", () => {
+    expect(methodTagSet("#Advanced #Fat-Loss")).toEqual(new Set(["advanced", "fat-loss"]));
+    expect(methodTagSet(null)).toEqual(new Set());
+  });
+
+  it("no chips → everything visible", () => {
+    expect(matchesMetadataFilters("#advanced", [], [])).toBe(true);
+    expect(matchesMetadataFilters(null, [], [])).toBe(true);
+  });
+
+  it("experience chip narrows only positively-tagged methods", () => {
+    expect(matchesMetadataFilters("#advanced #hypertrophy", ["Beginner"], [])).toBe(false);
+    expect(matchesMetadataFilters("#beginner-friendly", ["Beginner"], [])).toBe(true);
+    // lacks experience metadata → stays visible
+    expect(matchesMetadataFilters("#hypertrophy", ["Beginner"], [])).toBe(true);
+    expect(matchesMetadataFilters(null, ["Beginner"], [])).toBe(true);
+  });
+
+  it("#all-levels satisfies any experience selection", () => {
+    expect(matchesMetadataFilters("#all-levels #strength", ["Elite"], [])).toBe(true);
+  });
+
+  it("equipment chip narrows only when equipment metadata exists", () => {
+    expect(matchesMetadataFilters("#bodyweight", [], ["Full Gym"])).toBe(false);
+    expect(matchesMetadataFilters("#bodyweight", [], ["Bodyweight"])).toBe(true);
+    // no equipment metadata (the whole live catalog today) → stays visible
+    expect(matchesMetadataFilters("#advanced", [], ["Full Gym"])).toBe(true);
+  });
+
+  it("multi-select unions within a dimension", () => {
+    expect(matchesMetadataFilters("#intermediate", ["Beginner", "Intermediate"], [])).toBe(true);
+  });
+});
+
+describe("customGoalTiles (Step 1 tile filtering)", () => {
+  it("excludes archived + names covered by the hardcoded tiles", () => {
+    const goals = [
+      { id: "1", name: "Marathon Prep", slug: "marathon-prep", is_active: true },
+      { id: "2", name: "Hypertrophy", slug: "hypertrophy", is_active: true }, // covered by a fixed tile
+      { id: "3", name: "Lose Weight", slug: "lose-weight", is_active: true }, // covered
+      { id: "4", name: "Old Goal", slug: "old-goal", is_active: false }, // archived
+    ];
+    expect(customGoalTiles(goals).map((g) => g.name)).toEqual(["Marathon Prep"]);
   });
 });

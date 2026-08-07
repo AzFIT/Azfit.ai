@@ -211,9 +211,7 @@ export function defaultProgramData(
   overrides: Partial<ProgramData> = {}
 ): ProgramData {
   const defaultContext: ClientContext = {
-    ageRange: "",
     experience: "",
-    bodyType: "",
     availability: "",
     limitations: [],
     otherLimitation: "",
@@ -260,7 +258,7 @@ export function defaultProgramData(
   ];
 
   return {
-    goal: "",
+    goals: [],
     method: "",
     clientContext: defaultContext,
     phases: defaultPhases,
@@ -387,28 +385,13 @@ export function programDataFromDb(
   };
 }
 
-export function ageRangeFromDob(dateOfBirth: string | null): string {
-  if (!dateOfBirth) return "";
-  const birth = new Date(dateOfBirth);
-  if (isNaN(birth.getTime())) return "";
-  const age = Math.floor(
-    (Date.now() - birth.getTime()) / (1000 * 60 * 60 * 24 * 365.25)
-  );
-  if (age < 18) return "<18";
-  if (age <= 25) return "18-25";
-  if (age <= 35) return "26-35";
-  if (age <= 45) return "36-45";
-  if (age <= 55) return "46-55";
-  return "55+";
-}
-
+// Phase 56 Item 3: ageRange/bodyType removed from ClientContext — DOB no
+// longer maps into the wizard context (experience still does).
 export function clientContextFromClientFields(fields: {
   date_of_birth?: string | null;
   experience_level?: string | null;
 }): Partial<ClientContext> {
   const ctx: Partial<ClientContext> = {};
-  const ageRange = ageRangeFromDob(fields.date_of_birth || null);
-  if (ageRange) ctx.ageRange = ageRange;
   if (fields.experience_level) {
     const map: Record<string, string> = {
       beginner: "<1 year",
