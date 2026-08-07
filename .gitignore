@@ -41,3 +41,6 @@ playwright/.cache
 .env.local
 .env.*.local
 .temp/
+
+# Owner-supplied Excel import source (Phase 52A) — durable artifacts are scripts/ + supabase/seed
+scripts/data/
