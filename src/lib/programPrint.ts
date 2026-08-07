@@ -49,14 +49,14 @@ function shortDate(iso: string | null | undefined): string | null {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function phaseNamesFromJson(phases: Json | null): string[] {
+export function phaseNamesFromJson(phases: Json | null): string[] {
   if (!Array.isArray(phases)) return [];
   return (phases as unknown[])
     .filter((p): p is { name: string } => typeof p === "object" && p !== null && typeof (p as { name?: unknown }).name === "string")
     .map((p) => p.name);
 }
 
-function progressionRulesFromJson(rules: Json | null): { label: string; text: string }[] {
+export function progressionRulesFromJson(rules: Json | null): { label: string; text: string }[] {
   if (!Array.isArray(rules)) return [];
   return (rules as unknown[])
     .filter(

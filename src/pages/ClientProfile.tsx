@@ -363,6 +363,7 @@ export default function ClientProfile() {
           client={client}
           onBuildProgram={handleBuildProgram}
           onEdit={() => setEditOpen(true)}
+          onExportPlanPack={() => navigate(`/print/plan-pack/${client.id}`)}
         />
 
         {/* Tabs */}

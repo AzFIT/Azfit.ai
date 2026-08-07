@@ -9,6 +9,7 @@ import {
   Edit3,
   MoreHorizontal,
   Dumbbell,
+  Printer,
 } from "lucide-react";
 import type { Client } from "@/types/client";
 import { clientStatusMeta } from "@/lib/clientStatus";
@@ -24,12 +25,14 @@ interface ClientProfileHeaderProps {
   client: Client;
   onBuildProgram?: () => void;
   onEdit?: () => void;
+  onExportPlanPack?: () => void;
 }
 
 export default function ClientProfileHeader({
   client,
   onBuildProgram,
   onEdit,
+  onExportPlanPack,
 }: ClientProfileHeaderProps) {
   const navigate = useNavigate();
 
@@ -176,6 +179,17 @@ export default function ClientProfileHeader({
           >
             <Dumbbell size={13} />
             Build Program
+          </Button>
+          <Button
+            size="sm"
+            className="gap-1.5 rounded-xl hidden sm:flex"
+            style={{ backgroundColor: "rgba(139,92,246,0.12)", color: "#8B5CF6" }}
+            onClick={onExportPlanPack}
+            disabled={!onExportPlanPack}
+            title="Export Plan Pack (print / Save as PDF)"
+          >
+            <Printer size={13} />
+            Plan Pack
           </Button>
           <Button
             size="sm"

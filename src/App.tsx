@@ -63,6 +63,7 @@ const FormChecksPage = lazy(() => import("@/pages/FormChecks"));
 const LibraryPage = lazy(() => import("@/pages/Library"));
 const PrintProgramPage = lazy(() => import("@/pages/PrintProgram"));
 const PrintGroceryPage = lazy(() => import("@/pages/PrintGrocery"));
+const PrintPlanPackPage = lazy(() => import("@/pages/PrintPlanPack"));
 
 // Loading fallback
 function PageLoader() {
@@ -382,6 +383,14 @@ export default function App() {
                     element={
                       <ProtectedRoute>
                         <PrintGroceryPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/print/plan-pack/:clientRecordId"
+                    element={
+                      <ProtectedRoute>
+                        <PrintPlanPackPage />
                       </ProtectedRoute>
                     }
                   />
