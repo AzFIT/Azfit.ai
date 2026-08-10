@@ -39,6 +39,7 @@ import ComplianceHeroTile from "./bento/ComplianceHeroTile";
 import ActiveClientsTile from "./bento/ActiveClientsTile";
 import WeeklyVolumeTile from "./bento/WeeklyVolumeTile";
 import DeltaChip from "./bento/DeltaChip";
+import CoachBriefTile from "./CoachBriefTile";
 
 function addDays(d: Date, n: number): Date {
   const out = new Date(d);
@@ -566,10 +567,9 @@ export default function TrainerDashboard() {
       {/* ═══════════════════════════════════════════════════════════
           BENTO COMMAND CENTER (Phase 59)
           Row A: Today timeline 2fr · Compliance hero 1fr · Active Clients 1fr
-          Row B: Weekly Volume 1fr · Nutrition Command Center 2fr
-                 PHASE 60 SLOT — the Coach AI daily-brief tile joins Row B
-                 (add a third child and switch to lg:grid-cols-[1fr_1fr_1fr]) —
-                 no restructuring needed.
+          Row B: Weekly Volume 1fr · [NCC + Coach AI Daily Brief] 2fr column
+                 (Phase 60 filled the slot by stacking the brief under the
+                 NCC — structure unchanged at every breakpoint)
           Row C: 4 stat tiles with honest WoW delta chips
           (Client Health Grid + Follow-Ups follow as full-width rows)
           ═══════════════════════════════════════════════════════════ */}
@@ -611,13 +611,16 @@ export default function TrainerDashboard() {
           </motion.div>
         </div>
 
-        {/* Row B (Phase 60 slot — see header note) */}
+        {/* Row B — Phase 60: the Coach AI brief stacks under the NCC in the
+            2fr column (a third grid cell would crowd the row; the column
+            keeps the 59 structure intact at every breakpoint) */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-[1fr_2fr]">
           <motion.div variants={fadeInUp}>
             <WeeklyVolumeTile volume={weeklyVolume} loading={volumeLoading} />
           </motion.div>
-          <motion.div variants={fadeInUp}>
+          <motion.div variants={fadeInUp} className="space-y-4">
             <NutritionCommandCenter />
+            <CoachBriefTile sessionsToday={todaysSessionList.length} />
           </motion.div>
         </div>
 

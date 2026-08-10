@@ -210,6 +210,27 @@
     letter-spacing: -0.01em;
   }
 
+  /* Phase 60: AI skeleton shimmer (theme tokens only; respects reduced motion) */
+  .ai-skeleton {
+    background-color: var(--light-elevated);
+    position: relative;
+    overflow: hidden;
+  }
+  .ai-skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--page-text) 8%, transparent), transparent);
+    animation: ai-shimmer 1.6s ease-in-out infinite;
+  }
+  @keyframes ai-shimmer {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ai-skeleton::after { animation: none; }
+  }
+
   /* Glow effects for progress rings */
   .glow-teal {
     filter: drop-shadow(0 0 8px rgba(13, 148, 136, 0.4));
