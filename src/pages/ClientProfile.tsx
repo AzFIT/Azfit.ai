@@ -13,6 +13,7 @@ import {
   Camera,
   Video,
   ClipboardList,
+  FileText,
 } from "lucide-react";
 import ClientProfileHeader from "@/components/client/ClientProfileHeader";
 import QuickAddClientModal from "@/components/QuickAddClientModal";
@@ -28,6 +29,7 @@ import {
   ClientFormChecksTab,
   AssessmentsTab,
 } from "@/components/client";
+import PlanSummaryTab from "@/components/client/PlanSummaryTab";
 import type { Client, ClientGeneratedProgram } from "@/types/client";
 import { supabase } from "@/lib/supabase";
 import { codeFromOrderIndex, parseExerciseNotes } from "@/lib/aiProgramMapper";
@@ -46,6 +48,7 @@ const tabs = [
   { id: "schedule", label: "Schedule", icon: CalendarDays },
   { id: "programs", label: "Programs", icon: Layers },
   { id: "assessments", label: "Assessments", icon: ClipboardList },
+  { id: "plansummary", label: "Plan Summary", icon: FileText },
   { id: "photos", label: "Photos", icon: Camera },
   { id: "formchecks", label: "Form Checks", icon: Video },
   { id: "notes", label: "Notes", icon: StickyNote },
@@ -420,6 +423,7 @@ export default function ClientProfile() {
               <ProgramsTab programs={programs} onStartWorkout={handleStartWorkout} onChanged={reloadPrograms} clientId={client.id} />
             )}
             {activeTab === "assessments" && <AssessmentsTab clientId={client.id} />}
+            {activeTab === "plansummary" && <PlanSummaryTab clientId={client.id} />}
             {activeTab === "photos" && <ClientPhotosTab clientEmail={client.email} />}
             {activeTab === "formchecks" && <ClientFormChecksTab clientEmail={client.email} />}
             {activeTab === "notes" && <NotesTab clientId={client.id} />}

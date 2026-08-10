@@ -2190,5 +2190,35 @@ CREATE POLICY "Trainers can read waitlist"
   USING (public.is_trainer());
 
 -- ============================================================
+-- Phase 61: plan_summaries — client-facing Blueprint reports.
+-- RLS mirrors the 27B client_goals pattern.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.plan_summaries (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id uuid NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  trainer_id uuid NOT NULL,
+  inputs jsonb NOT NULL,
+  result jsonb NOT NULL,
+  recommended_style text,
+  created_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE public.plan_summaries ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Trainers can manage plan summaries"
+  ON public.plan_summaries FOR ALL TO authenticated
+  USING (client_id IN (SELECT id FROM clients WHERE trainer_id = auth.uid()));
+
+CREATE POLICY "Clients can read own plan summaries"
+  ON public.plan_summaries FOR SELECT TO authenticated
+  USING (
+    client_id IN (
+      SELECT clients.id FROM clients
+      WHERE clients.email = (SELECT profiles.email FROM profiles WHERE profiles.id = auth.uid())
+    )
+  );
+
+-- ============================================================
 -- DONE! Your AzFIT database is ready.
 -- ============================================================

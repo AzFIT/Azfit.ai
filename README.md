@@ -9,6 +9,7 @@ A modern fitness personal training mobile web app with a dual-mode interface: a 
 - **Sheets Mode** - Full spreadsheet data entry with Daily Tracking, Workouts, and Nutrition tabs
 - **Analytics** - Weight trends, workout volume charts, macro distribution donut, consistency heatmap, PRs
 - **Coach Dashboard** - Client management, program builder, messaging, revenue analytics
+- **Client Plan Summary (Blueprint)** - Trainers generate a professional, client-facing plan report from a client's stats: Katch-McArdle/Mifflin BMR → conservative TDEE → calorie targets with pace options (15/20/25% deficit + hard floor), five macro-style tables at target and maintenance with protein-floor flagging and a recommended split, expected outcomes, a phased program roadmap with optional mid-program diet break, a GBC training template scaled to the trainer/solo session split, a sample day of eating auto-scaled to the recommended macros (±5%), tracking rules, and FAQ (incl. female "you will NOT bulk up" reassurance when relevant). Managed from the **Plan Summary** tab on the client profile (generate/regenerate/version history); ink-friendly print at `/clients/:id/plan-summary/print` (window.print → Save as PDF); clients read their own summaries via RLS. Engine: `src/lib/planBlueprint.ts` (pure, unit-tested); storage: `plan_summaries` table (`supabase/plan-summaries.sql`).
 - **Settings** - Profile, dark mode toggle, units preference, notifications, connected devices
 
 ## Tech Stack

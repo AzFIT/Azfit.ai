@@ -2001,6 +2001,44 @@ export type Database = {
         };
         Relationships: [];
       };
+      plan_summaries: {
+        Row: {
+          id: string;
+          client_id: string;
+          trainer_id: string;
+          inputs: Json;
+          result: Json;
+          recommended_style: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          trainer_id: string;
+          inputs: Json;
+          result: Json;
+          recommended_style?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          client_id?: string;
+          trainer_id?: string;
+          inputs?: Json;
+          result?: Json;
+          recommended_style?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "plan_summaries_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       photo_metadata_owner: {
