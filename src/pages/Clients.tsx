@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
-import { Search, Plus, Edit3, Upload, X, User, ChevronDown, Link2, AlertTriangle } from "lucide-react";
+import { Search, Plus, Edit3, Upload, X, User, ChevronDown, Link2, AlertTriangle, MoreHorizontal } from "lucide-react";
 import Layout from "@/components/Layout";
 import QuickAddClientModal from "@/components/QuickAddClientModal";
 import { supabase } from "@/lib/supabase";
@@ -57,6 +57,8 @@ export default function ClientsPage() {
   const [filter, setFilter] = useState<StatusFilter>("Active");
   const [otherMenu, setOtherMenu] = useState<{ rect: DOMRect } | null>(null);
   const [statusMenu, setStatusMenu] = useState<{ clientId: string; rect: DOMRect } | null>(null);
+  // Phase 63: mobile row actions overflow (below sm)
+  const [actionsMenu, setActionsMenu] = useState<{ clientId: string; rect: DOMRect } | null>(null);
   const [clients, setClients] = useState<DbClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
@@ -465,7 +467,9 @@ export default function ClientsPage() {
                 itself became the overflow driver) */}
             <div className="overflow-x-auto rounded-2xl border border-[var(--card-border)]">
               <div>
-              <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-0 bg-[var(--light-elevated)] px-4 py-3 text-xs uppercase tracking-[0.2em] text-[var(--light-text-muted)]">
+              {/* Phase 63: header hidden below sm (the 4-column grid describes a
+                  row layout that only exists at sm+) */}
+              <div className="hidden sm:grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-0 bg-[var(--light-elevated)] px-4 py-3 text-xs uppercase tracking-[0.2em] text-[var(--light-text-muted)]">
                 <span>Name</span>
                 <span>Email</span>
                 <span>Status</span>
@@ -503,14 +507,16 @@ export default function ClientsPage() {
                             position: "relative",
                             zIndex: statusMenu?.clientId === client.id ? 30 : 0,
                           }}
-                          className={`flex w-full cursor-pointer items-center gap-4 px-4 py-4 transition ${
+                          className={`flex w-full cursor-pointer flex-col gap-2.5 px-4 py-4 transition sm:flex-row sm:items-center sm:gap-4 ${
                             isSelected
                               ? "bg-[var(--light-elevated)] shadow-sm"
                               : "hover:bg-[var(--light-elevated)]"
                           }`}
                           onClick={() => navigate(`/client/${client.id}`)}
                         >
-                          <div className="flex-1 min-w-0">
+                          {/* Phase 63: name/email always full width on mobile —
+                              the old flex row collapsed this to zero width */}
+                          <div className="min-w-0 sm:flex-1">
                             <p className="truncate font-semibold text-[var(--page-text)]">
                               {client.full_name}
                             </p>
@@ -532,8 +538,12 @@ export default function ClientsPage() {
                               );
                             })()}
                           </div>
+                          {/* Phase 63: line 2 on mobile (status left, actions
+                              right); sm:contents unwraps it so the desktop row
+                              keeps its exact original structure */}
+                          <div className="flex items-center justify-between gap-2 sm:contents">
                           <div
-                            className="w-1/4 relative"
+                            className="relative sm:w-1/4"
                             onClick={(e) => e.stopPropagation()}
                           >
                             {(() => {
@@ -590,7 +600,63 @@ export default function ClientsPage() {
                               );
                             })()}
                           </div>
-                          <div className="ml-auto flex items-center gap-2">
+                          {/* mobile: one compact Actions overflow (PortalMenu) */}
+                          <div className="sm:hidden" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setActionsMenu((m) =>
+                                  m?.clientId === client.id ? null : { clientId: client.id, rect },
+                                );
+                              }}
+                              className="inline-flex items-center gap-1 rounded-full border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-xs font-semibold transition hover:bg-[var(--light-elevated)]"
+                              title="Actions"
+                            >
+                              <MoreHorizontal size={14} />
+                              Actions
+                              <ChevronDown size={11} />
+                            </button>
+                            {actionsMenu?.clientId === client.id && (
+                              <PortalMenu anchor={actionsMenu.rect} onClose={() => setActionsMenu(null)} width={200}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionsMenu(null);
+                                    openEditClient(client);
+                                  }}
+                                  className="flex w-full items-center px-3 py-2.5 text-left text-xs font-semibold hover:bg-[var(--light-elevated)]"
+                                  style={{ color: "var(--page-text)" }}
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionsMenu(null);
+                                    navigate(`/client/${client.id}`);
+                                  }}
+                                  className="flex w-full items-center px-3 py-2.5 text-left text-xs font-semibold hover:bg-[var(--light-elevated)]"
+                                  style={{ color: "var(--page-text)" }}
+                                >
+                                  View
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionsMenu(null);
+                                    handleArchiveClient(client.id);
+                                  }}
+                                  className="flex w-full items-center px-3 py-2.5 text-left text-xs font-semibold text-red-600 hover:bg-[rgba(239,68,68,0.08)]"
+                                >
+                                  Archive
+                                </button>
+                              </PortalMenu>
+                            )}
+                          </div>
+
+                          {/* desktop: the original three buttons, unchanged */}
+                          <div className="ml-auto hidden items-center gap-2 sm:flex">
                             <button
                               type="button"
                               onClick={(event) => {
@@ -621,6 +687,7 @@ export default function ClientsPage() {
                             >
                               Archive
                             </button>
+                          </div>
                           </div>
                         </motion.div>
                       );
