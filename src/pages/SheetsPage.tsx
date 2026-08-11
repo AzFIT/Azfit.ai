@@ -34,6 +34,7 @@ export default function SheetsPage() {
     lastLoadPerExercise,
     updateExerciseTargetLoad,
     ghostByExercise,
+    progressionByExercise,
     method,
   } = useActiveWorkoutSession(workoutLogId);
 
@@ -213,16 +214,16 @@ export default function SheetsPage() {
       <header className="sticky top-0 z-30 backdrop-blur-xl border-b border-[var(--card-border)]" style={{ backgroundColor: 'var(--card-bg)', opacity: 0.95 }}>
         <div className="max-w-3xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <button
                 onClick={() => navigate('/dashboard')}
-                className="p-2 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] hover:bg-[var(--card-border)] text-[var(--text-muted)] transition-colors"
+                className="p-2 shrink-0 rounded-xl bg-[var(--card-bg)] border border-[var(--card-border)] hover:bg-[var(--card-border)] text-[var(--text-muted)] transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
-              <div>
-                <h1 className="text-sm font-bold text-[var(--text-primary)]">{program?.name || workout?.name || 'Workout'}</h1>
-                <p className="text-[10px] text-[var(--text-muted)]">
+              <div className="min-w-0">
+                <h1 className="truncate text-sm font-bold text-[var(--text-primary)]">{program?.name || workout?.name || 'Workout'}</h1>
+                <p className="truncate text-[10px] text-[var(--text-muted)]">
                   {currentPhase?.label} • Week {workout?.week_number || 1} • {workout?.name}
                 </p>
               </div>
@@ -367,6 +368,7 @@ export default function SheetsPage() {
             lastLoad={lastLoadPerExercise[exercise.name] || 0}
             workoutExerciseNames={exercises.map((e) => e.name)}
             ghost={ghostText(ghostByExercise.get(exercise.name))}
+            suggestion={progressionByExercise.get(exercise.name) ?? null}
             methodChip={methodChipFor(exercise)}
             methodRestSeconds={methodRestSeconds}
             isRestPause={method?.slug === 'rest-pause'}

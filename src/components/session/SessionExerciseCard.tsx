@@ -4,6 +4,7 @@ import { ChevronDown, CheckCircle, Square, Plus, Minus, Pencil, StickyNote, X } 
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase';
 import type { SessionExercise, SessionSet } from '@/lib/workoutSession';
+import type { ProgressionSuggestion } from '@/lib/autoProgression';
 import type { SessionUpdateResult } from '@/hooks/useActiveWorkoutSession';
 import {
   SET_TYPES,
@@ -99,6 +100,8 @@ interface SessionExerciseCardProps {
   workoutExerciseNames?: string[];
   /** Phase 49 Item 1: "Last: 22.5 kg × 10 @ RPE 8" ghost line (null = render nothing) */
   ghost?: string | null;
+  /** Phase 62: rule-based progression suggestion (increase/decrease only renders) */
+  suggestion?: ProgressionSuggestion | null;
   /** Phase 49 Item 2: per-exercise method chip ("Set 3 of 10" / "Wave 2/4") */
   methodChip?: string | null;
   /** Phase 49 Item 3: method default rest (applies only when the row has no explicit rest) */
@@ -126,6 +129,7 @@ export function SessionExerciseCard({
   unit = 'kg',
   workoutExerciseNames,
   ghost,
+  suggestion,
   methodChip,
   methodRestSeconds,
   isRestPause,
@@ -405,6 +409,31 @@ export function SessionExerciseCard({
             <p className="pb-2 text-[11px]" style={{ color: "var(--light-text-muted)" }}>
               {ghost}
             </p>
+          )}
+          {/* Phase 62: rule-based progression chip (increase/decrease only —
+              advisory tap-to-apply, never auto-submits; NOT an AI surface) */}
+          {suggestion && suggestion.suggestedWeight != null && (suggestion.action === 'increase' || suggestion.action === 'decrease') && (
+            <button
+              type="button"
+              title={suggestion.reason}
+              onClick={() => {
+                const idx = focusedSet ?? exercise.sets.findIndex((s) => !s.done);
+                if (idx >= 0) {
+                  onUpdateSet(idx, {
+                    clientLoad: suggestion.suggestedWeight as number,
+                    load: suggestion.suggestedWeight as number,
+                  });
+                }
+              }}
+              className="mb-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition hover:opacity-85"
+              style={{
+                borderColor: suggestion.action === 'increase' ? 'var(--azfit-primary)' : 'var(--warning)',
+                color: suggestion.action === 'increase' ? 'var(--azfit-primary)' : 'var(--warning)',
+                backgroundColor: 'var(--card-bg)',
+              }}
+            >
+              Suggested: {suggestion.suggestedWeight} {unit} — tap to apply
+            </button>
           )}
           <table className="w-full min-w-[600px] text-[13px]">
             <thead>

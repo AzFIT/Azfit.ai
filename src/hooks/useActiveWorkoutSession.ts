@@ -27,6 +27,13 @@ import {
   labelsAfterRemove,
 } from "@/lib/exerciseLabels";
 import { latestGhostByExercise, type GhostSet } from "@/lib/workoutIntel";
+import {
+  parseRepRange,
+  progressionSuggestion,
+  sessionsByExercise,
+  type GhostEntryRow,
+  type ProgressionSuggestion,
+} from "@/lib/autoProgression";
 import { parseMethodDefaults, type MethodDefaults } from "@/lib/methodDefaults";
 
 type WorkoutLogRow = Database["public"]["Tables"]["workout_logs"]["Row"];
@@ -72,6 +79,8 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
   // Phase 49: ghost data (latest previous set per exercise) + the program's
   // method defaults (drives player chrome + rest defaults)
   const [ghostByExercise, setGhostByExercise] = useState<Map<string, GhostSet>>(new Map());
+  // Phase 62: rule-based progression suggestion per exercise (null = render nothing)
+  const [progressionByExercise, setProgressionByExercise] = useState<Map<string, ProgressionSuggestion>>(new Map());
   const [method, setMethod] = useState<{ slug: string; name: string; d: MethodDefaults } | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -188,24 +197,31 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
 
       // Phase 49 Item 1: ghost data — latest PREVIOUS set per exercise from
       // completed logs before today (one pair of queries per session load).
+      // Phase 62: the SAME rows (plus workout_log_id + log recency order) also
+      // feed the progression engine — no extra round-trips.
+      let progressionGhostRows: GhostEntryRow[] = [];
+      let progressionLogOrder: string[] = [];
       if (log.client_id) {
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
         const { data: completedLogs } = await supabase
           .from("workout_logs")
-          .select("id")
+          .select("id, completed_at")
           .eq("client_id", log.client_id)
           .not("completed_at", "is", null)
-          .neq("id", workoutLogId);
+          .neq("id", workoutLogId)
+          .order("completed_at", { ascending: false });
         const logIds = (completedLogs || []).map((l) => l.id);
+        progressionLogOrder = logIds;
         if (logIds.length > 0) {
           const { data: ghostRows } = await supabase
             .from("workout_log_entries")
-            .select("exercise_name, weight_per_set, reps_per_set, rpe_per_set")
+            .select("exercise_name, workout_log_id, weight_per_set, reps_per_set, rpe_per_set")
             .in("workout_log_id", logIds)
             .lt("created_at", todayStart.toISOString())
             .order("created_at", { ascending: false })
             .limit(1000);
+          progressionGhostRows = (ghostRows as GhostEntryRow[] | null) ?? [];
           setGhostByExercise(latestGhostByExercise(ghostRows || []));
         } else {
           setGhostByExercise(new Map());
@@ -246,6 +262,26 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
       const sessionExercises = exerciseRows.map((ex) =>
         buildSessionExercise(ex as ExerciseRow, findCategoryForExercise(ex.name) || "Other", lastLoad)
       );
+
+      // Phase 62: rule-based progression suggestions from the SAME ghost rows
+      // (pure computation — no extra queries)
+      {
+        const sessionsMap = sessionsByExercise(progressionGhostRows, progressionLogOrder);
+        const progMap = new Map<string, ProgressionSuggestion>();
+        for (const ex of sessionExercises) {
+          const history = sessionsMap.get(ex.name);
+          if (!history || history.length === 0) continue;
+          const { min, max } = parseRepRange(ex.targetReps);
+          const suggestion = progressionSuggestion({
+            prescribedSets: ex.targetSets,
+            repRangeMin: min,
+            repRangeMax: max,
+            history,
+          });
+          if (suggestion.action) progMap.set(ex.name, suggestion);
+        }
+        setProgressionByExercise(progMap);
+      }
 
       // Phase 33C Fix 1d: restore per-session targetLoad saved in entry notes
       const { data: entryRows } = await supabase
@@ -685,6 +721,7 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
     historyPbs,
     lastLoadPerExercise,
     ghostByExercise,
+    progressionByExercise,
     method,
   };
 }
