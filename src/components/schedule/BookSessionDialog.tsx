@@ -1,7 +1,14 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarPlus, ChevronRight, User, CheckCircle } from 'lucide-react';
-import { endTimeFromDuration, DURATION_OPTIONS, DEFAULT_DURATION_MIN } from '@/lib/sessionDuration';
+import {
+  endTimeFromDuration,
+  durationFromTimes,
+  nearestDurationOption,
+  DURATION_OPTIONS,
+  DEFAULT_DURATION_MIN,
+} from '@/lib/sessionDuration';
+import { eventTypeToWizardType, wizardTypeToEventType } from '@/lib/sessionUpdate';
 import {
   Dialog,
   DialogContent,
@@ -38,6 +45,11 @@ interface BookSessionDialogProps {
   /** Phase 50: start-time containment check vs the trainer's availability
    * template (windows + blocked dates). Only called when a template exists. */
   availabilityCheck?: (date: string, startTime: string) => boolean;
+  /** Task 2: when set, the wizard edits this existing session instead of
+   * booking a new one (starts at the date/time step, client locked). */
+  editingEvent?: CalendarEvent | null;
+  /** Task 2: edit-mode submit — receives the id + the edited event. */
+  onUpdate?: (id: string, event: CalendarEvent) => void;
 }
 
 const SESSION_TYPES = [
@@ -63,15 +75,30 @@ export function BookSessionDialog({
   initialClientId,
   credits,
   availabilityCheck,
+  editingEvent,
+  onUpdate,
 }: BookSessionDialogProps) {
-  const [step, setStep] = useState(1);
-  const [clientId, setClientId] = useState(initialClientId || '');
-  const [date, setDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
-  const [startTime, setStartTime] = useState('09:00');
+  const isEdit = !!editingEvent;
+  const firstStep = isEdit ? 2 : 1; // edit mode skips client selection
+  // Task 2: edit-mode prefill happens via useState initializers — parents
+  // remount the dialog with key={editingEvent.id} (repo pattern: no
+  // setState-in-effect).
+  const [step, setStep] = useState(editingEvent ? 2 : 1);
+  const [clientId, setClientId] = useState(editingEvent?.clientId || initialClientId || '');
+  const [date, setDate] = useState(
+    editingEvent?.date || initialDate || new Date().toISOString().split('T')[0],
+  );
+  const [startTime, setStartTime] = useState(editingEvent?.startTime || '09:00');
   // Task 1: duration chips replace the End Time dropdown — end is DERIVED
-  const [durationMin, setDurationMin] = useState<number>(DEFAULT_DURATION_MIN);
-  const [sessionType, setSessionType] = useState('session');
-  const [notes, setNotes] = useState('');
+  const [durationMin, setDurationMin] = useState<number>(
+    editingEvent
+      ? nearestDurationOption(durationFromTimes(editingEvent.startTime, editingEvent.endTime))
+      : DEFAULT_DURATION_MIN,
+  );
+  const [sessionType, setSessionType] = useState(
+    editingEvent ? eventTypeToWizardType(editingEvent.type) : 'session',
+  );
+  const [notes, setNotes] = useState(editingEvent?.description || '');
   const [recurring, setRecurring] = useState(false);
   const [recurringCount, setRecurringCount] = useState(4);
 
@@ -124,12 +151,29 @@ export function BookSessionDialog({
     onOpenChange(false);
   };
 
+  // Task 2: edit-mode submit — UPDATE the existing row (no new booking)
+  const handleUpdate = () => {
+    if (!editingEvent || !onUpdate) return;
+    onUpdate(editingEvent.id, {
+      ...editingEvent,
+      date,
+      startTime,
+      endTime,
+      type: wizardTypeToEventType(sessionType),
+      clientId,
+      clientName: selectedClient?.name ?? editingEvent.clientName,
+      description: notes,
+    });
+    resetForm();
+    onOpenChange(false);
+  };
+
   const handleNext = () => {
     if (step < 4) setStep(step + 1);
   };
 
   const handleBack = () => {
-    if (step > 1) setStep(step - 1);
+    if (step > firstStep) setStep(step - 1);
   };
 
   return (
@@ -138,7 +182,7 @@ export function BookSessionDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-[#F0F0F0]">
             <CalendarPlus className="h-5 w-5 text-[#00AEEF]" />
-            Book Session
+            {isEdit ? 'Edit Session' : 'Book Session'}
           </DialogTitle>
         </DialogHeader>
 
@@ -290,7 +334,7 @@ export function BookSessionDialog({
                   className="mt-1 border-[#2A3447] bg-[#111827] text-[#F0F0F0]"
                 />
               </div>
-              {isTrainer && (
+              {isTrainer && !isEdit && (
                 <div className="space-y-3 rounded-lg border border-[#2A3447]/50 bg-[#111827]/50 p-3">
                   <div className="flex items-center gap-2">
                     <Checkbox
@@ -337,7 +381,9 @@ export function BookSessionDialog({
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-[#94A3B8]">Client</span>
-                  <span className="font-medium text-[#F0F0F0]">{selectedClient?.name}</span>
+                  <span className="font-medium text-[#F0F0F0]">
+                    {selectedClient?.name ?? (isEdit ? editingEvent?.clientName : undefined)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[#94A3B8]">Date</span>
@@ -365,8 +411,9 @@ export function BookSessionDialog({
                     <span className="max-w-[200px] truncate font-medium text-[#F0F0F0]">{notes}</span>
                   </div>
                 )}
-                {/* Phase 50: package credits after this booking (warn, never block) */}
-                {credits && (
+                {/* Phase 50: package credits after this booking (warn, never
+                    block). Hidden in edit mode — the credit is already consumed. */}
+                {credits && !isEdit && (
                   <div className="flex justify-between items-center">
                     <span className="text-[#94A3B8]">Credits</span>
                     <span
@@ -394,7 +441,7 @@ export function BookSessionDialog({
         </AnimatePresence>
 
         <DialogFooter className="gap-2">
-          {step > 1 ? (
+          {step > firstStep ? (
             <Button variant="outline" onClick={handleBack} className="border-[#2A3447] text-[#94A3B8]">
               Back
             </Button>
@@ -410,6 +457,10 @@ export function BookSessionDialog({
               className="bg-[#00AEEF] text-white hover:bg-[#00BFFF]"
             >
               Next <ChevronRight className="h-4 w-4" />
+            </Button>
+          ) : isEdit ? (
+            <Button onClick={handleUpdate} className="bg-[#00AEEF] text-white hover:bg-[#00BFFF]">
+              <CalendarPlus className="mr-1 h-4 w-4" /> Save Changes
             </Button>
           ) : (
             <Button onClick={handleBook} className="bg-[#00AEEF] text-white hover:bg-[#00BFFF]">

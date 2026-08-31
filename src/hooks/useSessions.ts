@@ -220,6 +220,38 @@ export function useSessions() {
     [myId, fetchSessions]
   );
 
+  /* ── Delete session (hard delete, optimistic + rollback) ──────── */
+  const deleteSession = useCallback(
+    async (id: string) => {
+      if (!myId) return false;
+      setSaving(true);
+
+      // Optimistic removal; rollback on error. Package credits (Phase 50)
+      // are derivative of session rows, so deleting auto-refunds the credit.
+      let previous: Session[] = [];
+      setSessions((cur) => {
+        previous = cur;
+        return cur.filter((s) => s.id !== id);
+      });
+
+      try {
+        const { error } = await supabase.from("sessions").delete().eq("id", id);
+        if (error) throw error;
+
+        toast.success("Session deleted");
+        return true;
+      } catch (err) {
+        console.error("Failed to delete session:", err);
+        setSessions(previous);
+        toast.error("Failed to delete session");
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [myId]
+  );
+
   /* ── Batch create sessions (recurring) ──────────────────────────── */
   const createSessions = useCallback(
     async (sessionsToCreate: Omit<Session, "id" | "createdAt">[]) => {
@@ -331,6 +363,7 @@ export function useSessions() {
     createSessions,
     updateSession,
     cancelSession,
+    deleteSession,
     findConflicts,
     todaySessions,
     nextUpcomingSession,

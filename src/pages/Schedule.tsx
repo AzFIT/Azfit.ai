@@ -30,8 +30,8 @@ import type { CalendarEvent } from '@/types';
 import { CellContextMenu } from '@/components/schedule/CellContextMenu';
 import { BookSessionDialog } from '@/components/schedule/BookSessionDialog';
 import { BlockTimeDialog } from '@/components/schedule/BlockTimeDialog';
-import { EditSessionDialog } from '@/components/schedule/EditSessionDialog';
-import { CancelConfirmDialog } from '@/components/schedule/CancelConfirmDialog';
+import { SessionDetailDialog } from '@/components/schedule/SessionDetailDialog';
+import { buildSessionUpdate } from '@/lib/sessionUpdate';
 
 /* ── Constants ─────────────────────────────────────────── */
 
@@ -101,7 +101,7 @@ function sessionToEvent(session: ReturnType<typeof useSessions>['sessions'][numb
 export default function SchedulePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { sessions, loading, saving, isTrainer, createSession, createSessions, updateSession, cancelSession, weekSessions } = useSessions();
+  const { sessions, loading, saving, isTrainer, createSession, createSessions, updateSession, cancelSession, deleteSession, weekSessions } = useSessions();
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
@@ -182,8 +182,10 @@ export default function SchedulePage() {
   // Dialogs
   const [bookOpen, setBookOpen] = useState(false);
   const [blockOpen, setBlockOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [cancelOpen, setCancelOpen] = useState(false);
+  // Task 2: tap a session → detail modal; Edit reopens the wizard pre-filled
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [editBookOpen, setEditBookOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
   // Conflict warning dialog
@@ -272,7 +274,7 @@ export default function SchedulePage() {
     });
     if (clickedEvent) {
       setSelectedEvent(clickedEvent);
-      setEditOpen(true);
+      setDetailOpen(true);
     }
   }, [events]);
 
@@ -437,30 +439,22 @@ export default function SchedulePage() {
     }
   };
 
+  // Task 2: saving an edit UPDATEs the existing row (wizard edit mode)
   const handleSaveEdit = async (id: string, updates: Partial<CalendarEvent>) => {
     const original = sessions.find((s) => s.id === id);
-    if (!original) {
-      await updateSession(id, {});
-      setEditOpen(false);
-      return;
-    }
+    if (!original) return;
 
-    const sessionUpdates: Parameters<typeof updateSession>[1] = {};
-    if (updates.title !== undefined) sessionUpdates.title = updates.title;
-    if (updates.type !== undefined) sessionUpdates.type = updates.type;
-    if (updates.date && updates.startTime) {
-      sessionUpdates.startsAt = new Date(`${updates.date}T${updates.startTime}`).toISOString();
+    const sessionUpdates = buildSessionUpdate(updates);
+    // Same vocabulary mapping as handleBook: DB stores '1-on-1' / 'blocked'
+    if (updates.type !== undefined) {
+      sessionUpdates.type = updates.type === 'blocked' ? 'blocked' : '1-on-1';
     }
-    if (updates.date && updates.endTime) {
-      sessionUpdates.endsAt = new Date(`${updates.date}T${updates.endTime}`).toISOString();
-    }
-    if (updates.description !== undefined) sessionUpdates.notes = updates.description;
-    if (updates.location !== undefined) sessionUpdates.location = updates.location;
 
     // Only trainers scheduling/approving need conflict checks.
     if (!isTrainer) {
       await updateSession(id, sessionUpdates);
-      setEditOpen(false);
+      setEditBookOpen(false);
+      setEditingEvent(null);
       return;
     }
 
@@ -487,25 +481,32 @@ export default function SchedulePage() {
     }
 
     await updateSession(id, sessionUpdates);
-    setEditOpen(false);
+    setEditBookOpen(false);
+    setEditingEvent(null);
+  };
+
+  // Task 2: hard delete — optimistic in the hook; credits auto-refund
+  // (Phase 50 remaining = package credits − session rows on/after package)
+  const handleDeleteSession = async (id: string) => {
+    const ok = await deleteSession(id);
+    if (ok) setDetailOpen(false);
   };
 
   const handleCancelSession = async (id: string) => {
     await cancelSession(id);
-    setEditOpen(false);
-    setCancelOpen(false);
+    setDetailOpen(false);
   };
 
   const handleMarkCompleted = async (id: string) => {
     const ok = await updateSession(id, { status: 'completed' });
     if (ok) toast.success('Session marked completed');
-    setEditOpen(false);
+    setDetailOpen(false);
   };
 
   const handleAcceptSession = async (id: string) => {
     const ok = await updateSession(id, { status: 'scheduled' });
     if (ok) toast.success('Session accepted');
-    setEditOpen(false);
+    setDetailOpen(false);
   };
 
   const handleRepeatWeekly = () => {
@@ -722,21 +723,51 @@ export default function SchedulePage() {
         onOpenChange={setBlockOpen}
         onBlock={handleBlock}
       />
-      <EditSessionDialog
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        event={selectedEvent}
-        onSave={handleSaveEdit}
-        onCancelSession={(id) => { setSelectedEvent(events.find((e) => e.id === id) || null); setCancelOpen(true); }}
-        onMarkCompleted={isTrainer ? handleMarkCompleted : undefined}
-        onAccept={isTrainer ? handleAcceptSession : undefined}
-      />
-      <CancelConfirmDialog
-        open={cancelOpen}
-        onOpenChange={setCancelOpen}
-        clientName={selectedEvent?.clientName || 'Unknown'}
-        date={selectedEvent?.date || ''}
-        onConfirm={() => selectedEvent && handleCancelSession(selectedEvent.id)}
+      {/* Task 2: tap a session → detail modal (client/date/time/status +
+          Edit/Delete for trainers, soft Cancel for clients, .ics for all).
+          Edit/Delete are limited to real session/block rows — holiday and
+          reminder rows are managed from the client profile Schedule tab. */
+      (() => {
+        const raw = sessions.find((s) => s.id === selectedEvent?.id);
+        const editable = !!raw && (raw.type === '1-on-1' || raw.type === 'blocked');
+        return (
+          <SessionDetailDialog
+            key={`${selectedEvent?.id ?? 'none'}-${detailOpen}`}
+            open={detailOpen}
+            onOpenChange={setDetailOpen}
+            event={selectedEvent}
+            isTrainer={isTrainer}
+            onEdit={
+              isTrainer && editable
+                ? (ev) => {
+                    setDetailOpen(false);
+                    setEditingEvent(ev);
+                    setEditBookOpen(true);
+                  }
+                : undefined
+            }
+            onDelete={isTrainer && editable ? handleDeleteSession : undefined}
+            onCancel={!isTrainer ? handleCancelSession : undefined}
+            onMarkCompleted={isTrainer ? handleMarkCompleted : undefined}
+            onAccept={isTrainer ? handleAcceptSession : undefined}
+          />
+        );
+      })()}
+      {/* Task 2: the Book Session wizard in edit mode (prefilled).
+          key remounts per edited session so the form re-initializes. */}
+      <BookSessionDialog
+        key={editingEvent?.id ?? 'edit-closed'}
+        open={editBookOpen}
+        onOpenChange={(v) => {
+          setEditBookOpen(v);
+          if (!v) setEditingEvent(null);
+        }}
+        onBook={handleBook}
+        onUpdate={handleSaveEdit}
+        editingEvent={editingEvent}
+        isTrainer={isTrainer}
+        clients={bookableClients}
+        availabilityCheck={availability ? availabilityCheck : undefined}
       />
 
       {/* Conflict Warning Dialog */}

@@ -29,6 +29,7 @@ import {
 } from "@/lib/creditsAvailability";
 import { generateWeeklyOccurrences } from "@/lib/sessionConflicts";
 import { BookSessionDialog } from "@/components/schedule/BookSessionDialog";
+import { SessionDetailDialog } from "@/components/schedule/SessionDetailDialog";
 import {
   Dialog,
   DialogContent,
@@ -73,6 +74,10 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
   const [reminderPreset, setReminderPreset] = useState<string | null>(null); // null = closed
   const [reminderIsCustom, setReminderIsCustom] = useState(false);
   const [actionSaving, setActionSaving] = useState(false);
+  // Task 2: tap a session tile → detail modal; Edit reopens the wizard
+  const [detailEvent, setDetailEvent] = useState<TabEvent | null>(null);
+  const [editBookOpen, setEditBookOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   // Phase 50: credits + availability state for the booking dialog hints
   const [credits, setCredits] = useState<{ remaining: number; total: number } | null>(null);
   const [availability, setAvailability] = useState<{ windows: AvailabilityWindow[]; blockedDates: string[] } | null>(null);
@@ -288,6 +293,72 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
       );
     } finally {
       setBooking(false);
+    }
+  };
+
+  /* ── Task 2: edit & delete for booked sessions ─────────────────────
+     TabEvents carry ISO timestamps; the wizard needs local date/HH:MM. */
+  const toCalendarEvent = (e: TabEvent): CalendarEvent => {
+    const s = new Date(e.startTime);
+    const en = new Date(e.endTime);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return {
+      id: e.id,
+      title: e.title,
+      date: `${s.getFullYear()}-${pad(s.getMonth() + 1)}-${pad(s.getDate())}`,
+      startTime: `${pad(s.getHours())}:${pad(s.getMinutes())}`,
+      endTime: `${pad(en.getHours())}:${pad(en.getMinutes())}`,
+      type: e.type === "session" ? "session" : "reminder",
+      clientId: profileId ?? clientsId ?? "",
+      clientName: e.clientName,
+      description: e.description,
+      location: e.location ?? null,
+      status: e.status,
+    };
+  };
+
+  const handleUpdateSession = async (id: string, ev: CalendarEvent) => {
+    try {
+      const { error } = await supabase
+        .from("sessions")
+        .update({
+          type: ev.type === "blocked" ? "blocked" : "1-on-1",
+          starts_at: new Date(`${ev.date}T${ev.startTime}`).toISOString(),
+          ends_at: new Date(`${ev.date}T${ev.endTime}`).toISOString(),
+          notes: ev.description || null,
+        })
+        .eq("id", id);
+      if (error) throw error;
+      toast.success("Session updated");
+      setEditBookOpen(false);
+      setEditingEvent(null);
+      await load();
+      await loadExtras();
+    } catch (err) {
+      toast.error(
+        "Failed to update session: " +
+          (err instanceof Error ? err.message : "Unknown error"),
+      );
+    }
+  };
+
+  // Hard delete, optimistic with rollback. Package credits are derivative
+  // of session rows (Phase 50), so deleting auto-refunds the credit.
+  const handleDeleteSession = async (id: string) => {
+    const previous = events;
+    setEvents((cur) => cur.filter((e) => e.id !== id));
+    setDetailEvent(null);
+    try {
+      const { error } = await supabase.from("sessions").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Session deleted");
+      await loadExtras();
+    } catch (err) {
+      setEvents(previous);
+      toast.error(
+        "Failed to delete session: " +
+          (err instanceof Error ? err.message : "Unknown error"),
+      );
     }
   };
 
@@ -573,7 +644,8 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
                 return (
                 <div
                   key={e.id}
-                  className="flex items-center justify-between rounded-xl px-3 py-2"
+                  onClick={() => setDetailEvent(e)}
+                  className="flex items-center justify-between rounded-xl px-3 py-2 cursor-pointer transition hover:opacity-80"
                   style={{ backgroundColor: "var(--light-elevated)" }}
                 >
                   <div className="flex-1 min-w-0">
@@ -764,6 +836,43 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
           initialDate={selectedDateStr || undefined}
           initialClientId={profileId ?? clientsId!}
           credits={credits}
+          availabilityCheck={availability ? availabilityCheck : undefined}
+        />
+      )}
+
+      {/* Task 2: tap a session tile → detail modal. Edit/Delete are limited
+          to real sessions (holidays/reminders keep their own dialogs). */}
+      <SessionDetailDialog
+        key={`${detailEvent?.id ?? "none"}-${!!detailEvent}`}
+        open={!!detailEvent}
+        onOpenChange={(v) => { if (!v) setDetailEvent(null); }}
+        event={detailEvent ? toCalendarEvent(detailEvent) : null}
+        isTrainer
+        onEdit={
+          detailEvent?.type === "session"
+            ? (ev) => {
+                setDetailEvent(null);
+                setEditingEvent(ev);
+                setEditBookOpen(true);
+              }
+            : undefined
+        }
+        onDelete={detailEvent?.type === "session" ? handleDeleteSession : undefined}
+      />
+      {(profileId || clientsId) && (
+        <BookSessionDialog
+          key={editingEvent?.id ?? "edit-closed"}
+          open={editBookOpen}
+          onOpenChange={(v) => {
+            setEditBookOpen(v);
+            if (!v) setEditingEvent(null);
+          }}
+          onBook={handleBook}
+          onUpdate={handleUpdateSession}
+          editingEvent={editingEvent}
+          isTrainer
+          clients={[{ id: profileId ?? clientsId!, name: profileId ? profileName : recordName }]}
+          initialClientId={profileId ?? clientsId!}
           availabilityCheck={availability ? availabilityCheck : undefined}
         />
       )}
