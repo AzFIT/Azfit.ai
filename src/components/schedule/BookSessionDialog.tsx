@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarPlus, ChevronRight, User, CheckCircle } from 'lucide-react';
+import { endTimeFromDuration, DURATION_OPTIONS, DEFAULT_DURATION_MIN } from '@/lib/sessionDuration';
 import {
   Dialog,
   DialogContent,
@@ -67,27 +68,38 @@ export function BookSessionDialog({
   const [clientId, setClientId] = useState(initialClientId || '');
   const [date, setDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('10:00');
+  // Task 1: duration chips replace the End Time dropdown — end is DERIVED
+  const [durationMin, setDurationMin] = useState<number>(DEFAULT_DURATION_MIN);
   const [sessionType, setSessionType] = useState('session');
   const [notes, setNotes] = useState('');
   const [recurring, setRecurring] = useState(false);
   const [recurringCount, setRecurringCount] = useState(4);
 
+  const endTime = endTimeFromDuration(startTime, durationMin);
+
   const selectedClient = clients.find((c) => c.id === clientId);
+
+  // Availability: the derived END must also fit the coach's window.
+  // NOTE: Phase 50 shipped this as an amber hint only; the current brief
+  // upgrades it to a hard block (Task 1) — documented in PROGRESS.
+  const outsideAvailability = useMemo(() => {
+    if (!availabilityCheck || !date || !startTime) return false;
+    return !availabilityCheck(date, startTime) || !availabilityCheck(date, endTime);
+  }, [availabilityCheck, date, startTime, endTime]);
 
   const canProceed = useMemo(() => {
     if (step === 1) return clientId !== '';
-    if (step === 2) return date !== '' && startTime !== '' && endTime !== '';
+    if (step === 2) return date !== '' && startTime !== '' && endTime !== '' && !outsideAvailability;
     if (step === 3) return true;
     return true;
-  }, [step, clientId, date, startTime, endTime]);
+  }, [step, clientId, date, startTime, endTime, outsideAvailability]);
 
   const resetForm = () => {
     setStep(1);
     setClientId('');
     setDate(new Date().toISOString().split('T')[0]);
     setStartTime('09:00');
-    setEndTime('10:00');
+    setDurationMin(DEFAULT_DURATION_MIN);
     setSessionType('session');
     setNotes('');
     setRecurring(false);
@@ -196,8 +208,8 @@ export function BookSessionDialog({
                   className="mt-1 border-[#2A3447] bg-[#111827] text-[#F0F0F0]"
                 />
               </div>
-              {/* Phase 50: outside-availability hint (never a hard block) */}
-              {availabilityCheck && date && startTime && !availabilityCheck(date, startTime) && (
+              {/* Availability: start AND derived end must fit the template */}
+              {outsideAvailability && (
                 <div className="rounded-lg border border-[#F59E0B]/40 bg-[#F59E0B]/10 px-3 py-2 text-[11px] font-medium text-[#F59E0B]">
                   Outside your availability template
                 </div>
@@ -219,19 +231,26 @@ export function BookSessionDialog({
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-sm text-[#94A3B8]">End Time</Label>
-                  <Select value={endTime} onValueChange={setEndTime}>
-                    <SelectTrigger className="mt-1 border-[#2A3447] bg-[#111827] text-[#F0F0F0]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="border-[#2A3447] bg-[#1A2235]">
-                      {TIME_SLOTS.map((t) => (
-                        <SelectItem key={t} value={t} className="text-[#F0F0F0]">
-                          {t}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-sm text-[#94A3B8]">Duration</Label>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {DURATION_OPTIONS.map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setDurationMin(d)}
+                        className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
+                          durationMin === d
+                            ? 'border-[#00AEEF] bg-[#00AEEF]/15 text-[#00AEEF]'
+                            : 'border-[#2A3447] bg-[#111827] text-[#94A3B8] hover:border-[#00AEEF40]'
+                        }`}
+                      >
+                        {d}m
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-xs font-medium text-[#94A3B8]">
+                    Ends <span className="font-bold text-[#F0F0F0]">{endTime}</span>
+                  </p>
                 </div>
               </div>
             </motion.div>
