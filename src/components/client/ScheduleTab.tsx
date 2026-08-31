@@ -549,7 +549,7 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
               <button
                 key={day}
                 onClick={() => setSelectedDay(isSelected ? null : day)}
-                className="min-h-[80px] border-b border-r p-1 relative text-left transition-colors hover:bg-[var(--light-elevated)]"
+                className="min-h-[64px] sm:min-h-[80px] border-b border-r p-0.5 sm:p-1 relative text-left transition-colors hover:bg-[var(--light-elevated)]"
                 style={{
                   borderColor: "var(--card-border)",
                   backgroundColor: isSelected
@@ -577,7 +577,7 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
                     return (
                       <div
                         key={e.id}
-                        className="text-[8px] truncate px-1 py-0.5 rounded"
+                        className="text-[8px] leading-tight truncate px-1 py-0.5 rounded"
                         style={{ backgroundColor: cfg.bg, color: cfg.color }}
                       >
                         {e.title}

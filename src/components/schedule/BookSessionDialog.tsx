@@ -136,7 +136,7 @@ export function BookSessionDialog({
   const handleBook = () => {
     const event: CalendarEvent = {
       id: `evt-${Date.now()}`,
-      title: selectedClient ? `PT with ${selectedClient.name}` : 'New Session',
+      title: selectedClient ? `${selectedClient.name} PT` : 'New Session', // Task 4: "{ClientName} PT"
       date,
       startTime,
       endTime,

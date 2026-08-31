@@ -32,6 +32,13 @@ import { BookSessionDialog } from '@/components/schedule/BookSessionDialog';
 import { BlockTimeDialog } from '@/components/schedule/BlockTimeDialog';
 import { SessionDetailDialog } from '@/components/schedule/SessionDetailDialog';
 import { buildSessionUpdate } from '@/lib/sessionUpdate';
+import { durationFromTimes, endTimeFromDuration } from '@/lib/sessionDuration';
+import {
+  snapMinutesToSlot,
+  minutesToTimeString,
+  movedSessionTimes,
+  dropAllowed,
+} from '@/lib/scheduleDnd';
 
 /* ── Constants ─────────────────────────────────────────── */
 
@@ -74,6 +81,20 @@ function getEventColor(type: string): string {
 
 /* ── Convert Session → CalendarEvent for grid display ─── */
 
+// Task 4 DnD helpers (module-level — no component state)
+function snapTimeInCell(hour: number, clientY: number, rect: DOMRect): string {
+  const ratio = rect.height > 0 ? (clientY - rect.top) / rect.height : 0;
+  return minutesToTimeString(snapMinutesToSlot(hour * 60 + (ratio >= 0.5 ? 30 : 0)));
+}
+
+function cellFromPoint(x: number, y: number): { date: string; time: string } | null {
+  const el = document.elementFromPoint(x, y)?.closest('[data-cell-date]');
+  if (!el) return null;
+  const date = el.getAttribute('data-cell-date')!;
+  const hour = parseInt(el.getAttribute('data-cell-hour')!, 10);
+  return { date, time: snapTimeInCell(hour, y, el.getBoundingClientRect()) };
+}
+
 function sessionToEvent(session: ReturnType<typeof useSessions>['sessions'][number]): CalendarEvent {
   const start = new Date(session.startsAt);
   const end = new Date(session.endsAt);
@@ -101,11 +122,15 @@ function sessionToEvent(session: ReturnType<typeof useSessions>['sessions'][numb
 export default function SchedulePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { sessions, loading, saving, isTrainer, createSession, createSessions, updateSession, cancelSession, deleteSession, weekSessions } = useSessions();
+  const { sessions, loading, saving, isTrainer, createSession, createSessions, updateSession, cancelSession, deleteSession, rescheduleSession, weekSessions } = useSessions();
 
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
-  const [selectedDay, setSelectedDay] = useState(0); // 0-6 for day view
+  // Task 4: phones default to the Day/agenda view (7 cramped columns → one
+  // readable day); tablet/desktop keep the week grid. Day defaults to today.
+  const [viewMode, setViewMode] = useState<'week' | 'day'>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 'day' : 'week'
+  );
+  const [selectedDay, setSelectedDay] = useState(() => (new Date().getDay() + 6) % 7);
   // Clients for the booking picker: resolved to profiles.id via email —
   // sessions.client_id references profiles(id), so clients WITHOUT a linked
   // app account are omitted (they cannot have sessions).
@@ -265,6 +290,11 @@ export default function SchedulePage() {
   }, []);
 
   const handleCellClick = useCallback((date: string, time: string) => {
+    // Task 4: a press-hold drag ends with a synthetic click — swallow it once
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
     const dateEvents = events.filter((ev) => ev.date === date);
     const timeMin = timeToMinutes(time);
     const clickedEvent = dateEvents.find((ev) => {
@@ -277,6 +307,182 @@ export default function SchedulePage() {
       setDetailOpen(true);
     }
   }, [events]);
+
+  /* ── Task 4: drag-and-drop rescheduling ──────────────────────────
+     Desktop/tablet: native HTML5 drag of a session tile onto a cell.
+     Mobile: press-and-hold (~300ms) to pick up, drag a ghost, release to
+     snap to the nearest 30-minute slot. The hovered target cell is
+     highlighted in both modes; the drop persists (duration preserved)
+     optimistically with rollback, guarded by availability + conflicts. */
+  const [drag, setDrag] = useState<{
+    eventId: string;
+    title: string;
+    overDate: string;
+    overTime: string;
+    ghostX: number;
+    ghostY: number;
+    touch: boolean;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
+
+  const doDrop = useCallback(
+    (eventId: string, date: string, startTime: string) => {
+      setDrag(null);
+      const event = events.find((e) => e.id === eventId);
+      if (!event) return;
+      if (event.date === date && event.startTime === startTime) return; // no-op drop
+
+      const duration = durationFromTimes(event.startTime, event.endTime);
+      const endTime = endTimeFromDuration(startTime, duration);
+      if (!dropAllowed(availability ? availabilityCheck : undefined, date, startTime, endTime)) {
+        toast.error('Outside your availability template');
+        return;
+      }
+
+      const { startsAt, endsAt } = movedSessionTimes(event, date, startTime);
+      const conflicts = findSessionConflicts(sessions, {
+        trainerId: user?.id || '',
+        clientId: event.clientId || '',
+        startsAt,
+        endsAt,
+        excludeId: eventId,
+      });
+      if (conflicts.length > 0) {
+        showConflictDialog(
+          'Move conflict',
+          `That slot overlaps with an existing session:\n\n${formatConflictList(conflicts)}`
+        );
+        return;
+      }
+
+      rescheduleSession(eventId, startsAt, endsAt);
+    },
+    [events, availability, availabilityCheck, sessions, user?.id, rescheduleSession]
+  );
+
+  // Resolve the grid cell under a viewport point (mobile ghost drag) —
+  // module-level cellFromPoint.
+  const updateDragPosition = useCallback((x: number, y: number) => {
+    const cell = cellFromPoint(x, y);
+    setDrag((prev) =>
+      prev
+        ? {
+            ...prev,
+            ghostX: x,
+            ghostY: y,
+            ...(cell ? { overDate: cell.date, overTime: cell.time } : {}),
+          }
+        : prev
+    );
+  }, []);
+
+  // Desktop: HTML5 drag start on a session tile
+  const handleEventDragStart = useCallback(
+    (event: CalendarEvent) => (e: React.DragEvent<HTMLDivElement>) => {
+      if (!isTrainer) return;
+      e.dataTransfer.setData('text/azfit-session', event.id);
+      e.dataTransfer.effectAllowed = 'move';
+      setDrag({
+        eventId: event.id,
+        title: event.title,
+        overDate: event.date,
+        overTime: event.startTime,
+        ghostX: 0,
+        ghostY: 0,
+        touch: false,
+      });
+    },
+    [isTrainer]
+  );
+
+  // Mobile: press-and-hold (~300ms) to pick the tile up. A non-passive
+  // native touchmove listener takes over once the hold activates — React's
+  // root listeners are passive, so they can't block scrolling mid-drag.
+  const handleEventTouchStart = useCallback(
+    (event: CalendarEvent) => (e: React.TouchEvent<HTMLDivElement>) => {
+      if (!isTrainer) return;
+      const startX = e.touches[0].clientX;
+      const startY = e.touches[0].clientY;
+      let active = false;
+
+      const clear = () => {
+        window.clearTimeout(timer);
+        window.removeEventListener('touchmove', onMove);
+        window.removeEventListener('touchend', onEnd);
+        window.removeEventListener('touchcancel', onEnd);
+      };
+      const onMove = (ev: TouchEvent) => {
+        const t = ev.touches[0];
+        if (!active) {
+          // moved before the hold fired → it's a scroll, cancel the pickup
+          if (Math.hypot(t.clientX - startX, t.clientY - startY) > 10) clear();
+          return;
+        }
+        ev.preventDefault();
+        updateDragPosition(t.clientX, t.clientY);
+      };
+      const onEnd = (ev: TouchEvent) => {
+        const wasActive = active;
+        clear();
+        if (wasActive) {
+          const t = ev.changedTouches[0];
+          const cell = cellFromPoint(t.clientX, t.clientY);
+          setDrag((prev) => {
+            if (prev) doDrop(prev.eventId, cell?.date ?? prev.overDate, cell?.time ?? prev.overTime);
+            return null;
+          });
+          // swallow the synthetic click that follows touchend
+          window.setTimeout(() => { suppressClickRef.current = false; }, 350);
+        }
+      };
+      const timer = window.setTimeout(() => {
+        active = true;
+        suppressClickRef.current = true;
+        setDrag({
+          eventId: event.id,
+          title: event.title,
+          overDate: event.date,
+          overTime: event.startTime,
+          ghostX: startX,
+          ghostY: startY,
+          touch: true,
+        });
+      }, 300);
+
+      window.addEventListener('touchmove', onMove, { passive: false });
+      window.addEventListener('touchend', onEnd);
+      window.addEventListener('touchcancel', onEnd);
+    },
+    [isTrainer, updateDragPosition, doDrop]
+  );
+
+  // Cell-level drag over/drop (desktop DnD). Cells also carry
+  // data-cell-date/hour for the mobile elementFromPoint lookup.
+  const handleCellDragOver = useCallback(
+    (date: string, hour: number) => (e: React.DragEvent<HTMLDivElement>) => {
+      if (!drag) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const time = snapTimeInCell(hour, e.clientY, e.currentTarget.getBoundingClientRect());
+      setDrag((prev) => (prev ? { ...prev, overDate: date, overTime: time } : prev));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [drag?.eventId]
+  );
+
+  const handleCellDrop = useCallback(
+    (date: string, hour: number) => (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      const id = e.dataTransfer.getData('text/azfit-session') || drag?.eventId;
+      if (!id) return;
+      const time = drag?.overTime ?? snapTimeInCell(hour, e.clientY, e.currentTarget.getBoundingClientRect());
+      doDrop(id, drag?.overDate ?? date, time);
+    },
+    [drag?.eventId, drag?.overDate, drag?.overTime, doDrop]
+  );
+
+  // Dropped outside a cell (or Esc) — clear the drag without moving
+  const handleEventDragEnd = useCallback(() => setDrag(null), []);
 
   const handleDownloadUpcoming = () => {
     const now = new Date().toISOString();
@@ -681,6 +887,13 @@ export default function SchedulePage() {
               onCellClick={handleCellClick}
               onCellRightClick={handleCellRightClick}
               currentTimeRef={currentTimeRef}
+              drag={drag}
+              onCellDragOver={handleCellDragOver}
+              onCellDrop={handleCellDrop}
+              onEventDragStart={handleEventDragStart}
+              onEventDragEnd={handleEventDragEnd}
+              onEventTouchStart={handleEventTouchStart}
+              dndEnabled={isTrainer}
             />
           ) : (
             <DayGrid
@@ -689,10 +902,27 @@ export default function SchedulePage() {
               onCellClick={handleCellClick}
               onCellRightClick={handleCellRightClick}
               currentTimeRef={currentTimeRef}
+              drag={drag}
+              onCellDragOver={handleCellDragOver}
+              onCellDrop={handleCellDrop}
+              onEventDragStart={handleEventDragStart}
+              onEventDragEnd={handleEventDragEnd}
+              onEventTouchStart={handleEventTouchStart}
+              dndEnabled={isTrainer}
             />
           )}
         </div>
       </div>
+
+      {/* Task 4: mobile press-hold drag ghost (snaps to the target slot) */}
+      {drag?.touch && (
+        <div
+          className="pointer-events-none fixed z-50 rounded-lg bg-[#00AEEF] px-2 py-1 text-xs font-medium text-white opacity-90 shadow-xl"
+          style={{ left: drag.ghostX + 10, top: drag.ghostY - 24, transition: 'left 80ms ease-out, top 80ms ease-out' }}
+        >
+          {drag.title} · {drag.overTime}
+        </div>
+      )}
 
       {/* Context Menu */}
       <CellContextMenu
@@ -804,19 +1034,36 @@ export default function SchedulePage() {
 
 /* ── Week Grid ─────────────────────────────────────────── */
 
+interface GridDndProps {
+  drag: { overDate: string; overTime: string } | null;
+  onCellDragOver: (date: string, hour: number) => (e: React.DragEvent<HTMLDivElement>) => void;
+  onCellDrop: (date: string, hour: number) => (e: React.DragEvent<HTMLDivElement>) => void;
+  onEventDragStart: (event: CalendarEvent) => (e: React.DragEvent<HTMLDivElement>) => void;
+  onEventDragEnd: () => void;
+  onEventTouchStart: (event: CalendarEvent) => (e: React.TouchEvent<HTMLDivElement>) => void;
+  dndEnabled: boolean;
+}
+
 function WeekGrid({
   weekDays,
   events,
   onCellClick,
   onCellRightClick,
   currentTimeRef,
+  drag,
+  onCellDragOver,
+  onCellDrop,
+  onEventDragStart,
+  onEventDragEnd,
+  onEventTouchStart,
+  dndEnabled,
 }: {
   weekDays: Date[];
   events: CalendarEvent[];
   onCellClick: (date: string, time: string) => void;
   onCellRightClick: (e: React.MouseEvent, date: string, time: string) => void;
   currentTimeRef: React.RefObject<HTMLDivElement | null>;
-}) {
+} & GridDndProps) {
   const now = new Date();
   const currentHour = now.getHours();
   const currentMinute = now.getMinutes();
@@ -845,14 +1092,30 @@ function WeekGrid({
             return (
               <div
                 key={`${dayIndex}-${hour}`}
-                className="relative border border-slate-800/50 rounded-lg bg-slate-900/20 hover:bg-slate-800/20 transition-colors"
+                data-cell-date={dateKey}
+                data-cell-hour={hour}
+                className={`relative border rounded-lg transition-colors ${
+                  drag && drag.overDate === dateKey && parseInt(drag.overTime, 10) === hour
+                    ? 'border-[#00AEEF] bg-[#00AEEF]/10 ring-1 ring-[#00AEEF]'
+                    : 'border-slate-800/50 bg-slate-900/20 hover:bg-slate-800/20'
+                }`}
                 style={{ height: SLOT_HEIGHT }}
                 onClick={() => onCellClick(dateKey, `${hour.toString().padStart(2, '0')}:00`)}
                 onContextMenu={(e) => onCellRightClick(e, dateKey, `${hour.toString().padStart(2, '0')}:00`)}
+                onDragOver={onCellDragOver(dateKey, hour)}
+                onDrop={onCellDrop(dateKey, hour)}
               >
                 {/* Events */}
                 {hourEvents.map((event) => (
-                  <EventCard key={event.id} event={event} compact />
+                  <EventCard
+                    key={event.id}
+                    event={event}
+                    compact
+                    dndEnabled={dndEnabled}
+                    onDragStart={onEventDragStart(event)}
+                    onDragEnd={onEventDragEnd}
+                    onTouchStart={onEventTouchStart(event)}
+                  />
                 ))}
 
                 {/* Current time indicator */}
@@ -882,13 +1145,20 @@ function DayGrid({
   onCellClick,
   onCellRightClick,
   currentTimeRef,
+  drag,
+  onCellDragOver,
+  onCellDrop,
+  onEventDragStart,
+  onEventDragEnd,
+  onEventTouchStart,
+  dndEnabled,
 }: {
   day: Date;
   events: CalendarEvent[];
   onCellClick: (date: string, time: string) => void;
   onCellRightClick: (e: React.MouseEvent, date: string, time: string) => void;
   currentTimeRef: React.RefObject<HTMLDivElement | null>;
-}) {
+} & GridDndProps) {
   const dateKey = formatDateKeyUtc(day);
   const now = new Date();
   const currentHour = now.getHours();
@@ -922,12 +1192,27 @@ function DayGrid({
               {hour.toString().padStart(2, '0')}:00
             </div>
             <div
-              className="flex-1 relative border border-slate-800/50 rounded-lg bg-slate-900/20 hover:bg-slate-800/20 transition-colors min-h-[48px]"
+              data-cell-date={dateKey}
+              data-cell-hour={hour}
+              className={`flex-1 relative border rounded-lg transition-colors min-h-[48px] ${
+                drag && drag.overDate === dateKey && parseInt(drag.overTime, 10) === hour
+                  ? 'border-[#00AEEF] bg-[#00AEEF]/10 ring-1 ring-[#00AEEF]'
+                  : 'border-slate-800/50 bg-slate-900/20 hover:bg-slate-800/20'
+              }`}
               onClick={() => onCellClick(dateKey, `${hour.toString().padStart(2, '0')}:00`)}
               onContextMenu={(e) => onCellRightClick(e, dateKey, `${hour.toString().padStart(2, '0')}:00`)}
+              onDragOver={onCellDragOver(dateKey, hour)}
+              onDrop={onCellDrop(dateKey, hour)}
             >
               {hourEvents.map((event) => (
-                <EventCard key={event.id} event={event} />
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  dndEnabled={dndEnabled}
+                  onDragStart={onEventDragStart(event)}
+                  onDragEnd={onEventDragEnd}
+                  onTouchStart={onEventTouchStart(event)}
+                />
               ))}
 
               {showCurrentTime && currentHour === hour && (
@@ -949,7 +1234,21 @@ function DayGrid({
 
 /* ── Event Card ────────────────────────────────────────── */
 
-function EventCard({ event, compact }: { event: CalendarEvent; compact?: boolean }) {
+function EventCard({
+  event,
+  compact,
+  dndEnabled = false,
+  onDragStart,
+  onDragEnd,
+  onTouchStart,
+}: {
+  event: CalendarEvent;
+  compact?: boolean;
+  dndEnabled?: boolean;
+  onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd?: () => void;
+  onTouchStart?: (e: React.TouchEvent<HTMLDivElement>) => void;
+}) {
   const start = timeToMinutes(event.startTime);
   const end = timeToMinutes(event.endTime);
   const duration = end - start;
@@ -957,10 +1256,13 @@ function EventCard({ event, compact }: { event: CalendarEvent; compact?: boolean
   const isCompleted = event.status === 'completed';
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
+    <div
+      draggable={dndEnabled}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onTouchStart={onTouchStart}
       className={`absolute left-1 right-1 rounded-lg px-2 py-1 text-xs overflow-hidden cursor-pointer
+        ${dndEnabled ? 'cursor-grab active:cursor-grabbing' : ''}
         ${isCompleted ? 'bg-slate-700/80 border border-slate-600 opacity-70' : `${getEventColor(event.type)} ${event.type === 'blocked' ? 'border' : ''}`}`}
       style={{
         top: '2px',
@@ -968,18 +1270,25 @@ function EventCard({ event, compact }: { event: CalendarEvent; compact?: boolean
         zIndex: 5,
       }}
     >
-      <div className="flex items-center gap-1 font-medium text-white truncate">
-        {isCompleted && <Check size={11} className="shrink-0 text-emerald-400" />}
-        <span className="truncate">{event.title}</span>
-      </div>
-      {!compact && (
-        <div className="text-[10px] text-white/70">
-          {event.startTime} – {event.endTime}
-          {event.clientName && ` • ${event.clientName}`}
-          {isCompleted && ' • completed'}
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="h-full">
+        <div className="flex items-center gap-1 font-medium text-white truncate">
+          {isCompleted && <Check size={11} className="shrink-0 text-emerald-400" />}
+          <span className="truncate">{event.title}</span>
         </div>
-      )}
-    </motion.div>
+        {/* Task 4: week tiles show the start time when there's room (short
+            "{Name} PT" titles + time beat the old truncated "PT with B…") */}
+        {compact && height >= 40 && (
+          <div className="text-[9px] text-white/70">{event.startTime}</div>
+        )}
+        {!compact && (
+          <div className="text-[10px] text-white/70">
+            {event.startTime} – {event.endTime}
+            {event.clientName && ` • ${event.clientName}`}
+            {isCompleted && ' • completed'}
+          </div>
+        )}
+      </motion.div>
+    </div>
   );
 }
 

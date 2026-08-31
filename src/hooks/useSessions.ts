@@ -252,6 +252,36 @@ export function useSessions() {
     [myId]
   );
 
+  /* ── Reschedule (Task 4 drag-and-drop: optimistic move + rollback) ── */
+  const rescheduleSession = useCallback(
+    async (id: string, startsAt: string, endsAt: string) => {
+      if (!myId) return false;
+
+      let previous: Session[] = [];
+      setSessions((cur) => {
+        previous = cur;
+        return cur.map((s) => (s.id === id ? { ...s, startsAt, endsAt } : s));
+      });
+
+      try {
+        const { error } = await supabase
+          .from("sessions")
+          .update({ starts_at: startsAt, ends_at: endsAt })
+          .eq("id", id);
+        if (error) throw error;
+
+        toast.success("Session moved");
+        return true;
+      } catch (err) {
+        console.error("Failed to move session:", err);
+        setSessions(previous);
+        toast.error("Failed to move session");
+        return false;
+      }
+    },
+    [myId]
+  );
+
   /* ── Batch create sessions (recurring) ──────────────────────────── */
   const createSessions = useCallback(
     async (sessionsToCreate: Omit<Session, "id" | "createdAt">[]) => {
@@ -364,6 +394,7 @@ export function useSessions() {
     updateSession,
     cancelSession,
     deleteSession,
+    rescheduleSession,
     findConflicts,
     todaySessions,
     nextUpcomingSession,
