@@ -55,6 +55,7 @@ import {
 import { buildPrintModelFromWizard } from '@/lib/programPrint';
 import { suggestPhasesForMethod } from '@/lib/phaseSuggestions';
 import { swapSplitContent } from '@/lib/wizardSplit';
+import { fullBodyWorkoutExercises } from '@/lib/fullBodyRotation';
 import { nextSeriesLetter } from '@/lib/exerciseLabels';
 import { pairingStyleForMethod, assignPairGroups } from '@/lib/supersets';
 import ExercisePickerDialog, { type LibraryExercise } from '@/components/exercise/ExercisePickerDialog';
@@ -967,7 +968,18 @@ function Step5Split({ data, updateData }: StepProps) {
   const [dropIdx, setDropIdx] = useState<number | null>(null);
   const toggleDay = useCallback((dayIdx: number) => updateData((prev) => ({ split: prev.split.map((d, i) => (i === dayIdx ? { ...d, active: !d.active } : d)) })), [updateData]);
   const updateDayWorkout = useCallback((dayIdx: number, value: string) => updateData((prev) => ({ split: prev.split.map((d, i) => (i === dayIdx ? { ...d, workout: value } : d)) })), [updateData]);
-  const applySplit = useCallback((type: string) => { setSplitType(type); if (SPLIT_DEFAULTS[type]) updateData({ split: SPLIT_DEFAULTS[type].map((d) => ({ ...d })) }); }, [updateData]);
+  // Task 3: the 'Full Body' preset now seeds DISTINCT per-day lineups
+  // (A/B/C rotation) instead of leaving all days on the shared default list.
+  const applySplit = useCallback((type: string) => {
+    setSplitType(type);
+    if (!SPLIT_DEFAULTS[type]) return;
+    const split = SPLIT_DEFAULTS[type].map((d) => ({ ...d }));
+    updateData(
+      type === 'Full Body'
+        ? { split, workoutExercises: fullBodyWorkoutExercises(split, (d) => SPLIT_DAY_INDEX[d] ?? 0) }
+        : { split },
+    );
+  }, [updateData]);
   // Swap workout assignments between two days — calendar labels stay fixed,
   // exercise lists follow their content (rest-day swaps included).
   const swapDays = useCallback(
