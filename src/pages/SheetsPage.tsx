@@ -11,6 +11,7 @@ import { labelsForPairAdd, nextSeriesLetter } from '@/lib/exerciseLabels';
 import { INTENSITY_HEX } from '@/lib/methodDefaults';
 import { highVolumeSets, waveProgress, parseRestSeconds, ghostText } from '@/lib/workoutIntel';
 import { hapticsEnabled, setHapticsEnabled } from '@/lib/haptics';
+import DraftBanner from '@/components/DraftBanner';
 import { supabase } from '@/lib/supabase';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -36,6 +37,9 @@ export default function SheetsPage() {
     ghostByExercise,
     progressionByExercise,
     method,
+    draft,
+    resumeDraft,
+    discardDraft,
   } = useActiveWorkoutSession(workoutLogId);
 
   const { timers, startTimer, skipTimer, addTime } = useRestTimer();
@@ -348,6 +352,10 @@ export default function SheetsPage() {
 
       {/* Exercise Cards */}
       <main className="max-w-3xl mx-auto px-4 py-4 pb-24 space-y-3">
+        {/* Task 6: unsaved-draft restore (screen lock / tab close survival) */}
+        {draft && (
+          <DraftBanner savedAt={draft.savedAt} onResume={resumeDraft} onDiscard={discardDraft} />
+        )}
         {exercises.map((exercise) => (
           <SessionExerciseCard
             key={exercise.id}

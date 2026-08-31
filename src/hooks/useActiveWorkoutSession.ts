@@ -35,6 +35,7 @@ import {
   type ProgressionSuggestion,
 } from "@/lib/autoProgression";
 import { parseMethodDefaults, type MethodDefaults } from "@/lib/methodDefaults";
+import { saveDraft, loadDraft, clearDraft, draftIsNewer } from "@/lib/draftStore";
 
 type WorkoutLogRow = Database["public"]["Tables"]["workout_logs"]["Row"];
 type WorkoutRow = Database["public"]["Tables"]["workouts"]["Row"];
@@ -82,6 +83,12 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
   // Phase 62: rule-based progression suggestion per exercise (null = render nothing)
   const [progressionByExercise, setProgressionByExercise] = useState<Map<string, ProgressionSuggestion>>(new Map());
   const [method, setMethod] = useState<{ slug: string; name: string; d: MethodDefaults } | null>(null);
+
+  // Task 6: draft autosave — typed-but-unfinished sets are LOCAL state only
+  // (DB writes happen on set-done/finish), so the draft is the only copy.
+  const draftKey = workoutLogId ? `workout-draft-${workoutLogId}` : null;
+  const [draft, setDraft] = useState<{ savedAt: number } | null>(null);
+  const dirtyRef = useRef(false);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(Date.now());
@@ -337,6 +344,22 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
 
       setExercises(sessionExercises);
       startTimeRef.current = Date.now();
+
+      // Task 6: offer to resume an unsaved draft (banner in SheetsPage).
+      // Finished logs never prompt — the draft is stale by definition.
+      // NOTE: workout_logs.completed_at has DEFAULT NOW() (every new log is
+      // "completed" at insert), so the honest finish marker is
+      // duration_minutes — set only by finishSession.
+      if (draftKey) {
+        if (log.duration_minutes != null) {
+          clearDraft(draftKey);
+          setDraft(null);
+        } else {
+          const d = loadDraft<{ exercises: SessionExercise[] }>(draftKey);
+          const entityTs = new Date(log.created_at).getTime();
+          setDraft(d && draftIsNewer(d, Number.isFinite(entityTs) ? entityTs : null) ? { savedAt: d.savedAt } : null);
+        }
+      }
     } catch (err) {
       console.error("[useActiveWorkoutSession] load failed:", err);
       setError(err instanceof Error ? err.message : "Failed to load session");
@@ -344,7 +367,7 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [workoutLogId]);
+  }, [workoutLogId, draftKey]);
 
   useEffect(() => {
     loadSession();
@@ -368,6 +391,7 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
   }, [workoutLog, isPaused]);
 
   const updateExercise = useCallback((exerciseId: string, updater: Partial<SessionExercise> | ((ex: SessionExercise) => SessionExercise)) => {
+    dirtyRef.current = true;
     setExercises((prev) =>
       prev.map((ex) => {
         if (ex.id !== exerciseId) return ex;
@@ -436,6 +460,7 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
 
 
   const swapExercise = useCallback((exerciseId: string, newName: string) => {
+    dirtyRef.current = true;
     setExercises((prev) =>
       prev.map((ex) =>
         ex.id === exerciseId
@@ -450,6 +475,7 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
   }, []);
 
   const removeExercise = useCallback((exerciseId: string) => {
+    dirtyRef.current = true;
     setExercises((prev) => {
       const idx = prev.findIndex((ex) => ex.id === exerciseId);
       if (idx === -1) return prev;
@@ -462,6 +488,7 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
   // trainer chooses "pair with last series" (E → E1/E2 auto-rename) or
   // "start new series" (next letter).
   const addExercise = useCallback((name: string, mode: "pair" | "newSeries" = "newSeries") => {
+    dirtyRef.current = true;
     setExercises((prev) => {
       const category = findCategoryForExercise(name) || "Other";
       let order: string;
@@ -560,6 +587,7 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
   // (client-writable; the shared program exercise row is not).
   const updateExerciseTargetLoad = useCallback(
     (exerciseId: string, load: number) => {
+      dirtyRef.current = true;
       const current = exercisesRef.current.find((e) => e.id === exerciseId);
       if (!current) return;
       const updated: SessionExercise = {
@@ -575,6 +603,7 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
 
   const toggleSetDone = useCallback(
     async (exerciseId: string, setIndex: number) => {
+      dirtyRef.current = true;
       let exerciseAfterUpdate: SessionExercise | null = null;
 
       setExercises((prev) => {
@@ -680,14 +709,39 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
         .eq("id", workoutLog.id);
 
       if (error) throw error;
+      // Task 6: the draft's job is done once the session is saved
+      if (draftKey) clearDraft(draftKey);
+      dirtyRef.current = false;
       return true;
     } catch (err) {
       console.error("[useActiveWorkoutSession] finish failed:", err);
       return false;
     }
-  }, [workoutLog, elapsedSeconds, exercises, writeExerciseToDb]);
+  }, [workoutLog, elapsedSeconds, exercises, writeExerciseToDb, draftKey]);
 
   const setPaused = useCallback((paused: boolean) => setIsPaused(paused), []);
+
+  // Task 6: debounced draft autosave once the session is dirty
+  useEffect(() => {
+    if (!draftKey || !dirtyRef.current || exercises.length === 0) return;
+    saveDraft(draftKey, { exercises });
+  }, [draftKey, exercises]);
+
+  // Task 6: resume applies the draft onto the freshly-loaded session
+  const resumeDraft = useCallback(() => {
+    if (!draftKey) return;
+    const d = loadDraft<{ exercises: SessionExercise[] }>(draftKey);
+    if (d?.data.exercises?.length) {
+      setExercises(d.data.exercises);
+      dirtyRef.current = true;
+    }
+    setDraft(null);
+  }, [draftKey]);
+
+  const discardDraft = useCallback(() => {
+    if (draftKey) clearDraft(draftKey);
+    setDraft(null);
+  }, [draftKey]);
 
   const snapshot: SessionSnapshot = {
     workoutLog,
@@ -723,5 +777,8 @@ export function useActiveWorkoutSession(workoutLogId: string | null) {
     ghostByExercise,
     progressionByExercise,
     method,
+    draft,
+    resumeDraft,
+    discardDraft,
   };
 }

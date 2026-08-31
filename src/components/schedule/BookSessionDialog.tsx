@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarPlus, ChevronRight, User, CheckCircle } from 'lucide-react';
 import {
@@ -9,6 +9,20 @@ import {
   DEFAULT_DURATION_MIN,
 } from '@/lib/sessionDuration';
 import { eventTypeToWizardType, wizardTypeToEventType } from '@/lib/sessionUpdate';
+import { saveDraft, loadDraft, clearDraft } from '@/lib/draftStore';
+import DraftBanner from '@/components/DraftBanner';
+
+/** Task 6: single in-flight booking draft (the wizard is a modal). */
+const BOOK_DRAFT_KEY = 'book-session';
+interface BookDraftData {
+  step: number;
+  clientId: string;
+  date: string;
+  startTime: string;
+  durationMin: number;
+  sessionType: string;
+  notes: string;
+}
 import {
   Dialog,
   DialogContent,
@@ -102,6 +116,43 @@ export function BookSessionDialog({
   const [recurring, setRecurring] = useState(false);
   const [recurringCount, setRecurringCount] = useState(4);
 
+  // Task 6: draft restore — checked when the dialog opens (create mode only;
+  // edit mode always prefills from the row being edited). `dismissed` resets
+  // via resetForm() on close, so the banner re-evaluates on the next open.
+  const [draftHandled, setDraftHandled] = useState(false);
+  const draftInfo = useMemo(
+    () => (open && !isEdit && !draftHandled ? loadDraft<BookDraftData>(BOOK_DRAFT_KEY) : null),
+    [open, isEdit, draftHandled],
+  );
+
+  // Task 6: debounced autosave while the wizard has real input
+  useEffect(() => {
+    if (!open || isEdit) return;
+    const pristine =
+      step === 1 && !clientId && startTime === '09:00' && durationMin === DEFAULT_DURATION_MIN &&
+      sessionType === 'session' && notes === '';
+    if (pristine) return;
+    saveDraft(BOOK_DRAFT_KEY, { step, clientId, date, startTime, durationMin, sessionType, notes });
+  }, [open, isEdit, step, clientId, date, startTime, durationMin, sessionType, notes]);
+
+  const resumeDraft = () => {
+    const d = loadDraft<BookDraftData>(BOOK_DRAFT_KEY);
+    if (d) {
+      setStep(d.data.step);
+      setClientId(d.data.clientId);
+      setDate(d.data.date);
+      setStartTime(d.data.startTime);
+      setDurationMin(d.data.durationMin);
+      setSessionType(d.data.sessionType);
+      setNotes(d.data.notes);
+    }
+    setDraftHandled(true);
+  };
+  const discardDraft = () => {
+    clearDraft(BOOK_DRAFT_KEY);
+    setDraftHandled(true);
+  };
+
   const endTime = endTimeFromDuration(startTime, durationMin);
 
   const selectedClient = clients.find((c) => c.id === clientId);
@@ -131,6 +182,7 @@ export function BookSessionDialog({
     setNotes('');
     setRecurring(false);
     setRecurringCount(4);
+    setDraftHandled(false);
   };
 
   const handleBook = () => {
@@ -147,6 +199,7 @@ export function BookSessionDialog({
       location: null,
     };
     onBook(event, isTrainer && recurring ? recurringCount : 1);
+    clearDraft(BOOK_DRAFT_KEY); // Task 6: booked — the draft's job is done
     resetForm();
     onOpenChange(false);
   };
@@ -185,6 +238,11 @@ export function BookSessionDialog({
             {isEdit ? 'Edit Session' : 'Book Session'}
           </DialogTitle>
         </DialogHeader>
+
+        {/* Task 6: unfinished-booking restore prompt */}
+        {draftInfo && (
+          <DraftBanner savedAt={draftInfo.savedAt} onResume={resumeDraft} onDiscard={discardDraft} />
+        )}
 
         {/* Progress dots */}
         <div className="flex items-center justify-center gap-2 py-2">

@@ -56,6 +56,11 @@ import { buildPrintModelFromWizard } from '@/lib/programPrint';
 import { suggestPhasesForMethod } from '@/lib/phaseSuggestions';
 import { swapSplitContent } from '@/lib/wizardSplit';
 import { fullBodyWorkoutExercises } from '@/lib/fullBodyRotation';
+import { saveDraft, loadDraft, clearDraft } from '@/lib/draftStore';
+import DraftBanner from '@/components/DraftBanner';
+
+/** Task 6: one in-flight program build per trainer (the wizard is a single surface). */
+const BUILDER_DRAFT_KEY = 'program-builder';
 import { nextSeriesLetter } from '@/lib/exerciseLabels';
 import { pairingStyleForMethod, assignPairGroups } from '@/lib/supersets';
 import ExercisePickerDialog, { type LibraryExercise } from '@/components/exercise/ExercisePickerDialog';
@@ -2058,6 +2063,31 @@ export default function AIProgramBuilderPage() {
   });
 
   const updateData = useCallback((partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => setData((prev) => ({ ...prev, ...(typeof partial === 'function' ? partial(prev) : partial) })), []);
+
+  // Task 6: builder draft — debounced autosave once the build diverges from
+  // the defaults; the banner offers Resume/Discard on return (never silent).
+  const [draftHandled, setDraftHandled] = useState(false);
+  const draftInfo = useMemo(
+    () => (draftHandled ? null : loadDraft<{ data: ProgramData; currentStep: number }>(BUILDER_DRAFT_KEY)),
+    [draftHandled],
+  );
+  useEffect(() => {
+    if (JSON.stringify(data) === JSON.stringify(defaultData) && currentStep === 0) return;
+    saveDraft(BUILDER_DRAFT_KEY, { data, currentStep });
+  }, [data, currentStep]);
+  const resumeBuilderDraft = useCallback(() => {
+    const d = loadDraft<{ data: ProgramData; currentStep: number }>(BUILDER_DRAFT_KEY);
+    if (d) {
+      setData(d.data.data);
+      setCurrentStep(d.data.currentStep);
+      setMaxStep((m) => Math.max(m, d.data.currentStep));
+    }
+    setDraftHandled(true);
+  }, []);
+  const discardBuilderDraft = useCallback(() => {
+    clearDraft(BUILDER_DRAFT_KEY);
+    setDraftHandled(true);
+  }, []);
   const selectedClient = useMemo(() => clients.find((c) => c.id === data.assignedClient), [clients, data.assignedClient]);
   const selectedClientName = selectedClient?.full_name || 'Unassigned';
   const buildForClientRow = useMemo(() => clients.find((c) => c.id === buildForClient), [clients, buildForClient]);
@@ -2248,7 +2278,7 @@ export default function AIProgramBuilderPage() {
     }, 1500);
   }, [generationProfile, data.method, dbMethods]);
 
-  const handleReset = useCallback(() => { setData(defaultData); setProgram(null); setCurrentStep(0); setMaxStep(0); }, []);
+  const handleReset = useCallback(() => { setData(defaultData); setProgram(null); setCurrentStep(0); setMaxStep(0); clearDraft(BUILDER_DRAFT_KEY); }, []);
   const handleSave = useCallback(async () => {
     if (!user?.id || saving) return;
     const assignedClientId = data.assignedClient || null;
@@ -2257,6 +2287,7 @@ export default function AIProgramBuilderPage() {
       const saved = await saveProgramToSupabase(data, user.id, assignedClientId);
       if (saved) {
         setData(saved);
+        clearDraft(BUILDER_DRAFT_KEY); // Task 6: saved — draft's job is done
         setSavedList(await loadSavedPrograms(user.id));
         setSaveFlash(true);
         setTimeout(() => setSaveFlash(false), 1200);
@@ -2283,6 +2314,7 @@ export default function AIProgramBuilderPage() {
       const saved = await saveProgramToSupabase(data, user.id, assignedClientId);
       if (saved) {
         setData(saved);
+        clearDraft(BUILDER_DRAFT_KEY); // Task 6
         setSavedList(await loadSavedPrograms(user.id));
         toast.success('Program assigned to client');
         navigate('/dashboard');
@@ -2481,6 +2513,15 @@ export default function AIProgramBuilderPage() {
                 <Button variant="outline" size="sm" onClick={dismissLegacy} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs">Dismiss</Button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Task 6: unsaved build restore prompt */}
+      {draftInfo && (
+        <div className="border-b border-[var(--card-border)] bg-[var(--card-bg)]">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3">
+            <DraftBanner savedAt={draftInfo.savedAt} onResume={resumeBuilderDraft} onDiscard={discardBuilderDraft} />
           </div>
         </div>
       )}

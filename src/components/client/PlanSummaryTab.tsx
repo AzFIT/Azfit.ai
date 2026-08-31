@@ -22,6 +22,8 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDate } from "@/lib/utils";
+import { saveDraft, loadDraft, clearDraft } from "@/lib/draftStore";
+import DraftBanner from "@/components/DraftBanner";
 import {
   computeBlueprint,
   ACTIVITY_PRESETS,
@@ -148,6 +150,7 @@ export default function PlanSummaryTab({ clientId }: { clientId: string }) {
         .single();
       if (error) throw error;
       toast.success("Plan Summary generated");
+      clearDraft(`plan-summary-${clientId}`); // Task 6: generated — draft done
       setFormOpen(false);
       await load();
       if (data) setActiveId(data.id);
@@ -252,7 +255,7 @@ export default function PlanSummaryTab({ clientId }: { clientId: string }) {
       {/* Generate form */}
       <AnimatePresence>
         {formOpen && prefill && canEdit && (
-          <BlueprintForm initial={report && active ? (active.inputs as unknown as BlueprintInputs) : prefill} saving={saving} onCancel={() => setFormOpen(false)} onGenerate={generate} />
+          <BlueprintForm draftKey={`plan-summary-${clientId}`} initial={report && active ? (active.inputs as unknown as BlueprintInputs) : prefill} saving={saving} onCancel={() => setFormOpen(false)} onGenerate={generate} />
         )}
       </AnimatePresence>
     </div>
@@ -267,11 +270,13 @@ function summariesOfLatest(bc: { weight_kg: number | null; body_fat_percentage: 
 /* ── Input form ──────────────────────────────────────────────── */
 
 function BlueprintForm({
+  draftKey,
   initial,
   saving,
   onCancel,
   onGenerate,
 }: {
+  draftKey: string;
   initial: BlueprintInputs;
   saving: boolean;
   onCancel: () => void;
@@ -281,6 +286,24 @@ function BlueprintForm({
   const set = <K extends keyof BlueprintInputs>(k: K, v: BlueprintInputs[K]) => setD((p) => ({ ...p, [k]: v }));
   const num = (v: string) => (v.trim() === "" ? 0 : Number(v));
   const valid = d.weightKg > 0 && d.heightCm > 0 && d.age > 0 && d.trainerName.trim().length > 0;
+
+  // Task 6: draft autosave for the blueprint inputs (form remounts per open,
+  // so the lazy read + effect guard covers the whole lifecycle)
+  const [draftInfo, setDraftInfo] = useState(() => loadDraft<BlueprintInputs>(draftKey));
+  useEffect(() => {
+    if (JSON.stringify(d) === JSON.stringify(initial)) return;
+    saveDraft(draftKey, d);
+  }, [draftKey, d, initial]);
+
+  const resumeDraft = () => {
+    const draft = loadDraft<BlueprintInputs>(draftKey);
+    if (draft) setD(draft.data);
+    setDraftInfo(null);
+  };
+  const discardDraft = () => {
+    clearDraft(draftKey);
+    setDraftInfo(null);
+  };
 
   return (
     <motion.div
@@ -298,6 +321,11 @@ function BlueprintForm({
           <X size={14} />
         </button>
       </div>
+      {draftInfo && (
+        <div className="mb-3">
+          <DraftBanner savedAt={draftInfo.savedAt} onResume={resumeDraft} onDiscard={discardDraft} />
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div>
           <label className={labelCls}>Gender</label>
