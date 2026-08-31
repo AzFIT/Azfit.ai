@@ -131,7 +131,7 @@ export default function TodaysMealsCard({ clientId }: { clientId: string }) {
         title={`Today's Meals — Day ${planDay} of your plan`}
         icon={<UtensilsCrossed className="h-4 w-4" />}
         defaultExpanded
-        accentColor="#8B5CF6"
+        accentColor="var(--azfit-accent)"
       >
         {dayItems.length === 0 ? (
           <div className="py-2 text-center">
@@ -166,7 +166,7 @@ export default function TodaysMealsCard({ clientId }: { clientId: string }) {
                       {loggedMeals.has(meal) && (
                         <span
                           className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
-                          style={{ backgroundColor: "rgba(34,197,94,0.15)", color: "#22C55E" }}
+                          style={{ backgroundColor: "color-mix(in srgb, var(--success) 15%, transparent)", color: "var(--success)" }}
                         >
                           <Check size={9} />
                           Logged

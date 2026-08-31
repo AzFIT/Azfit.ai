@@ -28,9 +28,9 @@ export interface AIInsight {
 /* ── Constants ───────────────────────────────────────── */
 
 const SEVERITY_CONFIG: Record<InsightSeverity, { icon: LucideIcon; color: string; bg: string; label: string }> = {
-  warning: { icon: TrendingDown, color: "#F59E0B", bg: "rgba(245,158,11,0.12)", label: "Warning" },
-  danger: { icon: AlertTriangle, color: "#EF4444", bg: "rgba(239,68,68,0.12)", label: "At Risk" },
-  info: { icon: Activity, color: "#3B82F6", bg: "rgba(59,130,246,0.12)", label: "Insight" },
+  warning: { icon: TrendingDown, color: "var(--warning)", bg: "color-mix(in srgb, var(--warning) 12%, transparent)", label: "Warning" },
+  danger: { icon: AlertTriangle, color: "var(--danger)", bg: "color-mix(in srgb, var(--danger) 12%, transparent)", label: "At Risk" },
+  info: { icon: Activity, color: "var(--info)", bg: "color-mix(in srgb, var(--info) 12%, transparent)", label: "Insight" },
 };
 
 /* ── Component ───────────────────────────────────────── */
@@ -52,12 +52,12 @@ export function AIInsightsPanel({
       titleIcon={<Activity className="h-4 w-4" />}
       glass
       hover
-      accentColor="#00AEEF"
+      accentColor="var(--azfit-primary)"
       headerAction={
         <button
           onClick={onViewAll}
           className="flex items-center gap-1 text-[10px] font-medium"
-          style={{ color: "#00AEEF" }}
+          style={{ color: "var(--azfit-primary)" }}
         >
           View All <ChevronRight className="h-3 w-3" />
         </button>
@@ -114,7 +114,7 @@ export function AIInsightsPanel({
                     <button
                       onClick={() => onActionClick?.(insight.id, insight.suggestedAction)}
                       className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-medium text-white"
-                      style={{ backgroundColor: "#00AEEF" }}
+                      style={{ backgroundColor: "var(--azfit-primary)" }}
                     >
                       <Send className="h-3 w-3" />
                       {insight.suggestedAction}

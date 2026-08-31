@@ -81,7 +81,7 @@ export default function StatsCards() {
   }, []);
 
   const cards = [
-    { label: 'Active Clients', value: stats?.activeClients ?? 0, sublabel: 'status: active', icon: Users, color: '#0D9488' },
+    { label: 'Active Clients', value: stats?.activeClients ?? 0, sublabel: 'status: active', icon: Users, color: 'var(--azfit-primary)' },
     { label: 'Active Programs', value: stats?.activePrograms ?? 0, sublabel: 'assigned to clients', icon: Target, color: '#84CC16' },
     { label: 'Sessions This Month', value: stats?.sessionsThisMonth ?? 0, sublabel: 'all statuses', icon: Calendar, color: '#06B6D4' },
   ];

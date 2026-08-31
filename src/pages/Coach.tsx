@@ -100,12 +100,12 @@ export default function Coach() {
             <div className="flex items-center gap-3">
               <div
                 className="flex h-10 w-10 items-center justify-center rounded-xl lg:h-11 lg:w-11"
-                style={{ backgroundColor: 'rgba(13, 148, 136, 0.15)' }}
+                style={{ backgroundColor: 'color-mix(in srgb, var(--azfit-primary) 15%, transparent)' }}
               >
                 <UserCircle
                   size={22}
                   className="lg:h-6 lg:w-6"
-                  style={{ color: '#0D9488' }}
+                  style={{ color: 'var(--azfit-primary)' }}
                 />
               </div>
               <div>
@@ -132,14 +132,14 @@ export default function Coach() {
               <button
                 className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-all duration-150 active:scale-[0.97]"
                 style={{
-                  backgroundColor: '#0D9488',
+                  backgroundColor: 'var(--azfit-primary)',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#14B8A6';
-                  e.currentTarget.style.boxShadow = '0 0 20px rgba(13,148,136,0.3)';
+                  e.currentTarget.style.boxShadow = '0 0 20px color-mix(in srgb, var(--azfit-primary) 3%, transparent)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#0D9488';
+                  e.currentTarget.style.backgroundColor = 'var(--azfit-primary)';
                   e.currentTarget.style.boxShadow = 'none';
                 }}
                 onClick={() => navigate('/ai-program-builder')}
@@ -224,7 +224,7 @@ export default function Coach() {
                       layoutId="activeCoachTab"
                       className="absolute inset-0 rounded-lg"
                       style={{
-                        backgroundColor: '#0D9488',
+                        backgroundColor: 'var(--azfit-primary)',
                       }}
                       transition={{
                         type: 'spring',

@@ -60,8 +60,8 @@ export const CLIENT_STATUSES: Record<ClientStatus, ClientStatusMeta> = {
   on_break: {
     label: "On Break",
     description: "Short personal break",
-    color: "#0D9488",
-    bg: "rgba(13,148,136,0.12)",
+    color: "var(--azfit-primary)",
+    bg: "color-mix(in srgb, var(--azfit-primary) 12%, transparent)",
   },
   pending_start: {
     label: "Pending Start",

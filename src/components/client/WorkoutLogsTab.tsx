@@ -161,8 +161,8 @@ export default function WorkoutLogsTab({ clientId }: WorkoutLogsTabProps) {
             className="w-full flex items-center justify-between p-4 text-left"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: log.completed ? 'rgba(13,148,136,0.15)' : 'rgba(245,158,11,0.15)' }}>
-                {log.completed ? <Trophy size={20} style={{ color: '#0D9488' }} /> : <Dumbbell size={20} style={{ color: '#F59E0B' }} />}
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: log.completed ? 'color-mix(in srgb, var(--success) 15%, transparent)' : 'color-mix(in srgb, var(--warning) 15%, transparent)' }}>
+                {log.completed ? <Trophy size={20} style={{ color: 'var(--success)' }} /> : <Dumbbell size={20} style={{ color: 'var(--warning)' }} />}
               </div>
               <div>
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--page-text)' }}>{log.workoutName}</h3>
@@ -192,7 +192,7 @@ export default function WorkoutLogsTab({ clientId }: WorkoutLogsTabProps) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: log.completed ? 'rgba(13,148,136,0.1)' : 'rgba(245,158,11,0.1)', color: log.completed ? '#0D9488' : '#F59E0B' }}>
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: log.completed ? 'color-mix(in srgb, var(--success) 10%, transparent)' : 'color-mix(in srgb, var(--warning) 10%, transparent)', color: log.completed ? 'var(--success)' : 'var(--warning)' }}>
                 {log.completed ? 'Completed' : 'Partial'}
               </span>
               {expandedLog === log.id ? <ChevronUp size={16} style={{ color: 'var(--light-text-muted)' }} /> : <ChevronDown size={16} style={{ color: 'var(--light-text-muted)' }} />}

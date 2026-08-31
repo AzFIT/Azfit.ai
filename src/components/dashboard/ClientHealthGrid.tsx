@@ -23,10 +23,10 @@ export interface ClientHealthItem {
 /* ── Constants ───────────────────────────────────────── */
 
 const STATUS_CONFIG: Record<HealthStatus, { label: string; color: string; bg: string; dot: string }> = {
-  on_track: { label: "On Track", color: "#22C55E", bg: "rgba(34,197,94,0.12)", dot: "#22C55E" },
-  needs_attention: { label: "Needs Attention", color: "#F59E0B", bg: "rgba(245,158,11,0.12)", dot: "#F59E0B" },
-  at_risk: { label: "At Risk", color: "#EF4444", bg: "rgba(239,68,68,0.12)", dot: "#EF4444" },
-  deload: { label: "Deload", color: "#3B82F6", bg: "rgba(59,130,246,0.12)", dot: "#3B82F6" },
+  on_track: { label: "On Track", color: "var(--success)", bg: "color-mix(in srgb, var(--success) 12%, transparent)", dot: "var(--success)" },
+  needs_attention: { label: "Needs Attention", color: "var(--warning)", bg: "color-mix(in srgb, var(--warning) 12%, transparent)", dot: "var(--warning)" },
+  at_risk: { label: "At Risk", color: "var(--danger)", bg: "color-mix(in srgb, var(--danger) 12%, transparent)", dot: "var(--danger)" },
+  deload: { label: "Deload", color: "var(--info)", bg: "color-mix(in srgb, var(--info) 12%, transparent)", dot: "var(--info)" },
 };
 
 /* ── Component ───────────────────────────────────────── */
@@ -50,7 +50,7 @@ export function ClientHealthGrid({
       titleIcon={<AlertTriangle className="h-4 w-4" />}
       glass
       hover
-      accentColor="#8B5CF6"
+      accentColor="var(--azfit-accent)"
       className="relative"
     >
       {/* Legend */}
@@ -150,7 +150,7 @@ export function ClientHealthGrid({
                           onSendMessage?.(client.id);
                         }}
                         className="flex flex-1 items-center justify-center gap-1 rounded-lg py-1 text-[10px] font-medium text-white"
-                        style={{ backgroundColor: "#00AEEF" }}
+                        style={{ backgroundColor: "var(--azfit-primary)" }}
                       >
                         <MessageSquare className="h-3 w-3" /> Message
                       </button>

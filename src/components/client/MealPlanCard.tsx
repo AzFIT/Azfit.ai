@@ -530,7 +530,7 @@ export default function MealPlanCard({ clientId, targets, restrictions, diet, ca
               Day {effectiveDay} vs targets:{" "}
               <span style={{ color: "#00AEEF" }}>{dayAccuracy.kcalPct}% kcal</span>
               {" · "}
-              <span style={{ color: "#0D9488" }}>{dayAccuracy.proteinPct}% protein</span>
+              <span style={{ color: "var(--azfit-primary)" }}>{dayAccuracy.proteinPct}% protein</span>
               {" · "}
               <span>{dayAccuracy.carbsPct}% carbs</span>
               {" · "}

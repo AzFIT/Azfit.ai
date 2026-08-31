@@ -38,9 +38,9 @@ interface Row {
 }
 
 const DOT_COLOR: Record<NutritionDot, string> = {
-  red: "#EF4444",
-  amber: "#F59E0B",
-  green: "#22C55E",
+  red: "var(--danger)",
+  amber: "var(--warning)",
+  green: "var(--success)",
 };
 
 const DAY_MS = 86400000;
@@ -183,7 +183,7 @@ export default function NutritionCommandCenter() {
         title="Nutrition Command Center"
         icon={<Apple className="h-4 w-4" />}
         defaultExpanded
-        accentColor="#22C55E"
+        accentColor="var(--success)"
         badge={
           rows ? (
             <span
@@ -276,7 +276,7 @@ export default function NutritionCommandCenter() {
                       <button
                         onClick={() => navigate(nutritionUrl(r.clientId))}
                         className="text-[11px] font-medium transition-opacity hover:opacity-70"
-                        style={{ color: "#EF4444" }}
+                        style={{ color: "var(--danger)" }}
                       >
                         No targets — Set targets
                       </button>
@@ -286,7 +286,7 @@ export default function NutritionCommandCenter() {
                       className="text-[10px]"
                       style={{
                         color: r.hasPlan
-                          ? "#22C55E"
+                          ? "var(--success)"
                           : "var(--light-text-muted)",
                       }}
                     >

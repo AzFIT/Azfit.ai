@@ -83,13 +83,13 @@ export default function MyTargetsCard({ clientsId }: { clientsId: string }) {
       titleIcon={<Target className="h-4 w-4" />}
       glass
       hover
-      accentColor="#8B5CF6"
+      accentColor="var(--azfit-accent)"
       headerAction={
         !editing ? (
           <button
             onClick={openEditor}
             className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium transition hover:opacity-80"
-            style={{ color: "#00AEEF" }}
+            style={{ color: "var(--azfit-primary)" }}
           >
             <Pencil size={11} /> {chips.length ? "Edit" : "Set targets"}
           </button>

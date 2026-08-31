@@ -205,10 +205,10 @@ export default function FollowUpsWidget() {
     Icon: typeof CalendarX;
     rows: FollowUpRow[];
   }[] = [
-    { key: "noSession", title: "No session in 5+ days", color: "#F59E0B", Icon: CalendarX, rows: groups.noSession },
-    { key: "bioprint", title: "BioPrint overdue (30+ days)", color: "#8B5CF6", Icon: Ruler, rows: groups.bioprint },
-    { key: "noProgram", title: "No active program", color: "#00AEEF", Icon: FileSpreadsheet, rows: groups.noProgram },
-    { key: "profileIncomplete", title: "Profile incomplete", color: "#F59E0B", Icon: AlertTriangle, rows: groups.profileIncomplete },
+    { key: "noSession", title: "No session in 5+ days", color: "var(--warning)", Icon: CalendarX, rows: groups.noSession },
+    { key: "bioprint", title: "BioPrint overdue (30+ days)", color: "var(--azfit-accent)", Icon: Ruler, rows: groups.bioprint },
+    { key: "noProgram", title: "No active program", color: "var(--azfit-primary)", Icon: FileSpreadsheet, rows: groups.noProgram },
+    { key: "profileIncomplete", title: "Profile incomplete", color: "var(--warning)", Icon: AlertTriangle, rows: groups.profileIncomplete },
   ];
 
   return (
@@ -222,11 +222,11 @@ export default function FollowUpsWidget() {
         title="Follow-Ups"
         icon={<AlertTriangle className="h-4 w-4" />}
         defaultExpanded
-        accentColor="#EF4444"
+        accentColor="var(--danger)"
         badge={
           <span
             className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
-            style={{ backgroundColor: "#EF4444" }}
+            style={{ backgroundColor: "var(--danger)" }}
           >
             {total}
           </span>

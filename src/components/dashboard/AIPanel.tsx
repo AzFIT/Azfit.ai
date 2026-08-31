@@ -30,7 +30,10 @@ export default function AIPanel({
       className="relative overflow-hidden rounded-[var(--radius-panel)] border p-5 backdrop-blur-xl"
       style={{
         borderColor: "color-mix(in srgb, var(--ai-violet) 35%, transparent)",
-        background: "color-mix(in srgb, var(--dark-elevated) 55%, transparent)",
+        /* Task 7: was --dark-elevated 55% — a dark-tinted panel even in the
+           LIGHT theme, where the violet header text failed AA. card-bg is
+           theme-aware (white light / #151D27 dark), so the glass follows. */
+        background: "color-mix(in srgb, var(--card-bg) 55%, transparent)",
         boxShadow: "var(--shadow-card)",
       }}
     >
@@ -43,7 +46,9 @@ export default function AIPanel({
       {/* Header */}
       <div className="mb-3 flex items-center gap-2">
         <Sparkles className="h-4 w-4" style={{ color: "var(--ai-violet)" }} />
-        <span className="text-sm font-bold tracking-wide" style={{ color: "var(--ai-violet)" }}>
+        {/* Task 7: --ai-violet text was 2.9:1 on the light glass panel —
+            --ai-violet-strong passes AA in light, equals --ai-violet in dark */}
+        <span className="text-sm font-bold tracking-wide" style={{ color: "var(--ai-violet-strong)" }}>
           Coach AI
         </span>
         {subtitle && (

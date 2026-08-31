@@ -100,9 +100,9 @@ export default function Signup() {
         >
           <div
             className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full"
-            style={{ backgroundColor: 'rgba(13, 148, 136, 0.15)' }}
+            style={{ backgroundColor: 'color-mix(in srgb, var(--azfit-primary) 15%, transparent)' }}
           >
-            <Dumbbell size={32} style={{ color: '#0D9488' }} />
+            <Dumbbell size={32} style={{ color: 'var(--azfit-primary)' }} />
           </div>
           <h2 className="text-2xl font-bold text-white">Account Created!</h2>
           <p className="mt-2 text-sm" style={{ color: '#94A3B8' }}>
@@ -111,7 +111,7 @@ export default function Signup() {
           <button
             onClick={() => navigate('/login')}
             className="mt-6 w-full rounded-lg py-3 text-sm font-semibold text-white transition-all"
-            style={{ backgroundColor: '#0D9488' }}
+            style={{ backgroundColor: 'var(--azfit-primary)' }}
           >
             Go to Sign In
           </button>
@@ -139,7 +139,7 @@ export default function Signup() {
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div
           className="absolute -top-40 -right-40 h-80 w-80 rounded-full opacity-20"
-          style={{ background: 'radial-gradient(circle, #0D9488 0%, transparent 70%)' }}
+          style={{ background: 'radial-gradient(circle, var(--azfit-primary) 0%, transparent 70%)' }}
         />
         <div
           className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full opacity-20"
@@ -170,9 +170,9 @@ export default function Signup() {
             <div className="mb-4 flex justify-center">
               <div
                 className="flex h-14 w-14 items-center justify-center rounded-xl"
-                style={{ backgroundColor: 'rgba(13, 148, 136, 0.15)' }}
+                style={{ backgroundColor: 'color-mix(in srgb, var(--azfit-primary) 15%, transparent)' }}
               >
-                <Dumbbell size={28} style={{ color: '#0D9488' }} />
+                <Dumbbell size={28} style={{ color: 'var(--azfit-primary)' }} />
               </div>
             </div>
             <h1 className="text-2xl font-bold text-white">Create Account</h1>
@@ -204,9 +204,9 @@ export default function Signup() {
                   onClick={() => setRole('client')}
                   className="flex items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium transition-all"
                   style={{
-                    borderColor: role === 'client' ? '#0D9488' : '#475569',
-                    backgroundColor: role === 'client' ? 'rgba(13, 148, 136, 0.1)' : '#0F172A',
-                    color: role === 'client' ? '#0D9488' : '#94A3B8',
+                    borderColor: role === 'client' ? 'var(--azfit-primary)' : '#475569',
+                    backgroundColor: role === 'client' ? 'color-mix(in srgb, var(--azfit-primary) 1%, transparent)' : '#0F172A',
+                    color: role === 'client' ? 'var(--azfit-primary)' : '#94A3B8',
                   }}
                 >
                   <User size={18} />
@@ -217,9 +217,9 @@ export default function Signup() {
                   onClick={() => setRole('trainer')}
                   className="flex items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium transition-all"
                   style={{
-                    borderColor: role === 'trainer' ? '#0D9488' : '#475569',
-                    backgroundColor: role === 'trainer' ? 'rgba(13, 148, 136, 0.1)' : '#0F172A',
-                    color: role === 'trainer' ? '#0D9488' : '#94A3B8',
+                    borderColor: role === 'trainer' ? 'var(--azfit-primary)' : '#475569',
+                    backgroundColor: role === 'trainer' ? 'color-mix(in srgb, var(--azfit-primary) 1%, transparent)' : '#0F172A',
+                    color: role === 'trainer' ? 'var(--azfit-primary)' : '#94A3B8',
                   }}
                 >
                   <UserCog size={18} />
@@ -237,7 +237,7 @@ export default function Signup() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
-                className="w-full rounded-lg border px-4 py-3 text-sm text-white outline-none transition-all focus:border-[#0D9488] focus:ring-1 focus:ring-[#0D9488]"
+                className="w-full rounded-lg border px-4 py-3 text-sm text-white outline-none transition-all focus:border-[var(--azfit-primary)] focus:ring-1 focus:ring-[var(--azfit-primary)]"
                 style={{ backgroundColor: '#0F172A', borderColor: '#475569' }}
                 placeholder="John Doe"
               />
@@ -252,7 +252,7 @@ export default function Signup() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full rounded-lg border px-4 py-3 text-sm text-white outline-none transition-all focus:border-[#0D9488] focus:ring-1 focus:ring-[#0D9488]"
+                className="w-full rounded-lg border px-4 py-3 text-sm text-white outline-none transition-all focus:border-[var(--azfit-primary)] focus:ring-1 focus:ring-[var(--azfit-primary)]"
                 style={{ backgroundColor: '#0F172A', borderColor: '#475569' }}
                 placeholder="you@example.com"
               />
@@ -272,7 +272,7 @@ export default function Signup() {
                   }}
                   required
                   minLength={6}
-                  className="w-full rounded-lg border px-4 py-3 pr-12 text-sm text-white outline-none transition-all focus:border-[#0D9488] focus:ring-1 focus:ring-[#0D9488]"
+                  className="w-full rounded-lg border px-4 py-3 pr-12 text-sm text-white outline-none transition-all focus:border-[var(--azfit-primary)] focus:ring-1 focus:ring-[var(--azfit-primary)]"
                   style={{ backgroundColor: '#0F172A', borderColor: '#475569' }}
                   placeholder="Min 6 characters"
                 />
@@ -324,7 +324,7 @@ export default function Signup() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                className="w-full rounded-lg border px-4 py-3 text-sm text-white outline-none transition-all focus:border-[#0D9488] focus:ring-1 focus:ring-[#0D9488]"
+                className="w-full rounded-lg border px-4 py-3 text-sm text-white outline-none transition-all focus:border-[var(--azfit-primary)] focus:ring-1 focus:ring-[var(--azfit-primary)]"
                 style={{ backgroundColor: '#0F172A', borderColor: '#475569' }}
                 placeholder="Confirm your password"
               />
@@ -335,8 +335,8 @@ export default function Signup() {
               disabled={loading}
               className="w-full rounded-lg py-3 text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 disabled:opacity-50"
               style={{
-                backgroundColor: '#0D9488',
-                boxShadow: '0 0 20px rgba(13,148,136,0.3)',
+                backgroundColor: 'var(--azfit-primary)',
+                boxShadow: '0 0 20px color-mix(in srgb, var(--azfit-primary) 3%, transparent)',
               }}
             >
               {loading ? 'Creating account...' : 'Create Account'}
@@ -354,7 +354,7 @@ export default function Signup() {
             <button
               onClick={() => navigate('/login')}
               className="font-semibold transition-colors hover:underline"
-              style={{ color: '#0D9488' }}
+              style={{ color: 'var(--azfit-primary)' }}
             >
               Sign in
             </button>

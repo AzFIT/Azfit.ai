@@ -468,8 +468,8 @@ export default function ClientDashboard() {
             {sessionsLoading ? (
               <div className="flex items-center gap-2 rounded-lg border px-3 py-2 animate-pulse"
                 style={{
-                  backgroundColor: "rgba(13,148,136,0.06)",
-                  borderColor: "rgba(13,148,136,0.2)",
+                  backgroundColor: "color-mix(in srgb, var(--azfit-primary) 6%, transparent)",
+                  borderColor: "color-mix(in srgb, var(--azfit-primary) 20%, transparent)",
                 }}
               >
                 <div className="h-4 w-4 rounded-full bg-[var(--dark-elevated)]" />
@@ -483,8 +483,8 @@ export default function ClientDashboard() {
                 onClick={() => navigate("/schedule")}
                 className="flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all hover:-translate-y-0.5"
                 style={{
-                  backgroundColor: "rgba(13,148,136,0.06)",
-                  borderColor: "rgba(13,148,136,0.2)",
+                  backgroundColor: "color-mix(in srgb, var(--azfit-primary) 6%, transparent)",
+                  borderColor: "color-mix(in srgb, var(--azfit-primary) 20%, transparent)",
                 }}
               >
                 <CalendarDays className="h-4 w-4 shrink-0" style={{ color: "var(--azfit-primary)" }} />
@@ -503,8 +503,8 @@ export default function ClientDashboard() {
                 onClick={() => navigate("/schedule")}
                 className="flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all hover:-translate-y-0.5"
                 style={{
-                  backgroundColor: "rgba(13,148,136,0.06)",
-                  borderColor: "rgba(13,148,136,0.2)",
+                  backgroundColor: "color-mix(in srgb, var(--azfit-primary) 6%, transparent)",
+                  borderColor: "color-mix(in srgb, var(--azfit-primary) 20%, transparent)",
                 }}
               >
                 <CalendarDays className="h-4 w-4 shrink-0" style={{ color: "var(--azfit-primary)" }} />
@@ -656,7 +656,7 @@ export default function ClientDashboard() {
                 transition={{ duration: 0.8, ease: "easeOut" }}
                 style={{
                   background: "linear-gradient(90deg, var(--azfit-primary), var(--azfit-primary-light))",
-                  boxShadow: workoutProgress > 0 ? "0 0 8px rgba(13,148,136,0.4)" : "none",
+                  boxShadow: workoutProgress > 0 ? "0 0 8px color-mix(in srgb, var(--azfit-primary) 40%, transparent)" : "none",
                 }}
               />
             </div>
@@ -675,10 +675,10 @@ export default function ClientDashboard() {
                 }`}
                 style={{
                   backgroundColor: exercise.completed
-                    ? "rgba(13,148,136,0.05)"
+                    ? "color-mix(in srgb, var(--azfit-primary) 5%, transparent)"
                     : "var(--card-bg)",
                   borderColor: exercise.completed
-                    ? "rgba(13,148,136,0.3)"
+                    ? "color-mix(in srgb, var(--azfit-primary) 30%, transparent)"
                     : "var(--card-border)",
                 }}
                 onClick={() => toggleExercise(exercise.id)}
@@ -968,7 +968,7 @@ export default function ClientDashboard() {
                     onClick={() => addWater(amount)}
                     className="flex-1 rounded-lg border py-2 text-[10px] font-medium transition-all hover:-translate-y-0.5 active:scale-95"
                     style={{
-                      backgroundColor: "rgba(34,211,238,0.08)",
+                      backgroundColor: "color-mix(in srgb, var(--azfit-secondary) 8%, transparent)",
                       borderColor: "rgba(34,211,238,0.2)",
                       color: "var(--azfit-secondary-light)",
                     }}
@@ -1101,7 +1101,7 @@ export default function ClientDashboard() {
                                 ? "linear-gradient(180deg, var(--warning), #D97706)"
                                 : "linear-gradient(180deg, var(--dark-text-muted), var(--dark-border))",
                           boxShadow: isToday
-                            ? "0 0 12px rgba(13,148,136,0.3)"
+                            ? "0 0 12px color-mix(in srgb, var(--azfit-primary) 30%, transparent)"
                             : day.value >= 80
                               ? "0 0 8px rgba(132,204,22,0.2)"
                               : "none",

@@ -402,7 +402,7 @@ export default function WeeklyDigest() {
 
                 {/* Program */}
                 <span className="flex items-center gap-1" title="Active program">
-                  <FileSpreadsheet size={11} style={{ color: r.hasProgram ? "#0D9488" : "#EF4444" }} />
+                  <FileSpreadsheet size={11} style={{ color: r.hasProgram ? "var(--azfit-primary)" : "#EF4444" }} />
                   {r.hasProgram ? (
                     <span className="max-w-[140px] truncate" style={{ color: "var(--page-text)" }}>
                       {r.programName}

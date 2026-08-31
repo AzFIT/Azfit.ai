@@ -53,10 +53,10 @@ interface ScheduleTabProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  scheduled: "#00AEEF",
-  completed: "#22C55E",
-  requested: "#F59E0B",
-  cancelled: "#94A3B8",
+  scheduled: "var(--azfit-primary)",
+  completed: "var(--success)",
+  requested: "var(--warning)",
+  cancelled: "var(--light-text-muted)",
 };
 
 export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps) {
@@ -442,7 +442,7 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
     session: { icon: Calendar, color: "#00AEEF", bg: "rgba(0,174,239,0.1)" },
     holiday: { icon: Sun, color: "#F59E0B", bg: "rgba(245,158,11,0.12)" },
     reminder: { icon: Bell, color: "#00AEEF", bg: "rgba(0,174,239,0.1)" },
-    workout: { icon: Dumbbell, color: "#0D9488", bg: "rgba(13,148,136,0.1)" },
+    workout: { icon: Dumbbell, color: "var(--azfit-primary)", bg: "color-mix(in srgb, var(--azfit-primary) 10%, transparent)" },
     checkin: { icon: User, color: "#8B5CF6", bg: "rgba(139,92,246,0.1)" },
     call: { icon: Video, color: "#06B6D4", bg: "rgba(6,182,212,0.1)" },
     message: {
@@ -687,8 +687,8 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
                     <span
                       className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-medium capitalize"
                       style={{
-                        backgroundColor: `${STATUS_COLORS[e.status] || "#94A3B8"}20`,
-                        color: STATUS_COLORS[e.status] || "#94A3B8",
+                        backgroundColor: `color-mix(in srgb, ${STATUS_COLORS[e.status] || "var(--light-text-muted)"} 12%, transparent)`,
+                        color: STATUS_COLORS[e.status] || "var(--light-text-muted)",
                       }}
                     >
                       {e.status}

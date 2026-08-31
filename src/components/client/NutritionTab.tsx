@@ -240,7 +240,7 @@ export default function NutritionTab({ clientId, clientEmail }: NutritionTabProp
 
   const macros: Array<{ label: string; current: number; target: number; color: string }> = [
     { label: "Calories", current: totals.calories, target: targets.calories, color: "#F59E0B" },
-    { label: "Protein", current: totals.protein, target: targets.protein, color: "#0D9488" },
+    { label: "Protein", current: totals.protein, target: targets.protein, color: "var(--azfit-primary)" },
     { label: "Carbs", current: totals.carbs, target: targets.carbs, color: "#06B6D4" },
     { label: "Fats", current: totals.fats, target: targets.fats, color: "#8B5CF6" },
   ];
@@ -298,7 +298,7 @@ export default function NutritionTab({ clientId, clientEmail }: NutritionTabProp
           <div className="grid grid-cols-4 gap-2">
             {[
               { label: "kcal", value: targets.calories, color: "#F59E0B" },
-              { label: "protein", value: `${targets.protein}g`, color: "#0D9488" },
+              { label: "protein", value: `${targets.protein}g`, color: "var(--azfit-primary)" },
               { label: "carbs", value: `${targets.carbs}g`, color: "#06B6D4" },
               { label: "fats", value: `${targets.fats}g`, color: "#8B5CF6" },
             ].map((t) => (

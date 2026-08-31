@@ -52,9 +52,9 @@ export default function ConversationList({
       <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">
         <div
           className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full"
-          style={{ backgroundColor: "rgba(13,148,136,0.1)" }}
+          style={{ backgroundColor: "color-mix(in srgb, var(--azfit-primary) 1%, transparent)" }}
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0D9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--azfit-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
         </div>
@@ -81,11 +81,11 @@ export default function ConversationList({
           style={{
             backgroundColor:
               selectedPartnerId === conv.partnerId
-                ? "rgba(13, 148, 136, 0.08)"
+                ? "color-mix(in srgb, var(--azfit-primary) 08%, transparent)"
                 : "transparent",
             borderLeft:
               conv.unreadCount > 0
-                ? "3px solid #0D9488"
+                ? "3px solid var(--azfit-primary)"
                 : "3px solid transparent",
           }}
           onMouseEnter={(e) => {
@@ -151,7 +151,7 @@ export default function ConversationList({
             <span
               className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-bold"
               style={{
-                backgroundColor: "#0D9488",
+                backgroundColor: "var(--azfit-primary)",
                 color: "#FFFFFF",
               }}
             >

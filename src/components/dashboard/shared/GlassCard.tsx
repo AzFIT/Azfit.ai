@@ -89,7 +89,7 @@ export function GlassCard({
           : "border",
         // Glow on hover
         glow &&
-          "hover:shadow-[0_0_24px_rgba(13,148,136,0.15)] dark:hover:shadow-[0_0_24px_rgba(13,148,136,0.25)]",
+          "hover:shadow-[0_0_24px_color-mix(in srgb, var(--azfit-primary) 15%, transparent)] dark:hover:shadow-[0_0_24px_color-mix(in srgb, var(--azfit-primary) 25%, transparent)]",
         // Elevation on hover
         hover && "transition-shadow duration-300 hover:shadow-lg",
         // Cursor

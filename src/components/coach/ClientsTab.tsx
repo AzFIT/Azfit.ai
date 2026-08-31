@@ -116,7 +116,7 @@ export default function ClientsTab() {
             placeholder="Search clients..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-11 w-full rounded-lg border pl-10 pr-4 text-sm outline-none transition-all focus:border-[var(--azfit-primary)] focus:ring-[3px] focus:ring-[rgba(13,148,136,0.15)]"
+            className="h-11 w-full rounded-lg border pl-10 pr-4 text-sm outline-none transition-all focus:border-[var(--azfit-primary)] focus:ring-[3px] focus:ring-[color-mix(in srgb, var(--azfit-primary) 15%, transparent)]"
             style={{
               backgroundColor: 'var(--card-bg)',
               borderColor: 'var(--card-border)',
@@ -127,7 +127,7 @@ export default function ClientsTab() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsQuickAddOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#0D9488] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-[#0B7A75]"
+            className="inline-flex items-center gap-1.5 rounded-full bg-[var(--azfit-primary)] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-[#0B7A75]"
           >
             <Plus size={14} />
             Add Client
@@ -144,15 +144,15 @@ export default function ClientsTab() {
               style={{
                 backgroundColor:
                   filter === opt
-                    ? 'rgba(13, 148, 136, 0.15)'
+                    ? 'color-mix(in srgb, var(--azfit-primary) 15%, transparent)'
                     : 'transparent',
                 color:
                   filter === opt
-                    ? '#0D9488'
+                    ? 'var(--azfit-primary)'
                     : 'var(--light-text-muted)',
                 border:
                   filter === opt
-                    ? '1px solid rgba(13, 148, 136, 0.3)'
+                    ? '1px solid color-mix(in srgb, var(--azfit-primary) 3%, transparent)'
                     : '1px solid var(--card-border)',
               }}
             >
@@ -261,9 +261,9 @@ export default function ClientsTab() {
                   <div className="mt-3 flex items-center gap-1 border-t pt-2.5" style={{ borderColor: 'var(--card-border)' }}>
                     <button
                       className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-[11px] font-medium transition-all duration-150 active:scale-[0.95]"
-                      style={{ color: '#0D9488' }}
+                      style={{ color: 'var(--azfit-primary)' }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'rgba(13,148,136,0.08)';
+                        e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--azfit-primary) 08%, transparent)';
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.backgroundColor = 'transparent';

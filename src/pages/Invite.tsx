@@ -83,7 +83,7 @@ export default function Invite() {
             <button
               onClick={() => navigate("/")}
               className="mt-6 w-full rounded-lg py-3 text-sm font-semibold transition-all hover:opacity-90"
-              style={{ backgroundColor: "#0D9488", color: "#fff" }}
+              style={{ backgroundColor: "var(--azfit-primary)", color: "#fff" }}
             >
               Go to AzFIT home
             </button>

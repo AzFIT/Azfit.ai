@@ -139,7 +139,7 @@ export default function OverviewTab({
           label="Current Weight"
           value={`${currentWeight} kg`}
           sub={client.goalWeight ? `Goal: ${client.goalWeight} kg` : undefined}
-          color="#0D9488"
+          color="var(--azfit-primary)"
           onClick={() => onNavigate("bio", "weight")}
         />
         <StatCard
@@ -609,7 +609,7 @@ function NutritionCard({ clientEmail, onClick }: { clientEmail: string; onClick?
           <MacroRow
             label="Protein"
             value={`${totals.protein} / ${targets.protein}g`}
-            color="#0D9488"
+            color="var(--azfit-primary)"
             percent={
               targets.protein > 0
                 ? Math.min(100, Math.round((totals.protein / targets.protein) * 100))

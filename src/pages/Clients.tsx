@@ -266,7 +266,7 @@ export default function ClientsPage() {
             <div className="flex items-center gap-3">
               <div
                 className="flex h-10 w-10 items-center justify-center rounded-full"
-                style={{ backgroundColor: "rgba(13,148,136,0.12)" }}
+                style={{ backgroundColor: "color-mix(in srgb, var(--azfit-primary) 12%, transparent)" }}
               >
                 <Upload size={18} style={{ color: "var(--azfit-primary)" }} />
               </div>
@@ -696,7 +696,7 @@ export default function ClientsPage() {
                       <div className="px-4 py-12 text-center">
                         <div
                           className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full"
-                          style={{ backgroundColor: "rgba(13,148,136,0.12)" }}
+                          style={{ backgroundColor: "color-mix(in srgb, var(--azfit-primary) 12%, transparent)" }}
                         >
                           <User size={22} style={{ color: "var(--azfit-primary)" }} />
                         </div>

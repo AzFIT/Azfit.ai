@@ -114,14 +114,14 @@ export default function Messages() {
             <div className="flex flex-1 flex-col items-center justify-center">
               <div
                 className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full"
-                style={{ backgroundColor: "rgba(13, 148, 136, 0.1)" }}
+                style={{ backgroundColor: "color-mix(in srgb, var(--azfit-primary) 1%, transparent)" }}
               >
                 <svg
                   width="28"
                   height="28"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="#0D9488"
+                  stroke="var(--azfit-primary)"
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"

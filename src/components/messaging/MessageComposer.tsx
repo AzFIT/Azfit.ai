@@ -38,8 +38,8 @@ export default function MessageComposer({
               onClick={() => handleQuickReply(reply)}
               className="shrink-0 rounded-full px-3 py-1 text-[11px] font-medium transition-all active:scale-[0.95]"
               style={{
-                backgroundColor: "rgba(13, 148, 136, 0.1)",
-                color: "#0D9488",
+                backgroundColor: "color-mix(in srgb, var(--azfit-primary) 1%, transparent)",
+                color: "var(--azfit-primary)",
               }}
             >
               {reply}
@@ -62,7 +62,7 @@ export default function MessageComposer({
           placeholder="Type a message..."
           rows={1}
           disabled={disabled}
-          className="max-h-[120px] min-h-[40px] flex-1 resize-none rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:border-[var(--azfit-primary)] focus:ring-[3px] focus:ring-[rgba(13,148,136,0.15)] disabled:opacity-50"
+          className="max-h-[120px] min-h-[40px] flex-1 resize-none rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:border-[var(--azfit-primary)] focus:ring-[3px] focus:ring-[color-mix(in srgb, var(--azfit-primary) 15%, transparent)] disabled:opacity-50"
           style={{
             backgroundColor: "var(--light-elevated)",
             borderColor: "var(--card-border)",
@@ -74,7 +74,7 @@ export default function MessageComposer({
           disabled={disabled || !text.trim()}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all duration-150 active:scale-[0.92] disabled:opacity-40"
           style={{
-            backgroundColor: "#0D9488",
+            backgroundColor: "var(--azfit-primary)",
             color: "#FFFFFF",
           }}
         >

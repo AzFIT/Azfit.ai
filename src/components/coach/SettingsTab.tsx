@@ -171,7 +171,7 @@ export default function SettingsTab() {
       >
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <CalendarDays size={18} style={{ color: '#0D9488' }} />
+            <CalendarDays size={18} style={{ color: 'var(--azfit-primary)' }} />
             <h3
               className="text-base font-bold"
               style={{ color: 'var(--page-text)' }}
@@ -230,11 +230,11 @@ export default function SettingsTab() {
                       className="h-8 rounded-md text-[10px] font-medium transition-all duration-150 active:scale-[0.92]"
                       style={{
                         backgroundColor: isActive
-                          ? 'rgba(13, 148, 136, 0.2)'
+                          ? 'color-mix(in srgb, var(--azfit-primary) 2%, transparent)'
                           : 'var(--light-elevated)',
-                        color: isActive ? '#0D9488' : 'var(--light-text-muted)',
+                        color: isActive ? 'var(--azfit-primary)' : 'var(--light-text-muted)',
                         border: isActive
-                          ? '1px solid rgba(13, 148, 136, 0.4)'
+                          ? '1px solid color-mix(in srgb, var(--azfit-primary) 4%, transparent)'
                           : '1px solid transparent',
                       }}
                     >
@@ -322,15 +322,15 @@ export default function SettingsTab() {
               style={{
                 borderColor:
                   sessionDuration === mins
-                    ? '#0D9488'
+                    ? 'var(--azfit-primary)'
                     : 'var(--card-border)',
                 backgroundColor:
                   sessionDuration === mins
-                    ? 'rgba(13, 148, 136, 0.08)'
+                    ? 'color-mix(in srgb, var(--azfit-primary) 08%, transparent)'
                     : 'transparent',
                 color:
                   sessionDuration === mins
-                    ? '#0D9488'
+                    ? 'var(--azfit-primary)'
                     : 'var(--page-text)',
               }}
             >
@@ -372,7 +372,7 @@ export default function SettingsTab() {
             className="relative h-7 w-12 rounded-full transition-colors duration-200"
             style={{
               backgroundColor: autoReminders
-                ? '#0D9488'
+                ? 'var(--azfit-primary)'
                 : 'var(--light-border)',
             }}
           >

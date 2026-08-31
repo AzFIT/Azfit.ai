@@ -332,7 +332,7 @@ export default function AzFitChat() {
                         style={{
                           backgroundColor:
                             msg.role === "user"
-                              ? "#0D9488"
+                              ? "var(--azfit-primary)"
                               : "var(--light-elevated)",
                           color:
                             msg.role === "user"

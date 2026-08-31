@@ -224,7 +224,7 @@ export default function BioHistoryTab({ clientId, openAdd = null }: BioHistoryTa
   }));
 
   const metricConfig = {
-    weight: { label: "Weight", unit: "kg", color: "#0D9488", icon: Weight },
+    weight: { label: "Weight", unit: "kg", color: "var(--azfit-primary)", icon: Weight },
     bodyFat: { label: "Body Fat", unit: "%", color: "#8B5CF6", icon: Percent },
     bmi: { label: "BMI", unit: "", color: "#06B6D4", icon: Activity },
     waist: { label: "Waist", unit: "cm", color: "#F59E0B", icon: Ruler },
@@ -493,7 +493,7 @@ export default function BioHistoryTab({ clientId, openAdd = null }: BioHistoryTa
                       </td>
                       <td
                         className="px-3 py-2 font-medium"
-                        style={{ color: "#0D9488" }}
+                        style={{ color: "var(--azfit-primary)" }}
                       >
                         {entry.weight != null ? `${entry.weight} kg` : "—"}
                       </td>

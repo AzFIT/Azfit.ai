@@ -101,7 +101,7 @@ export default function MessageThread({
                 <div
                   className="max-w-[75%] px-4 py-2.5 text-sm"
                   style={{
-                    backgroundColor: isMe ? "#0D9488" : "var(--light-elevated)",
+                    backgroundColor: isMe ? "var(--azfit-primary)" : "var(--light-elevated)",
                     color: isMe ? "#FFFFFF" : "var(--page-text)",
                     borderRadius: isMe ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
                   }}

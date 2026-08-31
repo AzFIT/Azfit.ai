@@ -57,7 +57,14 @@
     --light-border: #E2E8F0;
     --light-text-primary: #0F172A;
     --light-text-secondary: #5A6B7F;
-    --light-text-muted: #94A3B8;
+    /* Task 7: #94A3B8 on white was 2.5:1 — fails WCAG AA for small text.
+       Slate-500 (shared with --dark-text-muted) passes 4.7:1. */
+    --light-text-muted: #64748B;
+    /* Task 7: progress-ring track — must stay visible at 0% in light theme */
+    --ring-track: #64748B;
+    /* Task 7: violet for TEXT on AI surfaces (light theme) — --ai-violet is
+       2.9:1 on the light glass panel; this step passes AA. Dark overrides below. */
+    --ai-violet-strong: #5F4CB8;
 
     --dark-bg: #0A0E13;
     --dark-surface: #151D27;
@@ -138,6 +145,16 @@
     --page-text: #F2F6FA;
     --card-bg: #151D27;
     --card-border: rgba(255, 255, 255, 0.08);
+
+    /* Task 7: the "light-*" tokens are used app-wide as generic
+       elevated/muted aliases — without dark overrides they render
+       near-white surfaces (invisible light text on top, e.g. the Today
+       tile rows and the selected Clients row). */
+    --light-elevated: var(--dark-elevated);
+    --light-border: var(--dark-border);
+    --light-text-muted: var(--dark-text-secondary);
+    --ring-track: color-mix(in srgb, var(--dark-text-muted) 45%, transparent);
+    --ai-violet-strong: var(--ai-violet);
   }
 
   /* Smooth theme transitions */

@@ -445,7 +445,7 @@ export default function TrainerDashboard() {
               {attentionCounts.unreadMessages > 0 && (
                 <span
                   className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
-                  style={{ backgroundColor: "#F87171" }}
+                  style={{ backgroundColor: "var(--danger)" }}
                 >
                   {attentionCounts.unreadMessages}
                 </span>
@@ -490,10 +490,10 @@ export default function TrainerDashboard() {
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
                   style={{ backgroundColor: "rgba(248,113,113,0.12)" }}
                 >
-                  <AlertTriangle className="h-5 w-5" style={{ color: "#F87171" }} />
+                  <AlertTriangle className="h-5 w-5" style={{ color: "var(--danger)" }} />
                 </div>
                 <div>
-                  <p className="text-lg font-bold" style={{ color: "#F87171" }}>
+                  <p className="text-lg font-bold" style={{ color: "var(--danger)" }}>
                     {attentionCounts.missedWorkouts}
                   </p>
                   <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>
@@ -519,10 +519,10 @@ export default function TrainerDashboard() {
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
                   style={{ backgroundColor: "rgba(245,158,11,0.12)" }}
                 >
-                  <ClipboardCheck className="h-5 w-5" style={{ color: "#F59E0B" }} />
+                  <ClipboardCheck className="h-5 w-5" style={{ color: "var(--warning)" }} />
                 </div>
                 <div>
-                  <p className="text-lg font-bold" style={{ color: "#F59E0B" }}>
+                  <p className="text-lg font-bold" style={{ color: "var(--warning)" }}>
                     {attentionCounts.checkinsPending}
                   </p>
                   <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>
@@ -548,10 +548,10 @@ export default function TrainerDashboard() {
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
                   style={{ backgroundColor: "rgba(6,182,212,0.12)" }}
                 >
-                  <Mail className="h-5 w-5" style={{ color: "#06B6D4" }} />
+                  <Mail className="h-5 w-5" style={{ color: "var(--info)" }} />
                 </div>
                 <div>
-                  <p className="text-lg font-bold" style={{ color: "#06B6D4" }}>
+                  <p className="text-lg font-bold" style={{ color: "var(--info)" }}>
                     {attentionCounts.unreadMessages}
                   </p>
                   <p className="text-[11px]" style={{ color: "var(--light-text-muted)" }}>
@@ -700,19 +700,19 @@ export default function TrainerDashboard() {
             {
               label: "Add Client",
               icon: UserPlus,
-              color: "#0D9488",
+              color: "var(--azfit-primary)",
               onClick: () => setShowAddClientModal(true),
             },
             {
               label: "Build Program",
               icon: Dumbbell,
-              color: "#8B5CF6",
+              color: "var(--azfit-accent)",
               onClick: () => navigate("/ai-program-builder"),
             },
             {
               label: "Log Assessment",
               icon: Scale,
-              color: "#F59E0B",
+              color: "var(--warning)",
               onClick: () => navigate("/bioprint"),
             },
             {
@@ -724,7 +724,7 @@ export default function TrainerDashboard() {
             {
               label: "Broadcast",
               icon: Megaphone,
-              color: "#F87171",
+              color: "var(--danger)",
               onClick: () => navigate("/messages"),
             },
           ].map((action) => (

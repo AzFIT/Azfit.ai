@@ -221,7 +221,7 @@ export default function WeeklyAdherenceStrip({ userId, refreshKey = 0 }: Props) 
                 {" — "}
                 <span style={{ color: "#00AEEF" }}>{pct.kcalPct}% of kcal target</span>
                 {" · "}
-                <span style={{ color: "#0D9488" }}>{pct.proteinPct}% of protein target</span>
+                <span style={{ color: "var(--azfit-primary)" }}>{pct.proteinPct}% of protein target</span>
               </>
             ) : (
               <>

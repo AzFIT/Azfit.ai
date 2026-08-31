@@ -19,10 +19,10 @@ export default function ProtectedRoute({
 
   if (loading) {
     return (
-      <div className="flex min-h-[100dvh] items-center justify-center" style={{ backgroundColor: '#0F172A' }}>
+      <div className="flex min-h-[100dvh] items-center justify-center" style={{ backgroundColor: 'var(--page-bg)' }}>
         <div
           className="h-8 w-8 animate-spin rounded-full border-4 border-solid"
-          style={{ borderColor: '#0D9488', borderTopColor: 'transparent' }}
+          style={{ borderColor: 'var(--azfit-primary)', borderTopColor: 'transparent' }}
         />
       </div>
     );

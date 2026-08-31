@@ -372,7 +372,7 @@ export default function Settings() {
       connected: true,
       lastSync: '2 min ago',
       icon: <Watch size={20} />,
-      iconBg: 'rgba(13,148,136,0.1)',
+      iconBg: 'color-mix(in srgb, var(--azfit-primary) 1%, transparent)',
       iconColor: 'var(--azfit-primary)',
     },
     {
@@ -560,7 +560,7 @@ export default function Settings() {
                   key={goal.id}
                   className="rounded-full px-3 py-1 text-xs font-semibold"
                   style={{
-                    backgroundColor: 'rgba(13,148,136,0.15)',
+                    backgroundColor: 'color-mix(in srgb, var(--azfit-primary) 15%, transparent)',
                     color: 'var(--azfit-primary)',
                     textShadow: 'var(--text-shadow-dark)',
                   }}
@@ -647,7 +647,7 @@ export default function Settings() {
               className="flex-1 overflow-hidden rounded-xl border-2 transition-all duration-200"
               style={{
                 borderColor: !isDark ? 'var(--azfit-primary)' : 'var(--light-border)',
-                boxShadow: !isDark ? '0 0 0 3px rgba(13,148,136,0.15)' : 'none',
+                boxShadow: !isDark ? '0 0 0 3px color-mix(in srgb, var(--azfit-primary) 15%, transparent)' : 'none',
                 opacity: isDark ? 0.6 : 1,
               }}
               type="button"
@@ -667,7 +667,7 @@ export default function Settings() {
               className="flex-1 overflow-hidden rounded-xl border-2 transition-all duration-200"
               style={{
                 borderColor: isDark ? 'var(--azfit-primary)' : 'var(--light-border)',
-                boxShadow: isDark ? '0 0 0 3px rgba(13,148,136,0.15)' : 'none',
+                boxShadow: isDark ? '0 0 0 3px color-mix(in srgb, var(--azfit-primary) 15%, transparent)' : 'none',
                 opacity: !isDark ? 0.6 : 1,
               }}
               type="button"
@@ -739,7 +739,7 @@ export default function Settings() {
             </h3>
             <span
               className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold"
-              style={{ backgroundColor: 'rgba(13,148,136,0.15)', color: 'var(--azfit-primary)' }}
+              style={{ backgroundColor: 'color-mix(in srgb, var(--azfit-primary) 15%, transparent)', color: 'var(--azfit-primary)' }}
             >
               3 active
             </span>

@@ -4,7 +4,7 @@ import { ArrowLeft, Dumbbell, TrendingUp, Users, Calendar, Flame, BarChart3, Clo
 
 // Demo data - static sample data for preview
 const demoStats = [
-  { label: 'Active Clients', value: '24', icon: Users, change: '+3 this week', color: '#0D9488' },
+  { label: 'Active Clients', value: '24', icon: Users, change: '+3 this week', color: 'var(--azfit-primary)' },
   { label: 'Workouts Logged', value: '156', icon: Dumbbell, change: 'This month', color: '#06B6D4' },
   { label: 'Avg Session', value: '52m', icon: Clock, change: 'Per workout', color: '#8B5CF6' },
   { label: 'Completion Rate', value: '87%', icon: TrendingUp, change: '+5% vs last month', color: '#10B981' },
@@ -31,7 +31,7 @@ export default function DemoDashboard() {
       {/* Demo Banner */}
       <div 
         className="sticky top-0 z-50 px-4 py-2 text-center text-sm font-medium"
-        style={{ backgroundColor: '#0D9488', color: 'white' }}
+        style={{ backgroundColor: 'var(--azfit-primary)', color: 'white' }}
       >
         <div className="flex items-center justify-center gap-2">
           <Award size={16} />
@@ -59,7 +59,7 @@ export default function DemoDashboard() {
             </button>
           </div>
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-full" style={{ backgroundColor: 'rgba(13, 148, 136, 0.2)' }} />
+            <div className="h-8 w-8 rounded-full" style={{ backgroundColor: 'color-mix(in srgb, var(--azfit-primary) 2%, transparent)' }} />
             <span className="text-sm font-medium text-white">Demo Coach</span>
           </div>
         </div>
@@ -194,7 +194,7 @@ export default function DemoDashboard() {
           className="mt-8 rounded-xl border p-6 text-center"
           style={{ backgroundColor: '#1E293B', borderColor: '#334155' }}
         >
-          <Flame size={32} className="mx-auto mb-3" style={{ color: '#0D9488' }} />
+          <Flame size={32} className="mx-auto mb-3" style={{ color: 'var(--azfit-primary)' }} />
           <h3 className="text-lg font-semibold text-white">Ready to manage your clients?</h3>
           <p className="mt-1 text-sm" style={{ color: '#94A3B8' }}>
             Sign up for free and get access to AI program building, nutrition tracking, and more.
@@ -203,7 +203,7 @@ export default function DemoDashboard() {
             <button
               onClick={() => navigate('/signup')}
               className="rounded-lg px-6 py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90"
-              style={{ backgroundColor: '#0D9488' }}
+              style={{ backgroundColor: 'var(--azfit-primary)' }}
             >
               Get Started Free
             </button>

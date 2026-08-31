@@ -450,7 +450,7 @@ export default function ManualProgramBuilder() {
                 >
                   <span
                     className="w-7 shrink-0 text-center text-[10px] font-bold font-mono"
-                    style={{ color: "#0D9488" }}
+                    style={{ color: "var(--azfit-primary)" }}
                   >
                     {labels[exIdx]}
                   </span>

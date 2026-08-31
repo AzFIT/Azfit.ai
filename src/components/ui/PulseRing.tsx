@@ -59,15 +59,15 @@ export default function PulseRing({
             <stop offset="100%" stopColor={gradient[1]} />
           </linearGradient>
         </defs>
-        {/* track */}
+        {/* track — Task 7: solid --ring-track (the old opacity-20 on
+            --light-border rendered the 0% ring invisible in light theme) */}
         <circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
           fill="none"
           strokeWidth={strokeWidth}
-          className="opacity-20"
-          style={{ stroke: "var(--light-border)" }}
+          style={{ stroke: "var(--ring-track)" }}
         />
         {/* progress arc */}
         <circle

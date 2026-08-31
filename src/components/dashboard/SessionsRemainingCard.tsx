@@ -57,13 +57,13 @@ export default function SessionsRemainingCard({ clientId }: { clientId: string }
         title="Session Package"
         icon={<Ticket className="h-4 w-4" />}
         defaultExpanded
-        accentColor="#8B5CF6"
+        accentColor="var(--azfit-accent)"
         badge={
           <span
             className="rounded-full px-2 py-0.5 text-[10px] font-bold"
             style={{
               backgroundColor: state.remaining <= 1 ? "rgba(239,68,68,0.15)" : "rgba(139,92,246,0.15)",
-              color: state.remaining <= 1 ? "#EF4444" : "#8B5CF6",
+              color: state.remaining <= 1 ? "var(--danger)" : "var(--azfit-accent)",
             }}
           >
             {state.remaining} left
@@ -77,7 +77,7 @@ export default function SessionsRemainingCard({ clientId }: { clientId: string }
           </strong>{" "}
           of {state.total}
           {state.remaining <= 1 && (
-            <span className="ml-2 font-medium" style={{ color: "#F59E0B" }}>
+            <span className="ml-2 font-medium" style={{ color: "var(--warning)" }}>
               — time to renew
             </span>
           )}

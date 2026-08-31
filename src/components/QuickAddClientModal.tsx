@@ -312,7 +312,7 @@ export default function QuickAddClientModal({
                       value={fullName}
                       onChange={(e) => { setFullName(e.target.value); setErrors((p) => ({ ...p, fullName: '' })); }}
                       placeholder="John Doe"
-                      className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0D9488]/30 focus:border-[#0D9488] transition-all ${
+                      className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--azfit-primary)]/30 focus:border-[var(--azfit-primary)] transition-all ${
                         errors.fullName ? 'border-red-300' : 'border-slate-200 dark:border-slate-700'
                       }`}
                     />
@@ -334,7 +334,7 @@ export default function QuickAddClientModal({
                       value={email}
                       onChange={(e) => { setEmail(e.target.value); setErrors((p) => ({ ...p, email: '' })); }}
                       placeholder="john.doe@email.com"
-                      className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0D9488]/30 focus:border-[#0D9488] transition-all ${
+                      className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--azfit-primary)]/30 focus:border-[var(--azfit-primary)] transition-all ${
                         errors.email ? 'border-red-300' : 'border-slate-200 dark:border-slate-700'
                       }`}
                     />
@@ -356,7 +356,7 @@ export default function QuickAddClientModal({
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="+1 555 123 4567"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0D9488]/30 focus:border-[#0D9488] transition-all"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--azfit-primary)]/30 focus:border-[var(--azfit-primary)] transition-all"
                     />
                   </div>
                 </div>
@@ -368,7 +368,7 @@ export default function QuickAddClientModal({
                   </label>
                   <button
                     onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                    className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white hover:border-[#0D9488] transition-colors"
+                    className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white hover:border-[var(--azfit-primary)] transition-colors"
                   >
                     <span className="capitalize">{STATUS_OPTIONS.find((o) => o.value === status)?.label || status}</span>
                     <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showStatusDropdown ? 'rotate-180' : ''}`} />
@@ -390,7 +390,7 @@ export default function QuickAddClientModal({
                           >
                             <span className="capitalize">{opt.label}</span>
                             {status === opt.value && (
-                              <Check className="w-4 h-4 text-[#0D9488]" />
+                              <Check className="w-4 h-4 text-[var(--azfit-primary)]" />
                             )}
                           </button>
                         ))}
@@ -416,8 +416,8 @@ export default function QuickAddClientModal({
                             onClick={() => setGoalTypes((p) => (active ? p.filter((x) => x !== t) : [...p, t]))}
                             className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${
                               active
-                                ? 'border-[#0D9488] bg-[#0D9488]/10 text-[#0D9488]'
-                                : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[#0D9488]/50'
+                                ? 'border-[var(--azfit-primary)] bg-[var(--azfit-primary)]/10 text-[var(--azfit-primary)]'
+                                : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[var(--azfit-primary)]/50'
                             }`}
                           >
                             {GOAL_TYPE_LABELS[t]}
@@ -453,8 +453,8 @@ export default function QuickAddClientModal({
                           onClick={() => setEquipment((p) => (active ? p.filter((x) => x !== eq) : [...p, eq]))}
                           className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${
                             active
-                              ? 'border-[#0D9488] bg-[#0D9488]/10 text-[#0D9488]'
-                              : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[#0D9488]/50'
+                              ? 'border-[var(--azfit-primary)] bg-[var(--azfit-primary)]/10 text-[var(--azfit-primary)]'
+                              : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[var(--azfit-primary)]/50'
                           }`}
                         >
                           {eq}
@@ -474,7 +474,7 @@ export default function QuickAddClientModal({
                 <button
                   onClick={handleSave}
                   disabled={isSubmitting}
-                  className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-[#0D9488] hover:bg-[#0B7A75] text-white disabled:opacity-50 transition-colors"
+                  className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-[var(--azfit-primary)] hover:bg-[#0B7A75] text-white disabled:opacity-50 transition-colors"
                 >
                   {isSubmitting ? 'Saving...' : (clientToEdit ? 'Save Changes' : 'Save Client')}
                 </button>
@@ -496,9 +496,9 @@ export default function QuickAddClientModal({
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.1, type: 'spring', stiffness: 200, damping: 15 }}
-                  className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#0D9488]/10 mb-4"
+                  className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--azfit-primary)]/10 mb-4"
                 >
-                  <Check className="w-8 h-8 text-[#0D9488]" strokeWidth={3} />
+                  <Check className="w-8 h-8 text-[var(--azfit-primary)]" strokeWidth={3} />
                 </motion.div>
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">
                   Success! Client [{createdClient.full_name}] {clientToEdit ? 'Updated' : 'Created'}
@@ -520,16 +520,16 @@ export default function QuickAddClientModal({
                       navigate(action.route);
                       handleClose();
                     }}
-                    className="w-full flex items-center gap-3.5 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 hover:border-[#0D9488]/30 hover:bg-[#0D9488]/[0.03] dark:hover:bg-[#0D9488]/[0.05] transition-all group text-left"
+                    className="w-full flex items-center gap-3.5 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 hover:border-[var(--azfit-primary)]/30 hover:bg-[var(--azfit-primary)]/[0.03] dark:hover:bg-[var(--azfit-primary)]/[0.05] transition-all group text-left"
                   >
                     {/* Icon */}
-                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-[#0D9488]/10 flex items-center justify-center">
-                      <action.icon className="w-5 h-5 text-[#0D9488]" />
+                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-[var(--azfit-primary)]/10 flex items-center justify-center">
+                      <action.icon className="w-5 h-5 text-[var(--azfit-primary)]" />
                     </div>
 
                     {/* Text */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#0D9488] transition-colors">
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[var(--azfit-primary)] transition-colors">
                         {action.title}
                       </p>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -538,7 +538,7 @@ export default function QuickAddClientModal({
                     </div>
 
                     {/* Arrow */}
-                    <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-[#0D9488] group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                    <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-[var(--azfit-primary)] group-hover:translate-x-0.5 transition-all flex-shrink-0" />
                   </motion.button>
                 ))}
               </div>

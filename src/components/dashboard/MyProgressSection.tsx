@@ -98,7 +98,7 @@ export default function MyProgressSection({ clientsId, userId }: Props) {
   const pct = ring ? compliancePct(ring.completed, ring.planned) : null;
 
   return (
-    <GlassCard title="My Progress" titleIcon={<TrendingUp className="h-4 w-4" />} glass hover accentColor="#00AEEF">
+    <GlassCard title="My Progress" titleIcon={<TrendingUp className="h-4 w-4" />} glass hover accentColor="var(--azfit-primary)">
       <div className="space-y-5 py-2">
         {/* Week banner (hidden when no active program) */}
         {week && (

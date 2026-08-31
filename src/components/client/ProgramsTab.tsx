@@ -378,9 +378,9 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <div
                   className="flex h-10 w-10 items-center justify-center rounded-xl shrink-0"
-                  style={{ backgroundColor: "rgba(13,148,136,0.15)" }}
+                  style={{ backgroundColor: "color-mix(in srgb, var(--azfit-primary) 15%, transparent)" }}
                 >
-                  <Dumbbell size={20} style={{ color: "#0D9488" }} />
+                  <Dumbbell size={20} style={{ color: "var(--azfit-primary)" }} />
                 </div>
                 <div className="min-w-0 flex-1">
                   {renamingId === program.id ? (
@@ -458,8 +458,8 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
                 <span
                   className="text-[11px] font-medium px-2 py-0.5 rounded-full"
                   style={{
-                    backgroundColor: "rgba(13,148,136,0.1)",
-                    color: "#0D9488",
+                    backgroundColor: "color-mix(in srgb, var(--azfit-primary) 10%, transparent)",
+                    color: "var(--azfit-primary)",
                   }}
                 >
                   {program.frequency}x/week
@@ -514,7 +514,7 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
                   onClick={() => handleSetStatus(program, "active")}
                   disabled={!!busyIds[program.id]}
                   className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition hover:opacity-90 disabled:opacity-50"
-                  style={{ backgroundColor: "rgba(13,148,136,0.12)", color: "#0D9488" }}
+                  style={{ backgroundColor: "color-mix(in srgb, var(--azfit-primary) 12%, transparent)", color: "var(--azfit-primary)" }}
                 >
                   <ArchiveRestore size={12} />
                   Restore
@@ -734,8 +734,8 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
                                           className="flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold"
                                           style={{
                                             backgroundColor:
-                                              "rgba(13,148,136,0.15)",
-                                            color: "#0D9488",
+                                              "color-mix(in srgb, var(--azfit-primary) 15%, transparent)",
+                                            color: "var(--azfit-primary)",
                                           }}
                                         >
                                           {workout.dayNumber}
@@ -870,7 +870,7 @@ export default function ProgramsTab({ programs, onStartWorkout, onChanged, clien
                                                 <div className="flex items-center gap-2 min-w-0">
                                                   <span
                                                     className="text-[10px] font-bold font-mono shrink-0"
-                                                    style={{ color: "#0D9488" }}
+                                                    style={{ color: "var(--azfit-primary)" }}
                                                   >
                                                     {ex.order}
                                                   </span>

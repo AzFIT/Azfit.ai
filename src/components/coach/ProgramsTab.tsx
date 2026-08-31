@@ -204,11 +204,11 @@ export default function ProgramsTab() {
                 <button
                   className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-[11px] font-semibold transition-all duration-150 active:scale-[0.95]"
                   style={{
-                    color: '#0D9488',
-                    border: '1px solid rgba(13,148,136,0.3)',
+                    color: 'var(--azfit-primary)',
+                    border: '1px solid color-mix(in srgb, var(--azfit-primary) 3%, transparent)',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(13,148,136,0.08)';
+                    e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--azfit-primary) 08%, transparent)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.backgroundColor = 'transparent';
@@ -250,28 +250,28 @@ export default function ProgramsTab() {
         animate="visible"
         className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-5 transition-all duration-200 hover:shadow-md active:scale-[0.98]"
         style={{
-          borderColor: 'rgba(13, 148, 136, 0.35)',
-          backgroundColor: 'rgba(13, 148, 136, 0.03)',
+          borderColor: 'color-mix(in srgb, var(--azfit-primary) 35%, transparent)',
+          backgroundColor: 'color-mix(in srgb, var(--azfit-primary) 03%, transparent)',
           minHeight: 240,
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(13,148,136,0.06)';
-          e.currentTarget.style.borderColor = 'rgba(13,148,136,0.5)';
+          e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--azfit-primary) 06%, transparent)';
+          e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--azfit-primary) 5%, transparent)';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(13,148,136,0.03)';
-          e.currentTarget.style.borderColor = 'rgba(13,148,136,0.35)';
+          e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--azfit-primary) 03%, transparent)';
+          e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--azfit-primary) 35%, transparent)';
         }}
       >
         <div
           className="flex h-12 w-12 items-center justify-center rounded-full"
-          style={{ backgroundColor: 'rgba(13, 148, 136, 0.15)' }}
+          style={{ backgroundColor: 'color-mix(in srgb, var(--azfit-primary) 15%, transparent)' }}
         >
-          <Plus size={24} style={{ color: '#0D9488' }} />
+          <Plus size={24} style={{ color: 'var(--azfit-primary)' }} />
         </div>
         <span
           className="text-sm font-semibold"
-          style={{ color: '#0D9488' }}
+          style={{ color: 'var(--azfit-primary)' }}
         >
           Create New Program
         </span>

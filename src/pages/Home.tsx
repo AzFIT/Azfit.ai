@@ -330,7 +330,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
             className="rounded-full bg-[var(--azfit-primary)] px-8 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-[var(--azfit-primary-light)] active:scale-[0.97] lg:px-10 lg:py-4 lg:text-base"
             style={{
               textShadow: "0 1px 3px rgba(0,0,0,0.3)",
-              boxShadow: "0 0 20px rgba(13,148,136,0.4)",
+              boxShadow: "0 0 20px color-mix(in srgb, var(--azfit-primary) 4%, transparent)",
             }}
           >
             Try the Live Demo
@@ -429,7 +429,7 @@ function StatsSection() {
 const features = [
   {
     icon: TrendingUp,
-    iconBg: "rgba(13,148,136,0.1)",
+    iconBg: "color-mix(in srgb, var(--azfit-primary) 1%, transparent)",
     iconColor: "var(--azfit-primary)",
     title: "Visual Progress Tracking",
     description:
@@ -744,7 +744,7 @@ function PricingSection({ onNavigate }: { onNavigate: (path: string) => void }) 
                 style={{
                   backgroundColor: plan.highlighted ? "var(--dark-surface)" : "var(--dark-bg)",
                   borderColor: plan.highlighted ? "var(--azfit-primary)" : "var(--dark-elevated)",
-                  boxShadow: plan.highlighted ? "0 0 30px rgba(13,148,136,0.15)" : "none",
+                  boxShadow: plan.highlighted ? "0 0 30px color-mix(in srgb, var(--azfit-primary) 15%, transparent)" : "none",
                 }}
               >
                 {plan.highlighted && (
@@ -909,7 +909,7 @@ function DownloadCTA({ onNavigate }: { onNavigate: (path: string) => void }) {
             className="mt-8 rounded-full bg-[var(--azfit-primary)] px-10 py-4 text-base font-semibold text-white transition-all duration-200 hover:bg-[var(--azfit-primary-light)] active:scale-[0.97]"
             style={{
               textShadow: "0 1px 3px rgba(0,0,0,0.3)",
-              boxShadow: "0 0 24px rgba(13,148,136,0.5)",
+              boxShadow: "0 0 24px color-mix(in srgb, var(--azfit-primary) 5%, transparent)",
             }}
           >
             Try AzFIT Free

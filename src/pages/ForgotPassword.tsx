@@ -36,7 +36,7 @@ export default function ForgotPassword() {
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div
           className="absolute -top-40 -right-40 h-80 w-80 rounded-full opacity-20"
-          style={{ background: 'radial-gradient(circle, #0D9488 0%, transparent 70%)' }}
+          style={{ background: 'radial-gradient(circle, var(--azfit-primary) 0%, transparent 70%)' }}
         />
         <div
           className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full opacity-20"
@@ -73,9 +73,9 @@ export default function ForgotPassword() {
             <div className="mb-4 flex justify-center">
               <div
                 className="flex h-14 w-14 items-center justify-center rounded-xl"
-                style={{ backgroundColor: 'rgba(13, 148, 136, 0.15)' }}
+                style={{ backgroundColor: 'color-mix(in srgb, var(--azfit-primary) 15%, transparent)' }}
               >
-                <Dumbbell size={28} style={{ color: '#0D9488' }} />
+                <Dumbbell size={28} style={{ color: 'var(--azfit-primary)' }} />
               </div>
             </div>
             <h1 className="text-2xl font-bold text-white">Reset Password</h1>
@@ -101,7 +101,7 @@ export default function ForgotPassword() {
               <button
                 onClick={() => navigate('/login')}
                 className="w-full rounded-lg py-3 text-sm font-semibold text-white transition-all duration-200 hover:opacity-90"
-                style={{ backgroundColor: '#0D9488' }}
+                style={{ backgroundColor: 'var(--azfit-primary)' }}
               >
                 Back to login
               </button>
@@ -132,7 +132,7 @@ export default function ForgotPassword() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      className="w-full rounded-lg border px-4 py-3 pl-11 text-sm text-white outline-none transition-all focus:border-[#0D9488] focus:ring-1 focus:ring-[#0D9488]"
+                      className="w-full rounded-lg border px-4 py-3 pl-11 text-sm text-white outline-none transition-all focus:border-[var(--azfit-primary)] focus:ring-1 focus:ring-[var(--azfit-primary)]"
                       style={{
                         backgroundColor: '#0F172A',
                         borderColor: '#475569',
@@ -152,8 +152,8 @@ export default function ForgotPassword() {
                   disabled={loading}
                   className="w-full rounded-lg py-3 text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 disabled:opacity-50"
                   style={{
-                    backgroundColor: '#0D9488',
-                    boxShadow: '0 0 20px rgba(13,148,136,0.3)',
+                    backgroundColor: 'var(--azfit-primary)',
+                    boxShadow: '0 0 20px color-mix(in srgb, var(--azfit-primary) 3%, transparent)',
                   }}
                 >
                   {loading ? 'Sending...' : 'Send Reset Link'}
