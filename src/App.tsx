@@ -8,6 +8,7 @@ import { ChatProvider } from "@/components/chat/ChatContext";
 import { AIContextProvider } from "@/components/ai-copilot/AIContextProvider";
 import { registerServiceWorker } from "@/lib/registerSW";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import ArrowsShell from "@/components/ArrowsShell";
 import { Toaster } from "@/components/ui/sonner";
 import OfflineBanner from "@/components/OfflineBanner";
 import NotFound from "@/components/NotFound";
@@ -180,6 +181,10 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  {/* Task 5: arrows shell around every protected page that
+                      doesn't self-wrap in the full Layout (Layout already
+                      renders HistoryNav). Print routes stay outside. */}
+                  <Route element={<ArrowsShell />}>
                   <Route
                     path="/coach-ai"
                     element={
@@ -309,6 +314,7 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  </Route>{/* end ArrowsShell group A */}
                   <Route
                     path="/clients"
                     element={
@@ -325,6 +331,7 @@ export default function App() {
                       <Navigate to="/dashboard" replace />
                     }
                   />
+                  <Route element={<ArrowsShell />}>
                   <Route
                     path="/warmup"
                     element={
@@ -365,6 +372,7 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  </Route>{/* end ArrowsShell group B */}
                   <Route
                     path="/library"
                     element={

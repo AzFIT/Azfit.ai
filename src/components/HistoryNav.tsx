@@ -1,55 +1,54 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import { advanceHistory } from "@/lib/historyStack";
 
 const STACK_KEY = "azfit_history_stack";
 const POINTER_KEY = "azfit_history_pointer";
+
+function readStored(): { stack: string[]; pointer: number } {
+  const stack: string[] = JSON.parse(sessionStorage.getItem(STACK_KEY) || "[]");
+  const pointer = parseInt(sessionStorage.getItem(POINTER_KEY) || "0", 10);
+  return { stack, pointer };
+}
 
 export function HistoryNav() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Keep a lightweight history stack in sessionStorage so we can disable the
-  // forward/back buttons when there is no history in that direction.
-  useEffect(() => {
+  // Task 5 rework: derive the CURRENT back/forward availability during render
+  // (simulating this navigation against the stored stack — the old render
+  // read the persisted pointer, which lagged one navigation behind), and
+  // persist the advanced stack in an effect. The pre-Task-5 code only wrote
+  // inside the "new path" branch, so the initial push was never saved and
+  // Back stayed disabled forever.
+  const { canBack, canForward, advanced } = useMemo(() => {
     try {
-      const stack: string[] = JSON.parse(sessionStorage.getItem(STACK_KEY) || "[]");
-      let pointer = parseInt(sessionStorage.getItem(POINTER_KEY) || "0", 10);
-
-      if (stack.length === 0) {
-        stack.push(location.pathname);
-        pointer = 0;
-      }
-
-      const current = stack[pointer];
-      if (current !== location.pathname) {
-        if (stack[pointer - 1] === location.pathname) {
-          pointer--;
-        } else if (stack[pointer + 1] === location.pathname) {
-          pointer++;
-        } else {
-          // New path: prune forward history and push
-          stack.splice(pointer + 1);
-          stack.push(location.pathname);
-          pointer = stack.length - 1;
-        }
-        sessionStorage.setItem(STACK_KEY, JSON.stringify(stack.slice(-50)));
-        sessionStorage.setItem(POINTER_KEY, String(pointer));
-      }
+      const { stack, pointer } = readStored();
+      const adv = advanceHistory(stack, pointer, location.pathname);
+      return {
+        canBack: adv.pointer > 0,
+        canForward: adv.pointer < adv.stack.length - 1,
+        advanced: adv,
+      };
     } catch {
-      // sessionStorage unavailable; navigate(-1)/(1) still work
+      return {
+        canBack: window.history.length > 1,
+        canForward: false,
+        advanced: null,
+      };
     }
   }, [location.pathname]);
 
-  const [canBack, canForward] = (() => {
+  useEffect(() => {
+    if (!advanced) return;
     try {
-      const stack: string[] = JSON.parse(sessionStorage.getItem(STACK_KEY) || "[]");
-      const pointer = parseInt(sessionStorage.getItem(POINTER_KEY) || "0", 10);
-      return [pointer > 0, pointer < stack.length - 1] as const;
+      sessionStorage.setItem(STACK_KEY, JSON.stringify(advanced.stack));
+      sessionStorage.setItem(POINTER_KEY, String(advanced.pointer));
     } catch {
-      return [window.history.length > 1, false] as const;
+      // sessionStorage unavailable; navigate(-1)/(1) still work
     }
-  })();
+  }, [advanced]);
 
   const buttonBase =
     "flex h-11 w-11 items-center justify-center rounded-lg transition-colors";
