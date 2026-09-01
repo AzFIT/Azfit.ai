@@ -262,7 +262,6 @@ export function defaultProgramData(
     method: "",
     clientContext: defaultContext,
     phases: defaultPhases,
-    weeklyHours: 4.5,
     split: defaultSplit,
     exercises: defaultExercises,
     progressionRules: [],

@@ -12,7 +12,7 @@ import {
   Dumbbell, TrendingUp, Flame, Wind, HeartPulse, Pencil, Trash2,
   Plus, BarChart3, X, Target, Award, Sparkles, GripVertical,
   AlertTriangle, Layers, Calendar, Users, Play, ArrowLeft, Upload, ShieldAlert, Loader2, Copy, Link2, Printer,
-  ChevronUp, ChevronDown, type LucideIcon,
+  ChevronUp, ChevronDown, Shuffle, Wand2, type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -67,6 +67,10 @@ import { tileGridClass, rowGridClass, type ViewMode } from '@/lib/viewMode';
 import { exampleWeekForMethod } from '@/lib/methodWeek';
 import { programUsesMethod, entryVolumeKg, summarizeMethodHistory, type MethodHistorySummary, type MethodSessionVolume } from '@/lib/methodHistory';
 import { formatVolumeKg } from '@/lib/dashboardBento';
+import { phaseGuidanceFor, phaseDisplayName } from '@/lib/phaseGuidance';
+import { randomProgramName } from '@/lib/programNamer';
+import { buildAutoDescription } from '@/lib/programDescription';
+import { issueForStep, FIELD_BY_STEP, type WizardIssue } from '@/lib/wizardValidation';
 import { saveDraft, loadDraft, clearDraft } from '@/lib/draftStore';
 import DraftBanner from '@/components/DraftBanner';
 
@@ -101,7 +105,7 @@ import type { Database } from '@/types/supabase';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Slider } from '@/components/ui/slider';
+
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -111,9 +115,9 @@ export interface ProgramPhase { id: string; name: string; weeks: number; focus: 
 export interface ProgramSplit { day: string; active: boolean; workout: string; dbId?: string; }
 export interface ProgramExercise { code: string; name: string; sets: number; reps: string; pct1RM: string; tempo: string; rest: string; dbId?: string; isSubstituted?: boolean; safetyNote?: string; supersetGroup?: string; }
 // Phase 56: goal → goals (multi-select; goals[0] is the primary for generation mapping)
-export interface ProgramData { id?: string; goals: string[]; method: string; clientContext: ClientContext; phases: ProgramPhase[]; weeklyHours: number; split: ProgramSplit[]; exercises: ProgramExercise[]; workoutExercises?: Record<number, ProgramExercise[]>; progressionRules: ProgressionRule[]; programName: string; description: string; tags: string[]; isPublic: boolean; assignedClient: string; }
+export interface ProgramData { id?: string; goals: string[]; method: string; clientContext: ClientContext; phases: ProgramPhase[]; split: ProgramSplit[]; exercises: ProgramExercise[]; workoutExercises?: Record<number, ProgramExercise[]>; progressionRules: ProgressionRule[]; programName: string; description: string; tags: string[]; isPublic: boolean; assignedClient: string; }
 export interface SavedProgram { id: string; createdAt: string; updatedAt: string; data: ProgramData; }
-interface StepProps { data: ProgramData; updateData: (partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => void; onSave?: () => void; onSaveAndAssign?: () => void; program?: GeneratedProgram | null; clientName?: string; clients?: ClientRow[]; saving?: boolean; limitations?: string[]; dbMethods?: DbMethod[]; methodCategories?: DbMethodCategory[]; goalScores?: { method_id: string; score: number }[]; methodsLoading?: boolean; methodsError?: string | null; customGoals?: DbGoal[]; onAddGoal?: (name: string) => Promise<void>; onArchiveGoal?: (id: string) => Promise<void>; buildForClientId?: string; }
+interface StepProps { data: ProgramData; updateData: (partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => void; onSave?: () => void; onSaveAndAssign?: () => void; program?: GeneratedProgram | null; clientName?: string; clients?: ClientRow[]; saving?: boolean; limitations?: string[]; dbMethods?: DbMethod[]; methodCategories?: DbMethodCategory[]; goalScores?: { method_id: string; score: number }[]; methodsLoading?: boolean; methodsError?: string | null; customGoals?: DbGoal[]; onAddGoal?: (name: string) => Promise<void>; onArchiveGoal?: (id: string) => Promise<void>; buildForClientId?: string; onBuildForClientChange?: (id: string) => void; }
 
 type ClientRow = Database['public']['Tables']['clients']['Row'];
 type ProgramRow = Database['public']['Tables']['programs']['Row'];
@@ -378,7 +382,7 @@ const METHOD_MAP: Record<string, string> = { strength: '5x5', hypertrophy: 'germ
 const PCT_MAP: Record<string, string> = { strength: '82.5%', hypertrophy: '75%', fatloss: '65%', power: '70%', endurance: '60%', rehab: '50%' };
 // eslint-disable-next-line react-refresh/only-export-components
 export function mapGeneratedToProgramData(gen: GeneratedProgram, profile: ClientProfile | null): ProgramData { const genGoal = GOAL_MAP[gen.goal] || 'hypertrophy'; const genMethod = METHOD_MAP[genGoal] || 'german-volume'; const activeWorkouts = gen.phases[0]?.workouts || []; const totalWeeks = gen.totalWeeks || 4; let phases: ProgramPhase[]; if (totalWeeks >= 12) { const w1 = Math.round(totalWeeks * 0.33); const w2 = Math.round(totalWeeks * 0.33); const w3 = totalWeeks - w1 - w2; phases = [{ id: 'p1', name: 'Accumulation', weeks: w1, focus: 'Build work capacity and aerobic base with higher volume', color: '#F59E0B', active: true }, { id: 'p2', name: 'Intensification', weeks: w2, focus: 'Increase intensity with moderate volume reduction', color: '#EF4444', active: true }, { id: 'p3', name: 'Realization', weeks: w3, focus: 'Peak intensity with sport-specific demands', color: '#22C55E', active: true }]; } else { phases = [{ id: 'p1', name: 'Adaptation', weeks: totalWeeks, focus: 'Build foundational fitness and work capacity', color: '#00AEEF', active: true }]; } const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']; const split: ProgramSplit[] = dayNames.map((day, idx) => { const workout = activeWorkouts[idx]; return { day, active: !!workout, workout: workout ? `${workout.name} — ${workout.focus}` : 'Rest Day' }; }); const toProgramExercise = (ex: GeneratedExercise): ProgramExercise => { const restMins = Math.floor(ex.restSeconds / 60); const restSecs = ex.restSeconds % 60; return { code: ex.order, name: ex.name, sets: ex.sets, reps: ex.reps, pct1RM: PCT_MAP[genGoal] || 'N/A', tempo: ex.tempo, rest: `${restMins}:${String(restSecs).padStart(2, '0')}` }; }; // Phase 29A: each generated day keeps its OWN exercise list (workouts are day-indexed: Mon idx 0 → key 1 … Sun idx 6 → key 7)
-const workoutExercises: Record<number, ProgramExercise[]> = {}; activeWorkouts.forEach((workout, idx) => { if (workout && workout.exercises?.length) workoutExercises[idx + 1] = workout.exercises.map(toProgramExercise); }); const firstDayList = Object.values(workoutExercises)[0]; const exercises: ProgramExercise[] = firstDayList ? firstDayList.map((e) => ({ ...e })) : []; const clientContext: ClientContext = profile ? { experience: profile.trainingExperience === 'beginner' ? '<1 year' : profile.trainingExperience === 'advanced' ? '5-10 years' : '1-3 years', availability: `${profile.trainingFrequency} days`, limitations: profile.injuries ? ['Other'] : ['None (healthy)'], otherLimitation: profile.injuries || '' } : { experience: '', availability: '', limitations: [], otherLimitation: '' }; return { goals: [genGoal], method: genMethod, clientContext, phases, weeklyHours: 4.5, split, exercises, workoutExercises, progressionRules: [], programName: gen.name, description: gen.description, tags: ['AI Generated', GOALS.find((g) => g.id === genGoal)?.name || 'Custom'], isPublic: false, assignedClient: '' }; }
+const workoutExercises: Record<number, ProgramExercise[]> = {}; activeWorkouts.forEach((workout, idx) => { if (workout && workout.exercises?.length) workoutExercises[idx + 1] = workout.exercises.map(toProgramExercise); }); const firstDayList = Object.values(workoutExercises)[0]; const exercises: ProgramExercise[] = firstDayList ? firstDayList.map((e) => ({ ...e })) : []; const clientContext: ClientContext = profile ? { experience: profile.trainingExperience === 'beginner' ? '<1 year' : profile.trainingExperience === 'advanced' ? '5-10 years' : '1-3 years', availability: `${profile.trainingFrequency} days`, limitations: profile.injuries ? ['Other'] : ['None (healthy)'], otherLimitation: profile.injuries || '' } : { experience: '', availability: '', limitations: [], otherLimitation: '' }; return { goals: [genGoal], method: genMethod, clientContext, phases, split, exercises, workoutExercises, progressionRules: [], programName: gen.name, description: gen.description, tags: ['AI Generated', GOALS.find((g) => g.id === genGoal)?.name || 'Custom'], isPublic: false, assignedClient: '' }; }
 
 function createEmptySet(setNumber: number, restSeconds: number): LoggedSet { return { setNumber, load: 0, reps: 0, rpe: 0, done: false, restSeconds, type: 'Normal' }; }
 function workoutToSession(workout: GeneratedWorkout, programId: string): WorkoutLog { const exercises: LoggedExercise[] = workout.exercises.map((ex) => ({ order: ex.order, name: ex.name, category: ex.category, targetSets: ex.sets, targetReps: ex.reps, targetLoad: 0, tempo: ex.tempo, sets: Array.from({ length: ex.sets }, (_, i) => createEmptySet(i + 1, ex.restSeconds)), notes: '' })); const totalSets = exercises.reduce((sum, ex) => sum + ex.targetSets, 0); return { id: crypto.randomUUID(), programId, clientId: 'self', clientName: 'You', workoutName: workout.name, phaseName: 'Phase 1: Adaptation', weekNumber: 1, dayNumber: workout.dayNumber, exercises, startTime: new Date().toISOString(), durationSeconds: 0, totalVolume: totalSets * 10 * 20, totalSets, completedSets: 0, avgRpe: 0, status: 'in_progress', createdAt: new Date().toISOString() }; }
@@ -451,7 +455,7 @@ const STEPS = [
 // Phase 65A: a fresh wizard is per-day from the start — workoutExercises is
 // seeded pattern-aware for the default Upper/Lower split (the shared
 // `exercises` list stays as the legacy fallback only).
-const defaultData: ProgramData = { goals: [], method: '', clientContext: { experience: '', availability: '', limitations: [], otherLimitation: '' }, phases: PHASES_DEFAULT.map((p) => ({ ...p })), weeklyHours: 4.5, split: SPLIT_DEFAULTS['Upper/Lower'].map((d) => ({ ...d })), exercises: DEFAULT_EXERCISES.map((e) => ({ ...e })), workoutExercises: seedExercisesForSplit(SPLIT_DEFAULTS['Upper/Lower'], wizardDayKey), progressionRules: [], programName: '', description: '', tags: [], isPublic: false, assignedClient: '' };
+const defaultData: ProgramData = { goals: [], method: '', clientContext: { experience: '', availability: '', limitations: [], otherLimitation: '' }, phases: PHASES_DEFAULT.map((p) => ({ ...p })), split: SPLIT_DEFAULTS['Upper/Lower'].map((d) => ({ ...d })), exercises: DEFAULT_EXERCISES.map((e) => ({ ...e })), workoutExercises: seedExercisesForSplit(SPLIT_DEFAULTS['Upper/Lower'], wizardDayKey), progressionRules: [], programName: '', description: '', tags: [], isPublic: false, assignedClient: '' };
 
 // Phase 56: display names for all selected goal tiles (hardcoded + custom DB goals)
 function goalNamesFor(goals: string[], customGoals: DbGoal[]): string[] {
@@ -1096,6 +1100,14 @@ function Step4Phases({ data, updateData, dbMethods = [] }: StepProps) {
     setSuggestionDismissed(true);
   }, [suggestion, updateData]);
   const totalWeeks = useMemo(() => data.phases.filter((p) => p.active).reduce((sum, p) => sum + p.weeks, 0), [data.phases]);
+  // Phase 66 Item 1c: the mini-example only uses real config — phase weeks,
+  // the split's actual active days, and the selected method's defaults
+  // setsReps when it has them (never invented numbers).
+  const activeDays = useMemo(() => data.split.filter((d) => d.active).length, [data.split]);
+  const methodSetsReps = useMemo(
+    () => parseMethodDefaults(dbMethods.find((m) => m.slug === data.method)?.defaults)?.setsReps ?? null,
+    [dbMethods, data.method],
+  );
   return (
     <div className="space-y-5">
       {(suggestion || (pairing && !pairingDismissed)) && !suggestionDismissed && (
@@ -1131,7 +1143,7 @@ function Step4Phases({ data, updateData, dbMethods = [] }: StepProps) {
               <div key={phase.id} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg px-2.5 py-1.5 flex items-center gap-2.5">
                 <input type="checkbox" checked={phase.active} onChange={() => togglePhase(phase.id)} className="w-4 h-4 rounded accent-[#00AEEF] shrink-0" />
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: phase.color }} />
-                <span className={cn('text-xs font-medium truncate min-w-0 flex-1', phase.active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40 line-through')}>{phase.name}</span>
+                <span className={cn('text-xs font-medium truncate min-w-0 flex-1', phase.active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40 line-through')}>{phaseDisplayName(phase.name)}</span>
                 <span className="text-[10px] text-[var(--page-text)]/50 shrink-0">{phase.weeks}w</span>
               </div>
             );
@@ -1141,7 +1153,7 @@ function Step4Phases({ data, updateData, dbMethods = [] }: StepProps) {
               <div key={phase.id} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg px-3 py-2 flex items-center gap-2.5">
                 <input type="checkbox" checked={phase.active} onChange={() => togglePhase(phase.id)} className="w-4 h-4 rounded accent-[#00AEEF] shrink-0" />
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: phase.color }} />
-                <span className={cn('text-xs font-semibold truncate min-w-0 flex-1', phase.active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40 line-through')}>{phase.name}</span>
+                <span className={cn('text-xs font-semibold truncate min-w-0 flex-1', phase.active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40 line-through')}>{phaseDisplayName(phase.name)}</span>
                 <Badge variant="outline" className="text-[10px] border-[var(--card-border)] text-[var(--page-text)]/60 shrink-0">{phase.weeks} weeks</Badge>
                 <button onClick={() => setEditingPhase({ ...phase })} className="p-1 rounded hover:bg-[var(--page-bg)] text-[var(--page-text)]/60 hover:text-[var(--page-text)] transition-colors shrink-0"><Pencil className="w-3.5 h-3.5" /></button>
                 <button onClick={() => removePhase(phase.id)} className="p-1 rounded hover:bg-[#EF4444]/10 text-[var(--page-text)]/60 hover:text-[#EF4444] transition-colors shrink-0"><X className="w-3.5 h-3.5" /></button>
@@ -1154,13 +1166,26 @@ function Step4Phases({ data, updateData, dbMethods = [] }: StepProps) {
                 <input type="checkbox" checked={phase.active} onChange={() => togglePhase(phase.id)} className="w-5 h-5 rounded accent-[#00AEEF]" />
                 <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: phase.color }} />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h4 className={cn('text-sm font-semibold', phase.active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40 line-through')}>{phase.name}</h4>
-                    <Badge variant="outline" className="text-[10px] border-[var(--card-border)] text-[var(--page-text)]/60">{phase.weeks} weeks</Badge>
-                    {phase.intensityTarget && <Badge variant="outline" className="text-[10px] border-[#F59E0B]/40 text-[#F59E0B]">{phase.intensityTarget}</Badge>}
-                    {phase.volumeTarget && <Badge variant="outline" className="text-[10px] border-[var(--ai-violet)]/40 text-[var(--ai-violet)]">{phase.volumeTarget}</Badge>}
-                  </div>
-                  {mode !== 'small' && <p className={cn('text-xs mt-0.5', phase.active ? 'text-[var(--page-text)]/60' : 'text-[var(--page-text)]/40')}>{phase.focus}</p>}
+                  {/* Phase 66 Item 1: plain label + classic subtitle (stored
+                      name unchanged), guidance copy + honest mini-example */}
+                  {(() => { const g = phaseGuidanceFor(phase.name); return (
+                    <>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className={cn('text-sm font-semibold', phase.active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40 line-through')}>{g ? g.plain : phase.name}</h4>
+                        {g && <span className="text-[10px] text-[var(--page-text)]/50">({g.classic})</span>}
+                        <Badge variant="outline" className="text-[10px] border-[var(--card-border)] text-[var(--page-text)]/60">{phase.weeks} weeks</Badge>
+                        {phase.intensityTarget && <Badge variant="outline" className="text-[10px] border-[#F59E0B]/40 text-[#F59E0B]">{phase.intensityTarget}</Badge>}
+                        {phase.volumeTarget && <Badge variant="outline" className="text-[10px] border-[var(--ai-violet)]/40 text-[var(--ai-violet)]">{phase.volumeTarget}</Badge>}
+                      </div>
+                      {mode !== 'small' && <p className={cn('text-xs mt-0.5', phase.active ? 'text-[var(--page-text)]/60' : 'text-[var(--page-text)]/40')}>{phase.focus}</p>}
+                      {mode !== 'small' && g && <p className={cn('text-[11px] mt-1 leading-relaxed', phase.active ? 'text-[var(--page-text)]/50' : 'text-[var(--page-text)]/35')}>{g.description}</p>}
+                      {mode !== 'small' && (
+                        <p className="text-[10px] font-mono text-[#00AEEF]/80 mt-1">
+                          {phase.weeks} weeks · {activeDays} days/wk{methodSetsReps ? ` · ${methodSetsReps}` : ''}
+                        </p>
+                      )}
+                    </>
+                  ); })()}
                 </div>
                 <button onClick={() => setEditingPhase({ ...phase })} className="p-1.5 rounded-lg hover:bg-[var(--page-bg)] text-[var(--page-text)]/60 hover:text-[var(--page-text)] transition-colors"><Pencil className="w-4 h-4" /></button>
                 <button onClick={() => duplicatePhase(phase)} className="p-1.5 rounded-lg hover:bg-[var(--page-bg)] text-[var(--page-text)]/60 hover:text-[var(--page-text)] transition-colors"><Copy className="w-4 h-4" /></button>
@@ -1170,20 +1195,12 @@ function Step4Phases({ data, updateData, dbMethods = [] }: StepProps) {
           );
         })}
       </div>
-      <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <label className="text-[var(--page-text)] text-sm font-semibold">Weekly Training Hours</label>
-          <span className="text-[#00AEEF] font-mono text-sm font-bold">{data.weeklyHours}h</span>
-        </div>
-        <Slider value={[data.weeklyHours]} onValueChange={([v]) => updateData({ weeklyHours: v })} min={2} max={10} step={0.5} className="w-full" />
-        <div className="flex justify-between text-[10px] text-[var(--page-text)]/60 mt-1"><span>2h</span><span>10h</span></div>
-      </div>
       <div>
         <label className="text-[var(--page-text)]/60 text-xs font-medium mb-2 block">Phase Timeline ({totalWeeks} weeks)</label>
         <div className="flex h-8 rounded-xl overflow-hidden bg-[var(--page-bg)] border border-[var(--card-border)]">
           {data.phases.filter((p) => p.active).map((phase) => (
             <motion.div key={phase.id} initial={{ width: 0 }} animate={{ width: `${(phase.weeks / totalWeeks) * 100}%` }} transition={{ duration: 0.5 }} className="h-full flex items-center justify-center" style={{ backgroundColor: `${phase.color}30`, borderRight: `2px solid ${phase.color}` }}>
-              <span className="text-[10px] font-bold truncate px-1" style={{ color: phase.color }}>{phase.name}</span>
+              <span className="text-[10px] font-bold truncate px-1" style={{ color: phase.color }}>{phaseDisplayName(phase.name)}</span>
             </motion.div>
           ))}
         </div>
@@ -2094,7 +2111,7 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [],
           </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-          {[{ v: `${intensity}%`, l: 'Avg Intensity', c: '#EF4444' }, { v: totalSets, l: 'Total Sets / Week', c: '#00AEEF' }, { v: totalExercises, l: 'Exercises', c: '#F59E0B' }, { v: `${data.weeklyHours}h`, l: 'Weekly Time', c: 'var(--ai-violet)' }].map((s) => (
+          {[{ v: `${intensity}%`, l: 'Avg Intensity', c: '#EF4444' }, { v: totalSets, l: 'Total Sets / Week', c: '#00AEEF' }, { v: totalExercises, l: 'Exercises', c: '#F59E0B' }].map((s) => (
             <div key={s.l} className="bg-[var(--page-bg)] border border-[var(--card-border)] rounded-lg p-3 text-center">
               <div className="text-lg font-bold font-mono" style={{ color: s.c }}>{s.v}</div>
               <div className="text-[var(--page-text)]/60 text-[10px]">{s.l}</div>
@@ -2108,7 +2125,7 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [],
           <div className="flex h-8 rounded-lg overflow-hidden bg-[var(--page-bg)] border border-[var(--card-border)]">
             {data.phases.filter((p) => p.active).map((phase) => (
               <motion.div key={phase.id} initial={{ width: 0 }} animate={{ width: `${(phase.weeks / totalWeeks) * 100}%` }} transition={{ duration: 0.5 }} className="h-full flex items-center justify-center relative" style={{ backgroundColor: phase.color + '30', borderRight: `2px solid ${phase.color}` }}>
-                <span className="text-[10px] font-semibold text-[var(--page-text)] truncate px-1">{phase.name}</span>
+                <span className="text-[10px] font-semibold text-[var(--page-text)] truncate px-1">{phaseDisplayName(phase.name)}</span>
               </motion.div>
             ))}
           </div>
@@ -2256,7 +2273,7 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [],
             </div>
           ))}
         </div>
-        <div className="flex gap-4 mt-3 text-xs text-[var(--page-text)]/60"><span>{activeDays} training days</span><span>{restDays} rest days</span><span>{data.weeklyHours}h/week</span><span>~{Math.round((data.weeklyHours / activeDays) * 60)}min/session</span></div>
+        <div className="flex gap-4 mt-3 text-xs text-[var(--page-text)]/60"><span>{activeDays} training days</span><span>{restDays} rest days</span></div>
       </Card>
 
       {program && program.phases[0]?.workouts.length > 0 && (
@@ -2316,7 +2333,7 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [],
           {data.phases.filter((p) => p.active).map((phase, i) => (
             <div key={phase.id} className="flex items-center gap-3 p-3 rounded-lg bg-[var(--page-bg)] border border-[var(--card-border)]">
               <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: phase.color }}>{i + 1}</div>
-              <div className="flex-1"><div className="text-[var(--page-text)] text-sm font-semibold">{phase.name}</div><div className="text-[var(--page-text)]/60 text-xs">{phase.focus}</div></div>
+              <div className="flex-1"><div className="text-[var(--page-text)] text-sm font-semibold">{phaseDisplayName(phase.name)}</div><div className="text-[var(--page-text)]/60 text-xs">{phase.focus}</div></div>
               <div className="text-right"><div className="text-[var(--page-text)] font-mono font-bold text-sm">{phase.weeks}w</div><div className="text-[var(--page-text)]/60 text-[10px]">{Math.round((phase.weeks / totalWeeks) * 100)}% of program</div></div>
             </div>
           ))}
@@ -2326,7 +2343,7 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [],
       <Card className="bg-[var(--card-bg)] border-[var(--card-border)] p-5">
         <h4 className="text-[var(--page-text)] text-sm font-bold mb-3 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-[#00AEEF]" />Summary Statistics</h4>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {[{ l: 'Total Weeks', v: totalWeeks, c: 'text-[var(--page-text)]' }, { l: 'Training Days', v: `${activeDays}/wk`, c: 'text-[var(--page-text)]' }, { l: 'Total Sets', v: `${totalSets * activeDays}/wk`, c: 'text-[#00AEEF]' }, { l: 'Avg Rest', v: `${avgRest}s`, c: 'text-[#F59E0B]' }, { l: 'Est. Duration', v: `~${Math.round(totalWeeks * activeDays * (data.weeklyHours / activeDays))}h`, c: 'text-[var(--ai-violet)]' }].map((s) => (
+          {[{ l: 'Total Weeks', v: totalWeeks, c: 'text-[var(--page-text)]' }, { l: 'Training Days', v: `${activeDays}/wk`, c: 'text-[var(--page-text)]' }, { l: 'Total Sets', v: `${totalSets * activeDays}/wk`, c: 'text-[#00AEEF]' }, { l: 'Avg Rest', v: `${avgRest}s`, c: 'text-[#F59E0B]' }].map((s) => (
             <div key={s.l} className="bg-[var(--page-bg)] rounded-lg p-3 border border-[var(--card-border)]">
               <div className="text-[var(--page-text)]/60 text-[10px]">{s.l}</div>
               <div className={cn('font-mono font-bold text-lg', s.c)}>{s.v}</div>
@@ -2338,10 +2355,38 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [],
   );
 }
 
-function Step8Save({ data, updateData, onSave, clients, saving, dbMethods = [], customGoals = [] }: StepProps) {
+function Step8Save({ data, updateData, onSave, clients, saving, dbMethods = [], customGoals = [], buildForClientId, onBuildForClientChange }: StepProps) {
   const [showDetails, setShowDetails] = useState(true);
   const toggleTag = useCallback((tag: string) => updateData((prev) => { const next = prev.tags.includes(tag) ? prev.tags.filter((t) => t !== tag) : [...prev.tags, tag]; return { tags: next }; }), [updateData]);
   const selectedClient = clients?.find((c) => c.id === data.assignedClient);
+
+  // Phase 66 Item 2b/2c: goal+method-aware name randomize + honest auto
+  // description. Both derive ONLY from actual selections + the selected
+  // client's real row (never fabricated).
+  const [nameVariant, setNameVariant] = useState(0);
+  const methodDisplayName = useMemo(
+    () => (data.method ? resolveMethodName(data.method, dbMethods) : null),
+    [data.method, dbMethods],
+  );
+  const handleRandomizeName = useCallback(() => {
+    const customNames = goalNamesFor(data.goals, customGoals).filter((n) => !GOALS.some((g) => g.name === n));
+    updateData({ programName: randomProgramName(data.goals, customNames, methodDisplayName, nameVariant) });
+    setNameVariant((v) => v + 1);
+  }, [data.goals, customGoals, methodDisplayName, nameVariant, updateData]);
+  const handleAutoDescription = useCallback(() => {
+    const client = buildForClientId ? clients?.find((c) => c.id === buildForClientId) : undefined;
+    updateData({
+      description: buildAutoDescription({
+        goalNames: goalNamesFor(data.goals, customGoals),
+        methodName: methodDisplayName,
+        phases: data.phases,
+        daysPerWeek: data.split.filter((d) => d.active).length,
+        totalWeeks: data.phases.filter((p) => p.active).reduce((s, p) => s + p.weeks, 0),
+        clientName: client?.full_name ?? null,
+        clientExperience: client?.experience_level ?? null,
+      }),
+    });
+  }, [buildForClientId, clients, data.goals, customGoals, methodDisplayName, data.phases, data.split, updateData]);
 
   const totalWeeks = useMemo(() => data.phases.filter((p) => p.active).reduce((s, p) => s + p.weeks, 0), [data.phases]);
   const activeDays = useMemo(() => data.split.filter((d) => d.active).length, [data.split]);
@@ -2449,15 +2494,33 @@ function Step8Save({ data, updateData, onSave, clients, saving, dbMethods = [], 
 
       {/* Editable fields (kept) */}
       <div>
-        <label className="text-[var(--page-text)] text-sm font-semibold mb-1.5 block">Program Name</label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-[var(--page-text)] text-sm font-semibold">Program Name</label>
+          {/* Phase 66 Item 2b: goal/method-aware name generator, cycles variants */}
+          <button onClick={handleRandomizeName} title="Generate a name from the selected goal + method" className="inline-flex items-center gap-1 text-[11px] font-medium text-[#00AEEF] hover:opacity-80 transition">
+            <Shuffle className="w-3 h-3" />Randomize
+          </button>
+        </div>
         <Input value={data.programName} onChange={(e) => updateData({ programName: e.target.value })} placeholder="e.g., 12-Week Hypertrophy Block" className="bg-[var(--card-bg)] border-[var(--card-border)] text-[var(--page-text)]" />
       </div>
       <div>
-        <label className="text-[var(--page-text)] text-sm font-semibold mb-1.5 block">Description</label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-[var(--page-text)] text-sm font-semibold">Description</label>
+          {/* Phase 66 Item 2c: honest description from the actual selections */}
+          <button onClick={handleAutoDescription} title="Write a description from the current selections" className="inline-flex items-center gap-1 text-[11px] font-medium text-[#00AEEF] hover:opacity-80 transition">
+            <Wand2 className="w-3 h-3" />Auto-fill
+          </button>
+        </div>
         <Textarea value={data.description} onChange={(e) => updateData({ description: e.target.value })} placeholder="Describe the program goals, target audience, and expected outcomes..." className="bg-[var(--card-bg)] border-[var(--card-border)] text-[var(--page-text)] min-h-[80px]" />
       </div>
       <div>
-        <label className="text-[var(--page-text)] text-sm font-semibold mb-2 block">Tags</label>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-[var(--page-text)] text-sm font-semibold">Tags</label>
+          {/* Phase 66 Item 2e */}
+          <button onClick={() => updateData({ tags: data.tags.length === TAGS.length ? [] : [...TAGS] })} className="text-[11px] font-medium text-[#00AEEF] hover:opacity-80 transition">
+            {data.tags.length === TAGS.length ? 'Clear all' : 'Select all'}
+          </button>
+        </div>
         <div className="flex flex-wrap gap-2">
           {TAGS.map((tag) => { const isSelected = data.tags.includes(tag); return (
             <button key={tag} onClick={() => toggleTag(tag)} className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-all', isSelected ? 'bg-[#00AEEF]/10 border-[#00AEEF] text-[#00AEEF]' : 'bg-[var(--card-bg)] border-[var(--card-border)] text-[var(--page-text)]/60 hover:border-[var(--azfit-primary)]/50')}>
@@ -2474,6 +2537,9 @@ function Step8Save({ data, updateData, onSave, clients, saving, dbMethods = [], 
         <label className="text-[var(--page-text)] text-sm font-semibold mb-1.5 block">Assign to Client</label>
         <select value={data.assignedClient} onChange={(e) => {
           const clientId = e.target.value;
+          // Phase 66 Item 2d: the two selects share one truth — assigning
+          // here also sets the header's Build-for-client selection.
+          onBuildForClientChange?.(clientId);
           const client = clients?.find((c) => c.id === clientId);
           const ctx = client
             ? clientContextFromClientFields({
@@ -2514,6 +2580,9 @@ export default function AIProgramBuilderPage() {
   const [savedList, setSavedList] = useState<SavedProgram[]>([]);
   const [saveFlash, setSaveFlash] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Phase 66 Item 2f: blocking save overlay — spinner while saving, the
+  // error message in place of it when a save fails (dismissible).
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [program, setProgram] = useState<GeneratedProgram | null>(null);
   const [clients, setClients] = useState<ClientRow[]>([]);
@@ -2752,6 +2821,7 @@ export default function AIProgramBuilderPage() {
     if (!user?.id || saving) return;
     const assignedClientId = data.assignedClient || null;
     setSaving(true);
+    setSaveError(null);
     try {
       const saved = await saveProgramToSupabase(data, user.id, assignedClientId);
       if (saved) {
@@ -2762,10 +2832,12 @@ export default function AIProgramBuilderPage() {
         setTimeout(() => setSaveFlash(false), 1200);
         toast.success(assignedClientId ? 'Program assigned to client' : 'Program saved as draft');
       } else {
+        setSaveError('Failed to save program — please try again.');
         toast.error('Failed to save program');
       }
     } catch (err) {
       console.error('Save program failed:', err);
+      setSaveError('Failed to save program — please try again.');
       toast.error('Failed to save program');
     } finally {
       setSaving(false);
@@ -2779,6 +2851,7 @@ export default function AIProgramBuilderPage() {
       return;
     }
     setSaving(true);
+    setSaveError(null);
     try {
       const saved = await saveProgramToSupabase(data, user.id, assignedClientId);
       if (saved) {
@@ -2788,10 +2861,12 @@ export default function AIProgramBuilderPage() {
         toast.success('Program assigned to client');
         navigate('/dashboard');
       } else {
+        setSaveError('Failed to assign program — please try again.');
         toast.error('Failed to assign program');
       }
     } catch (err) {
       console.error('Assign program failed:', err);
+      setSaveError('Failed to assign program — please try again.');
       toast.error('Failed to assign program');
     } finally {
       setSaving(false);
@@ -2897,21 +2972,47 @@ export default function AIProgramBuilderPage() {
     return () => { cancelled = true; };
   }, [templateId, updateData]);
 
+  const exerciseCount = useMemo(
+    () => (data.workoutExercises ? Object.values(data.workoutExercises).flat().length : data.exercises.length),
+    [data.workoutExercises, data.exercises],
+  );
   const stepComplete = useMemo(() => {
-    const exerciseCount = data.workoutExercises
-      ? Object.values(data.workoutExercises).flat().length
-      : data.exercises.length;
     return [data.goals.length > 0, !!data.method, !!data.clientContext.experience, data.phases.some((p) => p.active), data.split.some((d) => d.active), exerciseCount > 0, data.goals.length > 0 && !!data.method, !!data.programName];
-  }, [data]);
+  }, [data, exerciseCount]);
   const completionPercent = useMemo(() => Math.round((stepComplete.filter(Boolean).length / stepComplete.length) * 100), [stepComplete]);
 
   const CurrentComponent = STEPS[currentStep].component;
   const isFinalStep = currentStep === STEPS.length - 1;
   const generateHint = buildForClientRow ? `Tailored to ${buildForClientRow.full_name}'s intake profile` : 'Generic template';
 
+  // Phase 66 Item 2g: blocked Next/Save jumps to the first missing field —
+  // scroll the step region into view, ring it, and name what's missing.
+  // Both nav bars share this via WizardNavBar (buttons stay clickable).
+  const [invalidField, setInvalidField] = useState<string | null>(null);
+  const [invalidMessage, setInvalidMessage] = useState<string | null>(null);
+  const flashInvalid = useCallback((issue: WizardIssue) => {
+    setInvalidField(issue.field);
+    setInvalidMessage(issue.message);
+    requestAnimationFrame(() => {
+      document.querySelector(`[data-field="${issue.field}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    window.setTimeout(() => {
+      setInvalidField(null);
+      setInvalidMessage(null);
+    }, 2800);
+  }, []);
   const goNext = () => {
+    const issue = issueForStep(currentStep, {
+      goals: data.goals,
+      method: data.method,
+      clientExperience: data.clientContext.experience,
+      hasActivePhase: data.phases.some((p) => p.active),
+      hasActiveDay: data.split.some((d) => d.active),
+      exerciseCount,
+      programName: data.programName,
+    });
+    if (issue) { flashInvalid(issue); return; }
     if (isFinalStep) { handleSaveAndAssign(); return; }
-    if (!stepComplete[currentStep]) return;
     setCurrentStep((s) => {
       const n = Math.min(STEPS.length - 1, s + 1);
       setMaxStep((m) => Math.max(m, n));
@@ -2955,8 +3056,10 @@ export default function AIProgramBuilderPage() {
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Users className="w-4 h-4 text-[#00AEEF]" />
             <span className="text-xs text-[var(--page-text)]/60">Build for client:</span>
-            <select value={buildForClient} onChange={(e) => setBuildForClient(e.target.value)} className="bg-[var(--page-bg)] border border-[var(--card-border)] text-[var(--page-text)] text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#00AEEF]">
-              <option value="">Generic template</option>
+            {/* Phase 66 Item 2d: one source of truth — this selection also
+                pre-selects Step 8's Assign-to-Client (and vice versa). */}
+            <select value={buildForClient} onChange={(e) => { const v = e.target.value; setBuildForClient(v); updateData({ assignedClient: v }); }} className="bg-[var(--page-bg)] border border-[var(--card-border)] text-[var(--page-text)] text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#00AEEF]">
+              <option value="">Select client</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.full_name}</option>)}
             </select>
             <span className="text-[11px] text-[#00AEEF]">{generateHint}</span>
@@ -3036,11 +3139,23 @@ export default function AIProgramBuilderPage() {
         {/* Phase 65B Item 4: the same Back/Next controls at the TOP of every
             step (shared component — identical validation to the bottom bar) */}
         <WizardNavBar currentStep={currentStep} saving={saving} isFinalStep={isFinalStep} canProceed={!!stepComplete[currentStep]} onBack={goBack} onNext={goNext} className="mb-4" />
-        <AnimatePresence mode="wait">
-          <motion.div key={currentStep} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.2 }}>
-            <CurrentComponent data={data} updateData={updateData} program={program} onSave={handleSave} onSaveAndAssign={handleSaveAndAssign} clientName={selectedClientName} clients={clients} saving={saving} limitations={wizardLimitations} dbMethods={dbMethods} methodCategories={methodCategories} goalScores={goalScores} methodsLoading={methodsLoading} methodsError={methodsError} customGoals={dbGoals} onAddGoal={handleAddGoal} onArchiveGoal={handleArchiveGoal} buildForClientId={buildForClient || undefined} />
-          </motion.div>
-        </AnimatePresence>
+        {/* Phase 66 Item 2g: the validation-jump target — the step region is
+            anchored by data-field, ring-highlighted, and gets the inline
+            "what's missing" message (covers every step without touching
+            Step 3's internals). */}
+        <div
+          data-field={FIELD_BY_STEP[currentStep]}
+          className={cn('rounded-2xl transition-shadow', invalidField === FIELD_BY_STEP[currentStep] && 'ring-2 ring-[#00AEEF] p-1 -m-1')}
+        >
+          {invalidMessage && invalidField === FIELD_BY_STEP[currentStep] && (
+            <p role="alert" className="mb-3 text-xs font-semibold text-[#EF4444]">{invalidMessage}</p>
+          )}
+          <AnimatePresence mode="wait">
+            <motion.div key={currentStep} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.2 }}>
+              <CurrentComponent data={data} updateData={updateData} program={program} onSave={handleSave} onSaveAndAssign={handleSaveAndAssign} clientName={selectedClientName} clients={clients} saving={saving} limitations={wizardLimitations} dbMethods={dbMethods} methodCategories={methodCategories} goalScores={goalScores} methodsLoading={methodsLoading} methodsError={methodsError} customGoals={dbGoals} onAddGoal={handleAddGoal} onArchiveGoal={handleArchiveGoal} buildForClientId={buildForClient || undefined} onBuildForClientChange={setBuildForClient} />
+            </motion.div>
+          </AnimatePresence>
+        </div>
 
         {/* Back / Next */}
         <WizardNavBar currentStep={currentStep} saving={saving} isFinalStep={isFinalStep} canProceed={!!stepComplete[currentStep]} onBack={goBack} onNext={goNext} className="mt-6" />
@@ -3049,6 +3164,37 @@ export default function AIProgramBuilderPage() {
       {/* Phase 65B Item 4: floating scroll arrows (appear after scrolling;
           bottom offset keeps them clear of the Back/Next bar + mobile nav) */}
       <ScrollArrows />
+
+      {/* Phase 66 Item 2f: blocking save feedback — spinner while saving,
+          the error message in its place on failure (dismissible). */}
+      <AnimatePresence>
+        {(saving || saveError) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+            role={saveError ? 'alert' : 'status'}
+          >
+            <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl px-6 py-5 flex flex-col items-center gap-3 shadow-2xl max-w-xs w-full">
+              {saving && !saveError ? (
+                <>
+                  <Loader2 className="w-6 h-6 animate-spin text-[#00AEEF]" />
+                  <p className="text-sm font-semibold text-[var(--page-text)]">Saving program…</p>
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="w-6 h-6 text-[#EF4444]" />
+                  <p className="text-sm font-semibold text-[var(--page-text)] text-center">{saveError}</p>
+                  <Button variant="outline" size="sm" onClick={() => setSaveError(null)} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs">
+                    Dismiss
+                  </Button>
+                </>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -3082,7 +3228,10 @@ function WizardNavBar({
           <Check className="w-4 h-4 mr-1.5" />{saving ? 'Saving…' : 'Save & Assign Program'}
         </Button>
       ) : (
-        <Button onClick={onNext} disabled={!canProceed} className="bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] font-bold px-6 disabled:opacity-50">
+        // Phase 66 Item 2g: NOT hard-disabled when incomplete — the click
+        // triggers the validation jump (scroll + highlight + message) instead
+        // of advancing. aria-disabled + dimmed, identical on both bars.
+        <Button onClick={onNext} aria-disabled={!canProceed} className={cn('bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] font-bold px-6', !canProceed && 'opacity-50')}>
           Next: {STEPS[currentStep + 1]?.title}
         </Button>
       )}
