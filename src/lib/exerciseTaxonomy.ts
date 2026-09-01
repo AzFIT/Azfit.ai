@@ -56,10 +56,12 @@ export function patternForExercise(primary: string | null, secondary?: string | 
  *  allow everything — we only flag when the label gives a basis. */
 export function dayPatternsForLabel(label: string): Set<'push' | 'pull' | 'legs'> {
   const w = label.toLowerCase();
+  // 'full' must win over focus suffixes: 'Full Body 1 — Pull + Legs' is a
+  // full-body day even though it contains 'legs' (65B audit catch).
+  if (w.includes('full')) return new Set(['push', 'pull', 'legs']);
   if (w.includes('upper')) return new Set(['push', 'pull']);
   if (w.includes('lower') || w.includes('legs') || w.includes('squat') || w.includes('quad')) return new Set(['legs']);
   if (w.includes('hinge') || w.includes('deadlift') || w.includes('ham')) return new Set(['legs']);
-  if (w.includes('full')) return new Set(['push', 'pull', 'legs']);
   if (w.includes('arm')) return new Set(['push', 'pull']); // biceps + triceps
   if (w.includes('push') || w.includes('chest') || w.includes('shoulder')) return new Set(['push']);
   if (w.includes('pull') || w.includes('back')) return new Set(['pull']);

@@ -148,3 +148,13 @@ describe("similarExercises (Change exercise → Similar)", () => {
     expect(similarExercises("Barbell Row", library)[0].matched).toBe(true);
   });
 });
+
+describe("day label precedence — 65B audit catch", () => {
+  it("'Full Body N — <focus>' stays full-body even when the focus contains legs/pull/upper", () => {
+    expect(dayPatternsForLabel("Full Body 1 — Pull + Legs").size).toBe(3);
+    expect(dayPatternsForLabel("Full Body 2 — Push + Legs").size).toBe(3);
+    expect(dayPatternsForLabel("Full Body 3 — Upper + Core").size).toBe(3);
+    expect(isPatternCompatible("Full Body 1 — Pull + Legs", "pull")).toBe(true);
+    expect(isPatternCompatible("Full Body 1 — Pull + Legs", "push")).toBe(true);
+  });
+});

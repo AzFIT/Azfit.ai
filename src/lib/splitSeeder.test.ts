@@ -126,3 +126,14 @@ describe("preserveSplitIds — workout-row identity", () => {
     expect(changed.every((d) => d.dbId === undefined)).toBe(true); // PPL labels differ → no false carries
   });
 });
+
+describe("day label precedence — 65B audit catch", () => {
+  it("'Full Body N — <focus>' seeds from the full-body mix, not a single pattern", () => {
+    const slots = slotsForDayLabel("Full Body 2 — Push + Legs");
+    expect(slots).toContain("pulling");
+    expect(slots).toContain("pressing");
+    expect(slots).toContain("bilateral_quad");
+    const day = seedExercisesForDay("Full Body 1 — Pull + Legs");
+    expect(day).toHaveLength(SEEDED_EXERCISES_PER_DAY);
+  });
+});

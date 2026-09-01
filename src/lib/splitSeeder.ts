@@ -37,13 +37,14 @@ const PRESCRIPTION = { sets: 3, reps: "10", pct1RM: "N/A", tempo: "2-0-1-0", res
 
 const ORDER_PREFIXES = ["A1", "A2", "B1", "B2", "C1", "C2", "C3", "D"];
 
-/* Day-label keyword → slot categories. First match wins; 'upper' must
-   beat 'push'/'pull' ('Upper — Push Focus' is an Upper day). Unknown
-   labels ('Workout A', trainer customs) get the full-body default mix. */
+/* Day-label keyword → slot categories. First match wins; 'full' must beat
+   the focus suffix ('Full Body 2 — Push + Legs' is NOT a legs day — 65B
+   audit catch), and 'upper' must beat 'push'/'pull'. Unknown labels
+   ('Workout A', trainer customs) get the full-body default mix. */
 const LABEL_SLOTS: [RegExp, string[]][] = [
+  [/full/i, ["pressing", "pulling", "bilateral_quad", "posterior", "delt_scap", "bracing"]],
   [/upper/i, ["pressing", "pulling", "pressing", "pulling", "delt_scap", "biceps"]],
   [/lower|legs|squat|quad|hinge|deadlift|ham/i, ["bilateral_quad", "posterior", "unilateral_quad", "posterior", "bracing", "metcon_bracing"]],
-  [/full/i, ["pressing", "pulling", "bilateral_quad", "posterior", "delt_scap", "bracing"]],
   [/arm/i, ["biceps", "triceps", "biceps", "triceps", "delt_scap", "bracing"]],
   [/push|chest|shoulder/i, ["pressing", "pressing", "delt_scap", "triceps", "delt_scap", "bracing"]],
   [/pull|back/i, ["pulling", "pulling", "biceps", "pulling", "biceps", "bracing"]],

@@ -2590,9 +2590,10 @@ export default function AIProgramBuilderPage() {
   const goBack = () => setCurrentStep((s) => Math.max(0, s - 1));
 
   return (
-    // Dark-mode-only page: the data-theme="dark" wrapper forces the app's
-    // dark CSS vars (page/card/border + shadcn tokens) for the whole subtree.
-    <div data-theme="dark" className="min-h-screen bg-[var(--page-bg)] text-[var(--page-text)]">
+    // Phase 65B: the page is theme-native again (it used to force
+    // data-theme="dark" on this wrapper — every light-theme render was a
+    // dark leak). The document's own data-theme now drives all tokens.
+    <div className="min-h-screen bg-[var(--page-bg)] text-[var(--page-text)]">
       {/* Header */}
       <div className="border-b border-[var(--card-border)] bg-[var(--card-bg)] sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
