@@ -1707,7 +1707,7 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
       )}
       <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl overflow-hidden">
         {(tbl === 'full' || tbl === 'rich' || tbl === 'slim') && (
-          <div className={cn('grid gap-1 px-3 py-2 bg-[var(--page-bg)] border-b border-[var(--card-border)] text-[10px] text-[var(--page-text)]/60 font-semibold uppercase tracking-wider', tbl === 'slim' ? 'grid-cols-7' : 'grid-cols-9')}>
+          <div className={cn('hidden sm:grid gap-1 px-3 py-2 bg-[var(--page-bg)] border-b border-[var(--card-border)] text-[10px] text-[var(--page-text)]/60 font-semibold uppercase tracking-wider', tbl === 'slim' ? 'sm:grid-cols-7' : 'sm:grid-cols-9')}>
             <span>Code</span><span className="col-span-2">Exercise</span><span>Sets</span><span>Reps</span>
             {tbl !== 'slim' && <><span>%1RM</span><span>Tempo</span></>}
             <span>Rest</span><span className="text-right">Actions</span>
@@ -1720,63 +1720,89 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
             const patternFlag = patternFlagByIdx.get(idx);
             const groupBadge = exercise.supersetGroup ? groupLabels.get(exercise.supersetGroup) : undefined;
             const isLastOfGroup = !!exercise.supersetGroup && (idx === list.length - 1 || list[idx + 1]?.supersetGroup !== exercise.supersetGroup);
+            // 65B Item 3: name cell + actions are shared between the desktop
+            // grid row (sm+) and the stacked mobile row (<sm) — no duplication.
+            const nameInner = (
+              <>
+                {activeFlag && <ShieldAlert className={cn('w-3 h-3 shrink-0', activeFlag.severity === 'exclude' ? 'text-[#EF4444]' : 'text-[#F59E0B]')} />}
+                <span className="truncate">
+                  {exercise.name}
+                  {tbl === 'rich' && (() => { const m = findTaxonomyMatch(exercise.name, taxonomyIndex); return m ? <span className="block text-[9px] font-normal text-[var(--page-text)]/40 truncate">{[m.primary_muscle, m.secondary_muscle].filter(Boolean).join(' · ')}{m.equipment ? ` · ${m.equipment}` : ''}</span> : null; })()}
+                </span>
+                {patternFlag && (
+                  <button
+                    onClick={() => setChangeIdx(idx)}
+                    title="Movement pattern doesn't fit this day — click to change exercise"
+                    className="inline-flex items-center px-1.5 py-0.5 rounded-full border border-[#F59E0B]/50 text-[#F59E0B] text-[9px] font-bold shrink-0 hover:bg-[#F59E0B]/10 transition-colors"
+                  >
+                    {patternFlag}
+                  </button>
+                )}
+                {groupBadge && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border border-[var(--ai-violet)]/50 text-[var(--ai-violet)] text-[9px] font-bold shrink-0">
+                    <Link2 className="w-2.5 h-2.5" />{groupBadge}
+                  </span>
+                )}
+              </>
+            );
+            const actionBtns = (
+              <div className="flex justify-end gap-1 shrink-0">
+                <button onClick={() => toggleRow(idx)} className="p-1 rounded hover:bg-[var(--page-bg)] text-[var(--page-text)]/60 hover:text-[var(--page-text)] transition-colors"><Pencil className="w-3 h-3" /></button>
+                <button onClick={() => deleteExercise(idx)} className="p-1 rounded hover:bg-[#EF4444]/10 text-[var(--page-text)]/60 hover:text-[#EF4444] transition-colors"><Trash2 className="w-3 h-3" /></button>
+              </div>
+            );
             return (
             <motion.div key={`${exercise.code}-${idx}`} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className={cn(
               "border-b border-[var(--card-border)] last:border-b-0",
               activeFlag && (activeFlag.severity === 'exclude' ? 'border-l-2 border-l-[#EF4444]' : 'border-l-2 border-l-[#F59E0B]')
             )}>
-              <div className={cn(
-                (tbl === 'full' || tbl === 'rich') && 'grid grid-cols-9 gap-1 px-3 py-2 items-center text-xs',
-                tbl === 'slim' && 'grid grid-cols-7 gap-1 px-3 py-2 items-center text-xs',
-                tbl === 'list' && 'flex items-center gap-2 px-3 py-1.5 text-xs',
-                tbl === 'details' && 'flex items-center gap-2 px-3 py-1 text-xs',
-              )}>
-                <span className="text-[#00AEEF] font-mono font-bold shrink-0">{exercise.code}</span>
-                <span className={cn('text-[var(--page-text)] font-medium truncate flex items-center gap-1 min-w-0', (tbl === 'full' || tbl === 'rich' || tbl === 'slim') ? 'col-span-2' : 'flex-1')}>
-                  {activeFlag && <ShieldAlert className={cn('w-3 h-3 shrink-0', activeFlag.severity === 'exclude' ? 'text-[#EF4444]' : 'text-[#F59E0B]')} />}
-                  <span className="truncate">
-                    {exercise.name}
-                    {tbl === 'rich' && (() => { const m = findTaxonomyMatch(exercise.name, taxonomyIndex); return m ? <span className="block text-[9px] font-normal text-[var(--page-text)]/40 truncate">{[m.primary_muscle, m.secondary_muscle].filter(Boolean).join(' · ')}{m.equipment ? ` · ${m.equipment}` : ''}</span> : null; })()}
-                  </span>
-                  {patternFlag && (
-                    <button
-                      onClick={() => setChangeIdx(idx)}
-                      title="Movement pattern doesn't fit this day — click to change exercise"
-                      className="inline-flex items-center px-1.5 py-0.5 rounded-full border border-[#F59E0B]/50 text-[#F59E0B] text-[9px] font-bold shrink-0 hover:bg-[#F59E0B]/10 transition-colors"
-                    >
-                      {patternFlag}
-                    </button>
-                  )}
-                  {groupBadge && (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border border-[var(--ai-violet)]/50 text-[var(--ai-violet)] text-[9px] font-bold shrink-0">
-                      <Link2 className="w-2.5 h-2.5" />{groupBadge}
-                    </span>
-                  )}
-                </span>
-                {(tbl === 'full' || tbl === 'rich' || tbl === 'slim') && (
-                  <>
+              {tbl === 'list' || tbl === 'details' ? (
+                <div className={cn('flex items-center gap-2 px-3 text-xs', tbl === 'details' ? 'py-1' : 'py-1.5')}>
+                  <span className="text-[#00AEEF] font-mono font-bold shrink-0">{exercise.code}</span>
+                  <span className="text-[var(--page-text)] font-medium truncate flex items-center gap-1 min-w-0 flex-1">{nameInner}</span>
+                  {tbl === 'list' && <span className="text-[var(--page-text)]/50 shrink-0 font-mono text-[10px]">{exercise.sets}×{exercise.reps}</span>}
+                  {actionBtns}
+                </div>
+              ) : (
+                <>
+                  {/* desktop grid row (sm+) */}
+                  <div className={cn('hidden sm:grid gap-1 px-3 py-2 items-center text-xs', tbl === 'slim' ? 'sm:grid-cols-7' : 'sm:grid-cols-9')}>
+                    <span className="text-[#00AEEF] font-mono font-bold shrink-0">{exercise.code}</span>
+                    <span className="col-span-2 text-[var(--page-text)] font-medium truncate flex items-center gap-1 min-w-0">{nameInner}</span>
                     <span className="text-[var(--page-text)]/60">{exercise.sets}</span>
                     <span className="text-[var(--page-text)]/60">{exercise.reps}</span>
-                  </>
-                )}
-                {(tbl === 'full' || tbl === 'rich') && (
-                  <>
-                    <span className="text-[var(--page-text)]/60 font-mono">{exercise.pct1RM}</span>
-                    <span className="text-[var(--ai-violet)] font-mono">{exercise.tempo}</span>
-                  </>
-                )}
-                {tbl === 'list' && <span className="text-[var(--page-text)]/50 shrink-0 font-mono text-[10px]">{exercise.sets}×{exercise.reps}</span>}
-                {(tbl === 'full' || tbl === 'rich' || tbl === 'slim') && (
-                  <span className="text-[#F59E0B] font-mono">
-                    {exercise.rest}
-                    {isLastOfGroup && groupBadge && <span className="block text-[8px] font-sans">Rest after group</span>}
-                  </span>
-                )}
-                <div className="flex justify-end gap-1 shrink-0">
-                  <button onClick={() => toggleRow(idx)} className="p-1 rounded hover:bg-[var(--page-bg)] text-[var(--page-text)]/60 hover:text-[var(--page-text)] transition-colors"><Pencil className="w-3 h-3" /></button>
-                  <button onClick={() => deleteExercise(idx)} className="p-1 rounded hover:bg-[#EF4444]/10 text-[var(--page-text)]/60 hover:text-[#EF4444] transition-colors"><Trash2 className="w-3 h-3" /></button>
-                </div>
-              </div>
+                    {(tbl === 'full' || tbl === 'rich') && (
+                      <>
+                        <span className="text-[var(--page-text)]/60 font-mono">{exercise.pct1RM}</span>
+                        <span className="text-[var(--ai-violet)] font-mono">{exercise.tempo}</span>
+                      </>
+                    )}
+                    <span className="text-[#F59E0B] font-mono">
+                      {exercise.rest}
+                      {isLastOfGroup && groupBadge && <span className="block text-[8px] font-sans">Rest after group</span>}
+                    </span>
+                    {actionBtns}
+                  </div>
+                  {/* stacked mobile row (<sm) — line 1 code/name/actions, line 2 stats */}
+                  <div className="sm:hidden px-3 py-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[#00AEEF] font-mono font-bold shrink-0">{exercise.code}</span>
+                      <span className="text-[var(--page-text)] font-medium truncate flex items-center gap-1 min-w-0 flex-1">{nameInner}</span>
+                      {actionBtns}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[var(--page-text)]/60">
+                      <span>{exercise.sets} sets</span>
+                      <span>{exercise.reps} reps</span>
+                      {(tbl === 'full' || tbl === 'rich') && <span className="font-mono">{exercise.pct1RM}</span>}
+                      {(tbl === 'full' || tbl === 'rich') && <span className="font-mono text-[var(--ai-violet)]">{exercise.tempo}</span>}
+                      <span className="font-mono text-[#F59E0B]">
+                        {exercise.rest}
+                        {isLastOfGroup && groupBadge && <span className="font-sans"> (after group)</span>}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
               <AnimatePresence>
                 {openRows[idx] && (
                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
