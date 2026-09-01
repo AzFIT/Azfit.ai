@@ -15,7 +15,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Loader2, Layers, ArrowLeftRight, Library } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useExerciseTaxonomy } from "@/hooks/useExerciseTaxonomy";
-import { similarExercises } from "@/lib/exerciseTaxonomy";
+import {
+  buildTaxonomyIndex,
+  findTaxonomyMatch,
+  patternForExercise,
+  similarExercises,
+  PATTERN_LABEL,
+} from "@/lib/exerciseTaxonomy";
 
 export interface ChangeDayOption {
   dayKey: number;
@@ -61,6 +67,14 @@ export default function ExerciseChangeDialog({
     [tab, currentName, rows, weekNames, dayLabel],
   );
   const unmatched = suggestions.length > 0 && !suggestions[0].matched;
+  // Two honest unmatched cases: the name isn't in the library, or it IS but
+  // its pattern doesn't fit this day (the flagged-chip case) — the note must
+  // say which one the trainer is looking at.
+  const flaggedMatch = useMemo(() => {
+    if (!unmatched) return null;
+    const m = findTaxonomyMatch(currentName, buildTaxonomyIndex(rows));
+    return m ? patternForExercise(m.primary_muscle, m.secondary_muscle) : null;
+  }, [unmatched, currentName, rows]);
   const swapDay = otherDays.find((d) => d.dayKey === swapDayKey) ?? otherDays[0];
   const dayShort = dayLabel.split("—")[0].trim() || "this day";
 
@@ -139,7 +153,9 @@ export default function ExerciseChangeDialog({
                   <>
                     {unmatched && (
                       <p className="py-2 text-[10px] text-[var(--page-text)]/50">
-                        "{currentName}" isn't in the exercise library — showing exercises that fit {dayShort} instead.
+                        {flaggedMatch
+                          ? `"${currentName}" is a ${PATTERN_LABEL[flaggedMatch]} movement — these fit ${dayShort} better:`
+                          : `"${currentName}" isn't in the exercise library — showing exercises that fit ${dayShort} instead.`}
                       </p>
                     )}
                     <ul className="divide-y divide-[var(--card-border)]">

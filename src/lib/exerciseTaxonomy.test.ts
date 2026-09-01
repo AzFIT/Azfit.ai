@@ -135,4 +135,16 @@ describe("similarExercises (Change exercise → Similar)", () => {
     expect(out.map((c) => c.row.name)).toContain("Flat BB Bench Press");
     expect(out.map((c) => c.row.name)).not.toContain("Barbell Row");
   });
+
+  it("flagged case: a day-incompatible current exercise gets day-fitting replacements, not 'similar' pulls", () => {
+    // Barbell Row IS in the library — but on a Push day the useful list is
+    // push-pattern replacements, not other rows.
+    const out = similarExercises("Barbell Row", library, { fallbackDayLabel: "Push — Chest/Shoulders/Tris" });
+    expect(out.length).toBeGreaterThan(0);
+    expect(out.every((c) => !c.matched)).toBe(true);
+    expect(out.map((c) => c.row.name)).toContain("Flat BB Bench Press");
+    expect(out.map((c) => c.row.name)).not.toContain("T Bar Row");
+    // without a day label the same call returns true similarity (unchanged behavior)
+    expect(similarExercises("Barbell Row", library)[0].matched).toBe(true);
+  });
 });

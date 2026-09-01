@@ -156,6 +156,12 @@ function equipmentTokens(equipment: string | null): string[] {
  * equipment token (+15) > same exercise type (+5). A bare equipment/type
  * match never qualifies on its own. Names already used in the program
  * week (excludedNames) and the current exercise itself are filtered out.
+ *
+ * fallbackDayLabel changes the shape in two honest cases, both returning
+ * matched=false (a "fits this day" list, never a fake similarity ranking):
+ *  - the current name isn't in the library at all, or
+ *  - it IS, but its pattern doesn't fit the day (the flagged-chip case —
+ *    "similar to a Barbell Row" is exactly what a Push day does NOT need).
  */
 export function similarExercises(
   currentName: string,
@@ -167,9 +173,14 @@ export function similarExercises(
   const current = findTaxonomyMatch(currentName, index);
   const excluded = new Set((opts.excludedNames ?? []).map(normalizeExerciseName));
   excluded.add(normalizeExerciseName(currentName));
+  const dayLabel = opts.fallbackDayLabel;
 
-  if (!current) {
-    const dayLabel = opts.fallbackDayLabel;
+  const currentFitsDay =
+    current && dayLabel
+      ? isPatternCompatible(dayLabel, patternForExercise(current.primary_muscle, current.secondary_muscle))
+      : true;
+
+  if (!current || !currentFitsDay) {
     return rows
       .filter((r) => !excluded.has(normalizeExerciseName(r.name)))
       .filter((r) =>
