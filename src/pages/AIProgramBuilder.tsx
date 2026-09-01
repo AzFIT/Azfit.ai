@@ -64,6 +64,9 @@ import ExerciseChangeDialog from '@/components/exercise/ExerciseChangeDialog';
 import { useViewMode } from '@/hooks/useViewMode';
 import ViewModeSwitch from '@/components/program-creator/ViewModeSwitch';
 import { tileGridClass, rowGridClass, type ViewMode } from '@/lib/viewMode';
+import { exampleWeekForMethod } from '@/lib/methodWeek';
+import { programUsesMethod, entryVolumeKg, summarizeMethodHistory, type MethodHistorySummary, type MethodSessionVolume } from '@/lib/methodHistory';
+import { formatVolumeKg } from '@/lib/dashboardBento';
 import { saveDraft, loadDraft, clearDraft } from '@/lib/draftStore';
 import DraftBanner from '@/components/DraftBanner';
 
@@ -110,7 +113,7 @@ export interface ProgramExercise { code: string; name: string; sets: number; rep
 // Phase 56: goal → goals (multi-select; goals[0] is the primary for generation mapping)
 export interface ProgramData { id?: string; goals: string[]; method: string; clientContext: ClientContext; phases: ProgramPhase[]; weeklyHours: number; split: ProgramSplit[]; exercises: ProgramExercise[]; workoutExercises?: Record<number, ProgramExercise[]>; progressionRules: ProgressionRule[]; programName: string; description: string; tags: string[]; isPublic: boolean; assignedClient: string; }
 export interface SavedProgram { id: string; createdAt: string; updatedAt: string; data: ProgramData; }
-interface StepProps { data: ProgramData; updateData: (partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => void; onSave?: () => void; onSaveAndAssign?: () => void; program?: GeneratedProgram | null; clientName?: string; clients?: ClientRow[]; saving?: boolean; limitations?: string[]; dbMethods?: DbMethod[]; methodCategories?: DbMethodCategory[]; goalScores?: { method_id: string; score: number }[]; methodsLoading?: boolean; methodsError?: string | null; customGoals?: DbGoal[]; onAddGoal?: (name: string) => Promise<void>; onArchiveGoal?: (id: string) => Promise<void>; }
+interface StepProps { data: ProgramData; updateData: (partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => void; onSave?: () => void; onSaveAndAssign?: () => void; program?: GeneratedProgram | null; clientName?: string; clients?: ClientRow[]; saving?: boolean; limitations?: string[]; dbMethods?: DbMethod[]; methodCategories?: DbMethodCategory[]; goalScores?: { method_id: string; score: number }[]; methodsLoading?: boolean; methodsError?: string | null; customGoals?: DbGoal[]; onAddGoal?: (name: string) => Promise<void>; onArchiveGoal?: (id: string) => Promise<void>; buildForClientId?: string; }
 
 type ClientRow = Database['public']['Tables']['clients']['Row'];
 type ProgramRow = Database['public']['Tables']['programs']['Row'];
@@ -620,9 +623,67 @@ function Step1Goal({ data, updateData, customGoals = [], onAddGoal, onArchiveGoa
   );
 }
 
-function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], goalScores = [], methodsLoading, methodsError, customGoals = [] }: StepProps) {
+function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], goalScores = [], methodsLoading, methodsError, customGoals = [], buildForClientId }: StepProps) {
   const [drawerMethod, setDrawerMethod] = useState<RankedMethod | null>(null);
   const [mode, setMode] = useViewMode('method');
+  // Phase 65B Item 5: the drawer's client-history panel (real Supabase data —
+  // programs carrying phases[].method = slug → their completed workout_logs).
+  const [methodHistory, setMethodHistory] = useState<MethodHistorySummary | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  useEffect(() => {
+    if (!drawerMethod || !buildForClientId) return;
+    let cancelled = false;
+    (async () => {
+      setHistoryLoading(true);
+      try {
+        const { data: progs } = await supabase.from('programs').select('id, phases').eq('client_id', buildForClientId);
+        const programIds = ((progs as { id: string; phases: unknown }[] | null) ?? [])
+          .filter((p) => programUsesMethod(p.phases, drawerMethod.slug))
+          .map((p) => p.id);
+        let sessions: MethodSessionVolume[] = [];
+        if (programIds.length > 0) {
+          const { data: logs } = await supabase
+            .from('workout_logs')
+            .select('id, completed_at')
+            .eq('client_id', buildForClientId)
+            .in('program_id', programIds)
+            .not('completed_at', 'is', null);
+          const logRows = (logs as { id: string; completed_at: string }[] | null) ?? [];
+          const logIds = logRows.map((l) => l.id);
+          const volByLog = new Map<string, number>();
+          if (logIds.length > 0) {
+            const { data: entries } = await supabase
+              .from('workout_log_entries')
+              .select('workout_log_id, weight_per_set, reps_per_set')
+              .in('workout_log_id', logIds);
+            for (const e of (entries as { workout_log_id: string; weight_per_set: unknown; reps_per_set: unknown }[] | null) ?? []) {
+              volByLog.set(e.workout_log_id, (volByLog.get(e.workout_log_id) ?? 0) + entryVolumeKg(e));
+            }
+          }
+          sessions = logRows.map((l) => ({ completedAt: l.completed_at, volumeKg: volByLog.get(l.id) ?? 0 }));
+        }
+        if (!cancelled) {
+          setMethodHistory(summarizeMethodHistory(sessions));
+          setHistoryLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setMethodHistory(null);
+          setHistoryLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [drawerMethod, buildForClientId]);
+  // Drawer close paths all reset the history panel (repo lint rule bans
+  // setState-in-effect for the reset — it happens on user action instead).
+  const closeDrawer = () => {
+    setDrawerMethod(null);
+    setMethodHistory(null);
+    setHistoryLoading(false);
+  };
   // Phase 56 Item 2: metadata filter chips (positive-match-only — a method
   // lacking that metadata dimension always stays visible)
   const [expChips, setExpChips] = useState<string[]>([]);
@@ -821,7 +882,7 @@ function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], 
       {/* Method detail drawer */}
       <AnimatePresence>
         {drawerMethod && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm" onClick={() => setDrawerMethod(null)}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm" onClick={closeDrawer}>
             <motion.div
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
@@ -835,7 +896,7 @@ function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], 
                   <h3 className="text-[var(--page-text)] text-lg font-bold">{drawerMethod.name}</h3>
                   <p className="text-[var(--page-text)]/60 text-xs mt-0.5">{drawerMethod.category}</p>
                 </div>
-                <button onClick={() => setDrawerMethod(null)} className="p-1.5 rounded-lg hover:bg-[var(--page-bg)] text-[var(--page-text)]/60 hover:text-[var(--page-text)] transition-colors"><X className="w-4 h-4" /></button>
+                <button onClick={closeDrawer} className="p-1.5 rounded-lg hover:bg-[var(--page-bg)] text-[var(--page-text)]/60 hover:text-[var(--page-text)] transition-colors"><X className="w-4 h-4" /></button>
               </div>
               {drawerMethod.score != null && (
                 <p className="text-xs mb-3"><span className="text-[var(--page-text)]/60">Score{goalName ? ` for ${goalName}` : ''}: </span><span className="font-mono text-[#00AEEF] font-bold">{drawerMethod.score.toFixed(1)}</span></p>
@@ -873,12 +934,60 @@ function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], 
                   </div>
                 );
               })()}
+              {/* Phase 65B Item 5: example draft week, derived from the method
+                  defaults (curated presentation of real jsonb — nothing invented) */}
+              {(() => {
+                const d = parseMethodDefaults(drawerMethod.defaults);
+                if (!d) return null;
+                return (
+                  <div className="mb-5 rounded-xl border border-[var(--card-border)] bg-[var(--page-bg)] p-3">
+                    <p className="text-[11px] font-bold text-[var(--page-text)] mb-2">
+                      Example week <span className="font-normal text-[var(--page-text)]/50">— drafted from the method defaults</span>
+                    </p>
+                    <ul className="space-y-1">
+                      {exampleWeekForMethod(d).map((s) => (
+                        <li key={s.day} className="flex items-baseline gap-2 text-[11px]">
+                          <span className="w-8 shrink-0 font-semibold text-[#00AEEF]">{s.day}</span>
+                          <span className="text-[var(--page-text)] font-medium shrink-0">{s.label}</span>
+                          <span className="text-[var(--page-text)]/50 truncate">{s.detail}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {d.idealFor.length > 0 && (
+                      <p className="mt-2 text-[10px] text-[var(--page-text)]/60">
+                        <span className="font-semibold text-[#22C55E]">Recommended for (guidance):</span> {d.idealFor.join(", ")}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+              {/* Phase 65B Item 5: client history with this method (real data only) */}
+              <div className="mb-5 rounded-xl border border-[var(--card-border)] p-3">
+                <p className="text-[11px] font-bold text-[var(--page-text)] mb-1.5">Client history with this method</p>
+                {!buildForClientId ? (
+                  <p className="text-[10px] text-[var(--page-text)]/50">Generic template selected — no client history to show. Pick a client in “Build for client” to see theirs.</p>
+                ) : historyLoading ? (
+                  <p className="text-[10px] text-[var(--page-text)]/50">Loading history…</p>
+                ) : !methodHistory || methodHistory.sessionsCompleted === 0 ? (
+                  <p className="text-[10px] text-[var(--page-text)]/50">No history yet for this client.</p>
+                ) : (
+                  <div className="text-[11px] text-[var(--page-text)]/80 space-y-0.5">
+                    <p>{methodHistory.sessionsCompleted} session{methodHistory.sessionsCompleted > 1 ? "s" : ""} completed with this method.</p>
+                    {methodHistory.volumeChangePct != null && methodHistory.firstVolumeKg != null && methodHistory.lastVolumeKg != null && (
+                      <p>
+                        Volume {methodHistory.volumeChangePct >= 0 ? "+" : ""}{methodHistory.volumeChangePct}% first → last session
+                        ({formatVolumeKg(methodHistory.firstVolumeKg) ?? "0 kg"} → {formatVolumeKg(methodHistory.lastVolumeKg) ?? "0 kg"}).
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
               <div className="flex flex-wrap gap-1.5 mb-5">
                 {templateTagLabels(drawerMethod.tags).map((l) => (
                   <span key={l} className="px-2 py-0.5 rounded-full text-[10px] border border-[var(--card-border)] text-[var(--page-text)]/60">{l}</span>
                 ))}
               </div>
-              <Button onClick={() => { selectMethod(drawerMethod); setDrawerMethod(null); }} className="w-full bg-gradient-to-r from-[#00AEEF] to-[var(--ai-violet)] text-white font-semibold">
+              <Button onClick={() => { selectMethod(drawerMethod); closeDrawer(); }} className="w-full bg-gradient-to-r from-[#00AEEF] to-[var(--ai-violet)] text-white font-semibold">
                 Select This Method
               </Button>
             </motion.div>
@@ -2897,7 +3006,7 @@ export default function AIProgramBuilderPage() {
         <WizardNavBar currentStep={currentStep} saving={saving} isFinalStep={isFinalStep} canProceed={!!stepComplete[currentStep]} onBack={goBack} onNext={goNext} className="mb-4" />
         <AnimatePresence mode="wait">
           <motion.div key={currentStep} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.2 }}>
-            <CurrentComponent data={data} updateData={updateData} program={program} onSave={handleSave} onSaveAndAssign={handleSaveAndAssign} clientName={selectedClientName} clients={clients} saving={saving} limitations={wizardLimitations} dbMethods={dbMethods} methodCategories={methodCategories} goalScores={goalScores} methodsLoading={methodsLoading} methodsError={methodsError} customGoals={dbGoals} onAddGoal={handleAddGoal} onArchiveGoal={handleArchiveGoal} />
+            <CurrentComponent data={data} updateData={updateData} program={program} onSave={handleSave} onSaveAndAssign={handleSaveAndAssign} clientName={selectedClientName} clients={clients} saving={saving} limitations={wizardLimitations} dbMethods={dbMethods} methodCategories={methodCategories} goalScores={goalScores} methodsLoading={methodsLoading} methodsError={methodsError} customGoals={dbGoals} onAddGoal={handleAddGoal} onArchiveGoal={handleArchiveGoal} buildForClientId={buildForClient || undefined} />
           </motion.div>
         </AnimatePresence>
 
