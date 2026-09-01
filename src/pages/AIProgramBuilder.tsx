@@ -12,6 +12,7 @@ import {
   Dumbbell, TrendingUp, Flame, Wind, HeartPulse, Pencil, Trash2,
   Plus, BarChart3, X, Target, Award, Sparkles, GripVertical,
   AlertTriangle, Layers, Calendar, Users, Play, ArrowLeft, Upload, ShieldAlert, Loader2, Copy, Link2, Printer,
+  ChevronUp, ChevronDown, type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -60,6 +61,9 @@ import { seedExercisesForDay, seedExercisesForSplit, reconcileWorkoutExercises, 
 import { buildTaxonomyIndex, findTaxonomyMatch, patternForExercise, isPatternCompatible, PATTERN_LABEL } from '@/lib/exerciseTaxonomy';
 import { useExerciseTaxonomy } from '@/hooks/useExerciseTaxonomy';
 import ExerciseChangeDialog from '@/components/exercise/ExerciseChangeDialog';
+import { useViewMode } from '@/hooks/useViewMode';
+import ViewModeSwitch from '@/components/program-creator/ViewModeSwitch';
+import { tileGridClass, rowGridClass, type ViewMode } from '@/lib/viewMode';
 import { saveDraft, loadDraft, clearDraft } from '@/lib/draftStore';
 import DraftBanner from '@/components/DraftBanner';
 
@@ -457,8 +461,84 @@ function goalNamesFor(goals: string[], customGoals: DbGoal[]): string[] {
     .filter((n): n is string => !!n);
 }
 
+/* Phase 65B Item 2 — one goal tile rendered in all 5 view modes.
+   LARGE gets a branded gradient header (built from the goal accent +
+   theme tokens — the documented no-photo fallback; never hotlinked images). */
+function GoalTileView({
+  name,
+  desc,
+  color,
+  icon: Icon,
+  selected,
+  primary,
+  mode,
+  onToggle,
+}: {
+  name: string;
+  desc: string;
+  color: string;
+  icon: LucideIcon;
+  selected: boolean;
+  primary: boolean;
+  mode: ViewMode;
+  onToggle: () => void;
+}) {
+  const selectedCls = selected
+    ? 'border-[#00AEEF] bg-[#00AEEF]/5 shadow-lg shadow-[#00AEEF]/10'
+    : 'border-[var(--card-border)] bg-[var(--card-bg)] hover:border-[var(--azfit-primary)]/50 hover:bg-[var(--page-bg)]';
+  const checkbox = (
+    <span className={cn('rounded border flex items-center justify-center transition-colors shrink-0', mode === 'details' ? 'w-4 h-4' : 'w-5 h-5', selected ? 'bg-[#00AEEF] border-[#00AEEF]' : 'border-[var(--card-border)] bg-[var(--page-bg)]')}>
+      {selected && <Check className={cn('text-white', mode === 'details' ? 'w-2.5 h-2.5' : 'w-3 h-3')} />}
+    </span>
+  );
+  const iconBlock = (size: string) => (
+    <span className={cn('rounded-lg flex items-center justify-center shrink-0', size)} style={{ backgroundColor: `${color}20`, border: `1px solid ${color}40` }}>
+      <Icon className={cn(size === 'w-7 h-7' ? 'w-3.5 h-3.5' : 'w-5 h-5')} style={{ color }} />
+    </span>
+  );
+  const primaryChip = primary ? <span className="text-[8px] font-bold uppercase tracking-wide text-[var(--ai-violet)]">Primary</span> : null;
+
+  if (mode === 'details') {
+    return (
+      <button onClick={onToggle} className={cn('flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left transition-all', selectedCls)}>
+        {checkbox}
+        <span className="text-xs font-medium text-[var(--page-text)] truncate flex-1">{name}</span>
+        {primaryChip}
+      </button>
+    );
+  }
+  if (mode === 'list') {
+    return (
+      <button onClick={onToggle} className={cn('flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all', selectedCls)}>
+        {iconBlock('w-7 h-7')}
+        <span className="text-xs font-semibold text-[var(--page-text)] truncate flex-1">{name}</span>
+        {primaryChip}
+        {checkbox}
+      </button>
+    );
+  }
+  return (
+    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onToggle} className={cn('relative flex flex-col items-start rounded-xl border-2 transition-all text-left overflow-hidden', mode === 'large' ? '' : 'p-4', selectedCls)}>
+      {mode === 'large' && (
+        <div className="w-full h-20 flex items-end p-3" style={{ background: `linear-gradient(135deg, ${color}30, transparent), var(--card-bg)` }}>
+          {iconBlock('w-10 h-10')}
+        </div>
+      )}
+      <div className={cn('w-full', mode === 'large' && 'p-4 pt-3')}>
+        <div className={cn('flex w-full', mode === 'small' ? 'justify-end mb-1.5' : 'items-center justify-between mb-2', mode === 'large' && 'mb-1.5')}>
+          {mode === 'medium' && iconBlock('w-10 h-10')}
+          <span className="flex items-center gap-1.5">{primaryChip}{checkbox}</span>
+        </div>
+        <h4 className="text-[var(--page-text)] font-semibold text-sm mb-1">{name}</h4>
+        {mode !== 'small' && <p className="text-[var(--page-text)]/60 text-xs leading-relaxed">{desc}</p>}
+      </div>
+    </motion.button>
+  );
+}
+
 function Step1Goal({ data, updateData, customGoals = [], onAddGoal, onArchiveGoal }: StepProps) {
   // Phase 56: multi-select tiles — goals[0] is the primary (generation mapping).
+  const [mode, setMode] = useViewMode('goal');
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -481,36 +561,38 @@ function Step1Goal({ data, updateData, customGoals = [], onAddGoal, onArchiveGoa
   };
   return (
     <div className="space-y-4">
-      <p className="text-[var(--page-text)]/60 text-xs">Select one or more goals — the first selected is the primary.</p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {GOALS.map((goal) => { const Icon = goal.icon; const isSelected = data.goals.includes(goal.id); const isPrimary = data.goals[0] === goal.id; return (
-          <motion.button key={goal.id} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => toggleGoal(goal.id)} className={cn('relative flex flex-col items-start p-4 rounded-xl border-2 transition-all text-left', isSelected ? 'border-[#00AEEF] bg-[#00AEEF]/5 shadow-lg shadow-[#00AEEF]/10' : 'border-[var(--card-border)] bg-[var(--card-bg)] hover:border-[var(--azfit-primary)]/50 hover:bg-[var(--page-bg)]')}>
-            <div className="flex items-center justify-between w-full mb-2">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${goal.color}20`, border: `1px solid ${goal.color}40` }}><Icon className="w-5 h-5" style={{ color: goal.color }} /></div>
-              <div className="flex items-center gap-1.5">
-                {isPrimary && <span className="text-[8px] font-bold uppercase tracking-wide text-[var(--ai-violet)]">Primary</span>}
-                <div className={cn('w-5 h-5 rounded border flex items-center justify-center transition-colors', isSelected ? 'bg-[#00AEEF] border-[#00AEEF]' : 'border-[var(--card-border)] bg-[var(--page-bg)]')}>{isSelected && <Check className="w-3 h-3 text-white" />}</div>
-              </div>
-            </div>
-            <h4 className="text-[var(--page-text)] font-semibold text-sm mb-1">{goal.name}</h4>
-            <p className="text-[var(--page-text)]/60 text-xs leading-relaxed">{goal.desc}</p>
-          </motion.button>
-        ); })}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[var(--page-text)]/60 text-xs">Select one or more goals — the first selected is the primary.</p>
+        <ViewModeSwitch mode={mode} onChange={setMode} />
+      </div>
+      <div className={tileGridClass(mode)}>
+        {GOALS.map((goal) => (
+          <GoalTileView
+            key={goal.id}
+            name={goal.name}
+            desc={goal.desc}
+            color={goal.color}
+            icon={goal.icon}
+            selected={data.goals.includes(goal.id)}
+            primary={data.goals[0] === goal.id}
+            mode={mode}
+            onToggle={() => toggleGoal(goal.id)}
+          />
+        ))}
         {/* Custom DB goals (is_active) — visible to all trainers */}
-        {activeCustom.map((g) => { const tid = customGoalId(g.slug); const isSelected = data.goals.includes(tid); const isPrimary = data.goals[0] === tid; return (
+        {activeCustom.map((g) => { const tid = customGoalId(g.slug); return (
           <div key={g.id} className="relative">
-            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => toggleGoal(tid)} className={cn('relative flex w-full flex-col items-start p-4 rounded-xl border-2 transition-all text-left', isSelected ? 'border-[#00AEEF] bg-[#00AEEF]/5 shadow-lg shadow-[#00AEEF]/10' : 'border-[var(--card-border)] bg-[var(--card-bg)] hover:border-[var(--azfit-primary)]/50 hover:bg-[var(--page-bg)]')}>
-              <div className="flex items-center justify-between w-full mb-2">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#00AEEF20', border: '1px solid #00AEEF40' }}><Target className="w-5 h-5" style={{ color: '#00AEEF' }} /></div>
-                <div className="flex items-center gap-1.5">
-                  {isPrimary && <span className="text-[8px] font-bold uppercase tracking-wide text-[var(--ai-violet)]">Primary</span>}
-                  <div className={cn('w-5 h-5 rounded border flex items-center justify-center transition-colors', isSelected ? 'bg-[#00AEEF] border-[#00AEEF]' : 'border-[var(--card-border)] bg-[var(--page-bg)]')}>{isSelected && <Check className="w-3 h-3 text-white" />}</div>
-                </div>
-              </div>
-              <h4 className="text-[var(--page-text)] font-semibold text-sm mb-1">{g.name}</h4>
-              <p className="text-[var(--page-text)]/60 text-xs leading-relaxed">Custom goal</p>
-            </motion.button>
-            {onArchiveGoal && (
+            <GoalTileView
+              name={g.name}
+              desc="Custom goal"
+              color="#00AEEF"
+              icon={Target}
+              selected={data.goals.includes(tid)}
+              primary={data.goals[0] === tid}
+              mode={mode}
+              onToggle={() => toggleGoal(tid)}
+            />
+            {onArchiveGoal && mode !== 'details' && mode !== 'list' && (
               <button
                 onClick={() => onArchiveGoal(g.id)}
                 aria-label={`Archive ${g.name}`}
@@ -540,6 +622,7 @@ function Step1Goal({ data, updateData, customGoals = [], onAddGoal, onArchiveGoa
 
 function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], goalScores = [], methodsLoading, methodsError, customGoals = [] }: StepProps) {
   const [drawerMethod, setDrawerMethod] = useState<RankedMethod | null>(null);
+  const [mode, setMode] = useViewMode('method');
   // Phase 56 Item 2: metadata filter chips (positive-match-only — a method
   // lacking that metadata dimension always stays visible)
   const [expChips, setExpChips] = useState<string[]>([]);
@@ -596,6 +679,10 @@ function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], 
         </div>
       ) : (
         <>
+          {/* Phase 65B Item 2: view switcher for the method card grid */}
+          <div className="flex items-center justify-end">
+            <ViewModeSwitch mode={mode} onChange={setMode} />
+          </div>
           {/* Phase 56 Item 2: filter chips */}
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-1.5">
@@ -643,43 +730,85 @@ function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], 
           {groups.map((group) => (
             <div key={group.category}>
               <h4 className="text-[var(--page-text)]/60 text-xs font-semibold uppercase tracking-wider mb-2">{group.category}</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+              {/* Phase 65B Item 2: all 5 view modes; Item 5: defaults chips on
+                  Medium+Large ('number of exercises' has no honest source in
+                  methods.defaults — omitted, never fabricated). */}
+              <div className={tileGridClass(mode)}>
                 {group.methods.map((method) => {
                   const isSelected = data.method === method.slug;
                   const isBest = best?.id === method.id;
                   const labels = templateTagLabels(method.tags);
                   const d = parseMethodDefaults(method.defaults);
+                  const selectedCls = isSelected
+                    ? 'border-[var(--ai-violet)] bg-[var(--ai-violet)]/5 shadow-lg shadow-[var(--ai-violet)]/10'
+                    : 'border-[var(--card-border)] bg-[var(--card-bg)] hover:border-[var(--azfit-primary)]/50';
+                  const checkbox = (
+                    <span className={cn('rounded border flex items-center justify-center transition-colors shrink-0', mode === 'details' ? 'w-4 h-4' : 'w-5 h-5', isSelected ? 'bg-[var(--ai-violet)] border-[var(--ai-violet)]' : 'border-[var(--card-border)] bg-[var(--page-bg)]')}>
+                      {isSelected && <Check className={cn('text-white', mode === 'details' ? 'w-2.5 h-2.5' : 'w-3 h-3')} />}
+                    </span>
+                  );
+                  if (mode === 'details') {
+                    return (
+                      <button key={method.id} onClick={() => setDrawerMethod(method)} className={cn('flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left transition-all', selectedCls)}>
+                        {checkbox}
+                        <span className="text-xs font-medium text-[var(--page-text)] truncate flex-1">{method.name}</span>
+                        {isBest && <span className="text-[9px] font-bold text-[#22C55E] shrink-0">Best</span>}
+                      </button>
+                    );
+                  }
+                  if (mode === 'list') {
+                    return (
+                      <button key={method.id} onClick={() => setDrawerMethod(method)} className={cn('flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all', selectedCls)}>
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d ? INTENSITY_HEX[d.intensityColor] : 'var(--card-border)' }} />
+                        <span className="text-xs font-semibold text-[var(--page-text)] truncate flex-1">{method.name}</span>
+                        {isBest && <span className="text-[9px] font-bold text-[#22C55E] shrink-0">Best Match</span>}
+                        {checkbox}
+                      </button>
+                    );
+                  }
+                  const headerColor = d ? INTENSITY_HEX[d.intensityColor] : '#00AEEF';
                   return (
-                    <motion.button key={method.id} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setDrawerMethod(method)} className={cn('flex flex-col items-start p-4 rounded-xl border-2 transition-all text-left', isSelected ? 'border-[var(--ai-violet)] bg-[var(--ai-violet)]/5 shadow-lg shadow-[var(--ai-violet)]/10' : 'border-[var(--card-border)] bg-[var(--card-bg)] hover:border-[var(--azfit-primary)]/50')}
-                      style={d ? { borderLeftColor: INTENSITY_HEX[d.intensityColor], borderLeftWidth: 4 } : undefined}>
-                      <div className="flex items-center justify-between w-full mb-2 gap-2">
-                        <Badge variant="outline" className="text-[10px] border-[var(--card-border)] text-[var(--page-text)]/60 truncate">{method.category}</Badge>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {d && (
-                            <span className="flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border" style={{ borderColor: `${INTENSITY_HEX[d.intensityColor]}60`, color: INTENSITY_HEX[d.intensityColor], backgroundColor: `${INTENSITY_HEX[d.intensityColor]}15` }}>
-                              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: INTENSITY_HEX[d.intensityColor] }} />
-                              {d.goalTag}
-                            </span>
-                          )}
-                          {isBest && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#22C55E]/15 text-[#22C55E] border border-[#22C55E]/40">Best Match</span>}
-                          <div className={cn('w-5 h-5 rounded border flex items-center justify-center transition-colors', isSelected ? 'bg-[var(--ai-violet)] border-[var(--ai-violet)]' : 'border-[var(--card-border)] bg-[var(--page-bg)]')}>{isSelected && <Check className="w-3 h-3 text-white" />}</div>
+                    <motion.button key={method.id} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setDrawerMethod(method)} className={cn('flex flex-col items-start rounded-xl border-2 transition-all text-left overflow-hidden', mode === 'large' ? '' : 'p-4', selectedCls)}
+                      style={d && mode !== 'large' ? { borderLeftColor: INTENSITY_HEX[d.intensityColor], borderLeftWidth: 4 } : undefined}>
+                      {mode === 'large' && (
+                        <div className="w-full h-16 flex items-end p-3" style={{ background: `linear-gradient(135deg, ${headerColor}30, transparent), var(--card-bg)` }}>
+                          <Badge variant="outline" className="text-[10px] border-[var(--card-border)] text-[var(--page-text)]/60 truncate bg-[var(--card-bg)]/70">{method.category}</Badge>
                         </div>
-                      </div>
-                      <h4 className="text-[var(--page-text)] font-semibold text-sm mb-1">{method.name}</h4>
-                      {method.description && <p className="text-[var(--page-text)]/60 text-xs mb-2 line-clamp-2">{method.description}</p>}
-                      {d && (
-                        <p className="text-[var(--page-text)]/50 text-[10px] mb-1">
-                          {d.setsReps} · {d.durationWeeks}w · {d.frequencyPerWeek}×/week
-                        </p>
                       )}
-                      <div className="flex flex-wrap gap-1 mt-auto pt-1">
-                        {labels.slice(0, 3).map((l) => (
-                          <span key={l} className="px-1.5 py-0.5 rounded-full text-[9px] border border-[var(--card-border)] text-[var(--page-text)]/50">{l}</span>
-                        ))}
+                      <div className={cn('w-full flex flex-col flex-1', mode === 'large' && 'p-4 pt-3')}>
+                        <div className="flex items-center justify-between w-full mb-2 gap-2">
+                          {mode !== 'large' && <Badge variant="outline" className="text-[10px] border-[var(--card-border)] text-[var(--page-text)]/60 truncate">{method.category}</Badge>}
+                          <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                            {d && (
+                              <span className="flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border" style={{ borderColor: `${INTENSITY_HEX[d.intensityColor]}60`, color: INTENSITY_HEX[d.intensityColor], backgroundColor: `${INTENSITY_HEX[d.intensityColor]}15` }}>
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: INTENSITY_HEX[d.intensityColor] }} />
+                                {d.goalTag}
+                              </span>
+                            )}
+                            {isBest && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#22C55E]/15 text-[#22C55E] border border-[#22C55E]/40">Best Match</span>}
+                            {checkbox}
+                          </div>
+                        </div>
+                        <h4 className="text-[var(--page-text)] font-semibold text-sm mb-1">{method.name}</h4>
+                        {mode !== 'small' && method.description && <p className="text-[var(--page-text)]/60 text-xs mb-2 line-clamp-2">{method.description}</p>}
+                        {mode !== 'small' && d && (
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            <span className="px-1.5 py-0.5 rounded-md text-[9px] font-semibold bg-[var(--page-bg)] border border-[var(--card-border)] text-[var(--page-text)]/70">{d.setsReps}</span>
+                            <span className="px-1.5 py-0.5 rounded-md text-[9px] font-semibold bg-[var(--page-bg)] border border-[var(--card-border)] text-[var(--page-text)]/70">{d.frequencyPerWeek}×/week</span>
+                            <span className="px-1.5 py-0.5 rounded-md text-[9px] font-semibold bg-[var(--page-bg)] border border-[var(--card-border)] text-[var(--page-text)]/70">{d.durationWeeks} weeks</span>
+                          </div>
+                        )}
+                        {mode !== 'small' && (
+                          <div className="flex flex-wrap gap-1 mt-auto pt-1">
+                            {labels.slice(0, 3).map((l) => (
+                              <span key={l} className="px-1.5 py-0.5 rounded-full text-[9px] border border-[var(--card-border)] text-[var(--page-text)]/50">{l}</span>
+                            ))}
+                          </div>
+                        )}
+                        {method.score != null && (
+                          <span className="text-[10px] mt-1.5 font-mono text-[#00AEEF]">{method.score.toFixed(1)} match</span>
+                        )}
                       </div>
-                      {method.score != null && (
-                        <span className="text-[10px] mt-1.5 font-mono text-[#00AEEF]">{method.score.toFixed(1)} match</span>
-                      )}
                     </motion.button>
                   );
                 })}
@@ -817,6 +946,7 @@ const PHASE_COLORS = ['#F59E0B', '#EF4444', '#22C55E', '#00AEEF', 'var(--ai-viol
 
 function Step4Phases({ data, updateData, dbMethods = [] }: StepProps) {
   const [editingPhase, setEditingPhase] = useState<ProgramPhase | null>(null);
+  const [mode, setMode] = useViewMode('phases');
   const [suggestionDismissed, setSuggestionDismissed] = useState(false);
   const [pairingDismissed, setPairingDismissed] = useState(false);
   const togglePhase = useCallback((phaseId: string) => updateData((prev) => ({ phases: prev.phases.map((p) => (p.id === phaseId ? { ...p, active: !p.active } : p)) })), [updateData]);
@@ -874,27 +1004,56 @@ function Step4Phases({ data, updateData, dbMethods = [] }: StepProps) {
           <button onClick={() => { setSuggestionDismissed(true); setPairingDismissed(true); }} className="p-1 rounded-lg text-[var(--page-text)]/50 hover:text-[var(--page-text)]"><X className="w-3.5 h-3.5" /></button>
         </div>
       )}
-      <div className="space-y-3">
-        {data.phases.map((phase) => (
-          <motion.div key={phase.id} layout className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <input type="checkbox" checked={phase.active} onChange={() => togglePhase(phase.id)} className="w-5 h-5 rounded accent-[#00AEEF]" />
-              <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: phase.color }} />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h4 className={cn('text-sm font-semibold', phase.active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40 line-through')}>{phase.name}</h4>
-                  <Badge variant="outline" className="text-[10px] border-[var(--card-border)] text-[var(--page-text)]/60">{phase.weeks} weeks</Badge>
-                  {phase.intensityTarget && <Badge variant="outline" className="text-[10px] border-[#F59E0B]/40 text-[#F59E0B]">{phase.intensityTarget}</Badge>}
-                  {phase.volumeTarget && <Badge variant="outline" className="text-[10px] border-[var(--ai-violet)]/40 text-[var(--ai-violet)]">{phase.volumeTarget}</Badge>}
-                </div>
-                <p className={cn('text-xs mt-0.5', phase.active ? 'text-[var(--page-text)]/60' : 'text-[var(--page-text)]/40')}>{phase.focus}</p>
+      <div className="flex items-center justify-end">
+        <ViewModeSwitch mode={mode} onChange={setMode} />
+      </div>
+      <div className={rowGridClass(mode)}>
+        {data.phases.map((phase) => {
+          // Phase 65B Item 2: details = checkbox + name (fast multi-tick);
+          // list = compact row with actions; small = card minus focus text.
+          if (mode === 'details') {
+            return (
+              <div key={phase.id} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg px-2.5 py-1.5 flex items-center gap-2.5">
+                <input type="checkbox" checked={phase.active} onChange={() => togglePhase(phase.id)} className="w-4 h-4 rounded accent-[#00AEEF] shrink-0" />
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: phase.color }} />
+                <span className={cn('text-xs font-medium truncate flex-1', phase.active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40 line-through')}>{phase.name}</span>
+                <span className="text-[10px] text-[var(--page-text)]/50 shrink-0">{phase.weeks}w</span>
               </div>
-              <button onClick={() => setEditingPhase({ ...phase })} className="p-1.5 rounded-lg hover:bg-[var(--page-bg)] text-[var(--page-text)]/60 hover:text-[var(--page-text)] transition-colors"><Pencil className="w-4 h-4" /></button>
-              <button onClick={() => duplicatePhase(phase)} className="p-1.5 rounded-lg hover:bg-[var(--page-bg)] text-[var(--page-text)]/60 hover:text-[var(--page-text)] transition-colors"><Copy className="w-4 h-4" /></button>
-              <button onClick={() => removePhase(phase.id)} className="p-1.5 rounded-lg hover:bg-[#EF4444]/10 text-[var(--page-text)]/60 hover:text-[#EF4444] transition-colors"><X className="w-4 h-4" /></button>
-            </div>
-          </motion.div>
-        ))}
+            );
+          }
+          if (mode === 'list') {
+            return (
+              <div key={phase.id} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg px-3 py-2 flex items-center gap-2.5">
+                <input type="checkbox" checked={phase.active} onChange={() => togglePhase(phase.id)} className="w-4 h-4 rounded accent-[#00AEEF] shrink-0" />
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: phase.color }} />
+                <span className={cn('text-xs font-semibold truncate flex-1', phase.active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40 line-through')}>{phase.name}</span>
+                <Badge variant="outline" className="text-[10px] border-[var(--card-border)] text-[var(--page-text)]/60 shrink-0">{phase.weeks} weeks</Badge>
+                <button onClick={() => setEditingPhase({ ...phase })} className="p-1 rounded hover:bg-[var(--page-bg)] text-[var(--page-text)]/60 hover:text-[var(--page-text)] transition-colors shrink-0"><Pencil className="w-3.5 h-3.5" /></button>
+                <button onClick={() => removePhase(phase.id)} className="p-1 rounded hover:bg-[#EF4444]/10 text-[var(--page-text)]/60 hover:text-[#EF4444] transition-colors shrink-0"><X className="w-3.5 h-3.5" /></button>
+              </div>
+            );
+          }
+          return (
+            <motion.div key={phase.id} layout className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4">
+              <div className="flex items-center gap-3">
+                <input type="checkbox" checked={phase.active} onChange={() => togglePhase(phase.id)} className="w-5 h-5 rounded accent-[#00AEEF]" />
+                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: phase.color }} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className={cn('text-sm font-semibold', phase.active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40 line-through')}>{phase.name}</h4>
+                    <Badge variant="outline" className="text-[10px] border-[var(--card-border)] text-[var(--page-text)]/60">{phase.weeks} weeks</Badge>
+                    {phase.intensityTarget && <Badge variant="outline" className="text-[10px] border-[#F59E0B]/40 text-[#F59E0B]">{phase.intensityTarget}</Badge>}
+                    {phase.volumeTarget && <Badge variant="outline" className="text-[10px] border-[var(--ai-violet)]/40 text-[var(--ai-violet)]">{phase.volumeTarget}</Badge>}
+                  </div>
+                  {mode !== 'small' && <p className={cn('text-xs mt-0.5', phase.active ? 'text-[var(--page-text)]/60' : 'text-[var(--page-text)]/40')}>{phase.focus}</p>}
+                </div>
+                <button onClick={() => setEditingPhase({ ...phase })} className="p-1.5 rounded-lg hover:bg-[var(--page-bg)] text-[var(--page-text)]/60 hover:text-[var(--page-text)] transition-colors"><Pencil className="w-4 h-4" /></button>
+                <button onClick={() => duplicatePhase(phase)} className="p-1.5 rounded-lg hover:bg-[var(--page-bg)] text-[var(--page-text)]/60 hover:text-[var(--page-text)] transition-colors"><Copy className="w-4 h-4" /></button>
+                <button onClick={() => removePhase(phase.id)} className="p-1.5 rounded-lg hover:bg-[#EF4444]/10 text-[var(--page-text)]/60 hover:text-[#EF4444] transition-colors"><X className="w-4 h-4" /></button>
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
       <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
@@ -1176,6 +1335,13 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
   );
   const [hintDismissed, setHintDismissed] = useState(false);
 
+  // Phase 65B Item 2: table view modes — medium = full 9-col table, large =
+  // full + taxonomy muscle line, small = slim (no %1RM/tempo), list/details =
+  // compact single-line rows. The expanded edit row is identical in all modes.
+  const [mode, setMode] = useViewMode('exercises');
+  const tbl: 'full' | 'rich' | 'slim' | 'list' | 'details' =
+    mode === 'medium' ? 'full' : mode === 'large' ? 'rich' : mode === 'small' ? 'slim' : mode;
+
   // Phase 65A: the selected day's workout label drives pattern-aware seeding,
   // pattern chips, and the Change-exercise dialog's Similar fallback.
   const selectedDayLabel = useMemo(
@@ -1394,6 +1560,7 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={handleAutoFill} className="border-[var(--ai-violet)] text-[var(--ai-violet)] hover:bg-[var(--ai-violet)]/10 text-xs"><Sparkles className="w-3.5 h-3.5 mr-1" />AI Auto-Fill</Button>
         <Button variant="outline" size="sm" onClick={openAddPicker} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs"><Plus className="w-3.5 h-3.5 mr-1" />Add Exercise</Button>
+        <div className="ml-auto"><ViewModeSwitch mode={mode} onChange={setMode} /></div>
       </div>
 
       {perDay && activeDays.length > 0 && (
@@ -1430,9 +1597,13 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
         </div>
       )}
       <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl overflow-hidden">
-        <div className="grid grid-cols-9 gap-1 px-3 py-2 bg-[var(--page-bg)] border-b border-[var(--card-border)] text-[10px] text-[var(--page-text)]/60 font-semibold uppercase tracking-wider">
-          <span>Code</span><span className="col-span-2">Exercise</span><span>Sets</span><span>Reps</span><span>%1RM</span><span>Tempo</span><span>Rest</span><span className="text-right">Actions</span>
-        </div>
+        {(tbl === 'full' || tbl === 'rich' || tbl === 'slim') && (
+          <div className={cn('grid gap-1 px-3 py-2 bg-[var(--page-bg)] border-b border-[var(--card-border)] text-[10px] text-[var(--page-text)]/60 font-semibold uppercase tracking-wider', tbl === 'slim' ? 'grid-cols-7' : 'grid-cols-9')}>
+            <span>Code</span><span className="col-span-2">Exercise</span><span>Sets</span><span>Reps</span>
+            {tbl !== 'slim' && <><span>%1RM</span><span>Tempo</span></>}
+            <span>Rest</span><span className="text-right">Actions</span>
+          </div>
+        )}
         <AnimatePresence>
           {list.map((exercise, idx) => {
             const flag = flagsByIdx.get(idx);
@@ -1445,11 +1616,19 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
               "border-b border-[var(--card-border)] last:border-b-0",
               activeFlag && (activeFlag.severity === 'exclude' ? 'border-l-2 border-l-[#EF4444]' : 'border-l-2 border-l-[#F59E0B]')
             )}>
-              <div className="grid grid-cols-9 gap-1 px-3 py-2 items-center text-xs">
-                <span className="text-[#00AEEF] font-mono font-bold">{exercise.code}</span>
-                <span className="col-span-2 text-[var(--page-text)] font-medium truncate flex items-center gap-1">
+              <div className={cn(
+                (tbl === 'full' || tbl === 'rich') && 'grid grid-cols-9 gap-1 px-3 py-2 items-center text-xs',
+                tbl === 'slim' && 'grid grid-cols-7 gap-1 px-3 py-2 items-center text-xs',
+                tbl === 'list' && 'flex items-center gap-2 px-3 py-1.5 text-xs',
+                tbl === 'details' && 'flex items-center gap-2 px-3 py-1 text-xs',
+              )}>
+                <span className="text-[#00AEEF] font-mono font-bold shrink-0">{exercise.code}</span>
+                <span className={cn('text-[var(--page-text)] font-medium truncate flex items-center gap-1 min-w-0', (tbl === 'full' || tbl === 'rich' || tbl === 'slim') ? 'col-span-2' : 'flex-1')}>
                   {activeFlag && <ShieldAlert className={cn('w-3 h-3 shrink-0', activeFlag.severity === 'exclude' ? 'text-[#EF4444]' : 'text-[#F59E0B]')} />}
-                  <span className="truncate">{exercise.name}</span>
+                  <span className="truncate">
+                    {exercise.name}
+                    {tbl === 'rich' && (() => { const m = findTaxonomyMatch(exercise.name, taxonomyIndex); return m ? <span className="block text-[9px] font-normal text-[var(--page-text)]/40 truncate">{[m.primary_muscle, m.secondary_muscle].filter(Boolean).join(' · ')}{m.equipment ? ` · ${m.equipment}` : ''}</span> : null; })()}
+                  </span>
                   {patternFlag && (
                     <button
                       onClick={() => setChangeIdx(idx)}
@@ -1465,15 +1644,26 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
                     </span>
                   )}
                 </span>
-                <span className="text-[var(--page-text)]/60">{exercise.sets}</span>
-                <span className="text-[var(--page-text)]/60">{exercise.reps}</span>
-                <span className="text-[var(--page-text)]/60 font-mono">{exercise.pct1RM}</span>
-                <span className="text-[var(--ai-violet)] font-mono">{exercise.tempo}</span>
-                <span className="text-[#F59E0B] font-mono">
-                  {exercise.rest}
-                  {isLastOfGroup && groupBadge && <span className="block text-[8px] font-sans">Rest after group</span>}
-                </span>
-                <div className="flex justify-end gap-1">
+                {(tbl === 'full' || tbl === 'rich' || tbl === 'slim') && (
+                  <>
+                    <span className="text-[var(--page-text)]/60">{exercise.sets}</span>
+                    <span className="text-[var(--page-text)]/60">{exercise.reps}</span>
+                  </>
+                )}
+                {(tbl === 'full' || tbl === 'rich') && (
+                  <>
+                    <span className="text-[var(--page-text)]/60 font-mono">{exercise.pct1RM}</span>
+                    <span className="text-[var(--ai-violet)] font-mono">{exercise.tempo}</span>
+                  </>
+                )}
+                {tbl === 'list' && <span className="text-[var(--page-text)]/50 shrink-0 font-mono text-[10px]">{exercise.sets}×{exercise.reps}</span>}
+                {(tbl === 'full' || tbl === 'rich' || tbl === 'slim') && (
+                  <span className="text-[#F59E0B] font-mono">
+                    {exercise.rest}
+                    {isLastOfGroup && groupBadge && <span className="block text-[8px] font-sans">Rest after group</span>}
+                  </span>
+                )}
+                <div className="flex justify-end gap-1 shrink-0">
                   <button onClick={() => toggleRow(idx)} className="p-1 rounded hover:bg-[var(--page-bg)] text-[var(--page-text)]/60 hover:text-[var(--page-text)] transition-colors"><Pencil className="w-3 h-3" /></button>
                   <button onClick={() => deleteExercise(idx)} className="p-1 rounded hover:bg-[#EF4444]/10 text-[var(--page-text)]/60 hover:text-[#EF4444] transition-colors"><Trash2 className="w-3 h-3" /></button>
                 </div>
@@ -2702,6 +2892,9 @@ export default function AIProgramBuilderPage() {
 
       {/* Current step */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+        {/* Phase 65B Item 4: the same Back/Next controls at the TOP of every
+            step (shared component — identical validation to the bottom bar) */}
+        <WizardNavBar currentStep={currentStep} saving={saving} isFinalStep={isFinalStep} canProceed={!!stepComplete[currentStep]} onBack={goBack} onNext={goNext} className="mb-4" />
         <AnimatePresence mode="wait">
           <motion.div key={currentStep} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.2 }}>
             <CurrentComponent data={data} updateData={updateData} program={program} onSave={handleSave} onSaveAndAssign={handleSaveAndAssign} clientName={selectedClientName} clients={clients} saving={saving} limitations={wizardLimitations} dbMethods={dbMethods} methodCategories={methodCategories} goalScores={goalScores} methodsLoading={methodsLoading} methodsError={methodsError} customGoals={dbGoals} onAddGoal={handleAddGoal} onArchiveGoal={handleArchiveGoal} />
@@ -2709,21 +2902,73 @@ export default function AIProgramBuilderPage() {
         </AnimatePresence>
 
         {/* Back / Next */}
-        <div className="mt-6 flex items-center justify-end gap-3">
-          <Button variant="outline" onClick={goBack} disabled={currentStep === 0} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] disabled:opacity-50">
-            Back
-          </Button>
-          {isFinalStep ? (
-            <Button onClick={goNext} disabled={saving} className="bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] font-bold px-6 disabled:opacity-50">
-              <Check className="w-4 h-4 mr-1.5" />{saving ? 'Saving…' : 'Save & Assign Program'}
-            </Button>
-          ) : (
-            <Button onClick={goNext} disabled={!stepComplete[currentStep]} className="bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] font-bold px-6 disabled:opacity-50">
-              Next: {STEPS[currentStep + 1]?.title}
-            </Button>
-          )}
-        </div>
+        <WizardNavBar currentStep={currentStep} saving={saving} isFinalStep={isFinalStep} canProceed={!!stepComplete[currentStep]} onBack={goBack} onNext={goNext} className="mt-6" />
       </div>
+
+      {/* Phase 65B Item 4: floating scroll arrows (appear after scrolling;
+          bottom offset keeps them clear of the Back/Next bar + mobile nav) */}
+      <ScrollArrows />
+    </div>
+  );
+}
+
+/* Phase 65B Item 4 — one shared nav bar, mounted at the top and bottom of
+   every wizard step (identical validation/disabled logic in both places). */
+function WizardNavBar({
+  currentStep,
+  saving,
+  isFinalStep,
+  canProceed,
+  onBack,
+  onNext,
+  className,
+}: {
+  currentStep: number;
+  saving?: boolean;
+  isFinalStep: boolean;
+  canProceed: boolean;
+  onBack: () => void;
+  onNext: () => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn('flex items-center justify-end gap-3', className)}>
+      <Button variant="outline" onClick={onBack} disabled={currentStep === 0} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] disabled:opacity-50">
+        Back
+      </Button>
+      {isFinalStep ? (
+        <Button onClick={onNext} disabled={saving} className="bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] font-bold px-6 disabled:opacity-50">
+          <Check className="w-4 h-4 mr-1.5" />{saving ? 'Saving…' : 'Save & Assign Program'}
+        </Button>
+      ) : (
+        <Button onClick={onNext} disabled={!canProceed} className="bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] font-bold px-6 disabled:opacity-50">
+          Next: {STEPS[currentStep + 1]?.title}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/* Phase 65B Item 4 — floating up/down scroll quick actions. Appear after
+   300px of scroll, fixed within the viewport, theme-native, smooth-scroll. */
+function ScrollArrows() {
+  const [visible, setVisible] = useState(() => window.scrollY > 300);
+  useEffect(() => {
+    const onScroll = () => setVisible(window.scrollY > 300);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  if (!visible) return null;
+  const btnCls =
+    'w-10 h-10 rounded-full border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--page-text)] shadow-lg flex items-center justify-center hover:border-[#00AEEF]/50 hover:text-[#00AEEF] transition-colors';
+  return (
+    <div className="fixed z-40 right-4 bottom-24 flex flex-col gap-2">
+      <button type="button" aria-label="Scroll to top" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className={btnCls}>
+        <ChevronUp className="w-4 h-4" />
+      </button>
+      <button type="button" aria-label="Scroll to bottom" onClick={() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })} className={btnCls}>
+        <ChevronDown className="w-4 h-4" />
+      </button>
     </div>
   );
 }
