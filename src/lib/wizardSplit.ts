@@ -54,3 +54,25 @@ export function swapSplitContent<
 
   return { split: next, workoutExercises: nextWe };
 }
+
+/* Phase 65A — Change exercise → "Swap from day": exchange ONE exercise
+   row with a row on another day (the whole row — prescription rides
+   with the exercise). Same-day, missing-day, and out-of-range inputs
+   are identity no-ops. */
+export function swapExerciseAcrossDays<E>(
+  map: Record<number, E[]>,
+  dayA: number,
+  idxA: number,
+  dayB: number,
+  idxB: number,
+): Record<number, E[]> {
+  const a = map[dayA];
+  const b = map[dayB];
+  if (dayA === dayB || !a || !b || !a[idxA] || !b[idxB]) return map;
+  const nextA = [...a];
+  const nextB = [...b];
+  const tmp = nextA[idxA];
+  nextA[idxA] = nextB[idxB];
+  nextB[idxB] = tmp;
+  return { ...map, [dayA]: nextA, [dayB]: nextB };
+}

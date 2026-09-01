@@ -86,7 +86,8 @@ interface SplitConfig {
   days: { name: string; focus: string; slotCategories: string[] }[];
 }
 
-function getSplitConfig(frequency: number): SplitConfig {
+// Exported for tests/introspection (Phase 65A pattern-purity assertions).
+export function getSplitConfig(frequency: number): SplitConfig {
   switch (frequency) {
     case 2:
       return {
@@ -239,19 +240,23 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
-function pickExercise(pool: Record<string, string[]>, category: string, used: Set<string>): string | null {
+function pickExercise(
+  pool: Record<string, string[]>,
+  category: string,
+  used: Set<string>,
+  usedToday: Set<string>,
+): string | null {
   const candidates = pool[category] || [];
-  const available = candidates.filter((e) => !used.has(e));
-  if (available.length === 0) {
-    // Fallback: any exercise from same category even if used
-    if (candidates.length > 0) {
-      const shuffled = shuffleArray(candidates);
-      return shuffled[0];
-    }
-    return null;
-  }
-  const shuffled = shuffleArray(available);
-  return shuffled[0];
+  // Phase 65A tiered pick — the old code fell straight back to "any
+  // exercise from same category even if used", which could repeat a name
+  // WITHIN one day. Now: (1) unused this week → (2) used on another day
+  // but not today → (3) same-category repeat only as documented last resort.
+  const fresh = candidates.filter((e) => !used.has(e));
+  if (fresh.length > 0) return shuffleArray(fresh)[0];
+  const notToday = candidates.filter((e) => !usedToday.has(e));
+  if (notToday.length > 0) return shuffleArray(notToday)[0];
+  if (candidates.length > 0) return shuffleArray(candidates)[0];
+  return null;
 }
 
 function getOrderPrefix(index: number): string {
@@ -284,46 +289,38 @@ export function generateProgram(profile: ClientProfile): GeneratedProgram {
 
   const workouts: GeneratedWorkout[] = split.days.map((day, dayIndex) => {
     const exercises: GeneratedExercise[] = [];
+    const usedToday = new Set<string>();
 
     for (let i = 0; i < day.slotCategories.length; i++) {
       const category = day.slotCategories[i];
-      const name = pickExercise(pool, category, usedExercises);
+      const name = pickExercise(pool, category, usedExercises, usedToday);
       if (!name) continue;
 
       usedExercises.add(name);
+      usedToday.add(name);
       exercises.push(makeExercise(i, name, category));
     }
 
     // Phase 29B top-up: every training day ends with >= MIN_EXERCISES_PER_DAY.
     // Candidates only ever come from the filtered pool, so applySafetyFilter
     // 'exclude' removals are never bypassed.
+    // Phase 65A: the top-up re-cycles ONLY the day's own slotCategories.
+    // The old stage 2 padded from the whole pool and put pulls/hinges on
+    // Push days — a full day is never bought with a pattern violation;
+    // repeats only ever happen inside the day's own categories (honest
+    // pool scarcity, tier-3 of pickExercise).
     let topUp = 0; // extra order prefixes start past the slot range (E1, E2, …)
-    if (exercises.length < MIN_EXERCISES_PER_DAY) {
-      // 1) cycle the day's own slotCategories again — pickExercise's
-      //    same-category fallback already handles repeats
-      for (let i = 0; exercises.length < MIN_EXERCISES_PER_DAY && i < day.slotCategories.length; i++) {
-        const category = day.slotCategories[i];
-        const name = pickExercise(pool, category, usedExercises);
-        if (!name) continue;
-        usedExercises.add(name);
-        exercises.push(makeExercise(day.slotCategories.length + topUp++, name, category));
-      }
-    }
-    if (exercises.length < MIN_EXERCISES_PER_DAY) {
-      // 2) any exercise across the whole filtered pool, preferring unused;
-      //    3) last resort — reuse (the unused-preferred ordering degenerates
-      //       to repeats) is better than a short day
-      const allNames = [...new Set(Object.values(pool).flat())];
-      const unusedFirst = allNames
-        .filter((n) => !usedExercises.has(n))
-        .concat(allNames.filter((n) => usedExercises.has(n)));
-      for (const name of unusedFirst) {
-        if (exercises.length >= MIN_EXERCISES_PER_DAY) break;
-        usedExercises.add(name);
-        const categoryId =
-          Object.keys(pool).find((cid) => pool[cid].includes(name)) || day.slotCategories[0];
-        exercises.push(makeExercise(day.slotCategories.length + topUp++, name, categoryId));
-      }
+    for (
+      let guard = 0;
+      exercises.length < MIN_EXERCISES_PER_DAY && guard < day.slotCategories.length * 3;
+      guard++
+    ) {
+      const category = day.slotCategories[guard % day.slotCategories.length];
+      const name = pickExercise(pool, category, usedExercises, usedToday);
+      if (!name) continue;
+      usedExercises.add(name);
+      usedToday.add(name);
+      exercises.push(makeExercise(day.slotCategories.length + topUp++, name, category));
     }
 
     const exerciseCount = exercises.length;

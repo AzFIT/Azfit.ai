@@ -77,3 +77,49 @@ describe("generateProgram — minimum exercises per day (Phase 29B)", () => {
     }
   });
 });
+
+// Phase 65A — a full day is never bought with a pattern violation, and a
+// name never repeats within one day. The old whole-pool top-up stage put
+// pulls/hinges on Push days; the old reuse fallback could same-day a name.
+import { getSplitConfig } from "@/lib/aiProgramGenerator";
+import { EXERCISE_CATEGORIES } from "@/data/exerciseDatabase";
+
+const labelFor = (cid: string) => EXERCISE_CATEGORIES.find((c) => c.id === cid)?.label ?? cid;
+
+describe("generateProgram — Phase 65A pattern purity + no same-day repeats", () => {
+  it("every generated exercise stays inside its day's slot categories (freq 2-6)", () => {
+    for (let freq = 2; freq <= 6; freq++) {
+      const gen = generateProgram({ ...base, trainingFrequency: freq });
+      const config = getSplitConfig(freq);
+      gen.phases[0].workouts.forEach((w, i) => {
+        const allowed = new Set(config.days[i].slotCategories.map(labelFor));
+        for (const e of w.exercises) expect(allowed.has(e.category)).toBe(true);
+      });
+    }
+  });
+
+  it("pattern purity + MIN hold under pool exhaustion (Bodyweight Only + beginner, 6 days)", () => {
+    const gen = generateProgram({
+      ...base,
+      trainingFrequency: 6,
+      trainingExperience: "beginner",
+      availableEquipment: ["Bodyweight Only"],
+    });
+    const config = getSplitConfig(6);
+    gen.phases[0].workouts.forEach((w, i) => {
+      expect(w.exercises.length).toBeGreaterThanOrEqual(MIN_EXERCISES_PER_DAY);
+      const allowed = new Set(config.days[i].slotCategories.map(labelFor));
+      for (const e of w.exercises) expect(allowed.has(e.category)).toBe(true);
+    });
+  });
+
+  it("no exercise name repeats within the same generated day (freq 2-6)", () => {
+    for (let freq = 2; freq <= 6; freq++) {
+      const gen = generateProgram({ ...base, trainingFrequency: freq });
+      for (const w of gen.phases[0].workouts) {
+        const names = w.exercises.map((e) => e.name);
+        expect(new Set(names).size).toBe(names.length);
+      }
+    }
+  });
+});

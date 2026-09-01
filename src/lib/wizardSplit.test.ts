@@ -44,3 +44,27 @@ describe("swapSplitContent (Step 5 drag-to-swap)", () => {
     expect(r.workoutExercises).toBeUndefined();
   });
 });
+
+import { swapExerciseAcrossDays } from "./wizardSplit";
+
+describe("swapExerciseAcrossDays (Phase 65A — Change exercise → Swap from day)", () => {
+  const map = {
+    1: [{ name: "bench" }, { name: "fly" }],
+    2: [{ name: "row" }, { name: "pulldown" }],
+    3: [{ name: "squat" }],
+  };
+
+  it("exchanges two rows across days; other days and positions untouched", () => {
+    const r = swapExerciseAcrossDays(map, 1, 0, 2, 1);
+    expect(r[1]).toEqual([{ name: "pulldown" }, { name: "fly" }]);
+    expect(r[2]).toEqual([{ name: "row" }, { name: "bench" }]);
+    expect(r[3]).toBe(map[3]); // untouched day keeps its reference
+    expect(map[1][0].name).toBe("bench"); // input not mutated
+  });
+
+  it("same-day, missing-day, and out-of-range inputs are identity no-ops", () => {
+    expect(swapExerciseAcrossDays(map, 1, 0, 1, 1)).toBe(map);
+    expect(swapExerciseAcrossDays(map, 1, 0, 9, 0)).toBe(map);
+    expect(swapExerciseAcrossDays(map, 1, 5, 2, 0)).toBe(map);
+  });
+});

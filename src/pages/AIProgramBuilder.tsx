@@ -54,8 +54,12 @@ import {
 } from '@/lib/methodDefaults';
 import { buildPrintModelFromWizard } from '@/lib/programPrint';
 import { suggestPhasesForMethod } from '@/lib/phaseSuggestions';
-import { swapSplitContent } from '@/lib/wizardSplit';
-import { fullBodyWorkoutExercises } from '@/lib/fullBodyRotation';
+import { swapSplitContent, swapExerciseAcrossDays } from '@/lib/wizardSplit';
+import { FULL_BODY_ROTATION } from '@/lib/fullBodyRotation';
+import { seedExercisesForDay, seedExercisesForSplit, reconcileWorkoutExercises, preserveSplitIds } from '@/lib/splitSeeder';
+import { buildTaxonomyIndex, findTaxonomyMatch, patternForExercise, isPatternCompatible, PATTERN_LABEL } from '@/lib/exerciseTaxonomy';
+import { useExerciseTaxonomy } from '@/hooks/useExerciseTaxonomy';
+import ExerciseChangeDialog from '@/components/exercise/ExerciseChangeDialog';
 import { saveDraft, loadDraft, clearDraft } from '@/lib/draftStore';
 import DraftBanner from '@/components/DraftBanner';
 
@@ -411,6 +415,20 @@ const SPLIT_DEFAULTS: Record<string, ProgramSplit[]> = {
   'Custom': [{ day: 'Mon', active: true, workout: 'Workout A' }, { day: 'Tue', active: false, workout: 'Rest Day' }, { day: 'Wed', active: true, workout: 'Workout B' }, { day: 'Thu', active: false, workout: 'Rest Day' }, { day: 'Fri', active: true, workout: 'Workout C' }, { day: 'Sat', active: false, workout: 'Rest Day' }, { day: 'Sun', active: false, workout: 'Rest Day' }],
 };
 const LIMITATIONS = ['None (healthy)', 'Lower back issues', 'Shoulder injury', 'Knee/Hip limitations', 'Wrist/Elbow pain', 'Neck/Upper back', 'Cardiovascular condition', 'Other'];
+// Phase 65A: moved up from below Step6 — defaultData seeds workoutExercises at module scope.
+const SPLIT_DAY_INDEX: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+const wizardDayKey = (day: string) => SPLIT_DAY_INDEX[day] ?? 0;
+/* Phase 65A: pattern-aware per-day seeding for Steps 5/6. 'Full Body X'
+   labels keep the curated Task-3 rotation lineups; every other label
+   seeds deterministically from its movement-pattern category pools. */
+function seedForWizardDay(label: string, used: Set<string>): ProgramExercise[] {
+  const m = /^Full Body\s+([A-C])/i.exec(label.trim());
+  if (m) {
+    const idx = (m[1].toUpperCase().charCodeAt(0) - 65) % FULL_BODY_ROTATION.length;
+    return FULL_BODY_ROTATION[idx].map((e) => ({ ...e }));
+  }
+  return seedExercisesForDay(label, { used });
+}
 const TAGS = ['Strength', 'Hypertrophy', 'Fat Loss', 'Endurance', 'Power', 'Rehab', 'Beginner', 'Advanced'];
 // Client dropdown is now populated live from the trainer's clients table.
 const STEPS = [
@@ -423,7 +441,10 @@ const STEPS = [
   { title: 'Program Preview', component: Step7Preview },
   { title: 'Save & Assign', component: Step8Save },
 ];
-const defaultData: ProgramData = { goals: [], method: '', clientContext: { experience: '', availability: '', limitations: [], otherLimitation: '' }, phases: PHASES_DEFAULT.map((p) => ({ ...p })), weeklyHours: 4.5, split: SPLIT_DEFAULTS['Upper/Lower'].map((d) => ({ ...d })), exercises: DEFAULT_EXERCISES.map((e) => ({ ...e })), progressionRules: [], programName: '', description: '', tags: [], isPublic: false, assignedClient: '' };
+// Phase 65A: a fresh wizard is per-day from the start — workoutExercises is
+// seeded pattern-aware for the default Upper/Lower split (the shared
+// `exercises` list stays as the legacy fallback only).
+const defaultData: ProgramData = { goals: [], method: '', clientContext: { experience: '', availability: '', limitations: [], otherLimitation: '' }, phases: PHASES_DEFAULT.map((p) => ({ ...p })), weeklyHours: 4.5, split: SPLIT_DEFAULTS['Upper/Lower'].map((d) => ({ ...d })), exercises: DEFAULT_EXERCISES.map((e) => ({ ...e })), workoutExercises: seedExercisesForSplit(SPLIT_DEFAULTS['Upper/Lower'], wizardDayKey), progressionRules: [], programName: '', description: '', tags: [], isPublic: false, assignedClient: '' };
 
 // Phase 56: display names for all selected goal tiles (hardcoded + custom DB goals)
 function goalNamesFor(goals: string[], customGoals: DbGoal[]): string[] {
@@ -967,23 +988,43 @@ function muscleTagsFor(workout: string): string[] {
 }
 
 function Step5Split({ data, updateData }: StepProps) {
-  const [splitType, setSplitType] = useState('Upper/Lower');
+  // Phase 65A: the selected preset is DERIVED from data.split (the old local
+  // useState always showed 'Upper/Lower' after generate/load, regardless of
+  // the actual split). Edited labels that match no preset read 'Custom'.
+  const splitType = useMemo(() => {
+    for (const [name, preset] of Object.entries(SPLIT_DEFAULTS)) {
+      if (
+        preset.length === data.split.length &&
+        preset.every((p, i) => p.day === data.split[i].day && p.active === data.split[i].active && p.workout === data.split[i].workout)
+      ) {
+        return name;
+      }
+    }
+    return 'Custom';
+  }, [data.split]);
   // Phase 56 Item 5: drag-to-swap state (native HTML5 DnD — no dependency)
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dropIdx, setDropIdx] = useState<number | null>(null);
-  const toggleDay = useCallback((dayIdx: number) => updateData((prev) => ({ split: prev.split.map((d, i) => (i === dayIdx ? { ...d, active: !d.active } : d)) })), [updateData]);
+  // Phase 65A: toggling a day reconciles the per-day exercise map too —
+  // deactivating prunes the day's list, re-activating reseeds it pattern-aware
+  // (previously the day silently fell back to a copy of Day 1's list).
+  const toggleDay = useCallback((dayIdx: number) => updateData((prev) => {
+    const split = prev.split.map((d, i) => (i === dayIdx ? { ...d, active: !d.active } : d));
+    return { split, workoutExercises: reconcileWorkoutExercises(prev.split, split, prev.workoutExercises, wizardDayKey, seedForWizardDay) };
+  }), [updateData]);
   const updateDayWorkout = useCallback((dayIdx: number, value: string) => updateData((prev) => ({ split: prev.split.map((d, i) => (i === dayIdx ? { ...d, workout: value } : d)) })), [updateData]);
-  // Task 3: the 'Full Body' preset now seeds DISTINCT per-day lineups
-  // (A/B/C rotation) instead of leaving all days on the shared default list.
+  // Phase 65A: changing the split type now RESEEDS the weekly plan pattern-aware
+  // (the old code only replaced day labels and left the old split's exercise
+  // lists under the new labels — the "Barbell Row on a Push day" bug). Days
+  // whose label is unchanged keep their list and workout-row dbId.
   const applySplit = useCallback((type: string) => {
-    setSplitType(type);
     if (!SPLIT_DEFAULTS[type]) return;
-    const split = SPLIT_DEFAULTS[type].map((d) => ({ ...d }));
-    updateData(
-      type === 'Full Body'
-        ? { split, workoutExercises: fullBodyWorkoutExercises(split, (d) => SPLIT_DAY_INDEX[d] ?? 0) }
-        : { split },
-    );
+    const preset = SPLIT_DEFAULTS[type].map((d) => ({ ...d }));
+    updateData((prev) => {
+      const split = preserveSplitIds(prev.split, preset);
+      const workoutExercises = reconcileWorkoutExercises(prev.split, split, prev.workoutExercises, wizardDayKey, seedForWizardDay);
+      return { split, workoutExercises };
+    });
   }, [updateData]);
   // Swap workout assignments between two days — calendar labels stay fixed,
   // exercise lists follow their content (rest-day swaps included).
@@ -1116,8 +1157,6 @@ function Step5Split({ data, updateData }: StepProps) {
   );
 }
 
-const SPLIT_DAY_INDEX: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
-
 function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepProps) {
   const [openRows, setOpenRows] = useState<Record<number, boolean>>({});
   const perDay = data.workoutExercises != null;
@@ -1136,6 +1175,13 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
     [methodDefaults],
   );
   const [hintDismissed, setHintDismissed] = useState(false);
+
+  // Phase 65A: the selected day's workout label drives pattern-aware seeding,
+  // pattern chips, and the Change-exercise dialog's Similar fallback.
+  const selectedDayLabel = useMemo(
+    () => data.split.find((d) => (SPLIT_DAY_INDEX[d.day] || 1) === selectedDay)?.workout ?? '',
+    [data.split, selectedDay],
+  );
 
   // In per-day mode (loaded from DB) each active day owns its exercise list;
   // a day without a list yet falls back to the shared `exercises` template.
@@ -1198,7 +1244,71 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
   );
   const openAddPicker = () => { setSwapIdx(null); setPickerOpen(true); };
   const openSwapPicker = (idx: number) => { setSwapIdx(idx); setPickerOpen(true); };
-  const handleAutoFill = useCallback(() => setList(() => DEFAULT_EXERCISES.map((e) => ({ ...e }))), [setList]);
+
+  // Phase 65A — Change-exercise dialog (Similar / Swap-from-day / Custom) +
+  // taxonomy-driven pattern chips. The taxonomy query is shared app-wide via
+  // useExerciseTaxonomy's module cache; unknown names stay unflagged (never
+  // accuse without a library basis).
+  const [changeIdx, setChangeIdx] = useState<number | null>(null);
+  const { rows: taxonomyRows } = useExerciseTaxonomy();
+  const taxonomyIndex = useMemo(() => buildTaxonomyIndex(taxonomyRows), [taxonomyRows]);
+  const weekNames = useMemo(() => {
+    const src = data.workoutExercises ? Object.values(data.workoutExercises).flat() : [];
+    const names = src.map((e) => e.name);
+    return names.length > 0 ? names : data.exercises.map((e) => e.name);
+  }, [data.workoutExercises, data.exercises]);
+  const otherDayOptions = useMemo(() => {
+    if (!perDay) return [];
+    return activeDays
+      .map((d) => {
+        const dayKey = SPLIT_DAY_INDEX[d.day] || 1;
+        return {
+          dayKey,
+          label: `${d.day} · ${d.workout.split('—')[0].trim() || 'Workout'}`,
+          names: (data.workoutExercises?.[dayKey] ?? []).map((e) => e.name),
+        };
+      })
+      .filter((o) => o.dayKey !== selectedDay && o.names.length > 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perDay, data.split, data.workoutExercises, selectedDay]);
+  const patternFlagByIdx = useMemo(() => {
+    const m = new Map<number, string>();
+    if (!perDay || taxonomyRows.length === 0) return m;
+    list.forEach((e, i) => {
+      const match = findTaxonomyMatch(e.name, taxonomyIndex);
+      if (!match) return;
+      const pattern = patternForExercise(match.primary_muscle, match.secondary_muscle);
+      if (!isPatternCompatible(selectedDayLabel, pattern)) {
+        m.set(i, `${PATTERN_LABEL[pattern]} on ${selectedDayLabel.split('—')[0].trim() || 'this'} day`);
+      }
+    });
+    return m;
+  }, [perDay, list, taxonomyRows.length, taxonomyIndex, selectedDayLabel]);
+  const handleSwapAcrossDays = useCallback(
+    (dayKey: number, idx: number) => {
+      if (changeIdx == null) return;
+      updateData((prev) => ({
+        workoutExercises: swapExerciseAcrossDays(prev.workoutExercises ?? {}, selectedDay, changeIdx, dayKey, idx),
+      }));
+    },
+    [changeIdx, selectedDay, updateData],
+  );
+
+  // Phase 65A: Auto-Fill reseeds the selected day pattern-aware from its own
+  // label (it used to reset EVERY day to the same 6 hardcoded exercises).
+  // Names already placed on other days are avoided while the pools allow.
+  const handleAutoFill = useCallback(
+    () =>
+      setList(() => {
+        const usedElsewhere = new Set(
+          Object.entries(data.workoutExercises ?? {})
+            .filter(([k]) => Number(k) !== selectedDay)
+            .flatMap(([, v]) => v.map((e) => e.name)),
+        );
+        return seedExercisesForDay(selectedDayLabel, { used: usedElsewhere });
+      }),
+    [setList, data.workoutExercises, selectedDay, selectedDayLabel],
+  );
   const toggleRow = useCallback((idx: number) => setOpenRows((prev) => ({ ...prev, [idx]: !prev[idx] })), []);
 
   // Phase 30C — superset group badges + per-exercise pair control
@@ -1327,6 +1437,7 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
           {list.map((exercise, idx) => {
             const flag = flagsByIdx.get(idx);
             const activeFlag = flag && !resolvedFlags[flagKey(idx)] ? flag : null;
+            const patternFlag = patternFlagByIdx.get(idx);
             const groupBadge = exercise.supersetGroup ? groupLabels.get(exercise.supersetGroup) : undefined;
             const isLastOfGroup = !!exercise.supersetGroup && (idx === list.length - 1 || list[idx + 1]?.supersetGroup !== exercise.supersetGroup);
             return (
@@ -1339,6 +1450,15 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
                 <span className="col-span-2 text-[var(--page-text)] font-medium truncate flex items-center gap-1">
                   {activeFlag && <ShieldAlert className={cn('w-3 h-3 shrink-0', activeFlag.severity === 'exclude' ? 'text-[#EF4444]' : 'text-[#F59E0B]')} />}
                   <span className="truncate">{exercise.name}</span>
+                  {patternFlag && (
+                    <button
+                      onClick={() => setChangeIdx(idx)}
+                      title="Movement pattern doesn't fit this day — click to change exercise"
+                      className="inline-flex items-center px-1.5 py-0.5 rounded-full border border-[#F59E0B]/50 text-[#F59E0B] text-[9px] font-bold shrink-0 hover:bg-[#F59E0B]/10 transition-colors"
+                    >
+                      {patternFlag}
+                    </button>
+                  )}
                   {groupBadge && (
                     <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border border-[var(--ai-violet)]/50 text-[var(--ai-violet)] text-[9px] font-bold shrink-0">
                       <Link2 className="w-2.5 h-2.5" />{groupBadge}
@@ -1419,10 +1539,10 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
                       </div>
                       <div className="flex items-end">
                         <button
-                          onClick={() => openSwapPicker(idx)}
+                          onClick={() => setChangeIdx(idx)}
                           className="h-7 px-2 rounded-md border border-[#00AEEF]/50 text-[#00AEEF] hover:bg-[#00AEEF]/10 text-[11px] font-medium transition-colors"
                         >
-                          Swap via library…
+                          Change exercise…
                         </button>
                       </div>
                     </div>
@@ -1522,6 +1642,24 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
         onOpenChange={setPickerOpen}
         onSelect={handlePicked}
         limitations={limitations ?? []}
+      />
+      {/* Phase 65A — key-remount resets the tab state per row (repo lint rule
+          bans setState-in-effect for dialog prefill). */}
+      <ExerciseChangeDialog
+        key={changeIdx ?? 'closed'}
+        open={changeIdx != null}
+        onOpenChange={(o) => { if (!o) setChangeIdx(null); }}
+        currentName={changeIdx != null ? (list[changeIdx]?.name ?? '') : ''}
+        dayLabel={selectedDayLabel}
+        weekNames={weekNames}
+        otherDays={otherDayOptions}
+        onReplace={(name) => { if (changeIdx != null) updateExercise(changeIdx, 'name', name); }}
+        onSwapWithDay={handleSwapAcrossDays}
+        onBrowseLibrary={() => {
+          const idx = changeIdx;
+          setChangeIdx(null);
+          if (idx != null) openSwapPicker(idx);
+        }}
       />
     </div>
   );
