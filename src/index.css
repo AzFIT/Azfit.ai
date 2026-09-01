@@ -98,6 +98,17 @@
     --page-text: #0F172A;
     --card-bg: #FFFFFF;
     --card-border: #E2E8F0;
+
+    /* Phase 64: event tile surface + text tokens (legible in both themes) */
+    --event-tile-bg: #64748B;
+    --event-tile-text: #FFFFFF;
+    --event-tile-session-bg: #00AEEF;
+    --event-tile-assessment-bg: #8B5CF6;
+    --event-tile-checkin-bg: #10B981;
+    --event-tile-group-bg: #F59E0B;
+    --event-tile-blocked-bg: #475569;
+    --event-tile-completed-bg: #334155;
+    --event-tile-completed-text: #F2F6FA;
   }
 
   [data-theme="dark"] {
@@ -145,6 +156,17 @@
     --page-text: #F2F6FA;
     --card-bg: #151D27;
     --card-border: rgba(255, 255, 255, 0.08);
+
+    /* Phase 64: event tile surface + text tokens (dark overrides) */
+    --event-tile-bg: #475569;
+    --event-tile-text: #F2F6FA;
+    --event-tile-session-bg: #00AEEF;
+    --event-tile-assessment-bg: #8B5CF6;
+    --event-tile-checkin-bg: #34D399;
+    --event-tile-group-bg: #FBBF24;
+    --event-tile-blocked-bg: #334155;
+    --event-tile-completed-bg: #1E293B;
+    --event-tile-completed-text: #94A3B8;
 
     /* Task 7: the "light-*" tokens are used app-wide as generic
        elevated/muted aliases — without dark overrides they render

@@ -132,3 +132,54 @@
 
 ## Notes
 - The `exercises` table does not have a `tempo` column yet; the session screen falls back to a default tempo of `3-0-1-0` and allows per-set edits. A schema change is deferred until a later phase.
+
+## Phase 64 — SPA deep-link fallback + UTC date-shift fix + event tile tokens + tile-click modal assertion
+
+**Branch:** `fix/spa-routing-dates-64` off `main` (`b7bef4b`)  
+**Goal:** Fix three verified live-site issues: GitHub Pages 404 on non-root URLs, UTC date-shift in schedule calendar, and hardcoded slate event tiles; add explicit Playwright tile-click→modal assertion.
+
+### Item 1 — SPA deep-link fallback (`404.html`)
+- Added `scripts/copy-404.mjs` to copy `dist/index.html` → `dist/404.html` after the Vite build.
+- Wired as `"postbuild": "node scripts/copy-404.mjs"` inside the existing `build` npm script.
+- `dist/404.html` is byte-identical to `dist/index.html` after build.
+- Deploy mechanism: `.github/workflows/deploy.yml` builds `dist/` and uploads it via `actions/upload-pages-artifact@v3` / `actions/deploy-pages@v4`, so `dist/404.html` is published.
+- Local smoke: `npx vite preview`, direct load `/schedule` returns the app shell (HTTP 200) instead of a 404 page.
+- **Deviation / note:** The app uses `HashRouter`, so a direct load of `/schedule` still lands without a hash. The 404 fallback ensures the SPA shell loads; HashRouter then renders the default route. End users should share/bookmark hash URLs (`/#/schedule`) for deep links. Converting path-based deep links to hash links would require a redirect script in `404.html` and is out of scope for this phase.
+
+### Item 2 — UTC date-shift fix
+- Changed `src/hooks/useSessions.ts` `getDateKey()` from `toISOString().split('T')[0]` to `formatDateKeyLocal(d)` so `todaySessions` and `weekSessions` filter by the user's local calendar day.
+- Changed all human-visible day keying in `src/pages/Schedule.tsx` from `formatDateKeyUtc` to `formatDateKeyLocal`:
+  - `sessionToEvent` date key
+  - `weekEvents` week-date filter
+  - `dayEvents` selected-day filter
+  - `stats` week-date filter
+  - `WeekGrid` cell `dateKey`
+  - `DayGrid` cell `dateKey`
+  - `handleRepeatWeekly` storage-date construction (uses local date string to build the local `Date` that is then stored as ISO)
+- Changed default date inputs in `src/components/schedule/BookSessionDialog.tsx` from `new Date().toISOString().split('T')[0]` to `formatDateKeyLocal(new Date())` so new bookings use the local day and don't mismatch the cell-keyed availability check.
+- `useHabits.ts` keeps `formatDateKeyUtc` because `habit_logs.log_date` is stored as a UTC date string; storage/compare operations remain UTC.
+- Added `src/lib/utils.test.ts` with fixed `TZ=Asia/Shanghai`: asserts `2026-09-01T22:30:00Z` keys to `2026-09-02` locally and remains `2026-09-01` in UTC.
+- **Verification:** Session `4e01d4e4-4477-4f38-8631-cc04e1674966` (`2026-08-30T22:30:00Z`) now renders on **Mon Aug 31** (local +8) instead of Sun Aug 30.
+
+### Item 3 — Event tile token polish
+- Added CSS variables to `src/index.css` for both light and dark themes:
+  `--event-tile-bg`, `--event-tile-text`, `--event-tile-session-bg`, `--event-tile-assessment-bg`, `--event-tile-checkin-bg`, `--event-tile-group-bg`, `--event-tile-blocked-bg`, `--event-tile-completed-bg`, `--event-tile-completed-text`.
+- Updated `getEventColor()` in `src/pages/Schedule.tsx` to return CSS custom properties instead of Tailwind `bg-*` classes; fixed the type mapping to `'session'` (the actual `CalendarEvent` type) instead of the non-existent `'1-on-1'`.
+- Updated `EventCard` to apply background/text colors via inline styles using the theme tokens.
+- **Deviation / note:** `Schedule.tsx` still hardcodes a dark page background (`bg-slate-950 text-white`), so the light-theme schedule screenshot is visually dark. The tile tokens are theme-ready, but a full Schedule light-mode refactor is out of scope for this phase.
+
+### Item 4 — Playwright tile-click modal assertion
+- Fixed pre-existing click bug: `EventCard` now has a direct `onClick` that opens `SessionDetailDialog`; previously, cell-level click used the cell hour as the time, so sessions starting at :30 could not be opened.
+- Added temporary smoke spec `.temp/audit/smoke-64.spec.ts` and serial config `.temp/audit/playwright.config.ts`.
+- Smoke coverage:
+  1. Direct `/schedule` deep route returns HTTP 200 and the app shell.
+  2. Week grid renders the known UTC-boundary session on its local day; screenshots at 390px/834px in both themes; computed-style assertion that tile background ≠ `rgb(100, 116, 139)`; zero horizontal overflow.
+  3. Clicking a session tile opens `SessionDetailDialog` with visible title/time/status and Edit/Delete buttons.
+
+### Gate results
+- `npx tsc -b` ✅
+- `npm run lint` ✅
+- `npm run test` ✅ (468 tests, +3 new)
+- `npm run build` ✅ (`dist/404.html` identical to `dist/index.html`)
+- `npm run test:e2e` ✅ (4/4 existing smoke tests)
+- Phase 64 temp smoke ✅ (3/3 tests)
