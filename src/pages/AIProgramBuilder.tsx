@@ -503,18 +503,18 @@ function GoalTileView({
 
   if (mode === 'details') {
     return (
-      <button onClick={onToggle} className={cn('flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left transition-all', selectedCls)}>
+      <button onClick={onToggle} className={cn('flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left transition-all', selectedCls)}>
         {checkbox}
-        <span className="text-xs font-medium text-[var(--page-text)] truncate flex-1">{name}</span>
+        <span className="text-xs font-medium text-[var(--page-text)] truncate min-w-0 flex-1">{name}</span>
         {primaryChip}
       </button>
     );
   }
   if (mode === 'list') {
     return (
-      <button onClick={onToggle} className={cn('flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all', selectedCls)}>
+      <button onClick={onToggle} className={cn('flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all', selectedCls)}>
         {iconBlock('w-7 h-7')}
-        <span className="text-xs font-semibold text-[var(--page-text)] truncate flex-1">{name}</span>
+        <span className="text-xs font-semibold text-[var(--page-text)] truncate min-w-0 flex-1">{name}</span>
         {primaryChip}
         {checkbox}
       </button>
@@ -568,7 +568,7 @@ function Step1Goal({ data, updateData, customGoals = [], onAddGoal, onArchiveGoa
         <p className="text-[var(--page-text)]/60 text-xs">Select one or more goals — the first selected is the primary.</p>
         <ViewModeSwitch mode={mode} onChange={setMode} />
       </div>
-      <div className={tileGridClass(mode)}>
+      <div className={tileGridClass(mode)} data-testid="view-grid">
         {GOALS.map((goal) => (
           <GoalTileView
             key={goal.id}
@@ -642,25 +642,31 @@ function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], 
           .map((p) => p.id);
         let sessions: MethodSessionVolume[] = [];
         if (programIds.length > 0) {
-          const { data: logs } = await supabase
-            .from('workout_logs')
-            .select('id, completed_at')
-            .eq('client_id', buildForClientId)
-            .in('program_id', programIds)
-            .not('completed_at', 'is', null);
-          const logRows = (logs as { id: string; completed_at: string }[] | null) ?? [];
-          const logIds = logRows.map((l) => l.id);
-          const volByLog = new Map<string, number>();
-          if (logIds.length > 0) {
-            const { data: entries } = await supabase
-              .from('workout_log_entries')
-              .select('workout_log_id, weight_per_set, reps_per_set')
-              .in('workout_log_id', logIds);
-            for (const e of (entries as { workout_log_id: string; weight_per_set: unknown; reps_per_set: unknown }[] | null) ?? []) {
-              volByLog.set(e.workout_log_id, (volByLog.get(e.workout_log_id) ?? 0) + entryVolumeKg(e));
+          // workout_logs link to programs via workouts (workout_logs.workout_id
+          // → workouts.program_id — there is no program_id column on the log)
+          const { data: wos } = await supabase.from('workouts').select('id').in('program_id', programIds);
+          const workoutIds = ((wos as { id: string }[] | null) ?? []).map((w) => w.id);
+          if (workoutIds.length > 0) {
+            const { data: logs } = await supabase
+              .from('workout_logs')
+              .select('id, completed_at')
+              .eq('client_id', buildForClientId)
+              .in('workout_id', workoutIds)
+              .not('completed_at', 'is', null);
+            const logRows = (logs as { id: string; completed_at: string }[] | null) ?? [];
+            const logIds = logRows.map((l) => l.id);
+            const volByLog = new Map<string, number>();
+            if (logIds.length > 0) {
+              const { data: entries } = await supabase
+                .from('workout_log_entries')
+                .select('workout_log_id, weight_per_set, reps_per_set')
+                .in('workout_log_id', logIds);
+              for (const e of (entries as { workout_log_id: string; weight_per_set: unknown; reps_per_set: unknown }[] | null) ?? []) {
+                volByLog.set(e.workout_log_id, (volByLog.get(e.workout_log_id) ?? 0) + entryVolumeKg(e));
+              }
             }
+            sessions = logRows.map((l) => ({ completedAt: l.completed_at, volumeKg: volByLog.get(l.id) ?? 0 }));
           }
-          sessions = logRows.map((l) => ({ completedAt: l.completed_at, volumeKg: volByLog.get(l.id) ?? 0 }));
         }
         if (!cancelled) {
           setMethodHistory(summarizeMethodHistory(sessions));
@@ -794,7 +800,7 @@ function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], 
               {/* Phase 65B Item 2: all 5 view modes; Item 5: defaults chips on
                   Medium+Large ('number of exercises' has no honest source in
                   methods.defaults — omitted, never fabricated). */}
-              <div className={tileGridClass(mode)}>
+              <div className={tileGridClass(mode)} data-testid="view-grid">
                 {group.methods.map((method) => {
                   const isSelected = data.method === method.slug;
                   const isBest = best?.id === method.id;
@@ -810,18 +816,18 @@ function Step2Method({ data, updateData, dbMethods = [], methodCategories = [], 
                   );
                   if (mode === 'details') {
                     return (
-                      <button key={method.id} onClick={() => setDrawerMethod(method)} className={cn('flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left transition-all', selectedCls)}>
+                      <button key={method.id} onClick={() => setDrawerMethod(method)} className={cn('flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left transition-all', selectedCls)}>
                         {checkbox}
-                        <span className="text-xs font-medium text-[var(--page-text)] truncate flex-1">{method.name}</span>
+                        <span className="text-xs font-medium text-[var(--page-text)] truncate min-w-0 flex-1">{method.name}</span>
                         {isBest && <span className="text-[9px] font-bold text-[#22C55E] shrink-0">Best</span>}
                       </button>
                     );
                   }
                   if (mode === 'list') {
                     return (
-                      <button key={method.id} onClick={() => setDrawerMethod(method)} className={cn('flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all', selectedCls)}>
+                      <button key={method.id} onClick={() => setDrawerMethod(method)} className={cn('flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all', selectedCls)}>
                         <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d ? INTENSITY_HEX[d.intensityColor] : 'var(--card-border)' }} />
-                        <span className="text-xs font-semibold text-[var(--page-text)] truncate flex-1">{method.name}</span>
+                        <span className="text-xs font-semibold text-[var(--page-text)] truncate min-w-0 flex-1">{method.name}</span>
                         {isBest && <span className="text-[9px] font-bold text-[#22C55E] shrink-0">Best Match</span>}
                         {checkbox}
                       </button>
@@ -1125,7 +1131,7 @@ function Step4Phases({ data, updateData, dbMethods = [] }: StepProps) {
               <div key={phase.id} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg px-2.5 py-1.5 flex items-center gap-2.5">
                 <input type="checkbox" checked={phase.active} onChange={() => togglePhase(phase.id)} className="w-4 h-4 rounded accent-[#00AEEF] shrink-0" />
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: phase.color }} />
-                <span className={cn('text-xs font-medium truncate flex-1', phase.active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40 line-through')}>{phase.name}</span>
+                <span className={cn('text-xs font-medium truncate min-w-0 flex-1', phase.active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40 line-through')}>{phase.name}</span>
                 <span className="text-[10px] text-[var(--page-text)]/50 shrink-0">{phase.weeks}w</span>
               </div>
             );
@@ -1135,7 +1141,7 @@ function Step4Phases({ data, updateData, dbMethods = [] }: StepProps) {
               <div key={phase.id} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg px-3 py-2 flex items-center gap-2.5">
                 <input type="checkbox" checked={phase.active} onChange={() => togglePhase(phase.id)} className="w-4 h-4 rounded accent-[#00AEEF] shrink-0" />
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: phase.color }} />
-                <span className={cn('text-xs font-semibold truncate flex-1', phase.active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40 line-through')}>{phase.name}</span>
+                <span className={cn('text-xs font-semibold truncate min-w-0 flex-1', phase.active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40 line-through')}>{phase.name}</span>
                 <Badge variant="outline" className="text-[10px] border-[var(--card-border)] text-[var(--page-text)]/60 shrink-0">{phase.weeks} weeks</Badge>
                 <button onClick={() => setEditingPhase({ ...phase })} className="p-1 rounded hover:bg-[var(--page-bg)] text-[var(--page-text)]/60 hover:text-[var(--page-text)] transition-colors shrink-0"><Pencil className="w-3.5 h-3.5" /></button>
                 <button onClick={() => removePhase(phase.id)} className="p-1 rounded hover:bg-[#EF4444]/10 text-[var(--page-text)]/60 hover:text-[#EF4444] transition-colors shrink-0"><X className="w-3.5 h-3.5" /></button>
@@ -1725,7 +1731,7 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
             const nameInner = (
               <>
                 {activeFlag && <ShieldAlert className={cn('w-3 h-3 shrink-0', activeFlag.severity === 'exclude' ? 'text-[#EF4444]' : 'text-[#F59E0B]')} />}
-                <span className="truncate">
+                <span data-testid="exercise-name" className="truncate">
                   {exercise.name}
                   {tbl === 'rich' && (() => { const m = findTaxonomyMatch(exercise.name, taxonomyIndex); return m ? <span className="block text-[9px] font-normal text-[var(--page-text)]/40 truncate">{[m.primary_muscle, m.secondary_muscle].filter(Boolean).join(' · ')}{m.equipment ? ` · ${m.equipment}` : ''}</span> : null; })()}
                 </span>
@@ -1757,7 +1763,7 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
               activeFlag && (activeFlag.severity === 'exclude' ? 'border-l-2 border-l-[#EF4444]' : 'border-l-2 border-l-[#F59E0B]')
             )}>
               {tbl === 'list' || tbl === 'details' ? (
-                <div className={cn('flex items-center gap-2 px-3 text-xs', tbl === 'details' ? 'py-1' : 'py-1.5')}>
+                <div data-testid="exercise-row" className={cn('flex items-center gap-2 px-3 text-xs', tbl === 'details' ? 'py-1' : 'py-1.5')}>
                   <span className="text-[#00AEEF] font-mono font-bold shrink-0">{exercise.code}</span>
                   <span className="text-[var(--page-text)] font-medium truncate flex items-center gap-1 min-w-0 flex-1">{nameInner}</span>
                   {tbl === 'list' && <span className="text-[var(--page-text)]/50 shrink-0 font-mono text-[10px]">{exercise.sets}×{exercise.reps}</span>}
@@ -1766,7 +1772,7 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
               ) : (
                 <>
                   {/* desktop grid row (sm+) */}
-                  <div className={cn('hidden sm:grid gap-1 px-3 py-2 items-center text-xs', tbl === 'slim' ? 'sm:grid-cols-7' : 'sm:grid-cols-9')}>
+                  <div data-testid="exercise-row" className={cn('hidden sm:grid gap-1 px-3 py-2 items-center text-xs', tbl === 'slim' ? 'sm:grid-cols-7' : 'sm:grid-cols-9')}>
                     <span className="text-[#00AEEF] font-mono font-bold shrink-0">{exercise.code}</span>
                     <span className="col-span-2 text-[var(--page-text)] font-medium truncate flex items-center gap-1 min-w-0">{nameInner}</span>
                     <span className="text-[var(--page-text)]/60">{exercise.sets}</span>
@@ -1784,7 +1790,7 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
                     {actionBtns}
                   </div>
                   {/* stacked mobile row (<sm) — line 1 code/name/actions, line 2 stats */}
-                  <div className="sm:hidden px-3 py-2 text-xs">
+                  <div data-testid="exercise-row" className="sm:hidden px-3 py-2 text-xs">
                     <div className="flex items-center gap-2">
                       <span className="text-[#00AEEF] font-mono font-bold shrink-0">{exercise.code}</span>
                       <span className="text-[var(--page-text)] font-medium truncate flex items-center gap-1 min-w-0 flex-1">{nameInner}</span>
