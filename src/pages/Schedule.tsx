@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
-import { formatDateKeyUtc, formatDayMonth } from '@/lib/utils';
+import { formatDateKeyLocal, formatDayMonth } from '@/lib/utils';
 import { useSessions } from '@/hooks/useSessions';
 import type { Session } from '@/hooks/useSessions';
 import { findSessionConflicts, generateWeeklyOccurrences, formatConflictList } from '@/lib/sessionConflicts';
@@ -70,12 +70,12 @@ function timeToMinutes(time: string): number {
 
 function getEventColor(type: string): string {
   switch (type) {
-    case '1-on-1': return 'bg-[#00AEEF]';
-    case 'assessment': return 'bg-violet-500';
-    case 'blocked': return 'bg-slate-600 border-dashed border-slate-500';
-    case 'check-in': return 'bg-emerald-500';
-    case 'group': return 'bg-amber-500';
-    default: return 'bg-slate-500';
+    case 'session': return 'var(--event-tile-session-bg)';
+    case 'assessment': return 'var(--event-tile-assessment-bg)';
+    case 'blocked': return 'var(--event-tile-blocked-bg)';
+    case 'check-in': return 'var(--event-tile-checkin-bg)';
+    case 'group': return 'var(--event-tile-group-bg)';
+    default: return 'var(--event-tile-bg)';
   }
 }
 
@@ -98,7 +98,7 @@ function cellFromPoint(x: number, y: number): { date: string; time: string } | n
 function sessionToEvent(session: ReturnType<typeof useSessions>['sessions'][number]): CalendarEvent {
   const start = new Date(session.startsAt);
   const end = new Date(session.endsAt);
-  const dateKey = formatDateKeyUtc(start);
+  const dateKey = formatDateKeyLocal(start);
   const startTime = start.toTimeString().slice(0, 5);
   const endTime = end.toTimeString().slice(0, 5);
 
@@ -253,17 +253,17 @@ export default function SchedulePage() {
   }, [weekSessions, weekStart]);
 
   const weekEvents = useMemo(() => {
-    const weekDates = weekDays.map(formatDateKeyUtc);
+    const weekDates = weekDays.map(formatDateKeyLocal);
     return events.filter((e) => weekDates.includes(e.date));
   }, [events, weekDays]);
 
   const dayEvents = useMemo(() => {
-    const dateKey = formatDateKeyUtc(weekDays[selectedDay]);
+    const dateKey = formatDateKeyLocal(weekDays[selectedDay]);
     return events.filter((e) => e.date === dateKey);
   }, [events, weekDays, selectedDay]);
 
   const stats = useMemo(() => {
-    const weekDates = weekDays.map(formatDateKeyUtc);
+    const weekDates = weekDays.map(formatDateKeyLocal);
     const weekEvts = events.filter((e) => weekDates.includes(e.date) && e.type !== 'blocked');
     const totalHours = weekEvts.reduce((sum, e) => {
       const start = timeToMinutes(e.startTime);
@@ -307,6 +307,16 @@ export default function SchedulePage() {
       setDetailOpen(true);
     }
   }, [events]);
+
+  const handleEventClick = useCallback((event: CalendarEvent) => {
+    // Phase 64: swallow the synthetic click that follows a mobile press-hold drag.
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    setSelectedEvent(event);
+    setDetailOpen(true);
+  }, []);
 
   /* ── Task 4: drag-and-drop rescheduling ──────────────────────────
      Desktop/tablet: native HTML5 drag of a session tile onto a cell.
@@ -725,8 +735,8 @@ export default function SchedulePage() {
         title: 'Recurring Block',
         type: 'blocked',
         status: 'scheduled',
-        startsAt: new Date(`${formatDateKeyUtc(nextDate)}T${time}`).toISOString(),
-        endsAt: new Date(`${formatDateKeyUtc(nextDate)}T${parseInt(time.split(':')[0]) + 1}:${time.split(':')[1]}`).toISOString(),
+        startsAt: new Date(`${formatDateKeyLocal(nextDate)}T${time}`).toISOString(),
+        endsAt: new Date(`${formatDateKeyLocal(nextDate)}T${parseInt(time.split(':')[0]) + 1}:${time.split(':')[1]}`).toISOString(),
         location: null,
         notes: 'Auto-blocked by repeat weekly',
       });
@@ -893,6 +903,7 @@ export default function SchedulePage() {
               onEventDragStart={handleEventDragStart}
               onEventDragEnd={handleEventDragEnd}
               onEventTouchStart={handleEventTouchStart}
+              onEventClick={handleEventClick}
               dndEnabled={isTrainer}
             />
           ) : (
@@ -908,6 +919,7 @@ export default function SchedulePage() {
               onEventDragStart={handleEventDragStart}
               onEventDragEnd={handleEventDragEnd}
               onEventTouchStart={handleEventTouchStart}
+              onEventClick={handleEventClick}
               dndEnabled={isTrainer}
             />
           )}
@@ -1041,6 +1053,7 @@ interface GridDndProps {
   onEventDragStart: (event: CalendarEvent) => (e: React.DragEvent<HTMLDivElement>) => void;
   onEventDragEnd: () => void;
   onEventTouchStart: (event: CalendarEvent) => (e: React.TouchEvent<HTMLDivElement>) => void;
+  onEventClick: (event: CalendarEvent) => void;
   dndEnabled: boolean;
 }
 
@@ -1056,6 +1069,7 @@ function WeekGrid({
   onEventDragStart,
   onEventDragEnd,
   onEventTouchStart,
+  onEventClick,
   dndEnabled,
 }: {
   weekDays: Date[];
@@ -1082,7 +1096,7 @@ function WeekGrid({
 
           {/* Hour slots for each day */}
           {weekDays.map((day, dayIndex) => {
-            const dateKey = formatDateKeyUtc(day);
+            const dateKey = formatDateKeyLocal(day);
             const hourEvents = events.filter((e) => {
               if (e.date !== dateKey) return false;
               const startH = parseInt(e.startTime.split(':')[0]);
@@ -1115,6 +1129,7 @@ function WeekGrid({
                     onDragStart={onEventDragStart(event)}
                     onDragEnd={onEventDragEnd}
                     onTouchStart={onEventTouchStart(event)}
+                    onClick={() => onEventClick(event)}
                   />
                 ))}
 
@@ -1151,6 +1166,7 @@ function DayGrid({
   onEventDragStart,
   onEventDragEnd,
   onEventTouchStart,
+  onEventClick,
   dndEnabled,
 }: {
   day: Date;
@@ -1159,7 +1175,7 @@ function DayGrid({
   onCellRightClick: (e: React.MouseEvent, date: string, time: string) => void;
   currentTimeRef: React.RefObject<HTMLDivElement | null>;
 } & GridDndProps) {
-  const dateKey = formatDateKeyUtc(day);
+  const dateKey = formatDateKeyLocal(day);
   const now = new Date();
   const currentHour = now.getHours();
   const currentMinute = now.getMinutes();
@@ -1212,6 +1228,7 @@ function DayGrid({
                   onDragStart={onEventDragStart(event)}
                   onDragEnd={onEventDragEnd}
                   onTouchStart={onEventTouchStart(event)}
+                  onClick={() => onEventClick(event)}
                 />
               ))}
 
@@ -1241,6 +1258,7 @@ function EventCard({
   onDragStart,
   onDragEnd,
   onTouchStart,
+  onClick,
 }: {
   event: CalendarEvent;
   compact?: boolean;
@@ -1248,6 +1266,7 @@ function EventCard({
   onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd?: () => void;
   onTouchStart?: (e: React.TouchEvent<HTMLDivElement>) => void;
+  onClick?: () => void;
 }) {
   const start = timeToMinutes(event.startTime);
   const end = timeToMinutes(event.endTime);
@@ -1255,33 +1274,40 @@ function EventCard({
   const height = Math.max((duration / 60) * SLOT_HEIGHT, 24);
   const isCompleted = event.status === 'completed';
 
+  const bgColor = isCompleted ? 'var(--event-tile-completed-bg)' : getEventColor(event.type);
+  const textColor = isCompleted ? 'var(--event-tile-completed-text)' : 'var(--event-tile-text)';
+
   return (
     <div
       draggable={dndEnabled}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onTouchStart={onTouchStart}
+      onClick={onClick}
       className={`absolute left-1 right-1 rounded-lg px-2 py-1 text-xs overflow-hidden cursor-pointer
         ${dndEnabled ? 'cursor-grab active:cursor-grabbing' : ''}
-        ${isCompleted ? 'bg-slate-700/80 border border-slate-600 opacity-70' : `${getEventColor(event.type)} ${event.type === 'blocked' ? 'border' : ''}`}`}
+        ${event.type === 'blocked' && !isCompleted ? 'border border-dashed' : ''}
+        ${isCompleted ? 'opacity-70' : ''}`}
       style={{
         top: '2px',
         height: compact ? Math.min(height, SLOT_HEIGHT - 4) : height - 4,
         zIndex: 5,
+        backgroundColor: bgColor,
+        borderColor: event.type === 'blocked' && !isCompleted ? 'var(--card-border)' : undefined,
       }}
     >
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="h-full">
-        <div className="flex items-center gap-1 font-medium text-white truncate">
+        <div className="flex items-center gap-1 font-medium truncate" style={{ color: textColor }}>
           {isCompleted && <Check size={11} className="shrink-0 text-emerald-400" />}
           <span className="truncate">{event.title}</span>
         </div>
         {/* Task 4: week tiles show the start time when there's room (short
             "{Name} PT" titles + time beat the old truncated "PT with B…") */}
         {compact && height >= 40 && (
-          <div className="text-[9px] text-white/70">{event.startTime}</div>
+          <div className="text-[9px]" style={{ color: textColor, opacity: 0.8 }}>{event.startTime}</div>
         )}
         {!compact && (
-          <div className="text-[10px] text-white/70">
+          <div className="text-[10px]" style={{ color: textColor, opacity: 0.8 }}>
             {event.startTime} – {event.endTime}
             {event.clientName && ` • ${event.clientName}`}
             {isCompleted && ' • completed'}

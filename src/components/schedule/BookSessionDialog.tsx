@@ -42,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { formatDateKeyLocal } from '@/lib/utils';
 import type { CalendarEvent } from '@/types';
 
 interface BookSessionDialogProps {
@@ -100,7 +101,7 @@ export function BookSessionDialog({
   const [step, setStep] = useState(editingEvent ? 2 : 1);
   const [clientId, setClientId] = useState(editingEvent?.clientId || initialClientId || '');
   const [date, setDate] = useState(
-    editingEvent?.date || initialDate || new Date().toISOString().split('T')[0],
+    editingEvent?.date || initialDate || formatDateKeyLocal(new Date()),
   );
   const [startTime, setStartTime] = useState(editingEvent?.startTime || '09:00');
   // Task 1: duration chips replace the End Time dropdown — end is DERIVED
@@ -175,7 +176,7 @@ export function BookSessionDialog({
   const resetForm = () => {
     setStep(1);
     setClientId('');
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate(formatDateKeyLocal(new Date()));
     setStartTime('09:00');
     setDurationMin(DEFAULT_DURATION_MIN);
     setSessionType('session');

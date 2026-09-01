@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { formatDateKeyLocal } from "@/lib/utils";
 import { findSessionConflicts, type ConflictCandidate } from "@/lib/sessionConflicts";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -48,7 +49,9 @@ function toSession(raw: Record<string, unknown>): Session {
 }
 
 function getDateKey(d: Date): string {
-  return d.toISOString().split("T")[0];
+  // Phase 64: human-visible day filtering (today/week/next-upcoming) must use
+  // the client's local timezone so sessions render on the correct calendar day.
+  return formatDateKeyLocal(d);
 }
 
 export function useSessions() {
