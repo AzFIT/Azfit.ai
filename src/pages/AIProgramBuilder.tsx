@@ -2266,9 +2266,14 @@ function Step7Preview({ data, program, clientName, dbMethods = [], clients = [],
         <h4 className="text-[var(--page-text)] text-sm font-bold mb-3 flex items-center gap-2"><Calendar className="w-4 h-4 text-[#F59E0B]" />Weekly Split — {splitName}</h4>
         <div className="grid grid-cols-7 gap-2">
           {data.split.map((day) => (
-            <div key={day.day} className={`rounded-lg p-2.5 text-center border ${day.active ? 'bg-[var(--page-bg)] border-[var(--card-border)]' : 'bg-[var(--page-bg)]/50 border-[var(--card-border)]/50 opacity-60'}`}>
+            <div key={day.day} className={`min-w-0 rounded-lg p-2.5 text-center border ${day.active ? 'bg-[var(--page-bg)] border-[var(--card-border)]' : 'bg-[var(--page-bg)]/50 border-[var(--card-border)]/50 opacity-60'}`}>
               <div className={`text-[10px] font-bold ${day.active ? 'text-[var(--page-text)]' : 'text-[var(--page-text)]/40'}`}>{day.day}</div>
-              <div className={`text-[10px] mt-1 ${day.active ? 'text-[#00AEEF]' : 'text-[var(--page-text)]/40'}`}>{day.active ? day.workout || 'Workout' : 'Rest'}</div>
+              {/* short label only — full labels like 'Push — Chest/Shoulders/Tris'
+                  contain unbreakable slash strings that overflow the 1/7 cell
+                  at 390px (65B/66 mobile audit catch); full label on title. */}
+              <div className={`text-[10px] mt-1 truncate ${day.active ? 'text-[#00AEEF]' : 'text-[var(--page-text)]/40'}`} title={day.active ? day.workout : undefined}>
+                {day.active ? (day.workout.split('—')[0].trim() || 'Workout') : 'Rest'}
+              </div>
               {day.active && <div className="w-1.5 h-1.5 rounded-full bg-[#00AEEF] mx-auto mt-1" />}
             </div>
           ))}
@@ -3230,8 +3235,9 @@ function WizardNavBar({
       ) : (
         // Phase 66 Item 2g: NOT hard-disabled when incomplete — the click
         // triggers the validation jump (scroll + highlight + message) instead
-        // of advancing. aria-disabled + dimmed, identical on both bars.
-        <Button onClick={onNext} aria-disabled={!canProceed} className={cn('bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] font-bold px-6', !canProceed && 'opacity-50')}>
+        // of advancing. Dimmed only (aria-disabled would block the click for
+        // assistive tooling AND Playwright), identical on both bars.
+        <Button onClick={onNext} title={canProceed ? undefined : 'Complete the required fields first'} className={cn('bg-[#00AEEF] hover:bg-[#0099D1] text-[#0B1120] font-bold px-6', !canProceed && 'opacity-50')}>
           Next: {STEPS[currentStep + 1]?.title}
         </Button>
       )}
