@@ -6,7 +6,7 @@
 // themselves or honestly stay unticked with an 'auto' tag.
 // ═══════════════════════════════════════════════════════════════
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Plus, Trash2, X, Loader2, PartyPopper } from "lucide-react";
 import { GlassCard } from "@/components/dashboard/shared/GlassCard";
@@ -60,6 +60,20 @@ export default function MyPlanTodayCard({ habits, habitLogs, checkinDue }: Props
   const [adding, setAdding] = useState(false);
   const [celebrating, setCelebrating] = useState(false);
 
+  // Celebration fires whenever the plan REACHES 100% (last custom tick OR a
+  // derived auto item completing, e.g. the session marked done elsewhere) —
+  // deferred via setTimeout to stay lint-clean (no sync setState-in-effect).
+  useEffect(() => {
+    if (loading) return;
+    const t = window.setTimeout(() => {
+      if (shouldCelebrate(items, celebrationDismissed(todayKey))) {
+        dismissCelebration(todayKey);
+        setCelebrating(true);
+      }
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [loading, items, todayKey]);
+
   const openRange = async (r: TrackingRange) => {
     setRange(r);
     if (r === "daily") return;
@@ -71,12 +85,7 @@ export default function MyPlanTodayCard({ habits, habitLogs, checkinDue }: Props
   const handleToggle = async (item: PlanItem) => {
     if (item.auto || !item.rowId) return; // derived items tick themselves
     await toggleCustom(item.rowId, !item.done);
-    // celebration fires from the user action (no setState-in-effect)
-    const next = items.map((i) => (i.key === item.key ? { ...i, done: !item.done } : i));
-    if (shouldCelebrate(next, celebrationDismissed(todayKey))) {
-      dismissCelebration(todayKey);
-      setCelebrating(true);
-    }
+    // the celebration effect above fires when this tick completes the plan
   };
 
   const handleAdd = async () => {
@@ -89,7 +98,7 @@ export default function MyPlanTodayCard({ habits, habitLogs, checkinDue }: Props
 
   return (
     <>
-      <GlassCard glass accentColor="var(--azfit-primary)" className="!p-5">
+      <GlassCard glass accentColor="var(--azfit-primary)" className="!p-5" dataTestId="plan-today-card">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="min-w-0">
             <h3 className="text-base font-bold" style={{ color: "var(--page-text)" }}>
@@ -158,7 +167,7 @@ export default function MyPlanTodayCard({ habits, habitLogs, checkinDue }: Props
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4"
+            className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4"
             onClick={() => setModalOpen(false)}
           >
             <motion.div
@@ -259,26 +268,6 @@ export default function MyPlanTodayCard({ habits, habitLogs, checkinDue }: Props
                         ))}
                       </ul>
                     )}
-                    {/* custom add */}
-                    <div className="mt-3 flex items-center gap-2">
-                      <Input
-                        value={newLabel}
-                        onChange={(e) => setNewLabel(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                        placeholder="Add a goal for today…"
-                        className="h-8 text-xs"
-                        style={{ backgroundColor: "var(--page-bg)", borderColor: "var(--card-border)", color: "var(--page-text)" }}
-                      />
-                      <button
-                        onClick={handleAdd}
-                        disabled={!newLabel.trim() || adding}
-                        className="flex h-8 shrink-0 items-center gap-1 rounded-lg px-3 text-xs font-semibold text-white disabled:opacity-50"
-                        style={{ backgroundColor: "var(--azfit-primary)" }}
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        Add
-                      </button>
-                    </div>
                   </>
                 ) : rangeLoading || !rangeData ? (
                   <div className="flex justify-center py-10">
@@ -318,6 +307,29 @@ export default function MyPlanTodayCard({ habits, habitLogs, checkinDue }: Props
                   </div>
                 )}
               </div>
+              {/* Phase 67: add-custom pinned to the sheet footer — always in
+                  view on mobile (the scrollable body never buries it) */}
+              {range === "daily" && (
+                <div className="flex items-center gap-2 border-t px-4 py-3" style={{ borderColor: "var(--card-border)" }}>
+                  <Input
+                    value={newLabel}
+                    onChange={(e) => setNewLabel(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                    placeholder="Add a goal for today…"
+                    className="h-8 text-xs"
+                    style={{ backgroundColor: "var(--page-bg)", borderColor: "var(--card-border)", color: "var(--page-text)" }}
+                  />
+                  <button
+                    onClick={handleAdd}
+                    disabled={!newLabel.trim() || adding}
+                    className="flex h-8 shrink-0 items-center gap-1 rounded-lg px-3 text-xs font-semibold text-white disabled:opacity-50"
+                    style={{ backgroundColor: "var(--azfit-primary)" }}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add
+                  </button>
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}
@@ -330,7 +342,7 @@ export default function MyPlanTodayCard({ habits, habitLogs, checkinDue }: Props
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
             onClick={() => setCelebrating(false)}
           >
             <motion.div

@@ -28,6 +28,8 @@ export interface GlassCardProps {
   padding?: string;
   /** Whether the card should have a fixed height or grow */
   grow?: boolean;
+  /** Test hook (Phase 67) */
+  dataTestId?: string;
 }
 
 const cardVariants: Variants = {
@@ -67,6 +69,7 @@ export function GlassCard({
   layoutId,
   padding = "p-5",
   grow = false,
+  dataTestId,
 }: GlassCardProps) {
   const accentStyle = accentColor
     ? { borderTopColor: accentColor }
@@ -78,6 +81,7 @@ export function GlassCard({
       initial="hidden"
       animate="visible"
       layoutId={layoutId}
+      data-testid={dataTestId}
       className={cn(
         // Base shape
         "rounded-xl overflow-hidden relative",
