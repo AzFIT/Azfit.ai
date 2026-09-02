@@ -1201,6 +1201,50 @@ export type Database = {
           }
         ];
       };
+      daily_plan_items: {
+        Row: {
+          id: string;
+          client_id: string;
+          plan_date: string;
+          label: string;
+          source: string;
+          done: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          plan_date: string;
+          label: string;
+          source?: string;
+          done?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          client_id?: string;
+          plan_date?: string;
+          label?: string;
+          source?: string;
+          done?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "daily_plan_items_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       habits: {
         Row: {
           id: string;
