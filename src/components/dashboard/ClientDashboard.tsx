@@ -33,6 +33,7 @@ import { GlassCard } from "./shared/GlassCard";
 import { ProgressRing } from "./shared/ProgressRing";
 import { CollapsibleSection } from "./shared/CollapsibleSection";
 import TodaysMealsCard from "./TodaysMealsCard";
+import MyPlanTodayCard from "./MyPlanTodayCard";
 import SessionsRemainingCard from "./SessionsRemainingCard";
 import MyProgressSection from "./MyProgressSection";
 import MyTargetsCard from "./MyTargetsCard";
@@ -421,6 +422,18 @@ export default function ClientDashboard() {
             </div>
           </div>
         </div>
+      </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          MY PLAN FOR TODAY (Phase 67) — first thing the client sees
+          ═══════════════════════════════════════════════════════════ */}
+      <motion.div
+        variants={fadeInUp}
+        initial="hidden"
+        animate={mounted ? "visible" : "hidden"}
+        className="mb-6"
+      >
+        <MyPlanTodayCard habits={habits} habitLogs={logs} checkinDue={checkinDue} />
       </motion.div>
 
       {/* ═══════════════════════════════════════════════════════════
