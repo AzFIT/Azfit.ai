@@ -196,9 +196,9 @@ export default function MonthCalendar({
       </div>
 
       {/* Footer strip — today's real session summary or the honest empty state */}
-      <div className="mt-3 flex items-center gap-2 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2.5">
+      <div data-testid="today-strip" className="mt-3 flex items-center gap-2 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2.5">
         <span className="text-[10px] font-bold uppercase tracking-wide text-[#00AEEF] shrink-0">
-          Today · {today.toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" })}
+          TODAY · {today.toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" })}
         </span>
         {featured ? (
           <span className="text-xs text-[var(--page-text)] truncate">

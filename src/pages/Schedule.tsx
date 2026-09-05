@@ -286,6 +286,10 @@ export default function SchedulePage() {
     return weekEvts.map(sessionToEvent);
   }, [weekSessions, weekStart]);
 
+  // Phase 68: the month grid reads ALL fetched sessions — `events` is
+  // week-scoped for the week/day grids (unchanged).
+  const monthEvents = useMemo(() => sessions.map(sessionToEvent), [sessions]);
+
   const weekEvents = useMemo(() => {
     const weekDates = weekDays.map(formatDateKeyLocal);
     return events.filter((e) => weekDates.includes(e.date));
@@ -919,7 +923,7 @@ export default function SchedulePage() {
             year={currentDate.getFullYear()}
             month={currentDate.getMonth()}
             onMonthChange={(y, m) => setCurrentDate(new Date(y, m, 1))}
-            events={events}
+            events={monthEvents}
             completionEmoji={calendarEmoji}
             onPickDay={(cell) => setDaySheetKey(cell.dateKey)}
             onEditEmoji={() => setEmojiPickerOpen(true)}
