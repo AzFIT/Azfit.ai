@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   avatar_url TEXT,
   role TEXT NOT NULL CHECK (role IN ('trainer', 'client')) DEFAULT 'client',
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  calendar_emoji TEXT NULL -- Phase 68 Item 3c: per-user completion emoji (applied live 2026-09-02, supabase/profiles-calendar-emoji.sql)
 );
 
 -- ============================================================

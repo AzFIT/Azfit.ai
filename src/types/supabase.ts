@@ -16,6 +16,7 @@ export type Database = {
           email: string;
           full_name: string | null;
           avatar_url: string | null;
+          calendar_emoji: string | null;
           role: "admin" | "trainer" | "client";
           created_at: string;
           updated_at: string;
@@ -25,6 +26,7 @@ export type Database = {
           email: string;
           full_name?: string | null;
           avatar_url?: string | null;
+          calendar_emoji?: string | null;
           role?: "trainer" | "client";
           created_at?: string;
           updated_at?: string;
@@ -34,6 +36,7 @@ export type Database = {
           email?: string;
           full_name?: string | null;
           avatar_url?: string | null;
+          calendar_emoji?: string | null;
           role?: "trainer" | "client";
           created_at?: string;
           updated_at?: string;
