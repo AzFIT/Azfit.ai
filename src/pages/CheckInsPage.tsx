@@ -17,6 +17,7 @@ import { supabase } from "@/lib/supabase";
 import { formatDateShort } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { isInCurrentWeek } from "@/lib/checkinWeek";
+import ArcSlider from "@/components/ui/ArcSlider";
 import type { Database } from "@/types/supabase";
 import ClientHabits from "@/components/checkins/ClientHabits";
 import TrainerHabits from "@/components/checkins/TrainerHabits";
@@ -780,25 +781,30 @@ function ClientCheckIns() {
                     />
                   )}
                   {field.type === "scale" && (
-                    <div className="flex flex-wrap gap-2">
-                      {Array.from({ length: 10 }).map((_, i) => {
-                        const n = i + 1;
-                        const selected = answers[field.key] === n;
-                        return (
-                          <button
-                            key={n}
-                            onClick={() => setAnswers((a) => ({ ...a, [field.key]: n }))}
-                            className="h-10 w-10 rounded-lg border text-sm font-semibold transition-colors"
-                            style={{
-                              borderColor: selected ? "#00AEEF" : "var(--card-border)",
-                              backgroundColor: selected ? "rgba(0,174,239,0.15)" : "transparent",
-                              color: selected ? "#00AEEF" : "var(--page-text)",
-                            }}
-                          >
-                            {n}
-                          </button>
-                        );
-                      })}
+                    /* Phase 69: the 1-10 rating (energy/recovery) is now the
+                       ArcSlider dial — the button grid it replaces was the
+                       existing input; the center readout types exact values. */
+                    <div className="flex flex-col items-center gap-1">
+                      <ArcSlider
+                        value={typeof answers[field.key] === "number" ? (answers[field.key] as number) : null}
+                        min={1}
+                        max={10}
+                        step={1}
+                        unit="/ 10"
+                        onChange={(v) => setAnswers((a) => ({ ...a, [field.key]: v }))}
+                        size={170}
+                        aria-label={field.label}
+                      />
+                      {typeof answers[field.key] === "number" && (
+                        <button
+                          type="button"
+                          onClick={() => setAnswers((a) => { const next = { ...a }; delete next[field.key]; return next; })}
+                          className="text-[10px] font-medium underline underline-offset-2"
+                          style={{ color: "var(--light-text-muted)" }}
+                        >
+                          Clear rating
+                        </button>
+                      )}
                     </div>
                   )}
                   {field.type === "yesno" && (

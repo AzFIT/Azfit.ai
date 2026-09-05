@@ -17,6 +17,7 @@ import {
   type LifestyleTargets,
 } from "@/lib/lifestyleTargets";
 import { GlassCard } from "./shared/GlassCard";
+import ArcSlider from "@/components/ui/ArcSlider";
 import type { Json } from "@/types/supabase";
 
 const inputCls =
@@ -118,45 +119,61 @@ export default function MyTargetsCard({ clientsId }: { clientsId: string }) {
         </div>
       ) : (
         <div className="space-y-3 py-2">
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <label className={labelCls}>Steps / day</label>
-              <input
-                type="number"
-                min={0}
-                className={inputCls}
-                value={steps}
-                onChange={(e) => setSteps(e.target.value)}
-                placeholder="8000"
-              />
-            </div>
-            <div>
+          {/* Phase 69: sleep + water use the ArcSlider dial (drag / tap /
+              keyboard); the center readout doubles as the exact-value input
+              (companion fallback). Steps stays a numeric input — its 0–20k
+              range is a poor fit for a 240° dial (documented). */}
+          <div>
+            <label className={labelCls}>Steps / day</label>
+            <input
+              type="number"
+              min={0}
+              className={inputCls}
+              value={steps}
+              onChange={(e) => setSteps(e.target.value)}
+              placeholder="8000"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2 justify-items-center">
+            <div className="flex flex-col items-center">
               <label className={labelCls}>Sleep (h)</label>
-              <input
-                type="number"
+              <ArcSlider
+                value={sleep.trim() ? parseFloat(sleep) : null}
                 min={0}
+                max={12}
                 step={0.5}
-                className={inputCls}
-                value={sleep}
-                onChange={(e) => setSleep(e.target.value)}
-                placeholder="7.5"
+                unit="h"
+                onChange={(v) => setSleep(String(v))}
+                size={150}
+                aria-label="Sleep target hours"
               />
+              {sleep.trim() && (
+                <button onClick={() => setSleep("")} className="mt-1 text-[10px] font-medium underline underline-offset-2" style={{ color: "var(--light-text-muted)" }}>
+                  Clear target
+                </button>
+              )}
             </div>
-            <div>
+            <div className="flex flex-col items-center">
               <label className={labelCls}>Water (ml)</label>
-              <input
-                type="number"
+              <ArcSlider
+                value={water.trim() ? parseFloat(water) : null}
                 min={0}
-                step={50}
-                className={inputCls}
-                value={water}
-                onChange={(e) => setWater(e.target.value)}
-                placeholder="2500"
+                max={5000}
+                step={100}
+                unit="ml"
+                onChange={(v) => setWater(String(v))}
+                size={150}
+                aria-label="Water target in milliliters"
               />
+              {water.trim() && (
+                <button onClick={() => setWater("")} className="mt-1 text-[10px] font-medium underline underline-offset-2" style={{ color: "var(--light-text-muted)" }}>
+                  Clear target
+                </button>
+              )}
             </div>
           </div>
           <p className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
-            Leave a field empty to clear that target.
+            Leave a field empty (or Clear a dial) to clear that target.
           </p>
           <div className="flex items-center justify-end gap-2">
             <button
