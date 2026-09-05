@@ -69,9 +69,16 @@ export default function ArcSlider({
 
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
     if (disabled) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setDragging(true);
+    // commit FIRST (tap-to-set must work even when capture fails), then
+    // capture — guarded: synthetic/keyboard-originated pointer ids throw
+    // NotFoundError and must never kill the commit (caught by the 69 probe).
     commitFromPoint(e.clientX, e.clientY);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      /* synthetic pointer — no capture needed */
+    }
+    setDragging(true);
   };
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
     if (!dragging || disabled) return;
