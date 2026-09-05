@@ -31,6 +31,10 @@ import { CellContextMenu } from '@/components/schedule/CellContextMenu';
 import { BookSessionDialog } from '@/components/schedule/BookSessionDialog';
 import { BlockTimeDialog } from '@/components/schedule/BlockTimeDialog';
 import { SessionDetailDialog } from '@/components/schedule/SessionDetailDialog';
+import MonthCalendar from '@/components/schedule/MonthCalendar';
+import DaySheet from '@/components/schedule/DaySheet';
+import EmojiPickerDialog from '@/components/schedule/EmojiPickerDialog';
+import { DEFAULT_COMPLETION_EMOJI } from '@/lib/scheduleEmoji';
 import { buildSessionUpdate } from '@/lib/sessionUpdate';
 import { durationFromTimes, endTimeFromDuration } from '@/lib/sessionDuration';
 import {
@@ -125,12 +129,15 @@ export default function SchedulePage() {
   const { sessions, loading, saving, isTrainer, createSession, createSessions, updateSession, cancelSession, deleteSession, rescheduleSession, weekSessions } = useSessions();
 
   const [currentDate, setCurrentDate] = useState(new Date());
-  // Task 4: phones default to the Day/agenda view (7 cramped columns → one
-  // readable day); tablet/desktop keep the week grid. Day defaults to today.
-  const [viewMode, setViewMode] = useState<'week' | 'day'>(() =>
-    typeof window !== 'undefined' && window.innerWidth < 768 ? 'day' : 'week'
-  );
+  // Phase 68: the month grid is the new default view everywhere
+  // (mobile-first redesign); week/day stay available via the toggle.
+  const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
   const [selectedDay, setSelectedDay] = useState(() => (new Date().getDay() + 6) % 7);
+  // Phase 68 Item 3: per-user completion emoji (profiles.calendar_emoji —
+  // NULL = never customized → default; '' = user chose None)
+  const [calendarEmoji, setCalendarEmoji] = useState<string>(DEFAULT_COMPLETION_EMOJI);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [daySheetKey, setDaySheetKey] = useState<string | null>(null);
   // Clients for the booking picker: resolved to profiles.id via email —
   // sessions.client_id references profiles(id), so clients WITHOUT a linked
   // app account are omitted (they cannot have sessions).
@@ -138,6 +145,33 @@ export default function SchedulePage() {
   // Phase 43 Fix 5: real roster size for the header stat (was the count of
   // clients WITH sessions this week — a meaningless "0 clients" on quiet weeks)
   const [rosterCount, setRosterCount] = useState<number | null>(null);
+
+  // Phase 68 Item 3c: load the per-user completion emoji (profiles row)
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('calendar_emoji')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      const v = (data as { calendar_emoji: string | null } | null)?.calendar_emoji;
+      if (v != null) setCalendarEmoji(v);
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
+  const handleSaveEmoji = useCallback(async (emoji: string) => {
+    setCalendarEmoji(emoji);
+    if (!user?.id) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ calendar_emoji: emoji })
+      .eq('id', user.id);
+    if (error) toast.error('Could not save the emoji preference');
+  }, [user]);
 
   useEffect(() => {
     if (!user?.id || !isTrainer) return;
@@ -756,48 +790,53 @@ export default function SchedulePage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="min-h-screen bg-[var(--page-bg)] text-[var(--page-text)]">
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-xl border-b border-slate-800">
+      <header className="sticky top-0 z-30 bg-[var(--card-bg)] backdrop-blur-xl border-b border-[var(--card-border)]">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
-              <h1 className="text-lg font-bold text-white flex items-center gap-2">
+              <h1 className="text-lg font-bold text-[var(--page-text)] flex items-center gap-2">
                 <CalendarIcon className="w-5 h-5 text-[#00AEEF]" />
                 Schedule
               </h1>
-              {/* Week Nav */}
-              <div className="flex items-center gap-1 bg-slate-800/50 rounded-lg p-0.5">
-                <button onClick={goToPrevWeek} className="p-1.5 rounded hover:bg-slate-700 text-slate-400">
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button onClick={goToToday} className="px-2 py-1 text-xs font-medium text-slate-300 hover:text-white">
-                  Today
-                </button>
-                <button onClick={goToNextWeek} className="p-1.5 rounded hover:bg-slate-700 text-slate-400">
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-              <span className="text-sm text-slate-400">
-                {formatDayMonth(weekDays[0])} – {formatDayMonth(weekDays[6])}
-              </span>
+              {/* Week Nav (hidden in month mode — the month grid has its
+                  own ‹ › + Today header row per the 68 mockup) */}
+              {viewMode !== 'month' && (
+                <>
+                  <div className="flex items-center gap-1 bg-[var(--page-bg)] rounded-lg p-0.5">
+                    <button onClick={goToPrevWeek} className="p-1.5 rounded hover:bg-[var(--page-bg)] text-[var(--light-text-muted)]">
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button onClick={goToToday} className="px-2 py-1 text-xs font-medium text-[var(--page-text)] hover:text-[var(--page-text)]">
+                      Today
+                    </button>
+                    <button onClick={goToNextWeek} className="p-1.5 rounded hover:bg-[var(--page-bg)] text-[var(--light-text-muted)]">
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <span className="text-sm text-[var(--light-text-muted)]">
+                    {formatDayMonth(weekDays[0])} – {formatDayMonth(weekDays[6])}
+                  </span>
+                </>
+              )}
             </div>
 
             {/* View Toggle + Stats */}
             <div className="flex items-center gap-3">
               {/* Quick Stats */}
-              <div className="hidden md:flex items-center gap-3 text-xs text-slate-400">
+              <div className="hidden md:flex items-center gap-3 text-xs text-[var(--light-text-muted)]">
                 <span className="flex items-center gap-1">
                   <Dumbbell className="w-3 h-3 text-[#00AEEF]" />
                   {stats.sessions} sessions
                 </span>
                 <span className="flex items-center gap-1">
-                  <Timer className="w-3 h-3 text-violet-400" />
+                  <Timer className="w-3 h-3 text-[#F59E0B]" />
                   {stats.hours}h
                 </span>
                 {isTrainer && rosterCount !== null && (
                   <span className="flex items-center gap-1" title="Active clients on your roster">
-                    <Users className="w-3 h-3 text-emerald-400" />
+                    <Users className="w-3 h-3 text-[#22C55E]" />
                     {rosterCount} clients
                   </span>
                 )}
@@ -806,7 +845,7 @@ export default function SchedulePage() {
               {/* Download upcoming .ics */}
               <button
                 onClick={handleDownloadUpcoming}
-                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-slate-700/50 text-slate-300"
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-[var(--page-bg)] text-[var(--page-text)]"
                 title="Download all upcoming sessions (.ics)"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -814,11 +853,19 @@ export default function SchedulePage() {
               </button>
 
               {/* View Toggle */}
-              <div className="flex items-center bg-slate-800/50 rounded-lg p-0.5">
+              <div className="flex items-center bg-[var(--page-bg)] rounded-lg p-0.5">
+                <button
+                  onClick={() => setViewMode('month')}
+                  className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                    viewMode === 'month' ? 'bg-[#00AEEF] text-[#0B1120]' : 'text-[var(--light-text-muted)] hover:text-[var(--page-text)]'
+                  }`}
+                >
+                  Month
+                </button>
                 <button
                   onClick={() => setViewMode('week')}
                   className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                    viewMode === 'week' ? 'bg-[#00AEEF] text-[#0B1120]' : 'text-slate-400 hover:text-white'
+                    viewMode === 'week' ? 'bg-[#00AEEF] text-[#0B1120]' : 'text-[var(--light-text-muted)] hover:text-[var(--page-text)]'
                   }`}
                 >
                   Week
@@ -826,7 +873,7 @@ export default function SchedulePage() {
                 <button
                   onClick={() => setViewMode('day')}
                   className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                    viewMode === 'day' ? 'bg-[#00AEEF] text-[#0B1120]' : 'text-slate-400 hover:text-white'
+                    viewMode === 'day' ? 'bg-[#00AEEF] text-[#0B1120]' : 'text-[var(--light-text-muted)] hover:text-[var(--page-text)]'
                   }`}
                 >
                   Day
@@ -845,7 +892,7 @@ export default function SchedulePage() {
                   className={`flex flex-col items-center px-3 py-2 rounded-xl text-xs transition-all min-w-[60px] ${
                     selectedDay === i
                       ? 'bg-[#00AEEF]/15 text-[#00AEEF] border border-[#00AEEF]/30'
-                      : 'bg-slate-800/30 text-slate-400 border border-transparent hover:border-slate-700'
+                      : 'bg-[var(--page-bg)] text-[var(--light-text-muted)] border border-transparent hover:border-[var(--card-border)]'
                   }`}
                 >
                   <span className="font-bold">{DAYS[i]}</span>
@@ -860,9 +907,23 @@ export default function SchedulePage() {
       {/* Time Grid */}
       <div className="max-w-7xl mx-auto px-4 py-4 relative">
         {isLoading && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/50">
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#00AEEF] border-t-transparent" />
           </div>
+        )}
+
+        {/* Phase 68 Item 2: the mobile-first month grid (default view) lives
+            OUTSIDE the internal time-grid scroller — it scrolls with the page. */}
+        {viewMode === 'month' && (
+          <MonthCalendar
+            year={currentDate.getFullYear()}
+            month={currentDate.getMonth()}
+            onMonthChange={(y, m) => setCurrentDate(new Date(y, m, 1))}
+            events={events}
+            completionEmoji={calendarEmoji}
+            onPickDay={(cell) => setDaySheetKey(cell.dateKey)}
+            onEditEmoji={() => setEmojiPickerOpen(true)}
+          />
         )}
 
         {/* Day Headers (week view) */}
@@ -875,7 +936,7 @@ export default function SchedulePage() {
                 className={`text-center py-2 rounded-xl text-xs font-medium ${
                   isToday(day)
                     ? 'bg-[#00AEEF]/15 text-[#00AEEF] border border-[#00AEEF]/30'
-                    : 'bg-slate-800/30 text-slate-400'
+                    : 'bg-[var(--page-bg)] text-[var(--light-text-muted)]'
                 }`}
               >
                 <div className="font-bold">{DAYS[i]}</div>
@@ -888,9 +949,9 @@ export default function SchedulePage() {
         {/* Grid */}
         <div
           ref={gridRef}
-          className="overflow-y-auto max-h-[calc(100vh-220px)] scrollbar-thin scrollbar-thumb-slate-700"
+          className={viewMode === 'month' ? 'hidden' : 'overflow-y-auto max-h-[calc(100vh-220px)] scrollbar-thin'}
         >
-          {viewMode === 'week' ? (
+          {viewMode === 'month' ? null : viewMode === 'week' ? (
             <WeekGrid
               weekDays={weekDays}
               events={weekEvents}
@@ -1014,25 +1075,25 @@ export default function SchedulePage() {
 
       {/* Conflict Warning Dialog */}
       <Dialog open={conflictDialog.open} onOpenChange={closeConflictDialog}>
-        <DialogContent className="max-w-md border-[#2A3447] bg-[#1A2235] text-[#F0F0F0]">
+        <DialogContent className="max-w-md border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--page-text)]">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-[#F0F0F0]">{conflictDialog.title}</DialogTitle>
+            <DialogTitle className="text-lg font-semibold text-[var(--page-text)]">{conflictDialog.title}</DialogTitle>
           </DialogHeader>
-          <div className="whitespace-pre-line text-sm text-[#94A3B8] max-h-64 overflow-y-auto">
+          <div className="whitespace-pre-line text-sm text-[var(--light-text-muted)] max-h-64 overflow-y-auto">
             {conflictDialog.message}
           </div>
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
               onClick={closeConflictDialog}
-              className="border-[#2A3447] text-[#94A3B8]"
+              className="border-[var(--card-border)] text-[var(--light-text-muted)]"
             >
               Cancel
             </Button>
             {conflictDialog.allowSkip && conflictDialog.onConfirm && (
               <Button
                 onClick={conflictDialog.onConfirm}
-                className="bg-[#00AEEF] text-white hover:bg-[#00BFFF]"
+                className="bg-[#00AEEF] text-white hover:opacity-90"
               >
                 Skip & Book Rest
               </Button>
@@ -1040,6 +1101,27 @@ export default function SchedulePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Phase 68 Item 2: bottom-sheet day view (month grid day tap) —
+          session rows route into the existing detail modal above. */}
+      <DaySheet
+        open={daySheetKey != null}
+        dateKey={daySheetKey ?? ''}
+        events={daySheetKey ? events.filter((e) => e.date === daySheetKey) : []}
+        onClose={() => setDaySheetKey(null)}
+        onPickEvent={(ev) => {
+          setDaySheetKey(null);
+          handleEventClick(ev);
+        }}
+      />
+
+      {/* Phase 68 Item 3b: completion-emoji editor (per-user, profiles row) */}
+      <EmojiPickerDialog
+        open={emojiPickerOpen}
+        current={calendarEmoji}
+        onSave={handleSaveEmoji}
+        onClose={() => setEmojiPickerOpen(false)}
+      />
     </div>
   );
 }
@@ -1088,7 +1170,7 @@ function WeekGrid({
       {HOURS.map((hour) => (
         <div key={hour} className="contents">
           {/* Time Label */}
-          <div className="text-right pr-2 text-[10px] text-slate-500 font-mono pt-1"
+          <div className="text-right pr-2 text-[10px] text-[var(--light-text-muted)] font-mono pt-1"
             style={{ height: SLOT_HEIGHT }}
           >
             {hour.toString().padStart(2, '0')}:00
@@ -1111,7 +1193,7 @@ function WeekGrid({
                 className={`relative border rounded-lg transition-colors ${
                   drag && drag.overDate === dateKey && parseInt(drag.overTime, 10) === hour
                     ? 'border-[#00AEEF] bg-[#00AEEF]/10 ring-1 ring-[#00AEEF]'
-                    : 'border-slate-800/50 bg-slate-900/20 hover:bg-slate-800/20'
+                    : 'border-[var(--card-border)] bg-[var(--page-bg)] hover:bg-[var(--card-bg)]'
                 }`}
                 style={{ height: SLOT_HEIGHT }}
                 onClick={() => onCellClick(dateKey, `${hour.toString().padStart(2, '0')}:00`)}
@@ -1204,7 +1286,7 @@ function DayGrid({
 
         return (
           <div key={hour} className="flex gap-2">
-            <div className="w-14 text-right pr-2 text-[10px] text-slate-500 font-mono pt-2 shrink-0">
+            <div className="w-14 text-right pr-2 text-[10px] text-[var(--light-text-muted)] font-mono pt-2 shrink-0">
               {hour.toString().padStart(2, '0')}:00
             </div>
             <div
@@ -1213,7 +1295,7 @@ function DayGrid({
               className={`flex-1 relative border rounded-lg transition-colors min-h-[48px] ${
                 drag && drag.overDate === dateKey && parseInt(drag.overTime, 10) === hour
                   ? 'border-[#00AEEF] bg-[#00AEEF]/10 ring-1 ring-[#00AEEF]'
-                  : 'border-slate-800/50 bg-slate-900/20 hover:bg-slate-800/20'
+                  : 'border-[var(--card-border)] bg-[var(--page-bg)] hover:bg-[var(--card-bg)]'
               }`}
               onClick={() => onCellClick(dateKey, `${hour.toString().padStart(2, '0')}:00`)}
               onContextMenu={(e) => onCellRightClick(e, dateKey, `${hour.toString().padStart(2, '0')}:00`)}
@@ -1298,7 +1380,7 @@ function EventCard({
     >
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="h-full">
         <div className="flex items-center gap-1 font-medium truncate" style={{ color: textColor }}>
-          {isCompleted && <Check size={11} className="shrink-0 text-emerald-400" />}
+          {isCompleted && <Check size={11} className="shrink-0 text-[#22C55E]" />}
           <span className="truncate">{event.title}</span>
         </div>
         {/* Task 4: week tiles show the start time when there's room (short
