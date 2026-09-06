@@ -137,7 +137,9 @@ function HeroNav({
     <nav
       className="fixed top-0 left-0 right-0 z-50 flex h-16 items-center justify-between px-4 transition-all duration-300 lg:px-8"
       style={{
-        backgroundColor: scrolled ? "rgba(15, 23, 42, 0.95)" : "transparent",
+        backgroundColor: scrolled
+          ? "color-mix(in srgb, var(--landing-navy-to) 92%, transparent)"
+          : "transparent",
         backdropFilter: scrolled ? "blur(20px)" : "none",
         WebkitBackdropFilter: scrolled ? "blur(20px)" : "none",
       }}
@@ -207,44 +209,11 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
       id="hero"
       className="relative flex min-h-[100dvh] flex-col overflow-hidden"
     >
-      {/* Background image (no baked logo) with a subtle Ken Burns drift */}
-      <motion.div
-        className="absolute inset-0"
-        animate={{ scale: [1.05, 1.12] }}
-        transition={{
-          duration: 20,
-          ease: "linear",
-          repeat: Infinity,
-          repeatType: "reverse",
-        }}
-        style={{ transformOrigin: "50% 50%" }}
-      >
-        <img
-          src={`${import.meta.env.BASE_URL}images/bg-wireframe-gym.webp`}
-          alt=""
-          fetchPriority="high"
-          className="h-full w-full object-cover"
-        />
-      </motion.div>
-
-      {/* Dark overlay gradient — keeps text readable while letting the
-          baked-in logo cluster show through */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(to bottom, rgba(11,17,32,0.6) 0%, rgba(11,17,32,0.72) 55%, rgba(11,17,32,0.92) 100%)",
-        }}
-      />
-
-      {/* Scanline overlay */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-30"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(6,182,212,0.03) 1px, rgba(6,182,212,0.03) 2px)",
-        }}
-      />
+      {/* Simple navy gradient + one subtle radial cyan glow (Phase 71) —
+          the busy backdrop artwork was removed per the owner-approved
+          loyalty-page aesthetic; the orbiting logo stays the centerpiece */}
+      <div className="absolute inset-0 landing-navy-bg" />
+      <div className="pointer-events-none absolute inset-0 landing-dot-texture opacity-60" />
 
       {/* Hero content: headline at top, orb unit in the middle, sub + CTA
           at bottom — all in normal flow on one central axis */}
@@ -256,25 +225,17 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.2, ease: easeDefault }}
-          className="mb-4 text-xs font-bold uppercase tracking-[0.15em]"
-          style={{
-            color: "var(--azfit-secondary-light)",
-            textShadow:
-              "0 0 12px rgba(6,182,212,0.4), 0 2px 4px rgba(0,0,0,0.3)",
-          }}
+          className="section-label mb-4 text-xs font-semibold"
         >
           Personal Training, Reimagined.
         </motion.p>
 
-        {/* Headline */}
+        {/* Headline — chrome/silver gradient matching the logo finish */}
         <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4, ease: easeDefault }}
-          className="max-w-[640px] text-4xl font-extrabold leading-[1.05] tracking-tight text-white lg:text-[56px]"
-          style={{
-            textShadow: "0 2px 4px rgba(0,0,0,0.6), 0 0 20px rgba(0,0,0,0.3)",
-          }}
+          className="font-display text-chrome max-w-[640px] text-4xl font-bold leading-[1.05] lg:text-[56px]"
         >
           Your Fitness Data, Beautifully Visualized.
         </motion.h1>
@@ -283,7 +244,8 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
-          className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-teal-600 text-white text-sm font-medium shadow-lg"
+          className="landing-surface mt-4 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium"
+          style={{ color: "var(--landing-cyan)" }}
         >
           <span>🚀</span>
           <span>Live Demo Available</span>
@@ -346,17 +308,18 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
         </div>
       </div>
 
-      {/* Scroll indicator */}
+      {/* Scroll indicator (decorative — hidden on mobile where the hero
+          content column is tall enough to collide with the CTAs) */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.6 }}
         transition={{ duration: 0.4, delay: 1.2 }}
-        className="absolute bottom-8 left-1/2 z-10 -translate-x-1/2"
+        className="absolute bottom-8 left-1/2 z-10 hidden -translate-x-1/2 sm:block"
       >
         <ChevronDown
           size={28}
           className="animate-bounce-slow"
-          style={{ color: "var(--azfit-secondary-light)" }}
+          style={{ color: "var(--landing-cyan)" }}
         />
       </motion.div>
     </section>
@@ -370,7 +333,7 @@ function StatsSection() {
     <section
       id="features"
       className="flex h-auto items-center py-10 lg:h-[140px] lg:py-0"
-      style={{ backgroundColor: "var(--dark-bg)" }}
+      style={{ backgroundColor: "var(--landing-navy-to)" }}
     >
       <div className="mx-auto grid w-full max-w-5xl grid-cols-2 gap-8 px-6 lg:grid-cols-4 lg:gap-0">
         {[
@@ -385,11 +348,10 @@ function StatsSection() {
             className="flex flex-col items-center text-center"
           >
             <span
-              className="text-2xl font-extrabold lg:text-[30px]"
+              className="font-display text-2xl font-semibold lg:text-[30px]"
               style={{
-                color: "var(--azfit-secondary-light)",
-                textShadow:
-                  "0 0 12px rgba(6,182,212,0.4), 0 2px 4px rgba(0,0,0,0.3)",
+                color: "var(--landing-cyan)",
+                textShadow: "0 0 12px var(--landing-glow)",
               }}
             >
               {stat.label === "Built for Coaches First" ? (
@@ -458,39 +420,25 @@ function FeaturesSection() {
     <section
       id="features"
       className="relative overflow-hidden px-6 py-16 lg:py-24"
-      style={{ backgroundColor: "var(--light-bg)" }}
+      style={{ backgroundColor: "var(--landing-navy-from)" }}
     >
-      {/* Holographic gym backdrop with a light overlay to preserve readability */}
-      <div className="pointer-events-none absolute inset-0">
-        <img
-          src={`${import.meta.env.BASE_URL}images/bg-holo-gym.webp`}
-          alt=""
-          loading="lazy"
-          className="h-full w-full object-cover"
-        />
-        <div
-          className="absolute inset-0"
-          style={{ background: "linear-gradient(rgba(248,250,252,0.9), rgba(241,245,249,0.94))" }}
-        />
-      </div>
       <div className="relative z-10 mx-auto max-w-6xl">
         {/* Section header */}
-        <ScrollReveal className="mb-12 text-center lg:mb-16">
-          <p
-            className="mb-3 text-xs font-bold uppercase tracking-[0.1em]"
-            style={{ color: "var(--azfit-primary)" }}
-          >
-            FEATURES
-          </p>
+        <ScrollReveal className="mb-12 lg:mb-16">
+          <div className="flex items-center gap-4">
+            <p className="section-label text-xs font-semibold">
+              01 — Features
+            </p>
+            <div className="section-divider flex-1" />
+          </div>
           <h2
-            className="text-3xl font-bold tracking-tight lg:text-[40px]"
-            style={{ color: "var(--light-text-primary)" }}
+            className="font-display mt-4 text-3xl font-semibold text-white lg:text-[40px]"
           >
             Everything You Need to Train Smarter
           </h2>
           <p
-            className="mx-auto mt-4 max-w-[560px] text-base leading-relaxed lg:text-lg"
-            style={{ color: "var(--light-text-secondary)" }}
+            className="mt-4 max-w-[560px] text-base leading-relaxed lg:text-lg"
+            style={{ color: "var(--dark-text-secondary)" }}
           >
             From workout logging to nutrition tracking, AzFIT gives you complete
             visibility into your fitness journey.
@@ -504,8 +452,7 @@ function FeaturesSection() {
               <motion.div
                 whileHover={{ y: -2 }}
                 transition={{ duration: 0.2 }}
-                className="rounded-2xl border bg-white p-6 transition-shadow duration-200 hover:shadow-lg lg:p-8"
-                style={{ borderColor: "var(--light-border)" }}
+                className="landing-surface rounded-2xl p-6 transition-shadow duration-200 hover:shadow-lg lg:p-8"
               >
                 {/* Icon */}
                 <motion.div
@@ -520,14 +467,13 @@ function FeaturesSection() {
                 </motion.div>
 
                 <h3
-                  className="mb-3 text-xl font-semibold"
-                  style={{ color: "var(--light-text-primary)" }}
+                  className="mb-3 text-xl font-semibold text-white"
                 >
                   {feature.title}
                 </h3>
                 <p
                   className="text-sm leading-relaxed lg:text-base"
-                  style={{ color: "var(--light-text-secondary)" }}
+                  style={{ color: "var(--dark-text-secondary)" }}
                 >
                   {feature.description}
                 </p>
@@ -571,20 +517,19 @@ function HowItWorksSection() {
     <section
       id="how-it-works"
       className="px-6 py-16 lg:py-24"
-      style={{ backgroundColor: "var(--light-elevated)" }}
+      style={{ backgroundColor: "var(--landing-navy-to)" }}
     >
       <div className="mx-auto max-w-4xl">
         {/* Section header */}
-        <ScrollReveal className="mb-12 text-center lg:mb-16">
-          <p
-            className="mb-3 text-xs font-bold uppercase tracking-[0.1em]"
-            style={{ color: "var(--azfit-primary)" }}
-          >
-            HOW IT WORKS
-          </p>
+        <ScrollReveal className="mb-12 lg:mb-16">
+          <div className="flex items-center gap-4">
+            <p className="section-label text-xs font-semibold">
+              02 — How It Works
+            </p>
+            <div className="section-divider flex-1" />
+          </div>
           <h2
-            className="text-3xl font-bold tracking-tight lg:text-[40px]"
-            style={{ color: "var(--light-text-primary)" }}
+            className="font-display mt-4 text-3xl font-semibold text-white lg:text-[40px]"
           >
             Three Steps to Better Training
           </h2>
@@ -596,7 +541,7 @@ function HowItWorksSection() {
           <div className="absolute top-5 left-0 hidden h-0.5 w-full md:block">
             <motion.div
               className="h-full origin-left"
-              style={{ backgroundColor: "var(--light-border)" }}
+              style={{ backgroundColor: "var(--landing-panel-border)" }}
               initial={{ scaleX: 0 }}
               animate={inView ? { scaleX: 1 } : { scaleX: 0 }}
               transition={{ duration: 1, ease: easeDefault, delay: 0.3 }}
@@ -635,8 +580,7 @@ function HowItWorksSection() {
                     ease: easeDefault,
                     delay: i * 0.2,
                   }}
-                  className="mb-3 text-xl font-semibold"
-                  style={{ color: "var(--light-text-primary)" }}
+                  className="mb-3 text-xl font-semibold text-white"
                 >
                   {step.title}
                 </motion.h3>
@@ -652,7 +596,7 @@ function HowItWorksSection() {
                     delay: i * 0.2 + 0.1,
                   }}
                   className="text-sm leading-relaxed lg:text-base"
-                  style={{ color: "var(--light-text-secondary)" }}
+                  style={{ color: "var(--dark-text-secondary)" }}
                 >
                   {step.description}
                 </motion.p>
@@ -717,21 +661,21 @@ function PricingSection({ onNavigate }: { onNavigate: (path: string) => void }) 
   ];
 
   return (
-    <section id="pricing" className="px-6 py-16 lg:py-24" style={{ backgroundColor: "var(--dark-bg)" }}>
+    <section id="pricing" className="px-6 py-16 lg:py-24" style={{ backgroundColor: "var(--landing-navy-from)" }}>
       <div className="mx-auto max-w-6xl">
-        <ScrollReveal className="mb-12 text-center lg:mb-16">
-          <p
-            className="mb-3 text-xs font-bold uppercase tracking-[0.1em]"
-            style={{ color: "var(--azfit-primary)" }}
-          >
-            Pricing
-          </p>
+        <ScrollReveal className="mb-12 lg:mb-16">
+          <div className="flex items-center gap-4">
+            <p className="section-label text-xs font-semibold">
+              03 — Pricing
+            </p>
+            <div className="section-divider flex-1" />
+          </div>
           <h2
-            className="text-3xl font-bold tracking-tight text-white lg:text-[40px]"
+            className="font-display mt-4 text-3xl font-semibold text-white lg:text-[40px]"
           >
             Simple, Transparent Pricing
           </h2>
-          <p className="mt-3 text-sm" style={{ color: "var(--light-text-muted)" }}>
+          <p className="mt-3 text-sm" style={{ color: "var(--dark-text-muted)" }}>
             Start free, upgrade when you need more power
           </p>
         </ScrollReveal>
@@ -740,10 +684,9 @@ function PricingSection({ onNavigate }: { onNavigate: (path: string) => void }) 
           {plans.map((plan, i) => (
             <ScrollReveal key={plan.name} delay={i * 0.1}>
               <div
-                className="relative rounded-2xl border p-6 lg:p-8"
+                className="landing-surface relative rounded-2xl p-6 lg:p-8"
                 style={{
-                  backgroundColor: plan.highlighted ? "var(--dark-surface)" : "var(--dark-bg)",
-                  borderColor: plan.highlighted ? "var(--azfit-primary)" : "var(--dark-elevated)",
+                  borderColor: plan.highlighted ? "var(--azfit-primary)" : "var(--landing-panel-border)",
                   boxShadow: plan.highlighted ? "0 0 30px color-mix(in srgb, var(--azfit-primary) 15%, transparent)" : "none",
                 }}
               >
@@ -760,7 +703,7 @@ function PricingSection({ onNavigate }: { onNavigate: (path: string) => void }) 
                   <span className="text-3xl font-bold text-white">{plan.price}</span>
                   <span className="text-sm" style={{ color: "var(--dark-text-muted)" }}>{plan.period}</span>
                 </div>
-                <p className="mt-2 text-sm" style={{ color: "var(--light-text-muted)" }}>{plan.description}</p>
+                <p className="mt-2 text-sm" style={{ color: "var(--dark-text-muted)" }}>{plan.description}</p>
                 <ul className="mt-6 space-y-3">
                   {plan.features.map((feature) => (
                     <li key={feature} className="flex items-start gap-2 text-sm" style={{ color: "var(--dark-text-secondary)" }}>
@@ -846,7 +789,7 @@ function WaitlistForm() {
           placeholder="you@email.com"
           aria-label="Email address"
           className="flex-1 rounded-full border px-5 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none focus:border-[var(--azfit-primary)]"
-          style={{ borderColor: "var(--dark-elevated)", backgroundColor: "rgba(255,255,255,0.06)" }}
+          style={{ borderColor: "var(--landing-panel-border)", backgroundColor: "rgba(255,255,255,0.06)" }}
         />
         <button
           onClick={submit}
@@ -873,32 +816,23 @@ function DownloadCTA({ onNavigate }: { onNavigate: (path: string) => void }) {
       id="waitlist"
       className="relative overflow-hidden px-6 py-16 lg:py-24"
     >
-      {/* Background */}
-      <div className="absolute inset-0">
-        <img
-          src="./azfit-hero-bg.png"
-          alt=""
-          className="h-full w-full object-cover dark-img-dim"
-          style={{ filter: "brightness(0.4)" }}
-        />
-      </div>
+      {/* Simple navy + radial cyan glow (Phase 71 — backdrop artwork removed) */}
+      <div className="absolute inset-0 landing-navy-bg" />
+      <div className="pointer-events-none absolute inset-0 landing-dot-texture opacity-60" />
 
       <div className="relative z-10 mx-auto max-w-2xl text-center">
         <ScrollReveal>
+          <p className="section-label text-xs font-semibold">
+            04 — Waitlist
+          </p>
           <h2
-            className="text-4xl font-extrabold leading-tight tracking-tight text-white lg:text-[56px]"
-            style={{
-              textShadow: "0 2px 4px rgba(0,0,0,0.6), 0 0 20px rgba(0,0,0,0.3)",
-            }}
+            className="font-display text-chrome mt-4 text-4xl font-bold leading-tight lg:text-[56px]"
           >
             Start Your Journey Today
           </h2>
           <p
             className="mt-6 text-base leading-relaxed lg:text-lg"
-            style={{
-              color: "var(--dark-text-secondary)",
-              textShadow: "0 2px 4px rgba(0,0,0,0.6), 0 0 20px rgba(0,0,0,0.3)",
-            }}
+            style={{ color: "var(--dark-text-secondary)" }}
           >
             Try AzFIT in your browser today. Native iOS and Android apps are on the roadmap.
           </p>
@@ -962,7 +896,7 @@ function MobileDrawer({
             transition={{ duration: 0.3, ease: easeDefault }}
             className="fixed left-0 top-0 z-[70] h-full w-[280px] overflow-y-auto"
             style={{
-              backgroundColor: "var(--dark-surface)",
+              backgroundColor: "var(--landing-navy-to)",
               boxShadow:
                 theme === "dark"
                   ? "0 0 40px rgba(0,0,0,0.4)"
@@ -1082,7 +1016,7 @@ export default function Home() {
       <DownloadCTA onNavigate={handleNavigate} />
 
       {/* Footer */}
-      <div style={{ backgroundColor: "var(--dark-bg)" }}>
+      <div style={{ backgroundColor: "var(--landing-navy-from)" }}>
         <Footer />
       </div>
     </div>

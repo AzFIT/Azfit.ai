@@ -109,6 +109,23 @@
     --event-tile-blocked-bg: #475569;
     --event-tile-completed-bg: #334155;
     --event-tile-completed-text: #F2F6FA;
+
+    /* Phase 71: LANDING-PAGE-ONLY tokens (owner-approved navy + Oswald +
+       electric-cyan restyle). Scoped to the marketing surface (Home.tsx) —
+       the app interior Pulse tokens above are untouched. */
+    --landing-navy-from: #02141B;
+    --landing-navy-to: #041E28;
+    --landing-panel: #0A3542;
+    --landing-panel-border: rgba(120, 200, 210, 0.16);
+    --landing-glow: rgba(69, 240, 240, 0.08);
+    --landing-cyan: #45F0F0; /* electric cyan — landing accent only */
+    --landing-chrome: linear-gradient(
+      180deg,
+      #FFFFFF 0%,
+      #DCE6EE 38%,
+      #93A6B8 58%,
+      #C9D6E0 100%
+    );
   }
 
   [data-theme="dark"] {
@@ -286,6 +303,75 @@
   /* Dark mode image adjustments */
   [data-theme="dark"] .dark-img-dim {
     filter: brightness(0.6);
+  }
+
+  /* ═══════════════════════════════════════════
+     Phase 71: landing-page utilities (marketing surface only)
+     ═══════════════════════════════════════════ */
+
+  /* Oswald display type — uppercase, wide tracking */
+  .font-display {
+    font-family: 'Oswald', 'Inter', system-ui, sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* Chrome/silver gradient text — matches the logo's metallic finish */
+  .text-chrome {
+    background: var(--landing-chrome);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Section label: electric-cyan Oswald caption */
+  .section-label {
+    font-family: 'Oswald', 'Inter', system-ui, sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--landing-cyan);
+    text-shadow: 0 0 12px var(--landing-glow);
+  }
+
+  /* Horizontal divider paired with .section-label ("01 — How it works") */
+  .section-divider {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      var(--landing-cyan),
+      transparent
+    );
+    opacity: 0.4;
+  }
+
+  /* Landing card/panel surface */
+  .landing-surface {
+    background-color: var(--landing-panel);
+    border: 1px solid var(--landing-panel-border);
+  }
+
+  /* Simple navy page background + one radial cyan glow */
+  .landing-navy-bg {
+    background:
+      radial-gradient(
+        ellipse 80% 60% at 50% 20%,
+        var(--landing-glow),
+        transparent 70%
+      ),
+      linear-gradient(
+        180deg,
+        var(--landing-navy-from) 0%,
+        var(--landing-navy-to) 100%
+      );
+  }
+
+  /* Faint dot texture overlay */
+  .landing-dot-texture {
+    background-image: radial-gradient(
+      rgba(69, 240, 240, 0.05) 1px,
+      transparent 1px
+    );
+    background-size: 24px 24px;
   }
 
   [data-theme="dark"] .dark-img-dim-more {
