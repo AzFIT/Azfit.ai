@@ -32,7 +32,7 @@ import { BookSessionDialog } from '@/components/schedule/BookSessionDialog';
 import { BlockTimeDialog } from '@/components/schedule/BlockTimeDialog';
 import { SessionDetailDialog } from '@/components/schedule/SessionDetailDialog';
 import MonthCalendar from '@/components/schedule/MonthCalendar';
-import DaySheet from '@/components/schedule/DaySheet';
+import DayActionPopup from '@/components/schedule/DayActionPopup';
 import EmojiPickerDialog from '@/components/schedule/EmojiPickerDialog';
 import { DEFAULT_COMPLETION_EMOJI } from '@/lib/scheduleEmoji';
 import { buildSessionUpdate } from '@/lib/sessionUpdate';
@@ -138,10 +138,15 @@ export default function SchedulePage() {
   const [calendarEmoji, setCalendarEmoji] = useState<string>(DEFAULT_COMPLETION_EMOJI);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [daySheetKey, setDaySheetKey] = useState<string | null>(null);
+  // Phase 73 Item 2a: the date the booking wizard opens with — set by the
+  // day-action popup or the right-click context menu; keys the dialog so a
+  // new date remounts and re-prefills (useState initializers run once).
+  const [bookDate, setBookDate] = useState<string>(() => formatDateKeyLocal(new Date()));
   // Clients for the booking picker: resolved to profiles.id via email —
   // sessions.client_id references profiles(id), so clients WITHOUT a linked
   // app account are omitted (they cannot have sessions).
-  const [bookableClients, setBookableClients] = useState<{ id: string; name: string; avatar?: string }[]>([]);
+  // Phase 73 Item 2b: email + status feed the searchable combobox.
+  const [bookableClients, setBookableClients] = useState<{ id: string; name: string; avatar?: string; email?: string; status?: string }[]>([]);
   // Phase 43 Fix 5: real roster size for the header stat (was the count of
   // clients WITH sessions this week — a meaningless "0 clients" on quiet weeks)
   const [rosterCount, setRosterCount] = useState<number | null>(null);
@@ -179,19 +184,19 @@ export default function SchedulePage() {
     (async () => {
       const { data: rows } = await supabase
         .from('clients')
-        .select('full_name, email')
+        .select('full_name, email, status')
         .eq('trainer_id', user.id)
         .neq('status', 'archived')
         .order('full_name', { ascending: true });
       if (!rows) return;
-      const out: { id: string; name: string }[] = [];
+      const out: { id: string; name: string; email: string; status: string }[] = [];
       for (const c of rows) {
         const { data: prof } = await supabase
           .from('profiles')
           .select('id')
           .eq('email', c.email)
           .maybeSingle();
-        if (prof) out.push({ id: prof.id, name: c.full_name });
+        if (prof) out.push({ id: prof.id, name: c.full_name, email: c.email, status: c.status ?? 'active' });
       }
       if (!cancelled) {
         setBookableClients(out);
@@ -1008,7 +1013,7 @@ export default function SchedulePage() {
         position={{ x: contextMenu.x, y: contextMenu.y }}
         date={contextMenu.date}
         time={contextMenu.time}
-        onBookClient={() => setBookOpen(true)}
+        onBookClient={() => { setBookDate(contextMenu.date || formatDateKeyLocal(new Date())); setBookOpen(true); }}
         onNewClient={() => navigate('/onboarding')}
         onBlockTime={() => setBlockOpen(true)}
         onQuickNote={() => {}}
@@ -1017,12 +1022,13 @@ export default function SchedulePage() {
 
       {/* Dialogs */}
       <BookSessionDialog
+        key={bookOpen ? bookDate : 'book-closed'}
         open={bookOpen}
         onOpenChange={setBookOpen}
         onBook={handleBook}
         isTrainer={isTrainer}
         clients={bookableClients}
-        initialDate={contextMenu.date}
+        initialDate={bookDate}
         availabilityCheck={availability ? availabilityCheck : undefined}
       />
       <BlockTimeDialog
@@ -1106,17 +1112,28 @@ export default function SchedulePage() {
         </DialogContent>
       </Dialog>
 
-      {/* Phase 68 Item 2: bottom-sheet day view (month grid day tap) —
-          session rows route into the existing detail modal above. */}
-      <DaySheet
+      {/* Phase 73 Item 1: day-action popup (month grid day tap) — session
+          rows route into the existing detail modal; "Book a session" opens
+          the wizard prefilled with the tapped date; the other four actions
+          are honest disabled "Soon" placeholders (trainer only). */}
+      <DayActionPopup
         open={daySheetKey != null}
         dateKey={daySheetKey ?? ''}
-        events={daySheetKey ? events.filter((e) => e.date === daySheetKey) : []}
+        events={daySheetKey ? monthEvents.filter((e) => e.date === daySheetKey) : []}
         onClose={() => setDaySheetKey(null)}
         onPickEvent={(ev) => {
           setDaySheetKey(null);
           handleEventClick(ev);
         }}
+        onBook={
+          isTrainer
+            ? () => {
+                setBookDate(daySheetKey ?? formatDateKeyLocal(new Date()));
+                setDaySheetKey(null);
+                setBookOpen(true);
+              }
+            : undefined
+        }
       />
 
       {/* Phase 68 Item 3b: completion-emoji editor (per-user, profiles row) */}

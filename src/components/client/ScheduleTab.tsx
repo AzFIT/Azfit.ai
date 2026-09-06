@@ -209,7 +209,9 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
   const daysInMonth = lastDay.getDate();
-  const startDayOfWeek = firstDay.getDay();
+  // Phase 73 Item 3c: week starts MONDAY to match the trainer calendar
+  // (was Sunday-start — inconsistent).
+  const startDayOfWeek = (firstDay.getDay() + 6) % 7;
 
   // A day cell shows events whose [start, end] range COVERS that day —
   // multi-day holidays appear on every covered day, not just their start.
@@ -517,7 +519,7 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
           className="grid grid-cols-7 border-b"
           style={{ borderColor: "var(--card-border)" }}
         >
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
             <div
               key={d}
               className="py-2 text-center text-[10px] font-medium"

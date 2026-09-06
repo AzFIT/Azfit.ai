@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CalendarPlus, ChevronRight, User, CheckCircle } from 'lucide-react';
+import { CalendarPlus, ChevronRight, User, CheckCircle, Search } from 'lucide-react';
+import { filterClients, groupClients, clientStatusLabel } from '@/lib/clientSearch';
 import {
   endTimeFromDuration,
   durationFromTimes,
@@ -22,6 +23,7 @@ interface BookDraftData {
   durationMin: number;
   sessionType: string;
   notes: string;
+  title: string;
 }
 import {
   Dialog,
@@ -50,7 +52,9 @@ interface BookSessionDialogProps {
   onOpenChange: (open: boolean) => void;
   onBook: (event: CalendarEvent, recurringCount: number) => void;
   isTrainer?: boolean;
-  clients: { id: string; name: string; avatar?: string }[];
+  /** Phase 73 Item 2b: email/status power the searchable combobox
+   * (filter + status chips). Optional — older callers pass id+name only. */
+  clients: { id: string; name: string; avatar?: string; email?: string; status?: string }[];
   initialDate?: string;
   /** When provided, the client is preselected and locked (booking from a
    * client's profile is always for that client). Default unchanged. */
@@ -117,6 +121,54 @@ export function BookSessionDialog({
   const [recurring, setRecurring] = useState(false);
   const [recurringCount, setRecurringCount] = useState(4);
 
+  // Phase 73 Item 2b: searchable client combobox (step 1)
+  const [clientQuery, setClientQuery] = useState('');
+  const [highlightIdx, setHighlightIdx] = useState(0);
+  const listRef = useRef<HTMLDivElement>(null);
+  const visibleClients = useMemo(() => {
+    const g = groupClients(filterClients(clients, clientQuery));
+    return { ...g, flat: [...g.active, ...g.others] };
+  }, [clients, clientQuery]);
+
+  // Phase 73 Item 2c: editable session title, auto-filled "<Client> PT"
+  // until the trainer types their own (titleTouched).
+  const [title, setTitle] = useState(() => {
+    if (editingEvent?.title) return editingEvent.title;
+    const locked = initialClientId ? clients.find((c) => c.id === initialClientId) : null;
+    return locked ? `${locked.name} PT` : '';
+  });
+  const [titleTouched, setTitleTouched] = useState(false);
+
+  const pickClient = (id: string) => {
+    if (initialClientId) return; // locked when booking from a client profile
+    setClientId(id);
+    if (!titleTouched) {
+      const c = clients.find((x) => x.id === id);
+      if (c) setTitle(`${c.name} PT`);
+    }
+  };
+
+  const onClientSearchKeyDown = (e: React.KeyboardEvent) => {
+    const n = visibleClients.flat.length;
+    if (n === 0) return;
+    let next: number | null = null;
+    if (e.key === 'ArrowDown') next = Math.min(highlightIdx + 1, n - 1);
+    if (e.key === 'ArrowUp') next = Math.max(highlightIdx - 1, 0);
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const c = visibleClients.flat[highlightIdx];
+      if (c) pickClient(c.id);
+      return;
+    }
+    if (next !== null) {
+      e.preventDefault();
+      setHighlightIdx(next);
+      listRef.current
+        ?.querySelector(`[data-idx="${next}"]`)
+        ?.scrollIntoView({ block: 'nearest' });
+    }
+  };
+
   // Task 6: draft restore — checked when the dialog opens (create mode only;
   // edit mode always prefills from the row being edited). `dismissed` resets
   // via resetForm() on close, so the banner re-evaluates on the next open.
@@ -133,8 +185,8 @@ export function BookSessionDialog({
       step === 1 && !clientId && startTime === '09:00' && durationMin === DEFAULT_DURATION_MIN &&
       sessionType === 'session' && notes === '';
     if (pristine) return;
-    saveDraft(BOOK_DRAFT_KEY, { step, clientId, date, startTime, durationMin, sessionType, notes });
-  }, [open, isEdit, step, clientId, date, startTime, durationMin, sessionType, notes]);
+    saveDraft(BOOK_DRAFT_KEY, { step, clientId, date, startTime, durationMin, sessionType, notes, title });
+  }, [open, isEdit, step, clientId, date, startTime, durationMin, sessionType, notes, title]);
 
   const resumeDraft = () => {
     const d = loadDraft<BookDraftData>(BOOK_DRAFT_KEY);
@@ -146,6 +198,8 @@ export function BookSessionDialog({
       setDurationMin(d.data.durationMin);
       setSessionType(d.data.sessionType);
       setNotes(d.data.notes);
+      setTitle(d.data.title ?? '');
+      if (d.data.title) setTitleTouched(true);
     }
     setDraftHandled(true);
   };
@@ -181,6 +235,10 @@ export function BookSessionDialog({
     setDurationMin(DEFAULT_DURATION_MIN);
     setSessionType('session');
     setNotes('');
+    setTitle('');
+    setTitleTouched(false);
+    setClientQuery('');
+    setHighlightIdx(0);
     setRecurring(false);
     setRecurringCount(4);
     setDraftHandled(false);
@@ -189,7 +247,7 @@ export function BookSessionDialog({
   const handleBook = () => {
     const event: CalendarEvent = {
       id: `evt-${Date.now()}`,
-      title: selectedClient ? `${selectedClient.name} PT` : 'New Session', // Task 4: "{ClientName} PT"
+      title: title.trim() || (selectedClient ? `${selectedClient.name} PT` : 'New Session'), // Task 4 / Phase 73: editable "{ClientName} PT"
       date,
       startTime,
       endTime,
@@ -210,6 +268,7 @@ export function BookSessionDialog({
     if (!editingEvent || !onUpdate) return;
     onUpdate(editingEvent.id, {
       ...editingEvent,
+      title: title.trim() || editingEvent.title,
       date,
       startTime,
       endTime,
@@ -270,25 +329,101 @@ export function BookSessionDialog({
               <div className="text-sm text-[#94A3B8]">
                 {initialClientId ? 'Booking for this client' : 'Select a client for this session'}
               </div>
-              <div className="max-h-64 space-y-1 overflow-y-auto">
-                {clients.map((client) => (
-                  <button
-                    key={client.id}
-                    onClick={() => { if (!initialClientId) setClientId(client.id); }}
-                    disabled={!!initialClientId}
-                    className={`flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition-all ${
-                      clientId === client.id
-                        ? 'border-[#00AEEF40] bg-[#00AEEF15]'
-                        : 'border-[#2A3447] bg-[#111827] hover:border-[#00AEEF20]'
-                    } ${initialClientId ? 'cursor-default opacity-90' : ''}`}
-                  >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#00AEEF20]">
-                      <User className="h-4 w-4 text-[#00AEEF]" />
-                    </div>
-                    <span className="text-sm font-medium text-[#F0F0F0]">{client.name}</span>
-                    {clientId === client.id && <CheckCircle className="ml-auto h-4 w-4 text-[#00AEEF]" />}
-                  </button>
-                ))}
+              {/* Phase 73 Item 2b: searchable combobox (client-side filter on
+                  the loaded roster; keyboard: ↑/↓ move, Enter selects) */}
+              {!initialClientId && (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
+                  <Input
+                    value={clientQuery}
+                    onChange={(e) => { setClientQuery(e.target.value); setHighlightIdx(0); }}
+                    onKeyDown={onClientSearchKeyDown}
+                    placeholder="Search by name or email…"
+                    aria-label="Search clients"
+                    className="border-[#2A3447] bg-[#111827] pl-9 text-[#F0F0F0] placeholder:text-[#64748B]"
+                  />
+                </div>
+              )}
+              <div ref={listRef} className="max-h-64 space-y-1 overflow-y-auto">
+                {visibleClients.active.length > 0 && !initialClientId && (
+                  <p className="px-1 pt-1 text-[10px] font-bold uppercase tracking-wide text-[#64748B]">Active</p>
+                )}
+                {visibleClients.active.map((client, i) => {
+                  const flatIdx = i;
+                  return (
+                    <button
+                      key={client.id}
+                      data-idx={flatIdx}
+                      onClick={() => pickClient(client.id)}
+                      disabled={!!initialClientId}
+                      className={`flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition-all ${
+                        clientId === client.id
+                          ? 'border-[#00AEEF40] bg-[#00AEEF15]'
+                          : highlightIdx === flatIdx && !initialClientId
+                            ? 'border-[#00AEEF60] bg-[#111827]'
+                            : 'border-[#2A3447] bg-[#111827] hover:border-[#00AEEF20]'
+                      } ${initialClientId ? 'cursor-default opacity-90' : ''}`}
+                    >
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#00AEEF20]">
+                        <User className="h-4 w-4 text-[#00AEEF]" />
+                      </div>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-[#F0F0F0]">{client.name}</span>
+                        {client.email && (
+                          <span className="block truncate text-[10px] text-[#64748B]">{client.email}</span>
+                        )}
+                      </span>
+                      <span className="shrink-0 rounded-full border border-[#2A3447] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#84CC16]">
+                        {clientStatusLabel(client.status)}
+                      </span>
+                      {clientId === client.id && <CheckCircle className="h-4 w-4 shrink-0 text-[#00AEEF]" />}
+                    </button>
+                  );
+                })}
+                {visibleClients.others.length > 0 && (
+                  <>
+                    {!initialClientId && (
+                      <p className="px-1 pt-2 text-[10px] font-bold uppercase tracking-wide text-[#64748B]">Other</p>
+                    )}
+                    {visibleClients.others.map((client, i) => {
+                      const flatIdx = visibleClients.active.length + i;
+                      return (
+                        <button
+                          key={client.id}
+                          data-idx={flatIdx}
+                          onClick={() => pickClient(client.id)}
+                          disabled={!!initialClientId}
+                          className={`flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition-all ${
+                            clientId === client.id
+                              ? 'border-[#00AEEF40] bg-[#00AEEF15]'
+                              : highlightIdx === flatIdx && !initialClientId
+                                ? 'border-[#00AEEF60] bg-[#111827]'
+                                : 'border-[#2A3447] bg-[#111827] hover:border-[#00AEEF20]'
+                          } ${initialClientId ? 'cursor-default opacity-90' : ''}`}
+                        >
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#00AEEF20]">
+                            <User className="h-4 w-4 text-[#00AEEF]" />
+                          </div>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium text-[#F0F0F0]">{client.name}</span>
+                            {client.email && (
+                              <span className="block truncate text-[10px] text-[#64748B]">{client.email}</span>
+                            )}
+                          </span>
+                          <span className="shrink-0 rounded-full border border-[#2A3447] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#94A3B8]">
+                            {clientStatusLabel(client.status)}
+                          </span>
+                          {clientId === client.id && <CheckCircle className="h-4 w-4 shrink-0 text-[#00AEEF]" />}
+                        </button>
+                      );
+                    })}
+                  </>
+                )}
+                {visibleClients.flat.length === 0 && (
+                  <p className="py-6 text-center text-xs text-[#64748B]">
+                    No clients match “{clientQuery}”
+                  </p>
+                )}
               </div>
             </motion.div>
           )}
@@ -368,6 +503,17 @@ export function BookSessionDialog({
               transition={{ duration: 0.2 }}
               className="space-y-4"
             >
+              {/* Phase 73 Item 2c: auto-fills "<ClientName> PT" from the
+                  picked client; stays editable (typing locks it in). */}
+              <div>
+                <Label className="text-sm text-[#94A3B8]">Session Title</Label>
+                <Input
+                  value={title}
+                  onChange={(e) => { setTitle(e.target.value); setTitleTouched(true); }}
+                  placeholder={selectedClient ? `${selectedClient.name} PT` : 'Session title'}
+                  className="mt-1 border-[#2A3447] bg-[#111827] text-[#F0F0F0]"
+                />
+              </div>
               <div>
                 <Label className="text-sm text-[#94A3B8]">Session Type</Label>
                 <Select value={sessionType} onValueChange={setSessionType}>
@@ -438,6 +584,12 @@ export function BookSessionDialog({
             >
               <h3 className="text-sm font-semibold text-[#F0F0F0]">Booking Summary</h3>
               <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-[#94A3B8]">Title</span>
+                  <span className="max-w-[200px] truncate font-medium text-[#F0F0F0]">
+                    {title.trim() || (selectedClient ? `${selectedClient.name} PT` : 'New Session')}
+                  </span>
+                </div>
                 <div className="flex justify-between">
                   <span className="text-[#94A3B8]">Client</span>
                   <span className="font-medium text-[#F0F0F0]">
