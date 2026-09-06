@@ -34,7 +34,7 @@ export default function ModeToggle({ mode, onToggle }: ModeToggleProps) {
         }}
       />
 
-      {/* Webview button */}
+      {/* Cards button (Phase 70 Item 2: user-language labels) */}
       <button
         ref={dashboardRef}
         onClick={() => onToggle("dashboard")}
@@ -44,10 +44,10 @@ export default function ModeToggle({ mode, onToggle }: ModeToggleProps) {
             mode === "dashboard" ? "#FFFFFF" : "var(--light-text-secondary)",
         }}
       >
-        Webview
+        Cards
       </button>
 
-      {/* Sheets View button */}
+      {/* Table button */}
       <button
         ref={sheetsRef}
         onClick={() => onToggle("sheets")}
@@ -56,7 +56,7 @@ export default function ModeToggle({ mode, onToggle }: ModeToggleProps) {
           color: mode === "sheets" ? "#FFFFFF" : "var(--light-text-secondary)",
         }}
       >
-        Sheets View
+        Table
       </button>
     </div>
   );

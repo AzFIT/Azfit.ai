@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
-import { Search, Plus, Edit3, Upload, X, User, ChevronDown, Link2, AlertTriangle, MoreHorizontal } from "lucide-react";
+import { Search, Plus, Upload, X, User, ChevronDown, Link2, AlertTriangle, MoreHorizontal } from "lucide-react";
 import Layout from "@/components/Layout";
 import QuickAddClientModal from "@/components/QuickAddClientModal";
 import { supabase } from "@/lib/supabase";
@@ -256,7 +256,7 @@ export default function ClientsPage() {
 
   return (
     <Layout mode={mode} onModeToggle={setMode}>
-      <div className="mx-auto max-w-[1200px] px-4 pt-20 pb-10 lg:px-6">
+      <div className="mx-auto max-w-[1200px] px-4 pt-4 pb-10 lg:px-6">
         {/* Legacy import banner */}
         {legacyClients.length > 0 && (
           <div
@@ -341,25 +341,9 @@ export default function ClientsPage() {
               <Link2 size={16} />
               Invite link
             </button>
-            <button
-              type="button"
-              onClick={() => openEditClient()}
-              disabled={!selectedClient}
-              className="inline-flex items-center gap-2 rounded-full border border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-2 text-sm font-semibold transition hover:bg-[var(--light-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Edit3 size={16} />
-              Edit Client
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                selectedClient && handleArchiveClient(selectedClient.id)
-              }
-              disabled={!selectedClient}
-              className="inline-flex items-center gap-2 rounded-full border border-red-500 bg-[var(--card-bg)] px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-[rgba(239,68,68,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Archive Client
-            </button>
+            {/* Phase 70 Item 4: Edit/Archive removed from the list header —
+                they acted on a not-always-obvious selection; both live in each
+                row's Actions menu (and the client profile) instead. */}
           </div>
         </div>
 

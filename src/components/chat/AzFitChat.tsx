@@ -51,6 +51,29 @@ export default function AzFitChat() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Phase 70 Item 1: FAB hides on scroll down, reappears on scroll up or
+  // ~1.2s after scrolling stops (never hidden near the top or when open).
+  const [fabHidden, setFabHidden] = useState(false);
+  const lastScrollY = useRef(0);
+  const scrollStopTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    const onScroll = () => {
+      const y = window.scrollY;
+      const goingDown = y > lastScrollY.current + 4;
+      const goingUp = y < lastScrollY.current - 4;
+      lastScrollY.current = y;
+      if (goingUp || y < 120) setFabHidden(false);
+      else if (goingDown) setFabHidden(true);
+      window.clearTimeout(scrollStopTimer.current);
+      scrollStopTimer.current = window.setTimeout(() => setFabHidden(false), 1200);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.clearTimeout(scrollStopTimer.current);
+    };
+  }, []);
+
   const userRole = user?.role === "admin" ? "trainer" : user?.role;
 
   // Auto-scroll to bottom
@@ -194,13 +217,20 @@ export default function AzFitChat() {
 
   return (
     <>
-      {/* Floating Chat Button */}
+      {/* Floating Chat Button — Phase 70 Item 1: bottom-RIGHT above the tab
+          bar (was bottom-left, overlapping page content); hides on scroll
+          down, reappears on scroll up / scroll stop; never hidden while the
+          chat is open. z-60 stays under the z-70+ sheets (Phase 67 rule). */}
       <motion.button
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ delay: 1, type: "spring", stiffness: 260, damping: 20 }}
         onClick={toggleChat}
-        className="fixed bottom-20 left-4 z-[60] flex h-14 w-14 items-center justify-center rounded-full shadow-lg lg:bottom-6"
+        aria-hidden={fabHidden && !isOpen}
+        tabIndex={fabHidden && !isOpen ? -1 : 0}
+        className={`fixed bottom-20 right-4 z-[60] flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-all duration-200 motion-reduce:transition-none lg:bottom-6 lg:right-6 ${
+          fabHidden && !isOpen ? "pointer-events-none translate-y-[140%] opacity-0" : ""
+        }`}
         style={{
           background: "linear-gradient(135deg, #00AEEF, var(--ai-violet))",
           boxShadow: "0 4px 20px rgba(0, 174, 239, 0.4)",

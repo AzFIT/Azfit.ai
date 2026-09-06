@@ -25,6 +25,7 @@ import {
   Flame,
   Brain,
   MessageSquare,
+  MoreHorizontal,
   ChevronDown,
   BookOpen,
   Library,
@@ -101,26 +102,29 @@ export default function Layout({
     ? [...baseSecondaryNavItems, messagesNavItem, { icon: Library, label: "Library", path: "/library" }, { icon: UserCircle, label: "Coach", path: "/coach" }]
     : [...baseSecondaryNavItems, messagesNavItem];
 
-  // Mobile tabs: clients see Schedule instead of Clients, no Coach
-  const tabItems = isTrainer
+  // Mobile tabs (Phase 70 Item 5): 4 primary + "More" sheet at ≤767px —
+  // the 7-item bar wrapped "Form Checks" to two lines at 390px. Routes,
+  // icons, and active-state rules are unchanged; ≥768px keeps the sidebar.
+  const primaryTabItems = isTrainer
     ? [
         { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
         { icon: ClipboardCheck, label: "Check-ins", path: "/check-ins" },
         { icon: Users, label: "Clients", path: "/clients" },
         { icon: Dumbbell, label: "Workouts", path: "/workouts" },
-        { icon: Video, label: "Form Checks", path: "/form-checks" },
-        { icon: MessageSquare, label: "Messages", path: "/messages" },
-        { icon: Settings, label: "Settings", path: "/settings" },
       ]
     : [
         { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
         { icon: ClipboardCheck, label: "Check-ins", path: "/check-ins" },
         { icon: Dumbbell, label: "Workouts", path: "/workouts" },
         { icon: Apple, label: "Nutrition", path: "/nutrition" },
-        { icon: Video, label: "Form Checks", path: "/form-checks" },
-        { icon: MessageSquare, label: "Messages", path: "/messages" },
-        { icon: Settings, label: "Settings", path: "/settings" },
       ];
+  const moreTabItems = [
+    { icon: Video, label: "Form Checks", path: "/form-checks" },
+    { icon: MessageSquare, label: "Messages", path: "/messages" },
+    { icon: Settings, label: "Settings", path: "/settings" },
+  ];
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreActive = moreTabItems.some((item) => isActive(item.path));
 
   const isActive = useCallback(
     (path: string) => {
@@ -665,7 +669,7 @@ export default function Layout({
         }}
       >
         <div className="flex h-full items-center justify-around">
-          {tabItems.map((item) => (
+          {primaryTabItems.map((item) => (
             <button
               key={item.label}
               onClick={() => navigate(item.path)}
@@ -691,8 +695,72 @@ export default function Layout({
               </span>
             </button>
           ))}
+          {/* Phase 70 Item 5: the More tab (Form Checks / Messages / Settings
+              live in its sheet) — highlighted when on one of those routes */}
+          <button
+            onClick={() => setMoreOpen(true)}
+            aria-label="More destinations"
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 py-1 transition-transform duration-100 active:scale-90"
+          >
+            <MoreHorizontal
+              size={24}
+              style={{ color: moreActive ? "var(--azfit-primary)" : "var(--light-text-muted)" }}
+            />
+            <span
+              className="text-[10px] font-medium"
+              style={{ color: moreActive ? "var(--azfit-primary)" : "var(--light-text-muted)" }}
+            >
+              More
+            </span>
+          </button>
         </div>
       </nav>
+
+      {/* Phase 70 Item 5: the More sheet — z-70 (above the z-50 tab bar and
+          the z-60 chat FAB, per the Phase 67 lesson) */}
+      <AnimatePresence>
+        {moreOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 backdrop-blur-sm lg:hidden"
+            onClick={() => setMoreOpen(false)}
+          >
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "tween", duration: 0.2 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full rounded-t-2xl border-t px-4 pb-6 pt-3 shadow-2xl"
+              style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}
+            >
+              <div className="mx-auto mb-3 h-1 w-10 rounded-full" style={{ backgroundColor: "var(--card-border)" }} />
+              {moreTabItems.map((item) => (
+                <button
+                  key={item.label}
+                  onClick={() => {
+                    setMoreOpen(false);
+                    navigate(item.path);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors"
+                  style={{
+                    backgroundColor: isActive(item.path) ? "var(--light-elevated)" : "transparent",
+                    color: isActive(item.path) ? "var(--azfit-primary)" : "var(--page-text)",
+                  }}
+                >
+                  <item.icon
+                    size={20}
+                    style={{ color: isActive(item.path) ? "var(--azfit-primary)" : "var(--light-text-muted)" }}
+                  />
+                  <span className="text-sm font-medium">{item.label}</span>
+                </button>
+              ))}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* AI Chat Bubble */}
       <AzFitChat />
