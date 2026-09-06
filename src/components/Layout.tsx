@@ -124,7 +124,6 @@ export default function Layout({
     { icon: Settings, label: "Settings", path: "/settings" },
   ];
   const [moreOpen, setMoreOpen] = useState(false);
-  const moreActive = moreTabItems.some((item) => isActive(item.path));
 
   const isActive = useCallback(
     (path: string) => {
@@ -134,6 +133,9 @@ export default function Layout({
     },
     [location.pathname],
   );
+
+  // More tab highlighted when the current route lives in the sheet
+  const moreActive = moreTabItems.some((item) => isActive(item.path));
 
   const handleNav = (path: string) => {
     if (path !== "#" && path !== location.pathname) {
