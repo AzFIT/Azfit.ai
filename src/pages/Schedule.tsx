@@ -851,10 +851,10 @@ export default function SchedulePage() {
                 )}
               </div>
 
-              {/* Download upcoming .ics */}
+              {/* Download upcoming .ics — Phase 77 audit fix: 44px target */}
               <button
                 onClick={handleDownloadUpcoming}
-                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-[var(--page-bg)] text-[var(--page-text)]"
+                className="flex min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-[var(--page-bg)] text-[var(--page-text)]"
                 title="Download all upcoming sessions (.ics)"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -865,7 +865,7 @@ export default function SchedulePage() {
               <div className="flex items-center bg-[var(--page-bg)] rounded-lg p-0.5">
                 <button
                   onClick={() => setViewMode('month')}
-                  className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                  className={`px-3 py-1.5 min-h-[44px] rounded text-xs font-medium transition-colors ${
                     viewMode === 'month' ? 'bg-[#00AEEF] text-[#0B1120]' : 'text-[var(--light-text-muted)] hover:text-[var(--page-text)]'
                   }`}
                 >
@@ -873,7 +873,7 @@ export default function SchedulePage() {
                 </button>
                 <button
                   onClick={() => setViewMode('week')}
-                  className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                  className={`px-3 py-1.5 min-h-[44px] rounded text-xs font-medium transition-colors ${
                     viewMode === 'week' ? 'bg-[#00AEEF] text-[#0B1120]' : 'text-[var(--light-text-muted)] hover:text-[var(--page-text)]'
                   }`}
                 >
@@ -881,7 +881,7 @@ export default function SchedulePage() {
                 </button>
                 <button
                   onClick={() => setViewMode('day')}
-                  className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                  className={`px-3 py-1.5 min-h-[44px] rounded text-xs font-medium transition-colors ${
                     viewMode === 'day' ? 'bg-[#00AEEF] text-[#0B1120]' : 'text-[var(--light-text-muted)] hover:text-[var(--page-text)]'
                   }`}
                 >

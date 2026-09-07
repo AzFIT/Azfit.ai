@@ -157,7 +157,7 @@ export default function TdeeCalculator({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="mt-2 flex items-center gap-1.5 text-xs font-medium transition hover:opacity-80"
+        className="mt-2 flex min-h-[44px] -my-2 items-center gap-1.5 text-xs font-medium transition hover:opacity-80"
         style={{ color: "#00AEEF" }}
       >
         <Calculator size={13} />

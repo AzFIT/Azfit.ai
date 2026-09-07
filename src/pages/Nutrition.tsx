@@ -420,7 +420,7 @@ export default function NutritionPage() {
                 });
                 setEditingTargets(true);
               }}
-              className="mt-3 text-xs font-medium"
+              className="mt-3 inline-flex min-h-[44px] -my-2 items-center text-xs font-medium"
               style={{ color: "#00AEEF" }}
             >
               Edit targets

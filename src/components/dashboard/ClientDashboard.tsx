@@ -457,7 +457,7 @@ export default function ClientDashboard() {
               <div className="relative">
                 <div
                   className="flex h-14 w-14 items-center justify-center rounded-full text-lg font-bold text-white"
-                  style={{ border: "2px solid var(--card-border)", background: "linear-gradient(135deg, #00AEEF, var(--azfit-accent))" }}
+                  style={{ border: "2px solid var(--card-border)", background: "linear-gradient(135deg, var(--azfit-primary), var(--azfit-accent))" }}
                 >
                   {(coachName || "?")
                     .split(/\s+/)
@@ -532,12 +532,12 @@ export default function ClientDashboard() {
               </button>
             )}
 
-            {/* Actions */}
+            {/* Actions — Phase 77 audit fix: 44px touch targets */}
             <div className="flex gap-2">
               <motion.button
                 whileTap={{ scale: 0.95 }}
                 onClick={() => navigate("/messages")}
-                className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white"
+                className="flex min-h-[44px] items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white"
                 style={{ backgroundColor: "var(--azfit-primary)" }}
               >
                 <MessageSquare className="h-4 w-4" />
@@ -546,7 +546,7 @@ export default function ClientDashboard() {
               <motion.button
                 whileTap={{ scale: 0.95 }}
                 onClick={() => navigate("/schedule")}
-                className="flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium transition-all"
+                className="flex min-h-[44px] items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium transition-all"
                 style={{
                   backgroundColor: "var(--card-bg)",
                   borderColor: "var(--card-border)",
@@ -560,7 +560,7 @@ export default function ClientDashboard() {
                 <motion.button
                   whileTap={{ scale: 0.95 }}
                   onClick={handleAddSessionToCalendar}
-                  className="flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium transition-all"
+                  className="flex min-h-[44px] items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium transition-all"
                   style={{
                     backgroundColor: "var(--card-bg)",
                     borderColor: "var(--card-border)",
@@ -603,7 +603,7 @@ export default function ClientDashboard() {
           headerAction={
             <button
               onClick={() => setLauncherOpen(true)}
-              className="flex items-center gap-0.5 text-[11px] font-medium transition-opacity hover:opacity-70"
+              className="flex min-h-[44px] -my-2 items-center gap-0.5 px-2 text-[11px] font-medium transition-opacity hover:opacity-70"
               style={{ color: "var(--azfit-primary)" }}
             >
               Full Program
@@ -982,7 +982,7 @@ export default function ClientDashboard() {
                     className="flex-1 rounded-lg border py-2 text-[10px] font-medium transition-all hover:-translate-y-0.5 active:scale-95"
                     style={{
                       backgroundColor: "color-mix(in srgb, var(--azfit-secondary) 8%, transparent)",
-                      borderColor: "rgba(34,211,238,0.2)",
+                      borderColor: "color-mix(in srgb, var(--azfit-secondary-light) 20%, transparent)",
                       color: "var(--azfit-secondary-light)",
                     }}
                   >
@@ -1109,14 +1109,14 @@ export default function ClientDashboard() {
                           background: isToday
                             ? "linear-gradient(180deg, var(--azfit-primary), var(--azfit-primary-light))"
                             : day.value >= 80
-                              ? "linear-gradient(180deg, var(--success), #65A30D)"
+                              ? "linear-gradient(180deg, var(--success), var(--success-strong))"
                               : day.value >= 50
-                                ? "linear-gradient(180deg, var(--warning), #D97706)"
-                                : "linear-gradient(180deg, var(--dark-text-muted), var(--dark-border))",
+                                ? "linear-gradient(180deg, var(--warning), var(--warning-strong))"
+                                : "linear-gradient(180deg, var(--light-text-muted), var(--card-border))",
                           boxShadow: isToday
                             ? "0 0 12px color-mix(in srgb, var(--azfit-primary) 30%, transparent)"
                             : day.value >= 80
-                              ? "0 0 8px rgba(132,204,22,0.2)"
+                              ? "0 0 8px color-mix(in srgb, var(--success) 20%, transparent)"
                               : "none",
                         }}
                       />

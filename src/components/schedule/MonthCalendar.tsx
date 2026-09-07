@@ -91,7 +91,7 @@ export default function MonthCalendar({
             onClick={onEditEmoji}
             title="Edit completion emoji"
             aria-label="Edit completion emoji"
-            className="p-1.5 rounded-lg text-[var(--light-text-muted)] hover:text-[var(--page-text)] hover:bg-[var(--page-bg)] transition-colors"
+            className="p-1.5 min-h-[44px] min-w-[44px] rounded-lg text-[var(--light-text-muted)] hover:text-[var(--page-text)] hover:bg-[var(--page-bg)] transition-colors"
           >
             <span className="text-sm leading-none">{completionEmoji || "—"}</span>
             <Pencil className="w-3 h-3 inline-block ml-0.5 -mt-0.5" />
@@ -100,20 +100,20 @@ export default function MonthCalendar({
             <button
               onClick={() => { const n = addMonths(year, month, -1); onMonthChange(n.year, n.month); }}
               aria-label="Previous month"
-              className="p-1.5 rounded hover:bg-[var(--card-bg)] text-[var(--light-text-muted)] hover:text-[var(--page-text)] transition-colors"
+              className="p-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-[var(--card-bg)] text-[var(--light-text-muted)] hover:text-[var(--page-text)] transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
               onClick={() => onMonthChange(today.getFullYear(), today.getMonth())}
-              className="px-2 py-1 text-xs font-medium text-[var(--page-text)] hover:text-[#00AEEF] transition-colors"
+              className="px-2 py-1 min-h-[44px] text-xs font-medium text-[var(--page-text)] hover:text-[#00AEEF] transition-colors"
             >
               Today
             </button>
             <button
               onClick={() => { const n = addMonths(year, month, 1); onMonthChange(n.year, n.month); }}
               aria-label="Next month"
-              className="p-1.5 rounded hover:bg-[var(--card-bg)] text-[var(--light-text-muted)] hover:text-[var(--page-text)] transition-colors"
+              className="p-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-[var(--card-bg)] text-[var(--light-text-muted)] hover:text-[var(--page-text)] transition-colors"
             >
               <ChevronRight className="w-4 h-4" />
             </button>

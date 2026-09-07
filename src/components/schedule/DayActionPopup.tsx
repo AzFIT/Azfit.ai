@@ -133,9 +133,12 @@ export default function DayActionPopup({ open, dateKey, events, onClose, onPickE
                         title="Coming soon"
                         className="flex items-center gap-2 rounded-xl border border-[var(--card-border)] bg-[var(--light-elevated)] px-3 py-2 text-left text-xs font-semibold text-[var(--page-text)] opacity-50 cursor-not-allowed"
                       >
-                        <Icon size={14} style={{ color: "var(--azfit-primary)" }} />
-                        <span className="flex-1 truncate">{a.label}</span>
-                        <span className="rounded-full border border-[var(--card-border)] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-[var(--light-text-muted)]">
+                        <Icon size={14} className="shrink-0" style={{ color: "var(--azfit-primary)" }} />
+                        {/* Phase 77 Item 1: labels WRAP at word boundaries
+                            (no truncation) — the 390px sheet used to show
+                            'Request me…' */}
+                        <span className="flex-1 min-w-0 text-[11px] leading-tight">{a.label}</span>
+                        <span className="shrink-0 rounded-full border border-[var(--card-border)] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-[var(--light-text-muted)]">
                           Soon
                         </span>
                       </button>
