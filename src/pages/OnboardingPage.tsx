@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, Navigate } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronRight, ChevronLeft, User, Scale, Dumbbell,
@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { calculateBMI, calculateBMR, calculateTDEE } from '@/lib/utils';
 
 import { useGoalCategories } from '@/hooks/useSupabaseData';
+import { useAuth } from '@/hooks/useAuth';
 import { createClientProfile, getSession } from '@/services/auth';
 import { setOnboardingData, clearOnboardingData } from '@/lib/storage';
 
@@ -55,6 +56,7 @@ const STEP_ICONS: LucideIcon[] = [
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
   const [step, setStep] = useState(1);
   const [data, setData] = useState<OnboardingData>(INITIAL_ONBOARDING_DATA);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -251,6 +253,11 @@ export default function OnboardingPage() {
 
   const StepIcon = STEP_ICONS[step - 1] || User;
   const totalSteps = 9;
+
+  // Phase 74 Item 3: the flow is for genuinely NEW users only — a signed-in
+  // user whose profile already has a role is sent to the dashboard.
+  if (loading) return null;
+  if (user?.role) return <Navigate to="/dashboard" replace />;
 
   return (
     <div className="min-h-[100dvh] pb-20" style={{ backgroundColor: 'var(--page-bg)' }}>

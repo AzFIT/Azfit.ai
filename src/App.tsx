@@ -323,14 +323,10 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
-                  <Route
-                    path="/leaderboard"
-                    element={
-                      // Phase 33B: no real leaderboard data source exists — the mock was
-                      // removed; the route redirects and the sidebar entry is hidden.
-                      <Navigate to="/dashboard" replace />
-                    }
-                  />
+                  {/* Phase 74 Item 2: /leaderboard route REMOVED (dead
+                      redirect to /dashboard from Phase 33B — no real
+                      leaderboard page exists and no nav links point to it).
+                      It now falls through to the catch-all NotFound. */}
                   <Route element={<ArrowsShell />}>
                   <Route
                     path="/warmup"

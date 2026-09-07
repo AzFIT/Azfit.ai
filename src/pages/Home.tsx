@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router";
-import { motion, useInView, AnimatePresence } from "framer-motion";
+import { motion, useInView, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   TrendingUp,
   Dumbbell,
@@ -204,6 +204,11 @@ function HeroNav({
 /* ──────────────────────── Section 1: Hero ──────────────────────── */
 
 function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
+  // Phase 74 Item 1: total entrance ≤1s (was ~1.6s) and instant render
+  // under prefers-reduced-motion.
+  const reduceMotion = useReducedMotion();
+  const t = (duration: number, delay: number) =>
+    reduceMotion ? { duration: 0, delay: 0 } : { duration, delay, ease: easeDefault };
   return (
     <section
       id="hero"
@@ -224,7 +229,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
         <motion.p
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.2, ease: easeDefault }}
+          transition={t(0.3, 0)}
           className="section-label mb-4 text-xs font-semibold"
         >
           Personal Training, Reimagined.
@@ -234,7 +239,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
         <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4, ease: easeDefault }}
+          transition={t(0.4, 0.1)}
           className="font-display text-chrome max-w-[640px] text-4xl font-bold leading-[1.05] lg:text-[56px]"
         >
           Your Fitness Data, Beautifully Visualized.
@@ -243,7 +248,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.5 }}
+          transition={t(0.3, 0.2)}
           className="landing-surface mt-4 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium"
           style={{ color: "var(--landing-cyan)" }}
         >
@@ -257,7 +262,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.1, ease: easeDefault }}
+            transition={t(0.5, 0)}
           >
             <AIShowcase />
           </motion.div>
@@ -269,7 +274,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.6, ease: easeDefault }}
+          transition={t(0.4, 0.25)}
           className="mx-auto mt-6 max-w-[480px] text-base leading-relaxed lg:text-lg"
           style={{
             color: "var(--dark-text-secondary)",
@@ -284,7 +289,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.8, ease: easeDefault }}
+          transition={t(0.3, 0.35)}
           className="mt-8 flex flex-col items-center gap-4 sm:flex-row"
         >
           <button
@@ -313,7 +318,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.6 }}
-        transition={{ duration: 0.4, delay: 1.2 }}
+        transition={t(0.3, 0.7)}
         className="absolute bottom-8 left-1/2 z-10 hidden -translate-x-1/2 sm:block"
       >
         <ChevronDown

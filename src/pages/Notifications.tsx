@@ -64,7 +64,6 @@ export default function NotificationsPage() {
   const navigate = useNavigate();
   const [settings, setSettings] = useState<NotificationSetting[]>(loadSettings);
   const [permission, setPermission] = useState<NotificationPermission>('default');
-  const [testSent, setTestSent] = useState<string | null>(null);
 
   // Check notification permission on mount using a timeout to avoid setState in effect
   useState(() => {
@@ -89,19 +88,6 @@ export default function NotificationsPage() {
 
   const updateTime = (id: string, time: string) => {
     setSettings((prev) => prev.map((s) => s.id === id ? { ...s, time } : s));
-  };
-
-  const sendTest = (setting: NotificationSetting) => {
-    if (!('Notification' in window) || Notification.permission !== 'granted') {
-      requestPermission();
-      return;
-    }
-    new Notification('AzFIT', {
-      body: setting.description,
-      icon: '/AzFIT_LOGO_Transparent.png',
-    });
-    setTestSent(setting.id);
-    setTimeout(() => setTestSent(null), 2000);
   };
 
   return (
@@ -188,12 +174,10 @@ export default function NotificationsPage() {
                     className="px-2 py-1 rounded-lg text-sm focus:outline-none focus:border-[#00AEEF]"
                     style={{ backgroundColor: 'var(--page-bg)', border: '1px solid var(--card-border)', color: 'var(--page-text)' }}
                   />
-                  <button
-                    onClick={() => sendTest(setting)}
-                    className="ml-auto text-xs text-[#00AEEF] hover:underline"
-                  >
-                    {testSent === setting.id ? 'Sent!' : 'Test'}
-                  </button>
+                  {/* Phase 74 Item 6: the per-setting "Test" buttons were
+                      removed — hardcoded demo artifacts on a preferences page
+                      for a feature (push) that hasn't shipped; the audit
+                      flagged them as residue. Settings themselves persist. */}
                 </motion.div>
               )}
             </motion.div>

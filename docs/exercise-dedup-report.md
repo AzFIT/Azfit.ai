@@ -224,3 +224,9 @@ Method: exact normalized-name collisions (lowercase, punctuation collapsed, barb
 
 - The SAFE list mostly pairs a 52A plain-name insert ("Barbell Back Squat") with a 31A prefixed variant ("BB Back Squat") — the SAME movement under two naming conventions. Execution phase should merge descriptions/safety/video/MET into the keep row, repoint any references, then delete the absorb rows.
 - The REVIEW list contains legitimate training variants (paused/pin/chain/grip variants are distinct prescriptions) — most should be KEPT as-is; only merge where the owner confirms they are the same movement.
+
+## Follow-up merges (executed)
+
+| Keep | Absorb | Canon name | Executed | Notes |
+|---|---|---|---|---|
+| EX0630 Machine Chest Supported Row | EX0632 Machine Chest Supported Row | machine chest supported row | 2026-09-06 (Phase 74) | Collision added after this report's 628-row snapshot (flagged by the Phase 72 run). Both rows 0/4 metadata, no junctions — keep = lower code per the tie-break rule. Merged via `supabase/dedup-exercises-followup-74.sql` (same guarded/idempotent pattern): library 541 → 540, zero dangling references, re-run no-op — all SQL-verified. |

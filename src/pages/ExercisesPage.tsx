@@ -170,12 +170,14 @@ function ExerciseCard({
   const descTooLong = exercise.Description.length > 80;
 
   return (
+    // Phase 74 Item 5: NO `layout` prop — the old popLayout+layout combo
+    // left filtered cards at their old grid positions thousands of px down
+    // (the page looked blank after searching). Simple fade only.
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       transition={{ duration: 0.35, delay: index * 0.02, ease: [0.16, 1, 0.3, 1] }}
-      layout
       className={cn(
         'bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden',
         'flex flex-col transition-all duration-200 hover:shadow-[0_8px_24px_rgba(0,174,239,0.08)]'
@@ -542,13 +544,13 @@ export default function ExercisesPage() {
           </button>
         </div>
       ) : (
-        <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          <AnimatePresence mode="popLayout">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          <AnimatePresence>
             {filtered.map((exercise, i) => (
               <ExerciseCard key={exercise.ExerciseID} exercise={exercise} index={i} onPlay={setPlayingExercise} />
             ))}
           </AnimatePresence>
-        </motion.div>
+        </div>
       )}
 
       {/* Video Modal */}
