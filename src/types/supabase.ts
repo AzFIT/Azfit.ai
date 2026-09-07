@@ -2136,6 +2136,32 @@ export type Database = {
         Args: { tags_a: string[]; tags_b: string[] };
         Returns: number;
       };
+      demo_dashboard_stats: {
+        Args: Record<string, never>;
+        Returns: {
+          active_clients: number;
+          workouts_this_month: number;
+          avg_session_minutes: number | null;
+          completed_this_month: number;
+          scheduled_this_month: number;
+          sessions_today: {
+            start_time: string;
+            title: string;
+            status: string;
+            client: string;
+          }[];
+          recent_completed: {
+            starts_at: string;
+            title: string;
+            duration_min: number;
+            client: string;
+          }[];
+        };
+      };
+      demo_short_name: {
+        Args: { p_full_name: string };
+        Returns: string;
+      };
       get_trainer_display_name: {
         Args: { p_trainer_id: string };
         Returns: string;
