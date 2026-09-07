@@ -109,9 +109,9 @@ export async function generateResponse(input: string, ctx: ResponseContext): Pro
     return {
       text: "I'm not sure I understood. Are you looking for help with workouts, nutrition, tracking progress, or something else?",
       actions: [
-        { label: '💪 Workouts', type: 'suggest', payload: 'workout' },
-        { label: '🍎 Nutrition', type: 'suggest', payload: 'nutrition' },
-        { label: '📊 Progress', type: 'suggest', payload: 'progress' },
+        { label: 'Workouts', type: 'suggest', payload: 'workout' },
+        { label: 'Nutrition', type: 'suggest', payload: 'nutrition' },
+        { label: 'Progress', type: 'suggest', payload: 'progress' },
         { label: '⚙️ Settings', type: 'suggest', payload: 'settings' },
       ],
     };
@@ -146,9 +146,9 @@ export async function generateResponse(input: string, ctx: ResponseContext): Pro
       return {
         text: "Here's what I can help you with:",
         actions: [
-          { label: '💪 Start Workout', type: 'navigate', payload: '/workouts' },
-          { label: '🍎 Log Food', type: 'navigate', payload: '/nutrition' },
-          { label: '📊 View Progress', type: 'navigate', payload: '/bioprint' },
+          { label: 'Start Workout', type: 'navigate', payload: '/workouts' },
+          { label: 'Log Food', type: 'navigate', payload: '/nutrition' },
+          { label: 'View Progress', type: 'navigate', payload: '/bioprint' },
           { label: '⚙️ Settings', type: 'navigate', payload: '/settings' },
         ],
       };
@@ -715,18 +715,18 @@ function handleNavigationIntent(input: string, _currentPage?: PageContext): Resp
     text: "Where would you like to go?",
     actions: [
       { label: '🏠 Dashboard', type: 'navigate', payload: '/dashboard' },
-      { label: '💪 Workouts', type: 'navigate', payload: '/workouts' },
-      { label: '🍎 Nutrition', type: 'navigate', payload: '/nutrition' },
-      { label: '📊 Progress', type: 'navigate', payload: '/bioprint' },
+      { label: 'Workouts', type: 'navigate', payload: '/workouts' },
+      { label: 'Nutrition', type: 'navigate', payload: '/nutrition' },
+      { label: 'Progress', type: 'navigate', payload: '/bioprint' },
     ],
   };
 }
 
 function quickActions(currentPage?: PageContext): ChatAction[] {
   const actions: ChatAction[] = [
-    { label: '💪 Start Workout', type: 'navigate', payload: '/workouts' },
-    { label: '🍎 Log Food', type: 'navigate', payload: '/nutrition' },
-    { label: '📊 Progress', type: 'navigate', payload: '/bioprint' },
+    { label: 'Start Workout', type: 'navigate', payload: '/workouts' },
+    { label: 'Log Food', type: 'navigate', payload: '/nutrition' },
+    { label: 'Progress', type: 'navigate', payload: '/bioprint' },
   ];
 
   if (currentPage?.path !== '/dashboard') {

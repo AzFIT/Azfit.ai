@@ -105,6 +105,7 @@ import type { Database } from '@/types/supabase';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import IconTile from '@/components/ui/IconTile';
 
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -498,10 +499,10 @@ function GoalTileView({
       {selected && <Check className={cn('text-white', mode === 'details' ? 'w-2.5 h-2.5' : 'w-3 h-3')} />}
     </span>
   );
-  const iconBlock = (size: string) => (
-    <span className={cn('rounded-lg flex items-center justify-center shrink-0', size)} style={{ backgroundColor: `${color}20`, border: `1px solid ${color}40` }}>
-      <Icon className={cn(size === 'w-7 h-7' ? 'w-3.5 h-3.5' : 'w-5 h-5')} style={{ color }} />
-    </span>
+  // Phase 75 Item 2b: the alpha-box iconBlock became the shared IconTile
+  // (tint = the goal's pre-existing accent; active = selected state).
+  const iconBlock = (size: 'sm' | 'md') => (
+    <IconTile icon={Icon} size={size} tint={color} active={selected} />
   );
   const primaryChip = primary ? <span className="text-[8px] font-bold uppercase tracking-wide text-[var(--ai-violet)]">Primary</span> : null;
 
@@ -517,7 +518,7 @@ function GoalTileView({
   if (mode === 'list') {
     return (
       <button onClick={onToggle} className={cn('flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all', selectedCls)}>
-        {iconBlock('w-7 h-7')}
+        {iconBlock('sm')}
         <span className="text-xs font-semibold text-[var(--page-text)] truncate min-w-0 flex-1">{name}</span>
         {primaryChip}
         {checkbox}
@@ -528,12 +529,12 @@ function GoalTileView({
     <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onToggle} className={cn('relative flex flex-col items-start rounded-xl border-2 transition-all text-left overflow-hidden', mode === 'large' ? '' : 'p-4', selectedCls)}>
       {mode === 'large' && (
         <div className="w-full h-20 flex items-end p-3" style={{ background: `linear-gradient(135deg, ${color}30, transparent), var(--card-bg)` }}>
-          {iconBlock('w-10 h-10')}
+          {iconBlock('md')}
         </div>
       )}
       <div className={cn('w-full', mode === 'large' && 'p-4 pt-3')}>
         <div className={cn('flex w-full', mode === 'small' ? 'justify-end mb-1.5' : 'items-center justify-between mb-2', mode === 'large' && 'mb-1.5')}>
-          {mode === 'medium' && iconBlock('w-10 h-10')}
+          {mode === 'medium' && iconBlock('md')}
           <span className="flex items-center gap-1.5">{primaryChip}{checkbox}</span>
         </div>
         <h4 className="text-[var(--page-text)] font-semibold text-sm mb-1">{name}</h4>
@@ -592,7 +593,7 @@ function Step1Goal({ data, updateData, customGoals = [], onAddGoal, onArchiveGoa
             <GoalTileView
               name={g.name}
               desc="Custom goal"
-              color="#00AEEF"
+              color="var(--light-text-muted)"
               icon={Target}
               selected={data.goals.includes(tid)}
               primary={data.goals[0] === tid}

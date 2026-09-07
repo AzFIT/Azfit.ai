@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, CheckCircle, Square, Plus, Minus, Pencil, StickyNote, X } from 'lucide-react';
+import { ChevronDown, CheckCircle, Square, Plus, Minus, Pencil, StickyNote, X, Trophy } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase';
 import type { SessionExercise, SessionSet } from '@/lib/workoutSession';
@@ -580,8 +580,8 @@ export function SessionExerciseCard({
                     >
                       {s.done ? <CheckCircle size={20} className="text-emerald-500" /> : <Square size={20} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]" />}
                       {showPr === si && (
-                        <span className="absolute -top-6 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-amber-400 text-[#0A0A0A] text-[10px] font-bold rounded animate-bounce whitespace-nowrap">
-                          NEW PB! 🏆
+                        <span className="absolute -top-6 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 px-2 py-0.5 bg-amber-400 text-[#0A0A0A] text-[10px] font-bold rounded animate-bounce whitespace-nowrap">
+                          <Trophy size={10} strokeWidth={2.5} /> NEW PB!
                         </span>
                       )}
                     </button>

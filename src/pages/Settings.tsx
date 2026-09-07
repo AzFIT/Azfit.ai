@@ -23,8 +23,10 @@ import {
   Dumbbell,
   Apple,
   Send,
+  type LucideIcon,
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import IconTile, { type IconTileTone } from '@/components/ui/IconTile';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -162,9 +164,8 @@ interface DeviceItem {
   type: string;
   connected: boolean;
   lastSync: string;
-  icon: React.ReactNode;
-  iconBg: string;
-  iconColor: string;
+  icon: LucideIcon;
+  tone: IconTileTone;
 }
 
 function DeviceRow({ device }: { device: DeviceItem }) {
@@ -178,12 +179,7 @@ function DeviceRow({ device }: { device: DeviceItem }) {
       }}
     >
       <div className="flex items-center gap-3">
-        <div
-          className="flex h-10 w-10 items-center justify-center rounded-xl"
-          style={{ backgroundColor: device.iconBg }}
-        >
-          <div style={{ color: device.iconColor }}>{device.icon}</div>
-        </div>
+        <IconTile icon={device.icon} size="md" tone={device.tone} />
         <div>
           <p className="text-sm font-semibold" style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}>
             {device.name}
@@ -371,27 +367,24 @@ export default function Settings() {
       type: 'Smartwatch',
       connected: true,
       lastSync: '2 min ago',
-      icon: <Watch size={20} />,
-      iconBg: 'color-mix(in srgb, var(--azfit-primary) 1%, transparent)',
-      iconColor: 'var(--azfit-primary)',
+      icon: Watch,
+      tone: 'brand',
     },
     {
       name: 'Withings Scale',
       type: 'Smart Scale',
       connected: true,
       lastSync: '1 hr ago',
-      icon: <Scale size={20} />,
-      iconBg: 'rgba(6,182,212,0.1)',
-      iconColor: 'var(--azfit-secondary)',
+      icon: Scale,
+      tone: 'brand',
     },
     {
       name: 'MyFitnessPal',
       type: 'Fitness App',
       connected: false,
       lastSync: '3 days ago',
-      icon: <Activity size={20} />,
-      iconBg: 'rgba(139,92,246,0.1)',
-      iconColor: 'var(--azfit-accent)',
+      icon: Activity,
+      tone: 'accent',
     },
   ];
 

@@ -4,6 +4,7 @@ import { Search, Play, X, Dumbbell, ChevronDown, AlertTriangle, Filter } from 'l
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { Input } from '@/components/ui/input';
+import IconTile from '@/components/ui/IconTile';
 
 interface Exercise {
   ExerciseID: string;
@@ -533,7 +534,7 @@ export default function ExercisesPage() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24">
-          <Search size={48} className="text-[var(--text-muted)] mb-4 opacity-50" />
+          <IconTile icon={Search} size="lg" tone="muted" className="mb-4" />
           <h3 className="text-[var(--text-primary)] font-semibold text-base mb-1">No exercises found</h3>
           <p className="text-[var(--text-muted)] text-sm mb-4">Try adjusting your search or filters</p>
           <button

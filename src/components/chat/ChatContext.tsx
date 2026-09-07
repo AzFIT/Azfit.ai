@@ -32,9 +32,9 @@ function loadMessages(): ChatMessage[] {
     text: "👋 Hey! I'm AzFIT AI. I can help you start workouts, log food, check progress, or navigate the app. What would you like to do?",
     timestamp: Date.now(),
     actions: [
-      { label: '💪 Start Workout', type: 'navigate', payload: '/workouts' },
-      { label: '🍎 Log Food', type: 'navigate', payload: '/nutrition' },
-      { label: '📊 View Progress', type: 'navigate', payload: '/bioprint' },
+      { label: 'Start Workout', type: 'navigate', payload: '/workouts' },
+      { label: 'Log Food', type: 'navigate', payload: '/nutrition' },
+      { label: 'View Progress', type: 'navigate', payload: '/bioprint' },
       { label: '⚙️ Settings', type: 'navigate', payload: '/settings' },
     ],
   }];

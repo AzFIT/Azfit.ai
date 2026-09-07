@@ -19,6 +19,7 @@ import { useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { GlassCard } from "./shared/GlassCard";
+import IconTile from "@/components/ui/IconTile";
 import { ClientHealthGrid } from "./ClientHealthGrid";
 import FollowUpsWidget from "./FollowUpsWidget";
 import NutritionCommandCenter from "./NutritionCommandCenter";
@@ -631,12 +632,7 @@ export default function TrainerDashboard() {
               <GlassCard glass hover padding="p-4" className="relative overflow-hidden">
                 <div className="relative">
                   <div className="mb-2 flex items-center gap-2">
-                    <div
-                      className="flex h-8 w-8 items-center justify-center rounded-lg"
-                      style={{ backgroundColor: "var(--light-elevated)" }}
-                    >
-                      <metric.icon className="h-4 w-4" style={{ color: "var(--azfit-primary)" }} />
-                    </div>
+                    <IconTile icon={metric.icon} size="sm" tone="brand" />
                     <span
                       className="text-[11px] font-medium uppercase tracking-wide"
                       style={{ color: "var(--light-text-muted)" }}
@@ -700,31 +696,31 @@ export default function TrainerDashboard() {
             {
               label: "Add Client",
               icon: UserPlus,
-              color: "var(--azfit-primary)",
+              tone: "brand" as const,
               onClick: () => setShowAddClientModal(true),
             },
             {
               label: "Build Program",
               icon: Dumbbell,
-              color: "var(--azfit-accent)",
+              tone: "accent" as const,
               onClick: () => navigate("/ai-program-builder"),
             },
             {
               label: "Log Assessment",
               icon: Scale,
-              color: "var(--warning)",
+              tone: "warn" as const,
               onClick: () => navigate("/bioprint"),
             },
             {
               label: "Export",
               icon: FileSpreadsheet,
-              color: "#84CC16",
+              tone: "success" as const,
               onClick: () => navigate("/export"),
             },
             {
               label: "Broadcast",
               icon: Megaphone,
-              color: "var(--danger)",
+              tone: "danger" as const,
               onClick: () => navigate("/messages"),
             },
           ].map((action) => (
@@ -739,12 +735,7 @@ export default function TrainerDashboard() {
                 borderColor: "var(--card-border)",
               }}
             >
-              <div
-                className="flex h-10 w-10 items-center justify-center rounded-lg"
-                style={{ backgroundColor: `${action.color}15` }}
-              >
-                <action.icon className="h-5 w-5" style={{ color: action.color }} />
-              </div>
+              <IconTile icon={action.icon} size="md" tone={action.tone} />
               <span className="text-[11px] font-medium" style={{ color: "var(--page-text)" }}>
                 {action.label}
               </span>
