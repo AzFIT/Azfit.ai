@@ -1204,6 +1204,59 @@ export type Database = {
           }
         ];
       };
+      client_plan_blueprints: {
+        Row: {
+          id: string;
+          client_id: string;
+          equipment_access: string | null;
+          injuries_notes: string | null;
+          stress_level: number | null;
+          sleep_quality: number | null;
+          dietary_restriction: string | null;
+          food_include: string[];
+          food_exclude: string[];
+          meal_preferences: Record<string, string[]>;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          equipment_access?: string | null;
+          injuries_notes?: string | null;
+          stress_level?: number | null;
+          sleep_quality?: number | null;
+          dietary_restriction?: string | null;
+          food_include?: string[];
+          food_exclude?: string[];
+          meal_preferences?: Record<string, string[]>;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          client_id?: string;
+          equipment_access?: string | null;
+          injuries_notes?: string | null;
+          stress_level?: number | null;
+          sleep_quality?: number | null;
+          dietary_restriction?: string | null;
+          food_include?: string[];
+          food_exclude?: string[];
+          meal_preferences?: Record<string, string[]>;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "client_plan_blueprints_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: true;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       daily_plan_items: {
         Row: {
           id: string;
@@ -1483,7 +1536,7 @@ export type Database = {
       foods_cache: {
         Row: {
           id: string;
-          source: "off" | "custom";
+          source: "off" | "custom" | "seed-staples";
           source_id: string | null;
           name: string;
           brand: string | null;
@@ -1499,7 +1552,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          source?: "off" | "custom";
+          source?: "off" | "custom" | "seed-staples";
           source_id?: string | null;
           name: string;
           brand?: string | null;
@@ -1515,7 +1568,7 @@ export type Database = {
         };
         Update: {
           id?: string;
-          source?: "off" | "custom";
+          source?: "off" | "custom" | "seed-staples";
           source_id?: string | null;
           name?: string;
           brand?: string | null;

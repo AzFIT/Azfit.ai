@@ -2386,3 +2386,41 @@ $function$;
 REVOKE ALL ON FUNCTION public.demo_dashboard_stats() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.demo_dashboard_stats() TO anon;
 GRANT EXECUTE ON FUNCTION public.demo_dashboard_stats() TO authenticated;
+
+-- ============================================================
+-- Phase 79: client_plan_blueprints (Smart Blueprint input panel)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.client_plan_blueprints (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL UNIQUE REFERENCES clients(id) ON DELETE CASCADE,
+  equipment_access TEXT CHECK (equipment_access IN (
+    'full_gym', 'home_gym_bb_db', 'dumbbells_only', 'bodyweight_only'
+  )),
+  injuries_notes TEXT,
+  stress_level INT CHECK (stress_level BETWEEN 1 AND 10),
+  sleep_quality INT CHECK (sleep_quality BETWEEN 1 AND 10),
+  dietary_restriction TEXT CHECK (dietary_restriction IN (
+    'none', 'vegan', 'vegetarian', 'pescatarian', 'dairy_free', 'gluten_free'
+  )),
+  food_include JSONB NOT NULL DEFAULT '[]'::jsonb,
+  food_exclude JSONB NOT NULL DEFAULT '[]'::jsonb,
+  meal_preferences JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.client_plan_blueprints ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Trainers can manage client plan blueprints"
+  ON public.client_plan_blueprints FOR ALL TO authenticated
+  USING (client_id IN (SELECT id FROM clients WHERE trainer_id = auth.uid()));
+
+CREATE POLICY "Clients can read own plan blueprint"
+  ON public.client_plan_blueprints FOR SELECT TO authenticated
+  USING (
+    client_id IN (
+      SELECT clients.id FROM clients
+      WHERE clients.email = (SELECT profiles.email FROM profiles WHERE profiles.id = auth.uid())
+    )
+  );
