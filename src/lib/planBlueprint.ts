@@ -3,9 +3,26 @@
    the client-facing Plan Summary ("Blueprint") report.
    Everything deterministic + unit-tested; the UI only renders the
    BlueprintResult this module returns.
+   Phase 80: `extras` (optional, computed by the caller from the
+   client's client_plan_blueprints row via planSummaryExtras.ts) —
+   warm-up / sample diet / supplements sections. Absent in older
+   stored summaries → those sections are simply omitted.
    ═══════════════════════════════════════════════════════════════ */
 
 import { calculateBMR, calculateBMRKatchMcArdle, ACTIVITY_LEVELS, type ActivityLevelKey } from "./tdee";
+import type { WarmupResult, SampleDietResult, SUPPLEMENT_BLOCK } from "./planSummaryExtras";
+
+/** Phase 80: blueprint-driven report sections (computed at generate
+ *  time in PlanSummaryTab, stored inside plan_summaries.result). */
+export interface BlueprintExtras {
+  warmup?: WarmupResult;
+  sampleDiet?: SampleDietResult;
+  supplements?: {
+    items: typeof SUPPLEMENT_BLOCK;
+    hydration: { min: number; max: number };
+    disclaimer: string;
+  };
+}
 
 /* ── Inputs ──────────────────────────────────────────────────── */
 export interface BlueprintInputs {
@@ -564,6 +581,9 @@ export interface BlueprintResult {
   roadmap: RoadmapPhase[];
   faq: FaqItem[];
   femaleReassurance: boolean;
+  /** Phase 80: blueprint-driven sections (optional — absent in
+   *  summaries generated before the blueprint panel existed). */
+  extras?: BlueprintExtras;
 }
 
 export function computeBlueprint(input: BlueprintInputs, generatedIso = new Date().toISOString()): BlueprintResult {

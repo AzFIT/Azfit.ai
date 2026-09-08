@@ -30,9 +30,21 @@ import {
   DEFAULT_INPUTS,
   type BlueprintInputs,
   type BlueprintResult,
+  type BlueprintExtras,
   type MacroGrams,
   type StyledMacros,
 } from "@/lib/planBlueprint";
+import {
+  buildWarmupProtocol,
+  buildSampleDiet,
+  hydrationMl,
+  SUPPLEMENT_BLOCK,
+  SUPPLEMENT_DISCLAIMER,
+  MEDICAL_DISCLAIMER,
+  type LibraryExercise,
+  type StapleFoodMacros,
+} from "@/lib/planSummaryExtras";
+import { blueprintFromRow, type BlueprintRow } from "@/lib/planBlueprintInput";
 import type { Database } from "@/types/supabase";
 
 type SummaryRow = Database["public"]["Tables"]["plan_summaries"]["Row"];
@@ -65,6 +77,58 @@ function normalizeGoalForSelect(g: string | null | undefined): string {
   if (["lose_weight", "reduce_body_fat", "build_muscle", "increase_strength", "improve_fitness"].includes(g)) return g;
   const k = g.trim().toLowerCase().replace(/[_-]/g, " ");
   return GOAL_SELECT_MAP[k] ?? "lose_weight";
+}
+
+/* Phase 80 Item 3: compute blueprint-driven report extras from the
+   client's client_plan_blueprints row (null when no row exists →
+   sections omitted entirely, never empty shells). The 61 engine
+   stays pure — this merges at generation time with the report's
+   REAL macro targets. */
+async function computeExtrasForClient(
+  clientId: string,
+  weightKg: number,
+  macroTargets: { kcal: number; proteinG: number; carbsG: number; fatsG: number },
+): Promise<BlueprintExtras | null> {
+  const { data: row } = await supabase
+    .from("client_plan_blueprints")
+    .select("*")
+    .eq("client_id", clientId)
+    .maybeSingle();
+  if (!row) return null;
+  const bp = blueprintFromRow(row as unknown as BlueprintRow);
+
+  const [libRes, foodsRes] = await Promise.all([
+    supabase
+      .from("exercise_library")
+      .select("id, name, primary_muscle, secondary_muscle, equipment, exercise_type")
+      .eq("is_active", true),
+    supabase
+      .from("foods_cache")
+      .select("name, category, calories, protein, carbs, fats")
+      .eq("source", "seed-staples"),
+  ]);
+  const library = (libRes.data as LibraryExercise[] | null) ?? [];
+  const foods = (foodsRes.data as StapleFoodMacros[] | null) ?? [];
+
+  const warmup = buildWarmupProtocol(bp.equipmentAccess, bp.injuriesNotes, library);
+  const sampleDiet = buildSampleDiet(
+    bp.dietPreferences.included,
+    bp.dietPreferences.excluded,
+    bp.dietaryRestriction,
+    bp.dietPreferences.meals,
+    macroTargets,
+    foods,
+  );
+  const extras: BlueprintExtras = {
+    warmup: warmup.steps.length > 0 ? warmup : undefined,
+    sampleDiet: sampleDiet ?? undefined,
+    supplements: {
+      items: SUPPLEMENT_BLOCK,
+      hydration: hydrationMl(weightKg),
+      disclaimer: SUPPLEMENT_DISCLAIMER,
+    },
+  };
+  return extras;
 }
 
 export default function PlanSummaryTab({ clientId }: { clientId: string }) {
@@ -137,13 +201,24 @@ export default function PlanSummaryTab({ clientId }: { clientId: string }) {
     setSaving(true);
     try {
       const result = computeBlueprint(inputs);
+      // Phase 80: merge blueprint-driven extras when the client has a
+      // client_plan_blueprints row (Phase 79). Older summaries without
+      // extras render unchanged — the sections are simply omitted.
+      const recStyle = result.macroStyles.find((s) => s.key === result.recommended.key) ?? result.macroStyles[0];
+      const extras = await computeExtrasForClient(clientId, inputs.weightKg, {
+        kcal: result.calories.target,
+        proteinG: recStyle.atTarget.proteinG,
+        carbsG: recStyle.atTarget.carbsG,
+        fatsG: recStyle.atTarget.fatsG,
+      });
+      const finalResult = extras ? { ...result, extras } : result;
       const { data, error } = await supabase
         .from("plan_summaries")
         .insert({
           client_id: clientId,
           trainer_id: user.id,
           inputs: inputs as unknown as Database["public"]["Tables"]["plan_summaries"]["Insert"]["inputs"],
-          result: result as unknown as Database["public"]["Tables"]["plan_summaries"]["Insert"]["result"],
+          result: finalResult as unknown as Database["public"]["Tables"]["plan_summaries"]["Insert"]["result"],
           recommended_style: result.recommended.key,
         })
         .select()
@@ -481,6 +556,10 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete }: { report:
   const [expanded, setExpanded] = useState(true);
   const a = report.assessment;
   const n = (k: number) => k + (report.femaleReassurance ? 1 : 0);
+  // Phase 80: dynamic section-number shifts for blueprint extras
+  const shiftWarmup = report.extras?.warmup ? 1 : 0;
+  const shiftDiet = shiftWarmup + (report.extras?.sampleDiet ? 1 : 0);
+  const shiftSupplements = shiftDiet + (report.extras?.supplements ? 1 : 0);
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between rounded-xl border px-4 py-3" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}>
@@ -574,7 +653,26 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete }: { report:
             </p>
           </Section>
 
-          <Section title={`${n(4)} · Training Plan (GBC) · ${report.training.sessions.length} sessions + ${report.training.stepTarget.toLocaleString()} steps/day`}>
+          {/* Phase 80: blueprint-driven sections — only when the stored
+              summary carries extras (blueprint row existed at generate
+              time). Section numbers shift dynamically. */}
+          {report.extras?.warmup && (
+            <Section title={`${n(4)} · Dynamic Warm-Up & Mobility`}>
+              <ol className="list-inside list-decimal space-y-1 text-xs" style={{ color: "var(--page-text)" }}>
+                {report.extras.warmup.steps.map((s) => (
+                  <li key={s.name}>
+                    <span className="font-semibold">{s.name}</span>
+                    <span className="text-[10px]" style={{ color: "var(--light-text-muted)" }}> — {s.muscle}</span>
+                  </li>
+                ))}
+              </ol>
+              {report.extras.warmup.note && (
+                <p className="mt-2 text-[10px]" style={{ color: "var(--light-text-muted)" }}>{report.extras.warmup.note}</p>
+              )}
+            </Section>
+          )}
+
+          <Section title={`${n(4 + shiftWarmup)} · Training Plan (GBC) · ${report.training.sessions.length} sessions + ${report.training.stepTarget.toLocaleString()} steps/day`}>
             {report.training.sessions.map((s, i) => (
               <div key={i} className="mb-3 rounded-lg border p-3 last:mb-0" style={{ borderColor: "var(--card-border)", backgroundColor: "var(--light-elevated)" }}>
                 <p className="mb-1.5 text-xs font-bold" style={{ color: "var(--page-text)" }}>{s.name}</p>
@@ -602,7 +700,7 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete }: { report:
             </ul>
           </Section>
 
-          <Section title={`${n(5)} · Sample Day of Eating (${report.recommended.name})`}>
+          <Section title={`${n(5 + shiftWarmup)} · Sample Day of Eating (${report.recommended.name})`}>
             {report.sampleDay.meals.map((m) => (
               <div key={m.name} className="mb-2 last:mb-0">
                 <div className="flex items-baseline justify-between gap-2">
@@ -628,7 +726,54 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete }: { report:
             </ul>
           </Section>
 
-          <Section title={`${n(6)} · Tracking & Accountability`}>
+          {report.extras?.sampleDiet && (
+            <Section title={`${n(6 + shiftWarmup)} · Sample Diet Day — Your Foods`}>
+              {report.extras.sampleDiet.meals.map((m) => (
+                <div key={m.name} className="mb-2 last:mb-0">
+                  <p className="text-xs font-semibold" style={{ color: "var(--page-text)" }}>{m.name}</p>
+                  <p className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+                    {m.items.map((i) => `${i.food} ${i.grams} g`).join(" · ")}
+                  </p>
+                </div>
+              ))}
+              <div className="mt-2 flex items-center justify-between rounded-lg px-3 py-2 text-xs font-bold" style={{ backgroundColor: "var(--light-elevated)", color: "var(--page-text)" }}>
+                <span>Day total</span>
+                <span className="tabular-nums">
+                  {report.extras.sampleDiet.totals.kcal} kcal · P{report.extras.sampleDiet.totals.proteinG} C{report.extras.sampleDiet.totals.carbsG} F{report.extras.sampleDiet.totals.fatsG}
+                  {report.extras.sampleDiet.withinTolerance && <span style={{ color: "#22C55E" }}> · within ±10% of target</span>}
+                </span>
+              </div>
+              {report.extras.sampleDiet.note && (
+                <p className="mt-2 text-[10px]" style={{ color: "var(--light-text-muted)" }}>{report.extras.sampleDiet.note}</p>
+              )}
+            </Section>
+          )}
+
+          {report.extras?.supplements && (
+            <Section title={`${n(6 + shiftDiet)} · Supplementation & Hydration`}>
+              {report.extras.supplements.items.map((s) => (
+                <div key={s.name} className={rowCls}>
+                  <span className={rowLabel}>{s.name}</span>
+                  <span className="text-right text-xs">
+                    <span className="font-semibold" style={{ color: "var(--page-text)" }}>{s.dose}</span>
+                    <span className="block text-[10px]" style={{ color: "var(--light-text-muted)" }}>{s.note}</span>
+                  </span>
+                </div>
+              ))}
+              <div className={rowCls}>
+                <span className={rowLabel}>Water</span>
+                <span className="text-right text-xs">
+                  <span className="font-semibold" style={{ color: "var(--page-text)" }}>
+                    {(report.extras.supplements.hydration.min / 1000).toFixed(1)}–{(report.extras.supplements.hydration.max / 1000).toFixed(1)} L/day
+                  </span>
+                  <span className="block text-[10px]" style={{ color: "var(--light-text-muted)" }}>30–35 ml per kg of your bodyweight</span>
+                </span>
+              </div>
+              <p className="mt-2 text-[10px]" style={{ color: "var(--light-text-muted)" }}>{report.extras.supplements.disclaimer}</p>
+            </Section>
+          )}
+
+          <Section title={`${n(6 + shiftSupplements)} · Tracking & Accountability`}>
             {report.tracking.map((t) => (
               <div key={t.what} className={rowCls}>
                 <span className={rowLabel}>{t.what}</span>
@@ -640,7 +785,7 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete }: { report:
             ))}
           </Section>
 
-          <Section title={`${n(7)} · Program Roadmap (${report.goal.programWeeks} weeks)`}>
+          <Section title={`${n(7 + shiftSupplements)} · Program Roadmap (${report.goal.programWeeks} weeks)`}>
             {report.roadmap.map((p) => (
               <div key={p.weeks} className="mb-2 flex gap-3 last:mb-0">
                 <span className="w-12 shrink-0 rounded-md px-1.5 py-0.5 text-center text-[10px] font-bold" style={{ backgroundColor: "var(--light-elevated)", color: "#00AEEF" }}>
@@ -659,7 +804,7 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete }: { report:
             )}
           </Section>
 
-          <Section title={`${n(8)} · FAQ`}>
+          <Section title={`${n(8 + shiftSupplements)} · FAQ`}>
             {report.faq.map((f) => (
               <div key={f.q} className="mb-2 last:mb-0">
                 <p className="text-xs font-semibold" style={{ color: "#00AEEF" }}>{f.q}</p>
@@ -667,6 +812,12 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete }: { report:
               </div>
             ))}
           </Section>
+
+          {/* Phase 80 Item 2: medical disclaimer — footer of the
+              on-screen report (the print page carries it too) */}
+          <p className="mt-4 border-t pt-3 text-center text-[10px]" style={{ borderColor: "var(--card-border)", color: "var(--light-text-muted)" }}>
+            {MEDICAL_DISCLAIMER}
+          </p>
         </>
       )}
     </div>

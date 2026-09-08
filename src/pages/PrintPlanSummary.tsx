@@ -11,6 +11,7 @@ import { Printer, ArrowLeft, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatNumber } from "@/lib/utils";
 import type { BlueprintResult } from "@/lib/planBlueprint";
+import { MEDICAL_DISCLAIMER } from "@/lib/planSummaryExtras";
 import type { Database } from "@/types/supabase";
 
 type SummaryRow = Database["public"]["Tables"]["plan_summaries"]["Row"];
@@ -80,6 +81,10 @@ export default function PrintPlanSummaryPage() {
   const m = report;
   const a = m.assessment;
   const n = (k: number) => k + (m.femaleReassurance ? 1 : 0);
+  // Phase 80: dynamic section-number shifts for blueprint extras
+  const shiftWarmup = m.extras?.warmup ? 1 : 0;
+  const shiftDiet = shiftWarmup + (m.extras?.sampleDiet ? 1 : 0);
+  const shiftSupplements = shiftDiet + (m.extras?.supplements ? 1 : 0);
   const genDate = new Date(m.header.generatedIso).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 
   return (
@@ -231,10 +236,27 @@ export default function PrintPlanSummaryPage() {
           </p>
         </section>
 
+        {/* Phase 80: Dynamic Warm-Up (only when the summary carries
+            blueprint extras) */}
+        {m.extras?.warmup && (
+          <section className={sec}>
+            <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(4)} · Dynamic Warm-Up & Mobility</h2>
+            <ol className="mt-1.5 list-inside list-decimal text-[11px]">
+              {m.extras.warmup.steps.map((s) => (
+                <li key={s.name}>
+                  <span className="font-semibold">{s.name}</span>
+                  <span className="text-gray-500"> — {s.muscle}</span>
+                </li>
+              ))}
+            </ol>
+            {m.extras.warmup.note && <p className="mt-1.5 text-[10px] text-gray-500">{m.extras.warmup.note}</p>}
+          </section>
+        )}
+
         {/* 5. Training Plan */}
         <section className={sec}>
           <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">
-            {n(4)} · Training Plan (GBC) · {m.training.sessions.length} sessions + {formatNumber(m.training.stepTarget)} steps/day
+            {n(4 + shiftWarmup)} · Training Plan (GBC) · {m.training.sessions.length} sessions + {formatNumber(m.training.stepTarget)} steps/day
           </h2>
           {m.training.sessions.map((s, i) => (
             <div key={i} className="mt-2">
@@ -266,7 +288,7 @@ export default function PrintPlanSummaryPage() {
 
         {/* 6. Sample Day */}
         <section className={sec}>
-          <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(5)} · Sample Day of Eating ({m.recommended.name})</h2>
+          <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(5 + shiftWarmup)} · Sample Day of Eating ({m.recommended.name})</h2>
           <table className="mt-1 w-full text-[10px]">
             <tbody>
               {m.sampleDay.meals.map((meal) => (
@@ -296,9 +318,63 @@ export default function PrintPlanSummaryPage() {
           </ul>
         </section>
 
+        {/* Phase 80: Sample Diet Day (blueprint foods) */}
+        {m.extras?.sampleDiet && (
+          <section className={sec}>
+            <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(6 + shiftWarmup)} · Sample Diet Day — Your Foods</h2>
+            <table className="mt-1 w-full text-[10px]">
+              <tbody>
+                {m.extras.sampleDiet.meals.map((meal) => (
+                  <tr key={meal.name} className="border-b border-gray-100 align-top">
+                    <td className={`${td} w-1/2`}>
+                      <p className="font-semibold">{meal.name}</p>
+                      <p className="text-gray-500">{meal.items.map((i) => `${i.food} ${i.grams} g`).join(" · ")}</p>
+                    </td>
+                    <td className={`${td} text-right text-gray-600`}></td>
+                  </tr>
+                ))}
+                <tr className="bg-gray-100 font-bold">
+                  <td className={td}>Day total</td>
+                  <td className={`${td} text-right`}>
+                    {m.extras.sampleDiet.totals.kcal} kcal · P{m.extras.sampleDiet.totals.proteinG} C{m.extras.sampleDiet.totals.carbsG} F{m.extras.sampleDiet.totals.fatsG}
+                    {m.extras.sampleDiet.withinTolerance ? " (within ±10% of target)" : ""}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            {m.extras.sampleDiet.note && <p className="mt-1.5 text-[10px] text-gray-500">{m.extras.sampleDiet.note}</p>}
+          </section>
+        )}
+
+        {/* Phase 80: Supplementation & Hydration */}
+        {m.extras?.supplements && (
+          <section className={sec}>
+            <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(6 + shiftDiet)} · Supplementation & Hydration</h2>
+            <table className="mt-1 w-full text-[10px]">
+              <tbody>
+                {m.extras.supplements.items.map((s) => (
+                  <tr key={s.name} className="border-b border-gray-100">
+                    <td className={`${td} font-medium`}>{s.name}</td>
+                    <td className={`${td} text-right font-semibold`}>{s.dose}</td>
+                    <td className={`${td} text-right text-gray-500`}>{s.note}</td>
+                  </tr>
+                ))}
+                <tr className="border-b border-gray-100">
+                  <td className={`${td} font-medium`}>Water</td>
+                  <td className={`${td} text-right font-semibold`}>
+                    {(m.extras.supplements.hydration.min / 1000).toFixed(1)}–{(m.extras.supplements.hydration.max / 1000).toFixed(1)} L/day
+                  </td>
+                  <td className={`${td} text-right text-gray-500`}>30–35 ml per kg bodyweight</td>
+                </tr>
+              </tbody>
+            </table>
+            <p className="mt-1.5 text-[10px] italic text-gray-500">{m.extras.supplements.disclaimer}</p>
+          </section>
+        )}
+
         {/* 7. Tracking */}
         <section className={sec}>
-          <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(6)} · Tracking & Accountability</h2>
+          <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(6 + shiftSupplements)} · Tracking & Accountability</h2>
           <table className="mt-1 w-full text-[10px]">
             <tbody>
               {m.tracking.map((t) => (
@@ -314,7 +390,7 @@ export default function PrintPlanSummaryPage() {
 
         {/* 8. Roadmap */}
         <section className={sec}>
-          <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(7)} · Program Roadmap ({m.goal.programWeeks} weeks)</h2>
+          <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(7 + shiftSupplements)} · Program Roadmap ({m.goal.programWeeks} weeks)</h2>
           {m.roadmap.map((p) => (
             <div key={p.weeks} className="mt-1.5 flex gap-3">
               <span className="w-14 shrink-0 rounded bg-gray-900 px-1.5 py-0.5 text-center text-[10px] font-bold text-white">Wk {p.weeks}</span>
@@ -333,7 +409,7 @@ export default function PrintPlanSummaryPage() {
 
         {/* 9. FAQ */}
         <section className={sec}>
-          <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(8)} · FAQ</h2>
+          <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(8 + shiftSupplements)} · FAQ</h2>
           {m.faq.map((f) => (
             <div key={f.q} className="mt-2">
               <p className="text-[11px] font-bold">{f.q}</p>
@@ -343,6 +419,7 @@ export default function PrintPlanSummaryPage() {
         </section>
 
         <footer className="mt-5 border-t border-gray-200 pt-3 text-[10px] text-gray-400">
+          <p className="mb-1.5 text-gray-500">{MEDICAL_DISCLAIMER}</p>
           Prepared by {m.header.trainerName}
           {m.header.businessName ? ` · ${m.header.businessName}` : ""} — generated {genDate}. Reviewed together at your next session.
         </footer>
