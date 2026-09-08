@@ -240,9 +240,10 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={t(0.4, 0.1)}
-          className="font-display text-chrome max-w-[640px] text-4xl font-bold leading-[1.05] lg:text-[56px]"
+          className="font-display text-chrome max-w-[640px] text-[28px] font-bold leading-[1.05] sm:text-4xl sm:leading-[1.05] lg:text-[56px] lg:leading-[1.05]"
         >
-          Your Fitness Data, On Display.
+          <span className="block">Your Fitness Data,</span>
+          <span className="block">On Display.</span>
         </motion.h1>
         {/* Live Demo Badge */}
         <motion.div
