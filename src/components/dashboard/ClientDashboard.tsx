@@ -35,6 +35,7 @@ import { CollapsibleSection } from "./shared/CollapsibleSection";
 import TodaysMealsCard from "./TodaysMealsCard";
 import MyPlanTodayCard from "./MyPlanTodayCard";
 import ClientScoreCard from "./ClientScoreCard";
+import MetricTilesGrid from "./MetricTilesGrid";
 import SessionsRemainingCard from "./SessionsRemainingCard";
 import MyProgressSection from "./MyProgressSection";
 import MyTargetsCard from "./MyTargetsCard";
@@ -435,6 +436,17 @@ export default function ClientDashboard() {
         animate={mounted ? "visible" : "hidden"}
       >
         <ClientScoreCard />
+      </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          METRIC TILE GRID (Phase 82) — below the score, above the plan
+          ═══════════════════════════════════════════════════════════ */}
+      <motion.div
+        variants={fadeInUp}
+        initial="hidden"
+        animate={mounted ? "visible" : "hidden"}
+      >
+        <MetricTilesGrid />
       </motion.div>
 
       {/* ═══════════════════════════════════════════════════════════
