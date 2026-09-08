@@ -437,10 +437,16 @@
 }
 
 .orb-caption {
+  /* Phase 81b: the caption must never cross the glow ring (ring = 76%
+     of the unit) — nowrap, capped safely inside it, centered. */
   margin: 0;
-  font-size: calc(var(--orb-size) * 0.036);
+  margin-inline: auto;
+  max-width: calc(var(--orb-size) * 0.62);
+  text-align: center;
+  white-space: nowrap;
+  font-size: calc(var(--orb-size) * 0.034);
   font-weight: 600;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
   color: #22D3EE;
   text-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
 }

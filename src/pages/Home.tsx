@@ -242,7 +242,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
           transition={t(0.4, 0.1)}
           className="font-display text-chrome max-w-[640px] text-4xl font-bold leading-[1.05] lg:text-[56px]"
         >
-          Your Fitness Data, Beautifully Visualized.
+          Your Fitness Data, On Display.
         </motion.h1>
         {/* Live Demo Badge */}
         <motion.div

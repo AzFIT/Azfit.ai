@@ -48,7 +48,7 @@ export default function AIShowcase() {
           alt="AzFIT"
           draggable={false}
         />
-        <p className="orb-caption">TRAIN SMARTER. AZFIT.</p>
+        <p className="orb-caption">PERSONAL TRAINING</p>
       </div>
 
       {/* Orbiting feature icons (outside the ring, stay upright) */}
