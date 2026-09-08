@@ -16,6 +16,10 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  Pencil,
+  Save,
+  LoaderCircle,
+  CircleAlert,
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -33,6 +37,7 @@ import {
   type BlueprintExtras,
   type MacroGrams,
   type StyledMacros,
+  type GbcSession,
 } from "@/lib/planBlueprint";
 import {
   buildWarmupProtocol,
@@ -45,6 +50,9 @@ import {
   type StapleFoodMacros,
 } from "@/lib/planSummaryExtras";
 import { blueprintFromRow, type BlueprintRow } from "@/lib/planBlueprintInput";
+import { validateSession } from "@/lib/trainingEditor";
+import { useExerciseTaxonomy } from "@/hooks/useExerciseTaxonomy";
+import TrainingPlanEditor from "./TrainingPlanEditor";
 import type { Database } from "@/types/supabase";
 
 type SummaryRow = Database["public"]["Tables"]["plan_summaries"]["Row"];
@@ -246,6 +254,23 @@ export default function PlanSummaryTab({ clientId }: { clientId: string }) {
     await load();
   };
 
+  /* Phase 81 Item 2: persist an edited training module back to the
+     SAME plan_summaries row (update only — same id, result jsonb
+     replaced with the edited sessions merged in). */
+  const saveTraining = useCallback(
+    async (sessions: GbcSession[]) => {
+      if (!active || !report) throw new Error("No active summary");
+      const next = { ...report, training: { ...report.training, sessions } };
+      const { error } = await supabase
+        .from("plan_summaries")
+        .update({ result: next as unknown as Database["public"]["Tables"]["plan_summaries"]["Update"]["result"] })
+        .eq("id", active.id);
+      if (error) throw new Error(error.message);
+      await load();
+    },
+    [active, report, load],
+  );
+
   if (loading) {
     return (
       <div className="flex justify-center py-10">
@@ -324,6 +349,7 @@ export default function PlanSummaryTab({ clientId }: { clientId: string }) {
           createdAt={active.created_at}
           canEdit={canEdit}
           onDelete={() => remove(active.id)}
+          onSaveTraining={saveTraining}
         />
       )}
 
@@ -552,8 +578,14 @@ const rowCls = "flex items-center justify-between border-b py-1.5 text-xs last:b
 const rowLabel = "text-[var(--light-text-muted)]";
 const rowValue = "font-semibold text-[var(--page-text)]";
 
-function BlueprintReportView({ report, createdAt, canEdit, onDelete }: { report: BlueprintResult; createdAt: string; canEdit: boolean; onDelete: () => void }) {
+function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTraining }: { report: BlueprintResult; createdAt: string; canEdit: boolean; onDelete: () => void; onSaveTraining: (sessions: GbcSession[]) => Promise<void> }) {
   const [expanded, setExpanded] = useState(true);
+  // Phase 81 Item 2: trainer-only training-module edit mode
+  const [editMode, setEditMode] = useState(false);
+  const [draftSessions, setDraftSessions] = useState<GbcSession[] | null>(null);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const { rows: taxonomyRows } = useExerciseTaxonomy();
   const a = report.assessment;
   const n = (k: number) => k + (report.femaleReassurance ? 1 : 0);
   // Phase 80: dynamic section-number shifts for blueprint extras
@@ -673,6 +705,64 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete }: { report:
           )}
 
           <Section title={`${n(4 + shiftWarmup)} · Training Plan (GBC) · ${report.training.sessions.length} sessions + ${report.training.stepTarget.toLocaleString()} steps/day`}>
+            {/* Phase 81 Item 2: trainer-only edit toggle */}
+            {canEdit && !editMode && (
+              <button
+                type="button"
+                onClick={() => { setDraftSessions(JSON.parse(JSON.stringify(report.training.sessions)) as GbcSession[]); setEditMode(true); }}
+                className="mb-2 flex min-h-[44px] items-center gap-1.5 rounded-lg border border-[var(--card-border)] px-3 text-[11px] font-semibold text-[var(--page-text)] hover:border-[var(--azfit-primary)]/50"
+              >
+                <Pencil size={12} style={{ color: "var(--azfit-primary)" }} />
+                Edit training plan
+              </button>
+            )}
+            {editMode && draftSessions ? (
+              <>
+                <TrainingPlanEditor
+                  sessions={draftSessions}
+                  taxonomy={taxonomyRows}
+                  onChange={setDraftSessions}
+                />
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const invalid = draftSessions.map((s) => validateSession(s)).filter((v) => !v.valid);
+                      if (invalid.length > 0) {
+                        setSaveState("error");
+                        setSaveError(invalid[0].errors[0] ?? "Validation failed");
+                        return;
+                      }
+                      setSaveState("saving");
+                      setSaveError(null);
+                      try {
+                        await onSaveTraining(draftSessions);
+                        setSaveState("idle");
+                        setEditMode(false);
+                        setDraftSessions(null);
+                        toast.success("Training plan saved");
+                      } catch (err) {
+                        setSaveState("error");
+                        setSaveError(err instanceof Error ? err.message : "Save failed");
+                      }
+                    }}
+                    className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold text-white"
+                    style={{ background: "linear-gradient(135deg, var(--azfit-primary), var(--azfit-accent))" }}
+                  >
+                    <Save size={13} />
+                    Save changes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setEditMode(false); setDraftSessions(null); }}
+                    className="min-h-[44px] rounded-lg border border-[var(--card-border)] px-4 text-xs font-semibold text-[var(--page-text)]"
+                  >
+                    Discard
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
             {report.training.sessions.map((s, i) => (
               <div key={i} className="mb-3 rounded-lg border p-3 last:mb-0" style={{ borderColor: "var(--card-border)", backgroundColor: "var(--light-elevated)" }}>
                 <p className="mb-1.5 text-xs font-bold" style={{ color: "var(--page-text)" }}>{s.name}</p>
@@ -698,6 +788,8 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete }: { report:
                 <li key={r}>{r}</li>
               ))}
             </ul>
+              </>
+            )}
           </Section>
 
           <Section title={`${n(5 + shiftWarmup)} · Sample Day of Eating (${report.recommended.name})`}>
@@ -818,6 +910,40 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete }: { report:
           <p className="mt-4 border-t pt-3 text-center text-[10px]" style={{ borderColor: "var(--card-border)", color: "var(--light-text-muted)" }}>
             {MEDICAL_DISCLAIMER}
           </p>
+
+          {/* Phase 81: blocking training-save overlay (Phase 66 pattern) */}
+          <AnimatePresence>
+            {(saveState === "saving" || saveState === "error") && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+              >
+                <div className="w-full max-w-xs rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-6 text-center shadow-2xl">
+                  {saveState === "saving" ? (
+                    <>
+                      <LoaderCircle className="mx-auto mb-3 h-8 w-8 animate-spin text-[var(--azfit-primary)]" />
+                      <p className="text-sm font-medium text-[var(--page-text)]">Saving training plan…</p>
+                    </>
+                  ) : (
+                    <>
+                      <CircleAlert className="mx-auto mb-3 h-8 w-8 text-[var(--danger)]" />
+                      <p className="text-sm font-medium text-[var(--page-text)]">Couldn't save</p>
+                      <p className="mt-1 text-xs text-[var(--light-text-muted)]">{saveError}</p>
+                      <button
+                        type="button"
+                        onClick={() => setSaveState("idle")}
+                        className="mt-4 w-full rounded-lg border border-[var(--card-border)] py-2 text-xs font-semibold text-[var(--page-text)]"
+                      >
+                        Back to editing
+                      </button>
+                    </>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </>
       )}
     </div>
