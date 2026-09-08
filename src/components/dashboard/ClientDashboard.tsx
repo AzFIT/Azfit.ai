@@ -34,6 +34,7 @@ import { ProgressRing } from "./shared/ProgressRing";
 import { CollapsibleSection } from "./shared/CollapsibleSection";
 import TodaysMealsCard from "./TodaysMealsCard";
 import MyPlanTodayCard from "./MyPlanTodayCard";
+import ClientScoreCard from "./ClientScoreCard";
 import SessionsRemainingCard from "./SessionsRemainingCard";
 import MyProgressSection from "./MyProgressSection";
 import MyTargetsCard from "./MyTargetsCard";
@@ -422,6 +423,18 @@ export default function ClientDashboard() {
             </div>
           </div>
         </div>
+      </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          YOUR AzFIT SCORE (Phase 78) — under the greeting hero,
+          above My Plan for Today
+          ═══════════════════════════════════════════════════════════ */}
+      <motion.div
+        variants={fadeInUp}
+        initial="hidden"
+        animate={mounted ? "visible" : "hidden"}
+      >
+        <ClientScoreCard />
       </motion.div>
 
       {/* ═══════════════════════════════════════════════════════════
