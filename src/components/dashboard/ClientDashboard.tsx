@@ -36,6 +36,7 @@ import TodaysMealsCard from "./TodaysMealsCard";
 import MyPlanTodayCard from "./MyPlanTodayCard";
 import ClientScoreCard from "./ClientScoreCard";
 import MetricTilesGrid from "./MetricTilesGrid";
+import InsightsStrip from "./InsightsStrip";
 import SessionsRemainingCard from "./SessionsRemainingCard";
 import MyProgressSection from "./MyProgressSection";
 import MyTargetsCard from "./MyTargetsCard";
@@ -447,6 +448,17 @@ export default function ClientDashboard() {
         animate={mounted ? "visible" : "hidden"}
       >
         <MetricTilesGrid />
+      </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          INSIGHTS STRIP (Phase 83) — rule-based cards, below the tiles
+          ═══════════════════════════════════════════════════════════ */}
+      <motion.div
+        variants={fadeInUp}
+        initial="hidden"
+        animate={mounted ? "visible" : "hidden"}
+      >
+        <InsightsStrip />
       </motion.div>
 
       {/* ═══════════════════════════════════════════════════════════
