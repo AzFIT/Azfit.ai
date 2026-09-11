@@ -25,6 +25,9 @@ const iso = (dateKey: string) => new Date(`${dateKey}T00:00:00`).toISOString();
 export function useInsights() {
   const { user } = useAuth();
   const [cards, setCards] = useState<InsightCard[] | null>(null);
+  // Phase 84 Item 6: the header streak badge reads the REAL computed
+  // streak from this same hook (single fetch — see PROGRESS).
+  const [streak, setStreak] = useState<{ currentStreak: number; longestStreak: number }>({ currentStreak: 0, longestStreak: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -100,6 +103,7 @@ export function useInsights() {
           ...((checkin90Res.data as { submitted_at: string }[] | null) ?? []).map((c) => formatDateKeyLocal(new Date(c.submitted_at))),
         ];
         const streaks = computeStreaks(activityDates, formatDateKeyLocal(today));
+        setStreak(streaks);
 
         setCards(
           computeInsights({
@@ -130,5 +134,5 @@ export function useInsights() {
     };
   }, [user]);
 
-  return { cards, loading, error };
+  return { cards, streak, loading, error };
 }

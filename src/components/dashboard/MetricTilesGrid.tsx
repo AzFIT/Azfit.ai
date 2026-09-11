@@ -35,7 +35,9 @@ function Tile({ tile }: { tile: MetricTile }) {
     >
       <span className="flex items-center gap-2.5">
         <IconTile icon={meta.icon} size="sm" tone={meta.tone} />
-        <span className="flex-1 text-[11px] font-semibold" style={{ color: "var(--page-text)" }}>{tile.label}</span>
+        {/* Phase 84 Item 2: never hyphen-break mid-word ("Check-/ins") —
+            nowrap + ellipsis */}
+        <span className="flex-1 truncate whitespace-nowrap text-[11px] font-semibold" style={{ color: "var(--page-text)" }}>{tile.label}</span>
         {tile.pct !== null && (
           <PulseRing
             percent={tile.pct}
@@ -45,7 +47,12 @@ function Tile({ tile }: { tile: MetricTile }) {
             ariaLabel={`${tile.label} ${tile.pct}%`}
           />
         )}
-        <ChevronRight size={14} className="shrink-0 text-[var(--light-text-muted)]" />
+        {/* Phase 84 Item 2: the chevron yields to the ring — ring tiles
+            read as tappable via hover/active affordances; no-target
+            tiles keep the chevron cue */}
+        {tile.pct === null && (
+          <ChevronRight size={14} className="shrink-0 text-[var(--light-text-muted)]" />
+        )}
       </span>
       <span className="mt-1.5 block text-[10px] leading-tight" style={{ color: "var(--light-text-secondary)" }}>
         {tile.value}

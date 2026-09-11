@@ -82,6 +82,8 @@ export default function HabitRow({
           <button
             onClick={() => onToggle(!isTodayDone)}
             disabled={disabled}
+            // Phase 84 Item 1: real accessible name (was an unnamed button)
+            aria-label={isTodayDone ? `Undo ${habit.name} for today` : `Log ${habit.name} for today`}
             className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-all ${
               isTodayDone
                 ? "border-emerald-500 bg-emerald-500/20 text-emerald-400"

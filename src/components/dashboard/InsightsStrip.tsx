@@ -9,7 +9,6 @@ import { useNavigate } from "react-router";
 import { TrendingUp, Flame, ListChecks, ClipboardCheck, Droplets, Sparkles } from "lucide-react";
 import IconTile from "@/components/ui/IconTile";
 import { GlassCard } from "./shared/GlassCard";
-import { useInsights } from "@/hooks/useInsights";
 import type { InsightCard } from "@/lib/insights";
 
 const CARD_ICONS: Record<string, typeof TrendingUp> = {
@@ -59,8 +58,17 @@ function InsightCardView({ card }: { card: InsightCard }) {
   );
 }
 
-export default function InsightsStrip() {
-  const { cards, loading, error } = useInsights();
+/** Phase 84 Item 6: PURE presentational — the dashboard owns the single
+ *  useInsights fetch (the header streak badge reads the same hook). */
+export default function InsightsStrip({
+  cards,
+  loading,
+  error,
+}: {
+  cards: InsightCard[] | null;
+  loading: boolean;
+  error: boolean;
+}) {
 
   if (loading) {
     return (

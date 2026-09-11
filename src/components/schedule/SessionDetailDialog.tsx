@@ -95,8 +95,15 @@ export function SessionDetailDialog({
             <p className="text-sm text-[#94A3B8]">
               {isTrainer
                 ? 'Delete this session? This cannot be undone.'
-                : `Cancel this session with ${event.clientName || 'your coach'} on ${prettyDate}?`}
+                : `Cancel this session with ${event.clientName || 'your coach'} on ${prettyDate}? This notifies your trainer.`}
             </p>
+            {/* Phase 84 Item 3: honest short-notice note (no policy
+                enforcement — cancel stays allowed after confirm) */}
+            {!isTrainer && new Date(`${event.date}T${event.startTime}`).getTime() - new Date().getTime() < 24 * 3600 * 1000 && (
+              <p className="rounded-lg border border-[#F59E0B]/40 bg-[#F59E0B]/10 px-3 py-2 text-[11px] font-medium text-[#F59E0B]">
+                This session is less than 24h away — your trainer will be notified.
+              </p>
+            )}
             <DialogFooter className="gap-2">
               <Button
                 variant="outline"
@@ -181,10 +188,14 @@ export function SessionDetailDialog({
                   Mark completed
                 </Button>
               )}
+              {/* Phase 84 Item 4: reads as an ACTIVE secondary action —
+                  brand-token border + text instead of the greyed
+                  'disabled' look (the dialog is the documented
+                  always-navy surface; tokens resolve correctly on it) */}
               <Button
                 variant="outline"
                 onClick={handleAddToCalendar}
-                className="border-[#2A3447] text-[#94A3B8]"
+                className="border-[var(--azfit-primary)]/50 bg-transparent text-[var(--azfit-primary)] hover:bg-[var(--azfit-primary)]/10"
                 title="Download .ics"
               >
                 <CalendarPlus className="mr-1 h-4 w-4" />

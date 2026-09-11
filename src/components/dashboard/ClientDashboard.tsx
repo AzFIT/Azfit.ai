@@ -22,6 +22,7 @@ import {
 import { useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { useSessions } from "@/hooks/useSessions";
+import { useInsights } from "@/hooks/useInsights";
 import { supabase } from "@/lib/supabase";
 import { codeFromOrderIndex } from "@/lib/aiProgramMapper";
 import { useHabits, last7Days, isDoneOnDate } from "@/components/checkins/useHabits";
@@ -116,6 +117,9 @@ export default function ClientDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { nextUpcomingSession, loading: sessionsLoading } = useSessions();
+  // Phase 83/84: ONE insights fetch feeds the strip AND the header streak
+  // badge (the badge was a hardcoded "12-day streak" mock before Phase 84)
+  const { cards: insightsCards, streak: realStreak, loading: insightsLoading, error: insightsError } = useInsights();
   const [mounted, setMounted] = useState(false);
   const [launcherOpen, setLauncherOpen] = useState(false);
 
@@ -410,19 +414,23 @@ export default function ClientDashboard() {
                 </span>
               )}
             </motion.button>
-            {/* Streak */}
-            <div
-              className="flex items-center gap-2 rounded-lg border px-3 py-2"
-              style={{
-                backgroundColor: "var(--card-bg)",
-                borderColor: "var(--card-border)",
-              }}
-            >
-              <Flame className="h-4 w-4" style={{ color: "var(--azfit-primary)" }} />
-              <span className="text-sm font-medium" style={{ color: "var(--page-text)" }}>
-                12-day streak
-              </span>
-            </div>
+            {/* Streak — Phase 84 Item 6: the REAL computed streak
+                (computeStreaks via useInsights); hidden when 0 (never a
+                fake number, never "0-day streak") */}
+            {realStreak.currentStreak > 0 && (
+              <div
+                className="flex items-center gap-2 rounded-lg border px-3 py-2"
+                style={{
+                  backgroundColor: "var(--card-bg)",
+                  borderColor: "var(--card-border)",
+                }}
+              >
+                <Flame className="h-4 w-4" style={{ color: "var(--azfit-primary)" }} />
+                <span className="text-sm font-medium" style={{ color: "var(--page-text)" }}>
+                  {realStreak.currentStreak}-day streak
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </motion.div>
@@ -458,7 +466,7 @@ export default function ClientDashboard() {
         initial="hidden"
         animate={mounted ? "visible" : "hidden"}
       >
-        <InsightsStrip />
+        <InsightsStrip cards={insightsCards} loading={insightsLoading} error={insightsError} />
       </motion.div>
 
       {/* ═══════════════════════════════════════════════════════════
