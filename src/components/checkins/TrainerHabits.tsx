@@ -13,6 +13,9 @@ export default function TrainerHabits() {
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [habitName, setHabitName] = useState("");
   const [frequency, setFrequency] = useState("daily");
+  // Phase 85: optional numeric target (NULL = flag-only habit)
+  const [targetValue, setTargetValue] = useState("");
+  const [unit, setUnit] = useState("");
   const [saving, setSaving] = useState(false);
 
   const { habits, logs, loading, refresh } = useHabits({
@@ -30,11 +33,19 @@ export default function TrainerHabits() {
     }
 
     setSaving(true);
+    const numericTarget = targetValue.trim() === "" ? null : Number(targetValue);
+    if (numericTarget != null && (!Number.isFinite(numericTarget) || numericTarget <= 0)) {
+      setSaving(false);
+      toast.error("Target value must be a positive number");
+      return;
+    }
     const { error } = await supabase.from("habits").insert({
       trainer_id: user.id,
       client_id: selectedClientId,
       name: habitName.trim(),
       target_frequency: frequency,
+      target_value: numericTarget,
+      unit: numericTarget != null && unit.trim() !== "" ? unit.trim() : null,
       active: true,
     });
     setSaving(false);
@@ -46,6 +57,8 @@ export default function TrainerHabits() {
 
     toast.success("Habit assigned");
     setHabitName("");
+    setTargetValue("");
+    setUnit("");
     refresh();
   };
 
@@ -123,6 +136,42 @@ export default function TrainerHabits() {
             >
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
+            </select>
+          </div>
+          {/* Phase 85: optional numeric target — when set, the client
+              logs a value (e.g. "7.5 of 8 h") instead of a bare flag */}
+          <div>
+            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+              Target value <span style={{ color: "var(--light-text-muted)" }}>(optional)</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={targetValue}
+              onChange={(e) => setTargetValue(e.target.value)}
+              placeholder="e.g. 8"
+              className="w-full rounded-lg border bg-transparent px-3 py-2 text-sm outline-none"
+              style={{ borderColor: "var(--card-border)", color: "var(--page-text)" }}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+              Unit <span style={{ color: "var(--light-text-muted)" }}>(with target)</span>
+            </label>
+            <select
+              value={unit}
+              onChange={(e) => setUnit(e.target.value)}
+              className="w-full rounded-lg border bg-transparent px-3 py-2 text-sm outline-none"
+              style={{ borderColor: "var(--card-border)", color: "var(--page-text)" }}
+            >
+              <option value="">Select unit</option>
+              <option value="h">h (hours)</option>
+              <option value="L">L (litres)</option>
+              <option value="ml">ml</option>
+              <option value="g">g (grams)</option>
+              <option value="k">k (thousand steps)</option>
+              <option value="min">min</option>
             </select>
           </div>
         </div>

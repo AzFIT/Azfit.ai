@@ -613,3 +613,45 @@ knee → Quadriceps/Hamstrings/Glutes/Calves · back → Posterior Chain/Lower B
 ### Gate results
 - `npx tsc -b` ✅ · `npm run lint` ✅ · `npm run test` ✅ (**642 tests** — no new pure logic; streak math covered by 83) · `npm run build` ✅ (404 fallback ✅) · repo e2e ✅ 4/4
 - Smoke ✅ 3/3; fixtures SQL-verified removed (0/0/0/0). Screenshots in `.temp/audit/shots/84/`.
+
+---
+
+## Phase 85 — Numeric habit logging ("7.5 of 8 h" tiles): BUILD + self-merge + deploy
+
+**Branch:** `feat/numeric-habits-85` off `main` (`3137893`) — **AUTONOMY ACTIVE** (self-merge + deploy on green gates).
+
+### Item 1 — DB (additive-only). DONE.
+Exact DDL applied live on `gcurvjprfwecbchreieu` via pooler (mirrored in `supabase/numeric-habits.sql` + `supabase/schema.sql`; types in `src/types/supabase.ts`):
+
+```sql
+ALTER TABLE public.habits
+  ADD COLUMN IF NOT EXISTS target_value NUMERIC,
+  ADD COLUMN IF NOT EXISTS unit TEXT;
+ALTER TABLE public.habit_logs
+  ADD COLUMN IF NOT EXISTS value NUMERIC;
+ALTER TABLE public.habits  ADD CONSTRAINT habits_target_value_positive CHECK (target_value IS NULL OR target_value > 0);
+ALTER TABLE public.habit_logs ADD CONSTRAINT habit_logs_value_nonnegative CHECK (value IS NULL OR value >= 0);
+```
+
+Existing rows were NEVER backfilled — pre-Phase-85 `habit_logs.value` stays NULL (done-flag only; smoke-verified: 0 old rows with a value). RLS unchanged (column-only addition; existing policies already cover client insert/update/select on own rows).
+
+### Item 2 — Logging UI. DONE.
+`HabitRow`: a habit with `target_value` renders a Phase 69 `ArcSlider` (min/max/step derived from the habit's own target via `sliderSpecForTarget` — max = max(2×target, target+1); step 0.1 < 5, 0.5 < 100, else 1; tap-to-type fallback intact) plus a 44px Log/Update confirm that upserts `habit_logs {done: true, value}` on the existing `toggleToday` upsert path (`useHabits.logValueToday`, same `onConflict: habit_id,log_date`). Flag-only habits keep the bare toggle untouched (regression smoke-proven). `TrainerHabits` assign form gained optional Target value + Unit inputs — the existing habits table IS the targets mechanism (extended, not duplicated).
+
+### Item 3 — Tiles: real numeric lines. DONE.
+`src/lib/numericHabits.ts` (pure, formula in header comment): `weekValues` (Mon–today per-day values; missing/undone/NULL → null), `averageLogged` (mean of logged days only — missing days are EXCLUDED, never 0-filled), `numericPct` (avg÷target capped 100), `numericValueLine` ("7.5 of 8 h"), `aggregateNumericWeek`, `findNumericHabit` (same keyword map as dailyPlan — exported `TARGET_HABIT_KEYWORDS`). `computeMetricTiles` uses the numeric aggregate when a numeric habit exists; the Phase 82 done-days fallback remains for flag-only habits. `useMetricTiles` fetches `value`/`target_value`/`unit` and now re-fetches on the `azfit:habit-logs-changed` window event (dispatched by `useHabits` after saves) so the tiles update in the same session.
+
+### Gates
+- `npx tsc -b` ✅ · `npm run lint` ✅ · `npm run test` ✅ (**665 tests**, +23: 18 numericHabits + 5 tile numeric path) · `npm run build` ✅ (404 fallback ✅) · repo e2e ✅ 4/4
+
+### Smoke (SMOKE85-DELETE fixture, SQL-verified removed: clients/habits/habit_logs/profiles 0, auth users deleted)
+- (a) sleep habit target 8 h → logged 7.5 h via tap-to-type → tile shows exactly **"7.5 of 8 h"** (94% ring) ✅
+- (b) water habit target 3 L → logged 1.8 L → tile shows exactly **"1.8 of 3 L"** (60% ring) ✅
+- (c) fresh fixture, no logs → honest **"No logs yet"** empty state, no fabricated 0% ✅
+- (d) SQL: fixture rows carry `value` 7.5 / 1.8 (Reading NULL — flag-only); **0 pre-existing rows have a value** (no backfill) ✅
+- (e) flag-only habit toggle still flips Log → Undo ✅; zero unnamed buttons in the habits row (Phase 84 a11y preserved) ✅
+- scrollWidth = 390 ✅ · zero console errors ✅ · dark + light @390, light @1280
+- Screenshots: `.temp/audit/shots/85/` (01 empty tiles, 02 habit rows, 03 tiles logged dark, 04 habits logged, 05 light 390, 06 light 1280). Temp spec/config deleted.
+
+### Deviations
+- Same-session tile refresh added (`azfit:habit-logs-changed` event) — without it the tiles above the habits row only updated on remount; documented above.

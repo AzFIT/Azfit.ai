@@ -188,7 +188,7 @@ export default function ClientDashboard() {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   // Habits
-  const { habits, logs, loading: habitsLoading, toggleToday } = useHabits({ role: "client" });
+  const { habits, logs, loading: habitsLoading, toggleToday, logValueToday } = useHabits({ role: "client" });
   const today = last7Days()[6];
 
   // Phase 33B data effect: today's workout, coach, check-in due, unread count
@@ -1114,6 +1114,7 @@ export default function ClientDashboard() {
                   logs={logs}
                   isTodayDone={isDoneOnDate(logs, habit.id, today)}
                   onToggle={(done) => toggleToday(habit.id, done)}
+                  onLogValue={(value) => logValueToday(habit.id, value)}
                 />
               ))}
             </div>

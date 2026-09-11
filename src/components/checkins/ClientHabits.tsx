@@ -3,7 +3,7 @@ import { useHabits, last7Days, isDoneOnDate } from "./useHabits";
 import HabitRow from "./HabitRow";
 
 export default function ClientHabits() {
-  const { habits, logs, loading, toggleToday } = useHabits({ role: "client" });
+  const { habits, logs, loading, toggleToday, logValueToday } = useHabits({ role: "client" });
   const today = last7Days()[6];
 
   if (loading) {
@@ -35,6 +35,7 @@ export default function ClientHabits() {
           logs={logs}
           isTodayDone={isDoneOnDate(logs, habit.id, today)}
           onToggle={(done) => toggleToday(habit.id, done)}
+          onLogValue={(value) => logValueToday(habit.id, value)}
         />
       ))}
     </div>

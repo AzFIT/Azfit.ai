@@ -1308,6 +1308,8 @@ export type Database = {
           client_id: string;
           name: string;
           target_frequency: string;
+          target_value: number | null;
+          unit: string | null;
           active: boolean;
           created_at: string;
         };
@@ -1317,6 +1319,8 @@ export type Database = {
           client_id: string;
           name: string;
           target_frequency?: string;
+          target_value?: number | null;
+          unit?: string | null;
           active?: boolean;
           created_at?: string;
         };
@@ -1326,6 +1330,8 @@ export type Database = {
           client_id?: string;
           name?: string;
           target_frequency?: string;
+          target_value?: number | null;
+          unit?: string | null;
           active?: boolean;
           created_at?: string;
         };
@@ -1353,6 +1359,7 @@ export type Database = {
           client_id: string;
           log_date: string;
           done: boolean;
+          value: number | null;
           created_at: string;
         };
         Insert: {
@@ -1361,6 +1368,7 @@ export type Database = {
           client_id: string;
           log_date: string;
           done?: boolean;
+          value?: number | null;
           created_at?: string;
         };
         Update: {
@@ -1369,6 +1377,7 @@ export type Database = {
           client_id?: string;
           log_date?: string;
           done?: boolean;
+          value?: number | null;
           created_at?: string;
         };
         Relationships: [

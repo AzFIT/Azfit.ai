@@ -601,6 +601,9 @@ CREATE TABLE IF NOT EXISTS habits (
   client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   target_frequency TEXT NOT NULL DEFAULT 'daily',
+  -- Phase 85: optional numeric target + unit (NULL = flag-only habit)
+  target_value NUMERIC CHECK (target_value IS NULL OR target_value > 0),
+  unit TEXT,
   active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -617,6 +620,9 @@ CREATE TABLE IF NOT EXISTS habit_logs (
   client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
   log_date DATE NOT NULL,
   done BOOLEAN NOT NULL DEFAULT true,
+  -- Phase 85: optional numeric value for numeric-target habits
+  -- (NULL on all pre-Phase-85 rows — done-flag only, never backfilled)
+  value NUMERIC CHECK (value IS NULL OR value >= 0),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (habit_id, log_date)
 );

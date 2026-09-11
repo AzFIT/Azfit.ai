@@ -130,6 +130,39 @@ export function useHabits({ role, clientId: propClientId }: UseHabitsOptions) {
         return;
       }
 
+      window.dispatchEvent(new Event("azfit:habit-logs-changed"));
+      await refresh();
+    },
+    [resolvedClientId, refresh]
+  );
+
+  /* Phase 85: log a numeric value for today (numeric-target habits).
+     Same upsert path as the done flag, plus habit_logs.value. */
+  const logValueToday = useCallback(
+    async (habitId: string, value: number) => {
+      if (!resolvedClientId) {
+        toast.error("Could not determine client record");
+        return;
+      }
+
+      const today = formatDateKeyUtc(new Date());
+      const { error } = await supabase.from("habit_logs").upsert(
+        {
+          habit_id: habitId,
+          client_id: resolvedClientId,
+          log_date: today,
+          done: true,
+          value,
+        },
+        { onConflict: "habit_id,log_date" }
+      );
+
+      if (error) {
+        toast.error("Failed to log value: " + error.message);
+        return;
+      }
+
+      window.dispatchEvent(new Event("azfit:habit-logs-changed"));
       await refresh();
     },
     [resolvedClientId, refresh]
@@ -142,6 +175,7 @@ export function useHabits({ role, clientId: propClientId }: UseHabitsOptions) {
     resolvedClientId,
     refresh,
     toggleToday,
+    logValueToday,
   };
 }
 

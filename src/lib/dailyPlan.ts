@@ -41,7 +41,7 @@ export interface PlanItem {
 
 /* ── Target → habit signal matching ────────────────────────── */
 
-const TARGET_HABIT_KEYWORDS: Record<"water" | "steps" | "sleep", RegExp> = {
+export const TARGET_HABIT_KEYWORDS: Record<"water" | "steps" | "sleep", RegExp> = {
   water: /water|hydrat/i,
   steps: /step|walk/i,
   sleep: /sleep/i,

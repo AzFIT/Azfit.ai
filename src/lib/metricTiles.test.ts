@@ -78,6 +78,60 @@ describe("computeMetricTiles", () => {
   });
 });
 
+/* Phase 85 — numeric habit aggregates replace the done-days fallback
+   ONLY when a numeric habit exists. */
+describe("computeMetricTiles numeric path", () => {
+  const sleepAgg = {
+    habitId: "h-sleep",
+    target: 8,
+    unit: "h",
+    loggedDays: 1,
+    avg: 7.5,
+  };
+  const waterAgg = {
+    habitId: "h-water",
+    target: 3,
+    unit: "L",
+    loggedDays: 1,
+    avg: 1.8,
+  };
+
+  it("sleep: real aggregate line '7.5 of 8 h', pct = avg÷target", () => {
+    const [, s] = computeMetricTiles({ ...BASE, sleepNumeric: sleepAgg });
+    expect(s.value).toBe("7.5 of 8 h");
+    expect(s.pct).toBe(94);
+    expect(s.state).toBe("ready");
+  });
+
+  it("hydration: real aggregate line '1.8 of 3 L'", () => {
+    const [, , h] = computeMetricTiles({ ...BASE, waterNumeric: waterAgg });
+    expect(h.value).toBe("1.8 of 3 L");
+    expect(h.pct).toBe(60);
+  });
+
+  it("numeric habit with no logs = honest No logs yet (not a fake 0 average)", () => {
+    const [, s] = computeMetricTiles({ ...BASE, sleepNumeric: { ...sleepAgg, avg: null, loggedDays: 0 } });
+    expect(s.value).toBe("No logs yet");
+    expect(s.state).toBe("no_logs");
+    // numeric habit IS a target — never "Set a target" here
+    const [, sNoLt] = computeMetricTiles({ ...BASE, sleepTargetSet: false, sleepNumeric: { ...sleepAgg, avg: null, loggedDays: 0 } });
+    expect(sNoLt.value).toBe("No logs yet");
+  });
+
+  it("above-target average caps the ring at 100 but states real numbers", () => {
+    const [, s] = computeMetricTiles({ ...BASE, sleepNumeric: { ...sleepAgg, avg: 9 } });
+    expect(s.pct).toBe(100);
+    expect(s.value).toBe("9 of 8 h");
+  });
+
+  it("no numeric habit (null) falls back to the done-days derivation", () => {
+    const [, s] = computeMetricTiles({ ...BASE, sleepNumeric: null });
+    expect(s.value).toBe("3 of 5 nights");
+    const [, , h] = computeMetricTiles({ ...BASE, waterNumeric: undefined });
+    expect(h.value).toBe("4 of 5 days");
+  });
+});
+
 describe("week helpers", () => {
   it("weekStartMonday returns Monday for any weekday", () => {
     // Wed 2026-09-09 → Mon 2026-09-07
