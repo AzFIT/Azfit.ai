@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type RefObject } from 'react';
 import { Menu } from 'lucide-react';
 import ModeToggle from './ModeToggle';
 
@@ -7,6 +7,8 @@ interface NavbarProps {
   mode?: 'dashboard' | 'sheets';
   onModeToggle?: (mode: 'dashboard' | 'sheets') => void;
   transparent?: boolean;
+  /** Phase 89: the nav drawer returns focus here on close. */
+  menuButtonRef?: RefObject<HTMLButtonElement | null>;
 }
 
 export default function Navbar({
@@ -14,6 +16,7 @@ export default function Navbar({
   mode = 'dashboard',
   onModeToggle,
   transparent = false,
+  menuButtonRef,
 }: NavbarProps) {
   const [scrolled, setScrolled] = useState(false);
 
@@ -43,10 +46,11 @@ export default function Navbar({
           : '1px solid var(--card-border)',
       }}
     >
-      {/* Hamburger menu button */}
+      {/* Hamburger menu button — Phase 89: 44px tap target, ref for drawer focus return */}
       <button
+        ref={menuButtonRef}
         onClick={onMenuOpen}
-        className="flex h-10 w-10 items-center justify-center rounded-lg transition-transform duration-100 active:scale-[0.92]"
+        className="flex h-11 w-11 items-center justify-center rounded-lg transition-transform duration-100 active:scale-[0.92]"
         aria-label="Open menu"
       >
         <Menu

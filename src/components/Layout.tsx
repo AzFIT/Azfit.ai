@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useLocation } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,6 +38,19 @@ import Badge from "@/components/Badge";
 import AzFitChat from "@/components/chat/AzFitChat";
 import PageBreadcrumbs from "@/components/PageBreadcrumbs";
 import HistoryNav from "@/components/HistoryNav";
+// Phase 89: Vault-style nav shell for the TRAINER role (drawer/sidebar,
+// pencil customization). Client role keeps the Phase 88 nav untouched.
+import TrainerNavShell, {
+  TRAINER_NAV_COLLAPSE_KEY,
+} from "@/components/nav/TrainerNavShell";
+
+function readTrainerNavCollapsed(): boolean {
+  try {
+    return localStorage.getItem(TRAINER_NAV_COLLAPSE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -75,6 +88,20 @@ export default function Layout({
 }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandMore, setExpandMore] = useState(false);
+  // Phase 89: hamburger ref (drawer focus return) + trainer sidebar collapse.
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [trainerNavCollapsed, setTrainerNavCollapsed] = useState(readTrainerNavCollapsed);
+  const toggleTrainerNavCollapse = useCallback(() => {
+    setTrainerNavCollapsed((c) => {
+      const next = !c;
+      try {
+        localStorage.setItem(TRAINER_NAV_COLLAPSE_KEY, next ? "1" : "0");
+      } catch {
+        /* private mode — collapse just won't persist */
+      }
+      return next;
+    });
+  }, []);
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -243,10 +270,23 @@ export default function Layout({
           mode={mode}
           onModeToggle={onModeToggle}
           transparent={transparentNav}
+          menuButtonRef={menuButtonRef}
         />
       )}
 
-      {/* Desktop persistent sidebar */}
+      {/* Phase 89: Vault-style trainer nav (client role keeps the Phase 88 shell below) */}
+      {isTrainer && (
+        <TrainerNavShell
+          mobileOpen={sidebarOpen}
+          onMobileClose={() => setSidebarOpen(false)}
+          menuButtonRef={menuButtonRef}
+          collapsed={trainerNavCollapsed}
+          onToggleCollapse={toggleTrainerNavCollapse}
+        />
+      )}
+
+      {/* Desktop persistent sidebar (CLIENT ROLE ONLY from Phase 89) */}
+      {!isTrainer && (
       <aside
         className="fixed left-0 top-14 hidden h-[calc(100dvh-3.5rem)] w-[280px] flex-col border-r lg:flex"
         style={{
@@ -448,8 +488,10 @@ export default function Layout({
           </button>
         </div>
       </aside>
+      )}
 
-      {/* Mobile sidebar drawer */}
+      {/* Mobile sidebar drawer (CLIENT ROLE ONLY from Phase 89) */}
+      {!isTrainer && (
       <AnimatePresence>
         {sidebarOpen && (
           <>
@@ -639,10 +681,15 @@ export default function Layout({
           </>
         )}
       </AnimatePresence>
+      )}
 
       {/* Main content */}
       <main
-        className={`min-h-[100dvh] pb-16 lg:ml-[280px] lg:pb-0 ${showNav ? "pt-14" : ""}`}
+        className={`min-h-[100dvh] ${
+          isTrainer
+            ? `${trainerNavCollapsed ? "lg:ml-[72px]" : "lg:ml-[280px]"} pb-0 lg:pb-0`
+            : "pb-16 lg:ml-[280px] lg:pb-0"
+        } ${showNav ? "pt-14" : ""}`}
         style={{ backgroundColor: "var(--page-bg)" }}
       >
         {showNav && user && (
@@ -660,7 +707,9 @@ export default function Layout({
         {children}
       </main>
 
-      {/* Bottom tab bar (mobile only) */}
+      {/* Bottom tab bar (mobile only, CLIENT ROLE ONLY from Phase 89 —
+          trainers use the hamburger drawer) */}
+      {!isTrainer && (
       <nav
         className="fixed bottom-0 left-0 right-0 z-50 h-16 border-t lg:hidden lg:left-[280px]"
         style={{
@@ -717,9 +766,11 @@ export default function Layout({
           </button>
         </div>
       </nav>
+      )}
 
       {/* Phase 70 Item 5: the More sheet — z-70 (above the z-50 tab bar and
           the z-60 chat FAB, per the Phase 67 lesson) */}
+      {!isTrainer && (
       <AnimatePresence>
         {moreOpen && (
           <motion.div
@@ -763,6 +814,7 @@ export default function Layout({
           </motion.div>
         )}
       </AnimatePresence>
+      )}
 
       {/* AI Chat Bubble */}
       <AzFitChat />

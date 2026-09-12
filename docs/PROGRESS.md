@@ -747,3 +747,36 @@ Migration file `supabase/sessions-cancel-reason.sql`; mirrored into `supabase/sc
 
 ### Out of scope (documented future work)
 Push/in-app notifications for edit/cancel (the "notifies your trainer" copy remains aspirational), session recurrence — per the phase brief.
+
+
+## Phase 89 — Trainer navigation: Vault-style hamburger shell + pencil customization
+
+**Branch:** `feat/nav-shell-89` off `main` (`f64aa1d`, Phase 88 — precondition met). AUTONOMY merge+deploy. Phase 1 of the Vault coach-portal series (89 nav → 90 dashboard → 91 roster/schedule → 92 privacy blur). Reference: `.temp/Build/VAULT WEBSITE IDEAS/app/src/components/AppShell.tsx` — LAYOUT PATTERN ONLY (drawer/sidebar, NAV_ITEMS, active-state rail, user chip); zero Vault black/gold/fonts/hex copied.
+
+### Item 1 — Nav shell (TRAINER ROLE ONLY; client nav untouched). DONE.
+New `src/components/nav/TrainerNavShell.tsx`, mounted from `Layout.tsx` behind `isTrainer` (the old desktop aside / mobile drawer / bottom tab bar / More sheet are all wrapped in `{!isTrainer && …}` — client role renders byte-identical Phase 88 markup). Mobile: hamburger (now 44px, `src/components/Navbar.tsx` gained an optional `menuButtonRef`) opens a 280px drawer. Desktop ≥1024: persistent collapsible sidebar (280px ⇄ 72px icon rail; collapse state is device-local in `localStorage["azfit-trainer-nav-collapsed"]` — only VISIBILITY prefs are server-persisted). Structure per Vault: wordmark header, scrollable item list, active item = left accent rail + token highlight (`--light-elevated` / `--azfit-primary`), user chip (avatar or initials + name + role) + Logout at bottom. All theme tokens, both themes, no new hex.
+**NAV ITEMS — exactly these 8, in this order** (`src/lib/trainerNav.ts` `TRAINER_NAV_ITEMS`, lucide icons): Dashboard → `/dashboard` · Coach → `/coach` · Clients → `/clients` · Schedule → `/schedule` · Analytics → `/analytics` · Sheets → `/sheets` · Plan Summary → `/plan-summary` · Settings → `/settings`.
+**Route mapping (the required documentation):** "Plan Summary" had NO standalone pre-89 route — the screen is per-client at `/client/:id?tab=plansummary` (PlanSummaryTab, Phase 61; print at `/clients/:id/plan-summary/print`). Item 7 therefore points at the NEW `/plan-summary` index page (`src/pages/PlanSummaryIndex.tsx`, `ProtectedRoute requireTrainer`): the trainer's non-archived roster (name, latest summary date from `plan_summaries` — or honest "No summary yet"), each row deep-linking to that client's existing Plan Summary tab. All other trainer routes (messages, exercises, library, weekly digest, check-ins, …) are intentionally NOT in this curated nav and remain reachable by deep link.
+
+### Item 2 — Pencil customization. DONE.
+Pencil button at the top of the nav (drawer + sidebar) enters edit mode: every item shows all 8 rows with an eye/eye-off `role="switch"` toggle; **Dashboard has no toggle** (lock icon + "Always shown" label) and can never be hidden or reordered. Exit (✓) saves. Edit rows render the toggle BESIDE the nav button so the switch never pollutes the nav button's accessible name (first smoke attempt caught this). **Persistence — server-side per user, syncs across devices:** the existing `app_settings` table is GLOBAL key-value (unique `key`, trainer-managed) — NOT per-user — so the additive alternative was used, same pattern as Phase 68 `calendar_emoji`. **Exact DDL (applied live 2026-09-12 via pooler on `gcurvjprfwecbchreieu`, verified `jsonb / nullable / default null`):**
+```sql
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS nav_preferences JSONB DEFAULT NULL;
+COMMENT ON COLUMN profiles.nav_preferences IS 'Phase 89: trainer nav visibility prefs {"hidden":["analytics",...]}; NULL = all visible; dashboard is permanent';
+```
+Migration file `supabase/profiles-nav-preferences.sql`; mirrored into `supabase/schema.sql`; `src/types/supabase.ts` profiles Row/Insert/Update updated. Shape `{ "hidden": ["analytics", "sheets"] }`; NULL/missing/malformed = all visible (default). `normalizeNavPreferences` drops unknown ids, non-strings, duplicates, and `dashboard` even if stored. `src/hooks/useTrainerNav.ts`: module-level per-user cache (re-mounts render instantly from cached profile — no fetch flicker); `saveHidden` updates optimistically and **reverts to the previous state on write failure** (honest rule — nav never breaks), returning false so the UI toasts "Could not save nav preferences — keeping your previous layout".
+
+### Item 3 — States. DONE.
+Drawer closes on navigate + Escape + backdrop tap; focus-trapped while open (Tab/Shift-Tab cycles within the drawer), focus returns to the hamburger on close (proven by assertion: `document.activeElement` aria-label === "Open menu" after Escape). Loading: nav renders from the cached profile (above). Both themes verified via screenshots + computed-token styles in smoke.
+
+### Gates
+- `npx tsc -b` ✅ · `npm run lint` ✅ · `npm run test` ✅ (**707 tests**, +15 in `src/lib/trainerNav.test.ts`: curated list/order, permanent-only Dashboard, normalize null/malformed/unknown/duplicate/dashboard-id/bare-array, visibleNavItems order + dashboard-never-hidden, toggle immutability, round-trip) · `npm run build` ✅ (404 fallback ✅) · repo e2e ✅ 4/4
+
+### Smoke (Playwright, temp spec deleted after; demo accounts only, no SMOKE89 fixture rows needed — visibility prefs were exercised on `trainer@azfit.demo` and restored to NULL)
+- **(a)** Drawer 390 dark: all 8 items, Dashboard `aria-current="page"` + visible accent rail; backdrop-tap and navigate-close both verified. Desktop 1280: sidebar (complementary landmark), 8 items, active rail, user chip + Logout, collapse → 72px rail (boundingBox width asserted <100 → >250 on expand) ✅
+- **(b)** Edit mode: 8 rows, exactly 7 switches, NO Dashboard switch, "Always shown" lock visible (screenshot 02). Hid Sheets + Analytics → 6 items (03). **Reload → still 6 (04). Server-side proof: pooler SELECT on `profiles.nav_preferences` = `{"hidden":["sheets","analytics"]}`** — then restored NULL and verified ✅
+- **(c)** Hidden routes still load directly: `/#/sheets` and `/#/analytics` render (no NotFound) ✅
+- **(d)** Client role: bottom tab bar with "More destinations" (Phase 88 nav) renders, NO trainer sidebar/drawer — unchanged (10) ✅
+- **(e)** `scrollWidth ≤ 390` with drawer closed AND open; zero console errors in both tests ✅
+- Both themes at 390 + 1280 (01–04, 07–08 dark; 06, 09 light). Screenshots: `.temp/audit/shots/89/` (01 drawer 390 dark, 02 edit mode, 03 six items, 04 persisted reload, 05 plan-summary page, 06 drawer 390 light, 07 sidebar 1280 dark, 08 collapsed rail, 09 sidebar 1280 light, 10 client nav regression).
+- Gotcha note: fresh headless Chromium has no `prefers-color-scheme: dark`, so dark-theme smokes must seed `azfit-theme` via `addInitScript` (re-runs on reload — desirable here). Also: signing out by deleting `sb-*` localStorage keys does NOT drop Supabase's in-memory session (it re-persists) — role switches in specs must use the real Logout button.

@@ -67,6 +67,9 @@ const PrintGroceryPage = lazy(() => import("@/pages/PrintGrocery"));
 const PrintPlanPackPage = lazy(() => import("@/pages/PrintPlanPack"));
 const PrivacyPage = lazy(() => import("@/pages/Privacy"));
 const PrintPlanSummaryPage = lazy(() => import("@/pages/PrintPlanSummary"));
+// Phase 89: "Plan Summary" nav destination — roster index deep-linking to
+// each client's existing Plan Summary tab (see PlanSummaryIndex header).
+const PlanSummaryIndexPage = lazy(() => import("@/pages/PlanSummaryIndex"));
 
 // Loading fallback
 function PageLoader() {
@@ -406,6 +409,14 @@ export default function App() {
                     element={
                       <ProtectedRoute>
                         <PrintPlanSummaryPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/plan-summary"
+                    element={
+                      <ProtectedRoute requireTrainer>
+                        <PlanSummaryIndexPage />
                       </ProtectedRoute>
                     }
                   />

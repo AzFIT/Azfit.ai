@@ -17,6 +17,7 @@ export type Database = {
           full_name: string | null;
           avatar_url: string | null;
           calendar_emoji: string | null;
+          nav_preferences: Json | null;
           role: "admin" | "trainer" | "client";
           created_at: string;
           updated_at: string;
@@ -27,6 +28,7 @@ export type Database = {
           full_name?: string | null;
           avatar_url?: string | null;
           calendar_emoji?: string | null;
+          nav_preferences?: Json | null;
           role?: "trainer" | "client";
           created_at?: string;
           updated_at?: string;
@@ -37,6 +39,7 @@ export type Database = {
           full_name?: string | null;
           avatar_url?: string | null;
           calendar_emoji?: string | null;
+          nav_preferences?: Json | null;
           role?: "trainer" | "client";
           created_at?: string;
           updated_at?: string;
