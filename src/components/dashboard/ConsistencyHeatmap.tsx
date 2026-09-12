@@ -24,14 +24,10 @@ import { LEVEL_RANGES, type ConsistencyCell } from "@/lib/consistencyMap";
 
 /** Intensity fill per level — theme tokens only, surface → brand
  *  cyan via color-mix (no new hex literals). Level 0 is a neutral
- *  trace so the grid structure stays visible. */
-const LEVEL_FILL: Record<number, string> = {
-  0: "color-mix(in srgb, var(--page-text) 7%, transparent)",
-  1: "color-mix(in srgb, var(--azfit-primary) 25%, transparent)",
-  2: "color-mix(in srgb, var(--azfit-primary) 45%, transparent)",
-  3: "color-mix(in srgb, var(--azfit-primary) 70%, transparent)",
-  4: "var(--azfit-primary)",
-};
+ *  trace so the grid structure stays visible.
+ *  (Single source lives in consistencyLevelFill.ts — Phase 90c —
+ *  so both the heatmap and the compact calendar share one map.) */
+import { LEVEL_FILL } from "./consistencyLevelFill";
 
 function Cell({ cell, onSelect }: { cell: ConsistencyCell; onSelect: (c: ConsistencyCell) => void }) {
   if (cell.dateKey === null) {

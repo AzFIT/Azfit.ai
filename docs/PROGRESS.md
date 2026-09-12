@@ -817,3 +817,35 @@ Four cards in the Vault hierarchy (small-caps title → large bold metric → re
 - **(c)** Alert strip names the real at-risk fixtures ✅ · **(d)** "Everyone trained this week" positive state on the fully-active fixture ✅
 - **(e)** `scrollWidth ≤ 390`; zero console errors in both tests ✅
 - Both themes, 390 + 1280 (settled UI). Screenshots `.temp/audit/shots/90/`: 01-summary-390-dark, 02-summary-1280-dark, 03-summary-390-light, 04-empty-compliance-390-dark.
+
+---
+
+## Phase 90c — Consistency: compact month calendar + day checklist (2026-09-13, AUTONOMY)
+
+**Branch:** `feat/consistency-calendar-90c` off `main` (`9fdc6ff`, Phase 90 — precondition met). AUTONOMY merge+deploy. UI rework only: the Phase 86 data engine (`consistencyMap.ts` + `useConsistencyMap`) is REUSED UNCHANGED — the 12-week heatmap was too tall for the dashboard and its day interaction was caption-only.
+
+### Item 1 — Compact month calendar. DONE.
+New `src/components/dashboard/ConsistencyCalendar.tsx` replaces the embedded `ConsistencyHeatmap` on BOTH the client dashboard and the trainer client-profile Overview tab. Single-month Monday-start grid with small day numerals (~one dashboard card tall vs the multi-hundred-px heatmap block); active days show a small dot intensity-mapped via the SAME 5-level Phase 86 weights (`levelForCount`) and the SAME token map (`LEVEL_FILL`, extracted to `consistencyLevelFill.ts` — react-refresh forbids non-component exports from component files); today gets an outline ring; future days render quiet at 45% opacity. Header: month + year, ‹ › navigation CLAMPED to the 12-week data window (older months hold no counts in the reused engine — navigating there would render a falsely-empty month; prev disables at the window edge), and a "View insights" text button. Streak caption is real (`computeStreaks` over the same merged activity dates; `<2` days → no caption). Empty client: numerals + the honest "Your consistency map builds as you log" caption — never a gray wall. Pure derivation in `src/lib/dayDetail.ts` (17 unit tests): Mon-start pads, today/window/future flags, nav bounds, shiftMonth year-wrap, streak caption threshold, value formatting.
+**a11y:** `role="grid"` with roving tabindex (one day in the Tab order, Arrow/Home/End keys move, Enter/Space native), every day button's aria-label = "Wed 3 Sep — 2 activities" / "— no activities", labeled month nav.
+
+### Item 2 — Day detail sheet. DONE.
+New `src/hooks/useDayDetail.ts` (LAZY per-tap fetch — fires only on day tap, no N+1; keyed to the single day so it honestly serves ANY past day, not just the window) + `src/components/dashboard/DayDetailSheet.tsx` (bottom sheet <640px / centered ≥640px, z-[70], DayActionPopup pattern). Read-only checklist of the 5 categories from real rows: Training (sessions that local day via the ownership OR filter + workout_logs via completed_at), Hydration / Steps / Sleep (habits matched by the Phase 82 `TARGET_HABIT_KEYWORDS` regexes, `habit_logs.value` + unit — "1.8 L", "7.5 h", "8,432 steps"; bare done flag → "Done", never a fake zero), Food logged (`nutrition_logs` rows that `logged_date` — "2 meals logged"). Missing → italic "Not logged". Future days → honest "Nothing to show yet" (no fetch). **Client rows tap through to the existing routes** (/schedule, /nutrition, /settings — one source of truth, the sheet never becomes a second logger); **trainer rows are read-only** (a tap-through would land on the TRAINER's own surfaces, not the client's — documented choice).
+
+### Item 3 — Expanded view. DONE.
+"View insights" opens the EXISTING `ConsistencyHeatmap` full-width in a modal (z-[70], backdrop-tap closes) — all Phase 86 behavior preserved (legend with numeric ranges, aria-labels, tap caption, sparse caption). Verified rendering + close in smoke.
+
+### PORTAL FIX (smoke-caught bug — permanent gotcha)
+Both overlays initially rendered IN PAGE FLOW instead of as overlays: they mount inside the dashboard `GlassCard`, whose **backdrop-filter creates a containing block that traps `position: fixed` descendants**. Fix: `createPortal(..., document.body)` for both the day sheet and the insights modal. Any future overlay mounted inside a glass card needs the same.
+
+### Gates
+- `npx tsc -b` ✅ · `npm run lint` ✅ · `npm run test` ✅ (**740 tests**, +17 in `dayDetail.test.ts`; all Phase 86/87 tests untouched and green) · `npm run build` ✅ (404 fallback ✅) · repo e2e ✅ 4/4
+
+### Smoke (Playwright vs preview; temp spec deleted after; fixtures `smoke90c-delete@azfit.demo` (10 varied activity days: 3 completed sessions, 1 workout_log, 3 plan items, 12 numeric habit logs across water/sleep/steps, 3 nutrition_logs) + `smoke90cb-delete@azfit.demo` (empty), SQL-verified removed — 0 rows in clients/profiles/sessions/programs/habits incl. auth.users; run TZ=Asia/Hong_Kong)
+- **(a)** ≥8 dotted days in the current month; the 5-activity day's dot computed a DIFFERENT (stronger) fill than the 1-activity day — Phase 86 intensity math proven end-to-end ✅
+- **(b)** Big-day sheet: all 5 categories matched truth exactly — Training "1 session (1 completed) · 1 workout", Hydration "1.8 L", Food "2 meals logged", Steps "8,432 steps", Sleep "7.5 h" ✅
+- **(c)** Inactive past day → all five rows "Not logged"; future day → "Nothing to show yet" ✅
+- **(d)** View insights → full Phase 86 heatmap renders (legend, Last 12 weeks, real September column) ✅
+- **(e)** Trainer Overview tab: same compact calendar + same accent day; sheet real values; rows read-only (zero logging-navigation buttons) ✅
+- **(f)** Empty fixture: 28+ day buttons, ZERO dots, honest caption ✅
+- **(g)** scrollWidth ≤ 390; arrow-key grid navigation proven; zero console errors in all 5 tests ✅
+- Screenshots `.temp/audit/shots/90c/`: 01-calendar-390-dark, 02-day-sheet-390-dark, 03-expanded-heatmap-390-dark, 04-empty-calendar-390-light, 05-trainer-overview-1280-dark, 06-calendar-1280-light.
