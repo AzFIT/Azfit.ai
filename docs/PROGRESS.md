@@ -655,3 +655,31 @@ Existing rows were NEVER backfilled — pre-Phase-85 `habit_logs.value` stays NU
 
 ### Deviations
 - Same-session tile refresh added (`azfit:habit-logs-changed` event) — without it the tiles above the habits row only updated on remount; documented above.
+
+---
+
+## Phase 86 — Consistency heatmap (client dashboard + trainer client profile)
+
+**Branch:** `feat/heatmap-86` off `main` (`ab5b623`, Phase 85 merged — precondition A met). AUTONOMY merge+deploy.
+
+### Item 1 — Data. DONE.
+`src/lib/consistencyMap.ts` (pure, formula in header): documented weights (completed session=2, done plan item=1, done habit log=1, check-in=2) → per-day totals → 5 intensity levels (0 · 1–2 · 3–4 · 5–6 · 7+). 12 weeks ending today, Monday-start; days after today are neutral STRUCTURAL pads (no color/tooltip/aria — not data). Date keys are LOCAL (`formatDateKeyLocal`, Phase 64 pattern — never raw UTC). One range query per source in `src/hooks/useConsistencyMap.ts` (sessions / daily_plan_items / habit_logs / check_in_submissions) — no N+1. **Shared vs new (addendum D):** reuses `weekStartMonday`, `formatDateKeyLocal`, and the client-resolution + `orFilter` pattern from useInsights; the queries are new because useInsights' windows (2 wk / 90-day streak) and aggregate math differ from the heatmap's per-day 12-week counts. 11 unit tests (empty, single-day, weights, buckets, week boundaries, pads, month labels, out-of-window).
+
+### Item 2 — UI. DONE.
+`src/components/dashboard/ConsistencyHeatmap.tsx`, mounted on the client dashboard directly BELOW InsightsStrip (above My Plan for Today). 7 rows × 12 columns; **LAYOUT LOCKED (owner rule, addendum B): fit-width compressed grid at 390px — NO horizontal scroll.** Intensity fills are token-only via `color-mix` (surface → `--azfit-primary`; no new hex). Tap caption row under the grid ("Fri 11 Sep — 5 activities"); every data cell carries the same text as its aria-label; Less→More legend includes numeric ranges (not color-only); month labels on top. Sparse state (<7 active days): honest "Your consistency map builds as you log" caption — grid shows real (empty) cells, never fake-filled. Loading skeleton + error state consistent with MetricTiles/InsightsStrip (render nothing on error rather than filler).
+
+### Item 4 — Trainer view. DONE.
+Same component (with `clientId` + `clientEmail`) mounted in the trainer's client-profile Overview tab (`src/components/client/OverviewTab.tsx`). RLS: trainer reads own client's rows only.
+
+### Gates
+- `npx tsc -b` ✅ · `npm run lint` ✅ · `npm run test` ✅ (**676 tests**, +11) · `npm run build` ✅ (404 fallback ✅) · repo e2e ✅ 4/4
+
+### Smoke (3/3, fixtures SQL-verified removed — clients/profiles/sessions/plan-items/habit data 0, 5 auth users deleted incl. failed-run orphans)
+- Fixture A (10 days, weights → counts 5,3,2,2,5,5,4,3,1,8 = levels 3,2,1,1,3,3,2,2,1,4): all 10 exact-count cell labels render; ≥3 distinct levels proven (8/5/3/1-activity cells); no sparse caption; tap → caption row shows the same text; scrollWidth = 390/320/768/1280 (fit-width, no overflow) ✅
+- Fixture B (empty): "Your consistency map builds as you log" caption + honest "no activities" cells ✅
+- Trainer view (trainer@azfit.demo → client profile Overview): same 10 labels ✅
+- Dark + light themes; zero console errors ✅
+- Screenshots: `.temp/audit/shots/86/` (01 dark 390, 02 light 390, 03 light 1280, 04 light 320, 05 empty 390, 06 trainer 1280). Temp spec/config deleted.
+
+### Gotcha documented for future fixture scripts
+Supabase normalizes auth emails to lowercase; the clients↔profiles RLS join is case-SENSITIVE. Fixture emails must be lowercase or the client's rows become invisible to their own session (first smoke run failed exactly this way — app code was correct).

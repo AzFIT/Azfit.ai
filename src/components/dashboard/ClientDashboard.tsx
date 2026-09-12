@@ -38,6 +38,7 @@ import MyPlanTodayCard from "./MyPlanTodayCard";
 import ClientScoreCard from "./ClientScoreCard";
 import MetricTilesGrid from "./MetricTilesGrid";
 import InsightsStrip from "./InsightsStrip";
+import ConsistencyHeatmap from "./ConsistencyHeatmap";
 import SessionsRemainingCard from "./SessionsRemainingCard";
 import MyProgressSection from "./MyProgressSection";
 import MyTargetsCard from "./MyTargetsCard";
@@ -467,6 +468,17 @@ export default function ClientDashboard() {
         animate={mounted ? "visible" : "hidden"}
       >
         <InsightsStrip cards={insightsCards} loading={insightsLoading} error={insightsError} />
+      </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          CONSISTENCY HEATMAP (Phase 86) — 12-week activity map
+          ═══════════════════════════════════════════════════════════ */}
+      <motion.div
+        variants={fadeInUp}
+        initial="hidden"
+        animate={mounted ? "visible" : "hidden"}
+      >
+        <ConsistencyHeatmap />
       </motion.div>
 
       {/* ═══════════════════════════════════════════════════════════

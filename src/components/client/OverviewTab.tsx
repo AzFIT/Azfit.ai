@@ -36,6 +36,7 @@ import {
 } from "@/lib/clientGoals";
 import ClientGoalsDialog from "@/components/client/ClientGoalsDialog";
 import SessionPackageCard from "@/components/client/SessionPackageCard";
+import ConsistencyHeatmap from "@/components/dashboard/ConsistencyHeatmap";
 import { useBodyComposition } from "@/components/bodycomp/useBodyComposition";
 import { AssessmentWizard } from "@/components/bodycomp/AssessmentWizard";
 
@@ -131,6 +132,12 @@ export default function OverviewTab({
     <div className="space-y-4">
       {/* Phase 50: session credit packages (trainer view) */}
       <SessionPackageCard clientId={clientId} />
+
+      {/* Phase 86: 12-week consistency map — this client's real data
+          (RLS: trainer reads own clients' rows only) */}
+      <motion.div {...fadeUp}>
+        <ConsistencyHeatmap clientId={clientId} clientEmail={client.email} />
+      </motion.div>
 
       {/* Quick Stats Row */}
       <motion.div {...fadeUp} className="grid grid-cols-2 gap-3 md:grid-cols-4">
