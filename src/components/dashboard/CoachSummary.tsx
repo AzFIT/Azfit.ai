@@ -150,7 +150,10 @@ export default function CoachSummary({ healthClients, healthLoading }: CoachSumm
             <span className="min-w-0">
               <span className="font-bold tabular-nums">{inactive.length}</span> client
               {inactive.length === 1 ? "" : "s"} missed workouts this week{" "}
-              <span className="truncate" style={{ color: "var(--light-text-muted)" }}>
+              {/* Phase 90d: block-level truncate — the inline span ignored
+                  overflow-hidden inside the flex min-w-0 chain and pushed
+                  the 390px dashboard to 451px scrollWidth. */}
+              <span className="block truncate" style={{ color: "var(--light-text-muted)" }}>
                 — {inactive.map((c) => c.firstName).join(", ")}
               </span>
             </span>

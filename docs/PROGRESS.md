@@ -849,3 +849,36 @@ Both overlays initially rendered IN PAGE FLOW instead of as overlays: they mount
 - **(f)** Empty fixture: 28+ day buttons, ZERO dots, honest caption ✅
 - **(g)** scrollWidth ≤ 390; arrow-key grid navigation proven; zero console errors in all 5 tests ✅
 - Screenshots `.temp/audit/shots/90c/`: 01-calendar-390-dark, 02-day-sheet-390-dark, 03-expanded-heatmap-390-dark, 04-empty-calendar-390-light, 05-trainer-overview-1280-dark, 06-calendar-1280-light.
+
+---
+
+## Phase 90d — Global search palette (⌘K) + logo→dashboard (2026-09-13, AUTONOMY)
+
+**Branch:** `feat/search-palette-90d` off `main` (`1621bca`, Phase 90c — precondition met). AUTONOMY merge+deploy. Vault palette used as LAYOUT reference only (centered overlay, typed rows with PAGE/CLIENT badges, kbd hints).
+
+### Item 1 — Global search palette. DONE.
+New `src/components/SearchPalette.tsx` (portaled to document.body — Phase 90c gotcha), open three ways: **⌘K/Ctrl+K anywhere** (window keydown), the **Search pill** in the app bar (trainer AND client shells), mounted by Layout with controlled open state. ESC closes + returns focus to the pill (trigger ref); Tab is trapped inside the overlay; ↑/↓ move (aria-activedescendant on a combobox input over a listbox), ↵ navigates, mouse/tap works; 44px rows.
+- **Surface (v1, role-aware):** TRAINER — the 8 curated nav pages (`trainerNav.ts`), roster clients (full_name → `/client/:id`), client programs (name → `/ai-program-builder?load=:id`, the same screen ProgramsTab uses) + `program_templates` (name → `/ai-program-builder?template=:id`, the Library open path). CLIENT — their nav pages only. Clients/programs/templates are fetched **lazily on first palette open** (never on render); fetch failure degrades honestly to page search with a visible note.
+- **Empty query:** real suggestions only — the user's most-visited pages (visit counts in `localStorage[azfit:page-visits]`, bumped by Layout per navigation; `topVisited` ignores unknown paths) + the trainer's first 4 active clients (alphabetical). No-results state: honest "No matches for 'xyz'".
+- **Matching:** `src/lib/searchRank.ts` pure lib (11 unit tests): case-insensitive exact(100)/prefix(80)/word-prefix(60)/substring(30), deterministic tiebreak (length then locale), non-matches excluded — no fuzzy dependency.
+- Both themes, tokens only, violet untouched, fits 390 (scrollWidth proven ≤390).
+- **Scope note (documented):** the app bar + palette live in `Layout`, which only the pages that self-wrap it render (dashboard, analytics, clients, coach, library, plan-summary). Schedule/CheckIns/Nutrition/Settings/etc. ship their own sticky headers by pre-90d design and don't get the shell — the palette is an app-shell feature exactly like the Phase 89 nav drawer.
+
+### Item 2 — Logo → dashboard. DONE.
+The centered app-bar logo (both roles, `Navbar.tsx`) is now a 44px button, aria-label "Go to dashboard", navigating to /dashboard; current-route safe no-op (no double history entry — proven by history.length assertion).
+
+### Overflow fix (smoke-caught, pre-existing from Phase 90)
+The trainer dashboard had 451px scrollWidth at 390: the Phase 90 alert strip's inline `truncate` names span ignored `overflow-hidden` inside the flex min-w-0 chain and forced the row wide. Fixed by making it a `block truncate` (names drop to their own line with ellipsis). One line.
+
+### Gates
+- `npx tsc -b` ✅ · `npm run lint` ✅ · `npm run test` ✅ (**751 tests**, +11 in `searchRank.test.ts`) · `npm run build` ✅ (404 fallback ✅) · repo e2e ✅ 4/4
+
+### Smoke (Playwright vs preview; temp spec deleted after; fixture `smoke90d-delete@azfit.demo` client row under trainer@azfit.demo — SQL-verified removed, 0 rows incl. auth.users; no auth user was needed)
+- **(a)** Ctrl+K opens; empty-query suggestions show PAGE rows + real CLIENT rows (Alex Carter, Amy Gregg, Ben Sabre, Eunice Tang — alphabetical, capped 4) ✅
+- **(b)** "smoke90d" filtered to exactly the 1 fixture client; Enter navigated to `/#/client/<id>` ✅
+- **(c)** "set" finds Settings with PAGE badge; "zzzqq90d" → honest "No matches for" ✅
+- **(d)** Client role: every suggestion badge is PAGE; "smoke90d" → no matches (trainer data invisible) ✅
+- **(e)** Logo click → /dashboard from /analytics (Layout-wrapped deep route), both roles; on-dashboard click is a history no-op ✅
+- **(f)** ESC closes + focus returns to the Search pill (aria-label assertion); scrollWidth ≤ 390 (after the overflow fix); zero console errors in all 5 tests ✅
+- Screenshots `.temp/audit/shots/90d/`: 01-palette-empty-390-dark, 02-palette-client-filter-390-dark, 03-palette-no-results-390-dark, 04-palette-1280-light, 05-palette-client-role-390-light, 06-logo-to-dashboard-390.
+- Gotcha notes: the palette mounts only after auth resolves — smokes must wait for the pill/dashboard chrome before ⌘K; AnimatePresence exit ghosts keep a closing dialog "visible" ~150ms — assert on a settled state; pages without Layout (ClientProfile, Schedule, …) have no app bar — logo/palette assertions must use Layout-wrapped routes.

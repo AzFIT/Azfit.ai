@@ -38,6 +38,8 @@ import Badge from "@/components/Badge";
 import AzFitChat from "@/components/chat/AzFitChat";
 import PageBreadcrumbs from "@/components/PageBreadcrumbs";
 import HistoryNav from "@/components/HistoryNav";
+// Phase 90d: global search palette (⌘K / app-bar pill, both roles).
+import SearchPalette, { PAGE_VISITS_KEY } from "@/components/SearchPalette";
 // Phase 89: Vault-style nav shell for the TRAINER role (drawer/sidebar,
 // pencil customization). Client role keeps the Phase 88 nav untouched.
 import TrainerNavShell, {
@@ -90,6 +92,10 @@ export default function Layout({
   const [expandMore, setExpandMore] = useState(false);
   // Phase 89: hamburger ref (drawer focus return) + trainer sidebar collapse.
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+  // Phase 90d: global search palette — open state + app-bar pill ref
+  // (focus returns to the pill on close).
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchButtonRef = useRef<HTMLButtonElement | null>(null);
   const [trainerNavCollapsed, setTrainerNavCollapsed] = useState(readTrainerNavCollapsed);
   const toggleTrainerNavCollapse = useCallback(() => {
     setTrainerNavCollapsed((c) => {
@@ -105,6 +111,20 @@ export default function Layout({
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Phase 90d: record page visits (local, per device) — the search
+  // palette's empty-query suggestions rank the most-visited pages.
+  useEffect(() => {
+    try {
+      const visits = JSON.parse(
+        localStorage.getItem(PAGE_VISITS_KEY) ?? "{}",
+      ) as Record<string, number>;
+      visits[location.pathname] = (visits[location.pathname] ?? 0) + 1;
+      localStorage.setItem(PAGE_VISITS_KEY, JSON.stringify(visits));
+    } catch {
+      /* storage unavailable — suggestions fall back to defaults */
+    }
+  }, [location.pathname]);
 
   const { user, isTrainer } = useAuth();
 
@@ -271,6 +291,18 @@ export default function Layout({
           onModeToggle={onModeToggle}
           transparent={transparentNav}
           menuButtonRef={menuButtonRef}
+          onSearchOpen={() => setSearchOpen(true)}
+          searchButtonRef={searchButtonRef}
+        />
+      )}
+
+      {/* Phase 90d: global search palette (⌘K / Ctrl+K / Search pill).
+          Authenticated shells only — the palette is role-aware. */}
+      {user && (
+        <SearchPalette
+          open={searchOpen}
+          onOpenChange={setSearchOpen}
+          triggerRef={searchButtonRef}
         />
       )}
 
