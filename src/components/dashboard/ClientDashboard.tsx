@@ -39,6 +39,7 @@ import ClientScoreCard from "./ClientScoreCard";
 import MetricTilesGrid from "./MetricTilesGrid";
 import InsightsStrip from "./InsightsStrip";
 import ConsistencyHeatmap from "./ConsistencyHeatmap";
+import AchievementsGrid from "./AchievementsGrid";
 import SessionsRemainingCard from "./SessionsRemainingCard";
 import MyProgressSection from "./MyProgressSection";
 import MyTargetsCard from "./MyTargetsCard";
@@ -479,6 +480,17 @@ export default function ClientDashboard() {
         animate={mounted ? "visible" : "hidden"}
       >
         <ConsistencyHeatmap />
+      </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          ACHIEVEMENTS GRID (Phase 87) — rule-based badges, below heatmap
+          ═══════════════════════════════════════════════════════════ */}
+      <motion.div
+        variants={fadeInUp}
+        initial="hidden"
+        animate={mounted ? "visible" : "hidden"}
+      >
+        <AchievementsGrid />
       </motion.div>
 
       {/* ═══════════════════════════════════════════════════════════

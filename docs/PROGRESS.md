@@ -683,3 +683,32 @@ Same component (with `clientId` + `clientEmail`) mounted in the trainer's client
 
 ### Gotcha documented for future fixture scripts
 Supabase normalizes auth emails to lowercase; the clients↔profiles RLS join is case-SENSITIVE. Fixture emails must be lowercase or the client's rows become invisible to their own session (first smoke run failed exactly this way — app code was correct).
+
+## Phase 87 — Rule-based Achievements Grid (client dashboard)
+
+**Branch:** `feat/achievements-87` off `main` (`9e94d51`, Phase 86 — precondition met). AUTONOMY merge+deploy.
+
+### Item 1 — Engine. DONE.
+`src/lib/achievements.ts` (pure, deterministic; rule set + data sources documented in header). 8 achievements: First Steps (all-time completed sessions ≥1, head-count — "first ever" is not a 12-week concept), Streak Builder I/II/III (3/7/14 consecutive active days), Check-in Regular (4 consecutive Mon-start weeks with ≥1 submission), Plan Finisher (any Mon-start week with total>0 and done==total), Hydration Hero (numeric water habit, ≥5 days meeting target in one Mon-start week, via Phase 85 `numericHabits.weekValues` shapes), Consistency Crown (≥20 distinct active days in the 12-week window). **No parallel query layer (rule 1):** streaks reuse `computeStreaks` (Phase 83), active-day count reuses `countByDay` (Phase 86), the four 12-week date arrays come from `useConsistencyMap().raw` — that hook was extended (daily_plan_items now selects `plan_date, done` without the done-only filter; new exported `ActivityWindowRaw`) and the hook adds ONLY two achievement-specific queries (all-time session head count; 12-week habit_logs with values + habits for the numeric water habit). New shared helpers: `weekKeyFor`/`longestWeekRun` (Mon-start week grouping). Deliberate design choice, documented in the header: streak rules use the LONGEST streak in the window, not the current streak — a broken streak does not re-lock an earned achievement. No latching: all rules derive from the trailing 12-week window.
+
+### Item 2 — Honest data. DONE.
+Locked cards render the requirement text ONLY — no fabricated progress bars, no "0%". A progress sub-line appears only when the engine reports real partial progress (`streak-14` → "7 days — longest streak", `consistency-crown` → "8 of 20 days", `plan-finisher` → "N of M this week", `hydration-hero` → "N days in your best week" — null when the client has no numeric water habit). Unlocked cards state the real numbers as evidence ("7 days longest streak in your window"). Tap-through detail panel shows description + requirement + evidence/progress, real numbers only.
+
+### Item 3 — UI. DONE.
+`src/components/dashboard/AchievementsGrid.tsx` mounted on the client dashboard directly BELOW ConsistencyHeatmap (above My Plan for Today). Unlocked = filled IconTile tone "brand" + full opacity; locked = tone "muted" + grayscale icon, opacity 0.75. Token-only styling (no new hex; violet untouched — AI-only). 2-col fit-width grid at 390, min-h 44px cards, no horizontal scroll. "N of 8 unlocked" header counter. Loading skeleton + error→null, consistent with MetricTiles/InsightsStrip.
+
+### Item 4 — Tests. DONE.
+11 unit tests in `src/lib/achievements.test.ts`: empty client unlocks nothing AND has no invented progress lines; unique ids; requirement text always present; first-steps evidence ("1 session completed"); **exact 7-day boundary** (6 days → locked with real "6 days — longest streak" progress, 7 → unlocked); multiple simultaneous unlocks; check-in 4-week run; plan-finisher 100% vs partial-week progress; hydration with/without a numeric water habit; consistency crown 20 vs 10 days.
+
+### Gates
+- `npx tsc -b` ✅ · `npm run lint` ✅ · `npm run test` ✅ (**687 tests**, +11) · `npm run build` ✅ (404 fallback ✅) · repo e2e ✅ 4/4
+- Lint note: `react-hooks/set-state-in-effect` flagged the initial sync `setError`/`setLoading` in `useAchievements`; fixed by deriving `error`/`loading` from `windowError` + fetch state instead of setting them in the effect body.
+
+### Smoke (3/3, fixtures SQL-verified removed — clients/profiles/habits/habit_logs/sessions all 0; 5 auth users deleted incl. 3 orphans from failed fixture-script runs)
+- Fixture A (7-day habit streak ending today + 1 completed session 10 days ago): "3 of 8 unlocked"; exact aria-label assertions for all 8 cards (First Steps / Streak Builder I / II unlocked; III, Check-in Regular, Plan Finisher, Hydration Hero, Consistency Crown locked); real progress lines "7 days — longest streak" + "8 of 20 days" (7 habit days + 1 distinct session day); tap Streak Builder II → detail "7 days longest streak in your window"; dark + light 390 ✅
+- Fixture B (fresh client, zero activity): "0 of 8 unlocked", all 8 locked, ZERO progress-line text matches (honest-data proof) ✅
+- scrollWidth = 390 everywhere; zero console errors ✅
+- Screenshots: `.temp/audit/shots/87/` (01 fixture A dark, 02 detail tapped, 03 fixture A light, 04 fixture B dark). Temp spec/config/scripts deleted.
+
+### Gotcha added for future fixture scripts
+The `handle_new_user` trigger auto-creates the `profiles` row on admin-API user creation — inserting it again 409s. Patch the row (role/full_name) instead. (The Phase 86 lowercase-email gotcha also still applies and was followed.)

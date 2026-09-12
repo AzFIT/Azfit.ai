@@ -37,9 +37,19 @@ interface UseConsistencyMapOptions {
 
 const iso = (dateKey: string) => new Date(`${dateKey}T00:00:00`).toISOString();
 
+export interface ActivityWindowRaw {
+  sessionDates: string[];
+  planItems: { date: string; done: boolean }[];
+  habitDates: string[];
+  checkinDates: string[];
+  startKey: string;
+  todayKey: string;
+}
+
 export function useConsistencyMap(opts: UseConsistencyMapOptions = {}) {
   const { user } = useAuth();
   const [grid, setGrid] = useState<ConsistencyGrid | null>(null);
+  const [raw, setRaw] = useState<ActivityWindowRaw | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -97,10 +107,12 @@ export function useConsistencyMap(opts: UseConsistencyMapOptions = {}) {
           sessionsQuery,
           cid
             ? supabase
+                // Phase 87: done flag shared with the achievements engine
+                // (plan-finisher needs done AND undone items; the heatmap
+                // still derives its planDates by filtering done)
                 .from("daily_plan_items")
-                .select("plan_date")
+                .select("plan_date, done")
                 .eq("client_id", cid)
-                .eq("done", true)
                 .gte("plan_date", startKey)
                 .lte("plan_date", todayKey)
             : Promise.resolve({ data: [] }),
@@ -127,7 +139,11 @@ export function useConsistencyMap(opts: UseConsistencyMapOptions = {}) {
         const sessionDates = ((sessRes.data as { starts_at: string }[] | null) ?? []).map((s) =>
           formatDateKeyLocal(new Date(s.starts_at)),
         );
-        const planDates = ((planRes.data as { plan_date: string }[] | null) ?? []).map((p) => p.plan_date);
+        const planItems = ((planRes.data as { plan_date: string; done: boolean }[] | null) ?? []).map((p) => ({
+          date: p.plan_date,
+          done: p.done,
+        }));
+        const planDates = planItems.filter((p) => p.done).map((p) => p.date);
         const habitDates = ((habitRes.data as { log_date: string }[] | null) ?? []).map((h) => h.log_date);
         const checkinDates = ((checkinRes.data as { submitted_at: string }[] | null) ?? []).map((c) =>
           formatDateKeyLocal(new Date(c.submitted_at)),
@@ -136,6 +152,9 @@ export function useConsistencyMap(opts: UseConsistencyMapOptions = {}) {
         setGrid(
           buildConsistencyGrid({ sessionDates, planDates, habitDates, checkinDates }),
         );
+        // Phase 87: raw arrays shared with useAchievements (no parallel
+        // query layer for the same sources)
+        setRaw({ sessionDates, planItems, habitDates, checkinDates, startKey, todayKey });
         setLoading(false);
       } catch {
         if (!cancelled) {
@@ -150,5 +169,5 @@ export function useConsistencyMap(opts: UseConsistencyMapOptions = {}) {
      
   }, [user, opts.clientId, opts.clientEmail]);
 
-  return { grid, loading, error };
+  return { grid, raw, loading, error };
 }
