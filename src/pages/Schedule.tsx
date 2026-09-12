@@ -118,6 +118,7 @@ function sessionToEvent(session: ReturnType<typeof useSessions>['sessions'][numb
     description: session.notes || undefined,
     location: session.location,
     status: session.status,
+    cancelReason: session.cancelReason,
   };
 }
 
@@ -709,6 +710,26 @@ export default function SchedulePage() {
       sessionUpdates.type = updates.type === 'blocked' ? 'blocked' : '1-on-1';
     }
 
+    // Phase 88 Item 2: a changed client persists — client_id (profiles id)
+    // plus the clients-row id (Phase 35 pairing), resolved by email join.
+    // When unchanged, clientId is omitted so account-less originals keep
+    // their NULL client_id untouched.
+    let finalClientId = original.clientId ?? '';
+    if (updates.clientId && updates.clientId !== original.clientId) {
+      sessionUpdates.clientId = updates.clientId;
+      finalClientId = updates.clientId;
+      const email = bookableClients.find((c) => c.id === updates.clientId)?.email;
+      if (email) {
+        const { data: crow } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('email', email)
+          .eq('trainer_id', user?.id || '')
+          .maybeSingle();
+        sessionUpdates.clientRecordId = (crow as { id: string } | null)?.id ?? null;
+      }
+    }
+
     // Only trainers scheduling/approving need conflict checks.
     if (!isTrainer) {
       await updateSession(id, sessionUpdates);
@@ -724,7 +745,7 @@ export default function SchedulePage() {
     if (finalStatus === 'scheduled' || finalStatus === 'requested') {
       const conflicts = findSessionConflicts(sessions, {
         trainerId: original.trainerId,
-        clientId: original.clientId ?? '',
+        clientId: finalClientId,
         startsAt: finalStartsAt,
         endsAt: finalEndsAt,
         excludeId: id,
@@ -754,6 +775,13 @@ export default function SchedulePage() {
   const handleCancelSession = async (id: string) => {
     await cancelSession(id);
     setDetailOpen(false);
+  };
+
+  // Phase 88 Item 3: trainer soft cancel — the required reason is stored
+  // on sessions.cancel_reason and shown to the client.
+  const handleTrainerCancel = async (id: string, reason: string) => {
+    const ok = await cancelSession(id, reason);
+    if (ok) setDetailOpen(false);
   };
 
   const handleMarkCompleted = async (id: string) => {
@@ -1061,6 +1089,11 @@ export default function SchedulePage() {
             }
             onDelete={isTrainer && editable ? handleDeleteSession : undefined}
             onCancel={!isTrainer ? handleCancelSession : undefined}
+            onCancelTrainer={isTrainer && editable ? handleTrainerCancel : undefined}
+            onBookNew={() => {
+              setBookDate(formatDateKeyLocal(new Date()));
+              setBookOpen(true);
+            }}
             onMarkCompleted={isTrainer ? handleMarkCompleted : undefined}
             onAccept={isTrainer ? handleAcceptSession : undefined}
           />

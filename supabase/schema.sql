@@ -1240,6 +1240,9 @@ CREATE TABLE IF NOT EXISTS sessions (
   ends_at TIMESTAMPTZ NOT NULL,
   location TEXT,
   notes TEXT,
+  -- Phase 88: trainer cancel with reason (NULL = not cancelled / no reason
+  -- recorded — never fabricated; see supabase/sessions-cancel-reason.sql)
+  cancel_reason TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

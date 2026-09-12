@@ -45,6 +45,29 @@ describe("buildSessionUpdate (edit path)", () => {
     expect(out.status).toBe("completed");
     expect(out.location).toBeNull();
   });
+
+  it("Phase 88: client re-assignment + cancel reason map through", () => {
+    const out = buildSessionUpdate({
+      clientId: "profile-uuid",
+      clientRecordId: "clients-uuid",
+      cancelReason: "Trainer ill — rescheduling",
+    });
+    expect(out.clientId).toBe("profile-uuid");
+    expect(out.clientRecordId).toBe("clients-uuid");
+    expect(out.cancelReason).toBe("Trainer ill — rescheduling");
+  });
+
+  it("Phase 88: client/cancel fields omitted when not edited", () => {
+    const out = buildSessionUpdate({ title: "T" });
+    expect(out.clientId).toBeUndefined();
+    expect(out.clientRecordId).toBeUndefined();
+    expect(out.cancelReason).toBeUndefined();
+  });
+
+  it("Phase 88: clientRecordId can be explicitly cleared (null)", () => {
+    const out = buildSessionUpdate({ clientRecordId: null });
+    expect(out.clientRecordId).toBeNull();
+  });
 });
 
 describe("session-type vocabulary mapping", () => {

@@ -6,6 +6,7 @@ import {
   endTimeFromDuration,
   durationFromTimes,
   nearestDurationOption,
+  isValidCustomDuration,
   DURATION_OPTIONS,
   DEFAULT_DURATION_MIN,
 } from '@/lib/sessionDuration';
@@ -21,6 +22,8 @@ interface BookDraftData {
   date: string;
   startTime: string;
   durationMin: number;
+  customOpen?: boolean;
+  customMin?: string;
   sessionType: string;
   notes: string;
   title: string;
@@ -98,22 +101,37 @@ export function BookSessionDialog({
   onUpdate,
 }: BookSessionDialogProps) {
   const isEdit = !!editingEvent;
-  const firstStep = isEdit ? 2 : 1; // edit mode skips client selection
+  // Phase 88 Item 2: in edit mode the client is editable via the Phase 73
+  // combobox UNLESS the wizard was opened from a client profile (locked).
+  const lockClient = !!initialClientId;
+  const firstStep = isEdit && lockClient ? 2 : 1;
   // Task 2: edit-mode prefill happens via useState initializers — parents
   // remount the dialog with key={editingEvent.id} (repo pattern: no
   // setState-in-effect).
-  const [step, setStep] = useState(editingEvent ? 2 : 1);
+  const [step, setStep] = useState(firstStep);
   const [clientId, setClientId] = useState(editingEvent?.clientId || initialClientId || '');
   const [date, setDate] = useState(
     editingEvent?.date || initialDate || formatDateKeyLocal(new Date()),
   );
   const [startTime, setStartTime] = useState(editingEvent?.startTime || '09:00');
-  // Task 1: duration chips replace the End Time dropdown — end is DERIVED
+  // Task 1: duration chips replace the End Time dropdown — end is DERIVED.
+  // Phase 88 Item 1: + a Custom option. Edit prefill keeps the EXACT saved
+  // minutes when they match no chip (custom prefill) — never snaps.
+  const savedDuration = editingEvent
+    ? durationFromTimes(editingEvent.startTime, editingEvent.endTime)
+    : null;
+  const savedIsChip = savedDuration != null && (DURATION_OPTIONS as readonly number[]).includes(savedDuration);
   const [durationMin, setDurationMin] = useState<number>(
-    editingEvent
-      ? nearestDurationOption(durationFromTimes(editingEvent.startTime, editingEvent.endTime))
-      : DEFAULT_DURATION_MIN,
+    savedDuration != null ? nearestDurationOption(savedDuration) : DEFAULT_DURATION_MIN,
   );
+  const [customOpen, setCustomOpen] = useState(savedDuration != null && !savedIsChip);
+  const [customMin, setCustomMin] = useState(
+    savedDuration != null && !savedIsChip ? String(savedDuration) : '',
+  );
+  const customValid = isValidCustomDuration(customMin);
+  // Invalid custom input falls back to the default so the derived end is
+  // never NaN; step-2 Proceed is blocked until the input is valid.
+  const effectiveDuration = customOpen ? (customValid ? Number(customMin) : DEFAULT_DURATION_MIN) : durationMin;
   const [sessionType, setSessionType] = useState(
     editingEvent ? eventTypeToWizardType(editingEvent.type) : 'session',
   );
@@ -185,8 +203,8 @@ export function BookSessionDialog({
       step === 1 && !clientId && startTime === '09:00' && durationMin === DEFAULT_DURATION_MIN &&
       sessionType === 'session' && notes === '';
     if (pristine) return;
-    saveDraft(BOOK_DRAFT_KEY, { step, clientId, date, startTime, durationMin, sessionType, notes, title });
-  }, [open, isEdit, step, clientId, date, startTime, durationMin, sessionType, notes, title]);
+    saveDraft(BOOK_DRAFT_KEY, { step, clientId, date, startTime, durationMin, customOpen, customMin, sessionType, notes, title });
+  }, [open, isEdit, step, clientId, date, startTime, durationMin, customOpen, customMin, sessionType, notes, title]);
 
   const resumeDraft = () => {
     const d = loadDraft<BookDraftData>(BOOK_DRAFT_KEY);
@@ -196,6 +214,8 @@ export function BookSessionDialog({
       setDate(d.data.date);
       setStartTime(d.data.startTime);
       setDurationMin(d.data.durationMin);
+      setCustomOpen(d.data.customOpen ?? false);
+      setCustomMin(d.data.customMin ?? '');
       setSessionType(d.data.sessionType);
       setNotes(d.data.notes);
       setTitle(d.data.title ?? '');
@@ -208,7 +228,7 @@ export function BookSessionDialog({
     setDraftHandled(true);
   };
 
-  const endTime = endTimeFromDuration(startTime, durationMin);
+  const endTime = endTimeFromDuration(startTime, effectiveDuration);
 
   const selectedClient = clients.find((c) => c.id === clientId);
 
@@ -222,10 +242,10 @@ export function BookSessionDialog({
 
   const canProceed = useMemo(() => {
     if (step === 1) return clientId !== '';
-    if (step === 2) return date !== '' && startTime !== '' && endTime !== '' && !outsideAvailability;
+    if (step === 2) return date !== '' && startTime !== '' && endTime !== '' && !outsideAvailability && (!customOpen || customValid);
     if (step === 3) return true;
     return true;
-  }, [step, clientId, date, startTime, endTime, outsideAvailability]);
+  }, [step, clientId, date, startTime, endTime, outsideAvailability, customOpen, customValid]);
 
   const resetForm = () => {
     setStep(1);
@@ -233,6 +253,8 @@ export function BookSessionDialog({
     setDate(formatDateKeyLocal(new Date()));
     setStartTime('09:00');
     setDurationMin(DEFAULT_DURATION_MIN);
+    setCustomOpen(false);
+    setCustomMin('');
     setSessionType('session');
     setNotes('');
     setTitle('');
@@ -273,7 +295,9 @@ export function BookSessionDialog({
       startTime,
       endTime,
       type: wizardTypeToEventType(sessionType),
-      clientId,
+      // never emit an empty clientId — an unresolvable original client
+      // (account-less) keeps its row untouched
+      clientId: clientId || editingEvent.clientId,
       clientName: selectedClient?.name ?? editingEvent.clientName,
       description: notes,
     });
@@ -470,22 +494,51 @@ export function BookSessionDialog({
                 </div>
                 <div>
                   <Label className="text-sm text-[#94A3B8]">Duration</Label>
+                  {/* Phase 88: 44px min tap targets; Custom option with a
+                      minutes input (15–240). Selecting a chip derives the
+                      end time — sessions store times, never a duration. */}
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {DURATION_OPTIONS.map((d) => (
                       <button
                         key={d}
                         type="button"
-                        onClick={() => setDurationMin(d)}
-                        className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
-                          durationMin === d
+                        onClick={() => { setDurationMin(d); setCustomOpen(false); }}
+                        className={`min-h-[44px] rounded-lg border px-3 text-xs font-semibold transition ${
+                          !customOpen && durationMin === d
                             ? 'border-[#00AEEF] bg-[#00AEEF]/15 text-[#00AEEF]'
                             : 'border-[#2A3447] bg-[#111827] text-[#94A3B8] hover:border-[#00AEEF40]'
                         }`}
                       >
-                        {d}m
+                        {d} min
                       </button>
                     ))}
+                    <button
+                      type="button"
+                      onClick={() => setCustomOpen(true)}
+                      className={`min-h-[44px] rounded-lg border px-3 text-xs font-semibold transition ${
+                        customOpen
+                          ? 'border-[#00AEEF] bg-[#00AEEF]/15 text-[#00AEEF]'
+                          : 'border-[#2A3447] bg-[#111827] text-[#94A3B8] hover:border-[#00AEEF40]'
+                      }`}
+                    >
+                      Custom
+                    </button>
                   </div>
+                  {customOpen && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={15}
+                        max={240}
+                        value={customMin}
+                        onChange={(e) => setCustomMin(e.target.value)}
+                        aria-label="Custom duration in minutes"
+                        placeholder="60"
+                        className="w-24 border-[#2A3447] bg-[#111827] text-[#F0F0F0]"
+                      />
+                      <span className="text-xs text-[#94A3B8]">minutes (15–240)</span>
+                    </div>
+                  )}
                   <p className="mt-1.5 text-xs font-medium text-[#94A3B8]">
                     Ends <span className="font-bold text-[#F0F0F0]">{endTime}</span>
                   </p>

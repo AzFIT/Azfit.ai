@@ -38,3 +38,11 @@ export function nearestDurationOption(durationMin: number): number {
   }
   return best;
 }
+
+/** Phase 88 Item 1: the Custom chip's minutes input must be a whole number
+ *  in 15–240. Empty, non-numeric and out-of-range values are invalid —
+ *  the derived end time is never built from garbage. */
+export function isValidCustomDuration(value: string): boolean {
+  const n = Number(value);
+  return value.trim() !== "" && Number.isFinite(n) && n >= 15 && n <= 240;
+}

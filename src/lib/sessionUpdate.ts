@@ -16,6 +16,11 @@ export interface SessionUpdatePayload {
   endsAt?: string;
   notes?: string;
   location?: string | null;
+  /** Phase 88 Item 2: client change (profiles id + clients-row id) */
+  clientId?: string;
+  clientRecordId?: string | null;
+  /** Phase 88 Item 3: cancel reason stored on the row */
+  cancelReason?: string | null;
 }
 
 /** Map CalendarEvent edit fields → a session update payload.
@@ -35,6 +40,9 @@ export function buildSessionUpdate(updates: Partial<CalendarEvent>): SessionUpda
   }
   if (updates.description !== undefined) out.notes = updates.description;
   if (updates.location !== undefined) out.location = updates.location ?? null;
+  if (updates.clientId !== undefined) out.clientId = updates.clientId;
+  if (updates.clientRecordId !== undefined) out.clientRecordId = updates.clientRecordId;
+  if (updates.cancelReason !== undefined) out.cancelReason = updates.cancelReason;
   return out;
 }
 

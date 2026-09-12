@@ -511,6 +511,7 @@ export type Database = {
           ends_at: string;
           location: string | null;
           notes: string | null;
+          cancel_reason: string | null; // Phase 88: trainer cancel reason
           created_at: string;
         };
         Insert: {
@@ -525,6 +526,7 @@ export type Database = {
           ends_at: string;
           location?: string | null;
           notes?: string | null;
+          cancel_reason?: string | null;
           created_at?: string;
         };
         Update: {
@@ -539,6 +541,7 @@ export type Database = {
           ends_at?: string;
           location?: string | null;
           notes?: string | null;
+          cancel_reason?: string | null;
           created_at?: string;
         };
         Relationships: [];

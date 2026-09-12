@@ -45,7 +45,7 @@ import type { CalendarEvent } from "@/types";
 import type { Database } from "@/types/supabase";
 
 type SessionRow = Database["public"]["Tables"]["sessions"]["Row"];
-type TabEvent = Omit<ClientScheduleEvent, "type"> & { type: string; status?: string };
+type TabEvent = Omit<ClientScheduleEvent, "type"> & { type: string; status?: string; cancelReason?: string | null };
 
 interface ScheduleTabProps {
   clientEmail: string; // sessions.client_id references profiles(id) — resolved via email
@@ -187,6 +187,7 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
         location: s.location ?? undefined,
         description: s.notes ?? undefined,
         status: s.status,
+        cancelReason: s.cancel_reason ?? null,
       }));
       setEvents(mapped);
     } catch (err) {
@@ -316,6 +317,7 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
       description: e.description,
       location: e.location ?? null,
       status: e.status,
+      cancelReason: (e as { cancelReason?: string | null }).cancelReason ?? null,
     };
   };
 
@@ -324,6 +326,7 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
       const { error } = await supabase
         .from("sessions")
         .update({
+          title: ev.title,
           type: ev.type === "blocked" ? "blocked" : "1-on-1",
           starts_at: new Date(`${ev.date}T${ev.startTime}`).toISOString(),
           ends_at: new Date(`${ev.date}T${ev.endTime}`).toISOString(),
@@ -359,6 +362,27 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
       setEvents(previous);
       toast.error(
         "Failed to delete session: " +
+          (err instanceof Error ? err.message : "Unknown error"),
+      );
+    }
+  };
+
+  // Phase 88 Item 3: trainer soft cancel with a required reason, stored on
+  // the row (the client sees "Cancelled by your trainer" + this reason).
+  const handleTrainerCancel = async (id: string, reason: string) => {
+    try {
+      const { error } = await supabase
+        .from("sessions")
+        .update({ status: "cancelled", cancel_reason: reason })
+        .eq("id", id);
+      if (error) throw error;
+      toast.success("Session cancelled");
+      setDetailEvent(null);
+      await load();
+      await loadExtras();
+    } catch (err) {
+      toast.error(
+        "Failed to cancel session: " +
           (err instanceof Error ? err.message : "Unknown error"),
       );
     }
@@ -860,6 +884,7 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
             : undefined
         }
         onDelete={detailEvent?.type === "session" ? handleDeleteSession : undefined}
+        onCancelTrainer={detailEvent?.type === "session" ? handleTrainerCancel : undefined}
       />
       {(profileId || clientsId) && (
         <BookSessionDialog

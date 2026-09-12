@@ -712,3 +712,38 @@ Locked cards render the requirement text ONLY — no fabricated progress bars, n
 
 ### Gotcha added for future fixture scripts
 The `handle_new_user` trigger auto-creates the `profiles` row on admin-API user creation — inserting it again 409s. Patch the row (role/full_name) instead. (The Phase 86 lowercase-email gotcha also still applies and was followed.)
+
+
+## Phase 88 — Booking Polish: duration chips, full session edit, trainer cancel with reason
+
+**Branch:** `feat/booking-polish-88` off `main` (`b7f701c`, Phase 87 — precondition met). AUTONOMY merge+deploy.
+
+### Item 1 — Duration chips. DONE (polish over the Task-1 chips that already existed).
+`BookSessionDialog` chips relabeled `30/45/60/90 min` with **44px min tap targets** (`min-h-[44px]`) and a new **Custom** option: a minutes input (15–240, validated by the new pure `isValidCustomDuration` in `src/lib/sessionDuration.ts`; step-2 Proceed is blocked until valid; an invalid value can never produce a derived end). Selecting a chip derives the end time (sessions store `starts_at`/`ends_at`, never a duration column — unchanged). Edit prefill keeps the EXACT saved minutes via the Custom input when they match no chip (never snaps to a nearest chip). Draft autosave carries the custom fields. "Existing sessions without a stored duration render unchanged" is inherent: the DB has never stored a duration; end times always come from `ends_at`.
+
+### Item 2 — Full session edit. DONE (fills gaps in the existing Task-2 edit mode).
+· **Client is now editable in edit mode** via the Phase 73 combobox (edit starts at step 1 unless the wizard was opened from a client profile, where the client stays locked). A changed client persists: `buildSessionUpdate` maps `clientId`/`clientRecordId`; `useSessions.updateSession` writes `client_id` + `client_record_id` (clients-row id resolved by email join in `Schedule.tsx handleSaveEdit`, Phase 35 pairing). When unchanged, `client_id` is omitted so account-less originals keep their NULL untouched; the wizard never emits an empty clientId.
+· **Past/completed guard:** the detail dialog's Edit button renders DISABLED with an honest tooltip ("Past sessions cannot be edited" / "Completed or cancelled sessions cannot be edited") — no silent failure.
+· Conflict check in `handleSaveEdit` now uses the post-edit client id. Fixed a pre-existing silent drop in `ScheduleTab.handleUpdateSession`: title edits were built in the wizard but never written (now persisted).
+
+### Item 3 — Trainer cancel with reason. DONE.
+**Exact DDL (applied live 2026-09-12 via pooler on `gcurvjprfwecbchreieu`, 28 existing rows unaffected, all NULL):**
+```sql
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS cancel_reason TEXT;
+```
+Migration file `supabase/sessions-cancel-reason.sql`; mirrored into `supabase/schema.sql`; `src/types/supabase.ts` sessions Row/Insert/Update updated. **Trainer flow:** the detail dialog's destructive action is now "Cancel session" (soft) → confirm step with a REQUIRED reason textarea (≥3 chars, labelled "shown to your client"); `useSessions.cancelSession(id, reason)` stores `status='cancelled'` + `cancel_reason`. Hard delete remains as a tertiary "or delete permanently" escape hatch (credits auto-refund still applies only to delete — cancel keeps the row). Wired in both `Schedule.tsx` and the client-profile `ScheduleTab.tsx`. **Client view:** a cancelled session renders an honest state — "Cancelled by your trainer" + the stored reason (or "No reason was recorded." when NULL — never fabricated) + a "Book a new session" affordance that opens the booking wizard. Cancelled sessions never show Add-to-calendar/Edit; the client cancel button only appears on live (scheduled/requested) sessions.
+
+### Gates
+- `npx tsc -b` ✅ · `npm run lint` ✅ · `npm run test` ✅ (**692 tests**, +5: `isValidCustomDuration` bounds/empties; `buildSessionUpdate` client/cancel mapping, omission, explicit-null clientRecordId) · `npm run build` ✅ (404 fallback ✅) · repo e2e ✅ 4/4
+
+### Smoke (7/7 in one full run; fixtures SQL-verified removed — clients/profiles/sessions 0, 1 auth user deleted)
+- **(a)** Booked via the client-profile wizard with the 45-min chip → summary "14:00 - 14:45" → SQL: `ends_at - starts_at` = exactly **45.0 minutes** ✅
+- **(b)** Edited the same session (14:00→15:00, retitled) → SQL: starts 15:00 local, title 'SMOKE88 Retitled' → client view after reload shows the new title + **15:00 – 15:45** ✅ (duration survived the edit)
+- **(c)** Trainer cancel: confirm button provably DISABLED before a reason, enabled after; reason "SMOKE88 reason" → SQL: `status='cancelled'`, `cancel_reason='SMOKE88 reason'` → client view shows "Cancelled by your trainer" + the exact reason + "Book a new session" (dark 390 + light 1280 screenshots) ✅
+- **(d)** Past completed session: Edit button disabled, `title="Past sessions cannot be edited"` ✅
+- **(e)** 50-minute fixture session renders its real "10:00 – 10:50" — no invented chip-derived end ✅
+- Zero console errors in all 7 tests. Screenshots: `.temp/audit/shots/88/` (01 chips, 02 summary, 03 client edited, 04 trainer cancel reason, 05 client cancelled dark 390, 06 client cancelled light 1280, 07 past guard, 08 odd duration). Temp spec/config/scripts deleted.
+- Screenshot note: 01 catches the chips' 150ms color cross-fade mid-transition (60 fading out, 45 fading in — the default chip is 60) — the Ends line and the booked row's DB-verified 45.0 minutes are the source of truth, not a state desync.
+
+### Out of scope (documented future work)
+Push/in-app notifications for edit/cancel (the "notifies your trainer" copy remains aspirational), session recurrence — per the phase brief.

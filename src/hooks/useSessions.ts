@@ -21,6 +21,8 @@ export interface Session {
   endsAt: string;
   location: string | null;
   notes: string | null;
+  /** Phase 88: trainer cancel reason (NULL when not cancelled / not given) */
+  cancelReason?: string | null;
   createdAt: string;
   // Joined fields
   clientName?: string;
@@ -41,6 +43,7 @@ function toSession(raw: Record<string, unknown>): Session {
     endsAt: raw.ends_at as string,
     location: raw.location as string | null,
     notes: raw.notes as string | null,
+    cancelReason: (raw.cancel_reason as string | null) ?? null,
     createdAt: raw.created_at as string,
     clientName: (raw as Record<string, unknown>).client_name as string | undefined,
     clientAvatar: (raw as Record<string, unknown>).client_avatar as string | null | undefined,
@@ -177,6 +180,11 @@ export function useSessions() {
         if (updates.endsAt !== undefined) payload.ends_at = updates.endsAt;
         if (updates.location !== undefined) payload.location = updates.location;
         if (updates.notes !== undefined) payload.notes = updates.notes;
+        // Phase 88 Item 2: client change persists (profiles id + clients row)
+        if (updates.clientId !== undefined) payload.client_id = updates.clientId;
+        if (updates.clientRecordId !== undefined) payload.client_record_id = updates.clientRecordId;
+        // Phase 88 Item 3: cancel reason stored on the row
+        if (updates.cancelReason !== undefined) payload.cancel_reason = updates.cancelReason;
 
         // Cast to any to bypass strict generated-type checking
         const { error } = await (supabase.from("sessions").update(payload as never) as unknown as { eq: (field: string, value: string) => Promise<{ error: { message: string } | null }> }).eq("id", id);
@@ -198,14 +206,19 @@ export function useSessions() {
 
   /* ── Cancel session ───────────────────────────────────────────── */
   const cancelSession = useCallback(
-    async (id: string) => {
+    async (id: string, reason?: string) => {
       if (!myId) return false;
       setSaving(true);
 
       try {
+        // Phase 88 Item 3: a given reason is stored on the row (trainer
+        // cancel flow makes it required; client cancels may omit it).
         const { error } = await supabase
           .from("sessions")
-          .update({ status: "cancelled" })
+          .update({
+            status: "cancelled",
+            ...(reason?.trim() ? { cancel_reason: reason.trim() } : {}),
+          })
           .eq("id", id);
         if (error) throw error;
 

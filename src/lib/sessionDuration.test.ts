@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { endTimeFromDuration, durationFromTimes, nearestDurationOption, DURATION_OPTIONS } from "./sessionDuration";
+import { endTimeFromDuration, durationFromTimes, nearestDurationOption, isValidCustomDuration, DURATION_OPTIONS } from "./sessionDuration";
 
 describe("endTimeFromDuration", () => {
   it("derives the end from start + duration", () => {
@@ -36,5 +36,21 @@ describe("nearestDurationOption", () => {
   });
   it("every option round-trips", () => {
     for (const opt of DURATION_OPTIONS) expect(nearestDurationOption(opt)).toBe(opt);
+  });
+});
+
+describe("isValidCustomDuration (Phase 88 Custom chip)", () => {
+  it("accepts whole minutes 15–240", () => {
+    expect(isValidCustomDuration("15")).toBe(true);
+    expect(isValidCustomDuration("60")).toBe(true);
+    expect(isValidCustomDuration("240")).toBe(true);
+    expect(isValidCustomDuration(" 45 ")).toBe(true);
+  });
+  it("rejects empty, non-numeric and out-of-range", () => {
+    expect(isValidCustomDuration("")).toBe(false);
+    expect(isValidCustomDuration("   ")).toBe(false);
+    expect(isValidCustomDuration("abc")).toBe(false);
+    expect(isValidCustomDuration("14")).toBe(false);
+    expect(isValidCustomDuration("241")).toBe(false);
   });
 });

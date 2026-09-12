@@ -1,13 +1,21 @@
 /* ═══════════════════════════════════════════════════════════════
-   SessionDetailDialog (Task 2) — tap target for any booked session.
-   Read-only detail (client, date, start–end, status, notes) plus
-   actions: Edit (via the Book Session wizard), Delete (trainer, hard
-   delete with confirm), Cancel (client, soft cancel), Accept /
-   Mark completed / Add to Calendar — migrated from EditSessionDialog.
+   SessionDetailDialog (Task 2 / Phase 84 / Phase 88) — tap target for
+   any booked session. Read-only detail (client, date, start–end,
+   status, notes) plus actions:
+   · Edit (trainer, via the Book Session wizard) — Phase 88: disabled
+     with an honest tooltip for past/completed sessions
+   · Cancel (client, soft cancel — Phase 84 two-tap guard)
+   · Cancel with reason (trainer, Phase 88 — required reason stored
+     on sessions.cancel_reason; hard delete stays as a tertiary escape
+     hatch for bogus rows)
+   · Cancelled sessions render an honest state (Phase 88): who
+     cancelled + the reason + "Book a new session" for the client —
+     never presented as still on
+   · Accept / Mark completed / Add to Calendar
    ═══════════════════════════════════════════════════════════════ */
 
 import { useState } from 'react';
-import { CalendarPlus, Check, CheckCheck, Clock, MapPin, Pencil, Trash2, User } from 'lucide-react';
+import { CalendarPlus, Check, CheckCheck, Clock, MapPin, Pencil, Trash2, User, XCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -16,6 +24,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { generateICS, downloadICS, icsFilename } from '@/lib/ics';
 import type { CalendarEvent } from '@/types';
 
@@ -23,11 +32,18 @@ interface SessionDetailDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   event: CalendarEvent | null;
-  /** Trainers get Edit + Delete; clients get Cancel (soft) — matches RLS. */
+  /** Trainers get Edit + Cancel-with-reason (+ permanent delete); clients
+   *  get soft Cancel — matches RLS. */
   isTrainer?: boolean;
   onEdit?: (event: CalendarEvent) => void;
+  /** Hard delete (trainer, permanent — credits auto-refund) */
   onDelete?: (id: string) => void;
+  /** Client soft cancel (no reason stored) */
   onCancel?: (id: string) => void;
+  /** Phase 88: trainer soft cancel — reason is required and stored on the row */
+  onCancelTrainer?: (id: string, reason: string) => void;
+  /** Phase 88: client cancelled-state "Book a new session" affordance */
+  onBookNew?: () => void;
   /** requested → accept (status='scheduled') */
   onAccept?: (id: string) => void;
   /** scheduled/requested + past → mark completed */
@@ -41,6 +57,8 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: '#94A3B8',
 };
 
+type ConfirmMode = 'cancel' | 'delete' | null;
+
 export function SessionDetailDialog({
   open,
   onOpenChange,
@@ -49,21 +67,31 @@ export function SessionDetailDialog({
   onEdit,
   onDelete,
   onCancel,
+  onCancelTrainer,
+  onBookNew,
   onAccept,
   onMarkCompleted,
 }: SessionDetailDialogProps) {
-  const [confirming, setConfirming] = useState(false);
+  const [confirming, setConfirming] = useState<ConfirmMode>(null);
+  const [cancelReason, setCancelReason] = useState('');
 
   if (!event) return null;
 
   const isPast = new Date(`${event.date}T${event.endTime}`) < new Date();
+  const isCancelled = event.status === 'cancelled';
+  const isLiveStatus = event.status === 'scheduled' || event.status === 'requested';
   const canComplete =
     !!onMarkCompleted &&
     isPast &&
     (event.status === 'scheduled' || event.status === 'requested');
   const canAccept = !!onAccept && event.status === 'requested';
-  const destructiveLabel = isTrainer ? 'Delete' : 'Cancel session';
-  const destructiveHandler = isTrainer ? onDelete : onCancel;
+
+  // Phase 88 Item 2 guard: past/completed sessions are not editable —
+  // the button renders DISABLED with an honest tooltip (no silent fail).
+  const editable = !!onEdit && !isPast && isLiveStatus;
+
+  const canCancelClient = !isTrainer && !!onCancel && isLiveStatus;
+  const canCancelTrainer = isTrainer && !!onCancelTrainer && isLiveStatus;
 
   const prettyDate = new Date(`${event.date}T12:00:00`).toLocaleDateString(undefined, {
     weekday: 'long',
@@ -83,6 +111,14 @@ export function SessionDetailDialog({
     downloadICS(ics, icsFilename(new Date(`${event.date}T${event.startTime}`).toISOString()));
   };
 
+  const trimmedReason = cancelReason.trim();
+  const reasonValid = trimmedReason.length >= 3;
+
+  const handleBookNew = () => {
+    onOpenChange(false);
+    onBookNew?.();
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md border-[#2A3447] bg-[#1A2235] text-[#F0F0F0]">
@@ -90,13 +126,35 @@ export function SessionDetailDialog({
           <DialogTitle className="text-lg font-semibold text-[#F0F0F0]">{event.title}</DialogTitle>
         </DialogHeader>
 
-        {confirming ? (
+        {confirming === 'cancel' ? (
           <div className="space-y-4 py-2">
             <p className="text-sm text-[#94A3B8]">
               {isTrainer
-                ? 'Delete this session? This cannot be undone.'
+                ? `Cancel this session${event.clientName ? ` with ${event.clientName}` : ''} on ${prettyDate}? The client will see it as cancelled.`
                 : `Cancel this session with ${event.clientName || 'your coach'} on ${prettyDate}? This notifies your trainer.`}
             </p>
+            {/* Phase 88 Item 3: trainer cancels give a required reason —
+                it is stored on the row and shown to the client. */}
+            {isTrainer && (
+              <div className="space-y-1.5">
+                <label htmlFor="cancel-reason" className="text-xs font-medium text-[#94A3B8]">
+                  Reason <span className="text-[#EF4444]">(required)</span> — shown to your client
+                </label>
+                <Textarea
+                  id="cancel-reason"
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="e.g. Trainer ill — rescheduling"
+                  rows={2}
+                  className="border-[#2A3447] bg-[#111827] text-sm text-[#F0F0F0] placeholder:text-[#64748B]"
+                />
+                {!reasonValid && cancelReason.length > 0 && (
+                  <p className="text-[11px] text-[#F59E0B]">
+                    Please give a short reason (at least 3 characters).
+                  </p>
+                )}
+              </div>
+            )}
             {/* Phase 84 Item 3: honest short-notice note (no policy
                 enforcement — cancel stays allowed after confirm) */}
             {!isTrainer && new Date(`${event.date}T${event.startTime}`).getTime() - new Date().getTime() < 24 * 3600 * 1000 && (
@@ -107,21 +165,79 @@ export function SessionDetailDialog({
             <DialogFooter className="gap-2">
               <Button
                 variant="outline"
-                onClick={() => setConfirming(false)}
+                onClick={() => { setConfirming(null); setCancelReason(''); }}
                 className="border-[#2A3447] text-[#94A3B8]"
               >
                 Keep Session
               </Button>
               <Button
-                onClick={() => destructiveHandler?.(event.id)}
+                onClick={() => {
+                  if (isTrainer) {
+                    if (!reasonValid) return;
+                    onCancelTrainer?.(event.id, trimmedReason);
+                  } else {
+                    onCancel?.(event.id);
+                  }
+                }}
+                disabled={isTrainer && !reasonValid}
                 className="bg-[#EF4444] text-white hover:bg-[#EF4444]/80"
               >
-                {isTrainer ? 'Delete Session' : 'Cancel Session'}
+                Cancel Session
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : confirming === 'delete' ? (
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-[#94A3B8]">
+              Delete this session permanently? This cannot be undone.
+            </p>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setConfirming(null)}
+                className="border-[#2A3447] text-[#94A3B8]"
+              >
+                Keep Session
+              </Button>
+              <Button
+                onClick={() => onDelete?.(event.id)}
+                className="bg-[#EF4444] text-white hover:bg-[#EF4444]/80"
+              >
+                Delete Session
               </Button>
             </DialogFooter>
           </div>
         ) : (
           <div className="space-y-4">
+            {/* Phase 88 Item 3: a cancelled session is never rendered as
+                still on — honest who/why + a rebooking affordance. */}
+            {isCancelled && (
+              <div className="rounded-lg border border-[#94A3B8]/30 bg-[#94A3B8]/10 px-3 py-3">
+                <div className="flex items-center gap-2">
+                  <XCircle className="h-4 w-4 text-[#94A3B8]" />
+                  <p className="text-sm font-semibold text-[#F0F0F0]">
+                    {isTrainer ? 'This session is cancelled' : 'Cancelled by your trainer'}
+                  </p>
+                </div>
+                {event.cancelReason ? (
+                  <p className="mt-1.5 text-xs text-[#94A3B8]">
+                    Reason: <span className="text-[#F0F0F0]">{event.cancelReason}</span>
+                  </p>
+                ) : (
+                  <p className="mt-1.5 text-xs text-[#94A3B8]">No reason was recorded.</p>
+                )}
+                {!isTrainer && onBookNew && (
+                  <Button
+                    onClick={handleBookNew}
+                    className="mt-3 bg-[#00AEEF] text-white hover:bg-[#00BFFF]"
+                  >
+                    <CalendarPlus className="mr-1 h-4 w-4" />
+                    Book a new session
+                  </Button>
+                )}
+              </div>
+            )}
+
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2 text-[#F0F0F0]">
                 <User className="h-4 w-4 text-[#00AEEF]" />
@@ -160,15 +276,37 @@ export function SessionDetailDialog({
             </div>
 
             <DialogFooter className="gap-2">
-              {destructiveHandler && (
+              {/* Destructive (left): trainer = cancel-with-reason (soft,
+                  Phase 88) + permanent delete tucked behind a second
+                  confirm; client = soft cancel (Phase 84 guard) */}
+              {canCancelTrainer && (
                 <Button
                   variant="outline"
-                  onClick={() => setConfirming(true)}
+                  onClick={() => setConfirming('cancel')}
                   className="mr-auto border-[#EF444440] text-[#EF4444] hover:bg-[#EF444410]"
                 >
                   <Trash2 className="mr-1 h-4 w-4" />
-                  {destructiveLabel}
+                  Cancel session
                 </Button>
+              )}
+              {canCancelClient && (
+                <Button
+                  variant="outline"
+                  onClick={() => setConfirming('cancel')}
+                  className="mr-auto border-[#EF444440] text-[#EF4444] hover:bg-[#EF444410]"
+                >
+                  <Trash2 className="mr-1 h-4 w-4" />
+                  Cancel session
+                </Button>
+              )}
+              {isTrainer && !!onDelete && (
+                <button
+                  type="button"
+                  onClick={() => setConfirming('delete')}
+                  className="mr-auto text-[11px] text-[#64748B] underline underline-offset-2 hover:text-[#94A3B8]"
+                >
+                  or delete permanently
+                </button>
               )}
               {canAccept && (
                 <Button
@@ -192,19 +330,29 @@ export function SessionDetailDialog({
                   brand-token border + text instead of the greyed
                   'disabled' look (the dialog is the documented
                   always-navy surface; tokens resolve correctly on it) */}
-              <Button
-                variant="outline"
-                onClick={handleAddToCalendar}
-                className="border-[var(--azfit-primary)]/50 bg-transparent text-[var(--azfit-primary)] hover:bg-[var(--azfit-primary)]/10"
-                title="Download .ics"
-              >
-                <CalendarPlus className="mr-1 h-4 w-4" />
-                Add to Calendar
-              </Button>
+              {!isCancelled && (
+                <Button
+                  variant="outline"
+                  onClick={handleAddToCalendar}
+                  className="border-[var(--azfit-primary)]/50 bg-transparent text-[var(--azfit-primary)] hover:bg-[var(--azfit-primary)]/10"
+                  title="Download .ics"
+                >
+                  <CalendarPlus className="mr-1 h-4 w-4" />
+                  Add to Calendar
+                </Button>
+              )}
               {isTrainer && onEdit && (
                 <Button
-                  onClick={() => onEdit(event)}
-                  className="bg-[#00AEEF] text-white hover:bg-[#00BFFF]"
+                  onClick={() => editable && onEdit(event)}
+                  disabled={!editable}
+                  title={
+                    editable
+                      ? undefined
+                      : isPast
+                        ? 'Past sessions cannot be edited'
+                        : 'Completed or cancelled sessions cannot be edited'
+                  }
+                  className="bg-[#00AEEF] text-white hover:bg-[#00BFFF] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Pencil className="mr-1 h-4 w-4" />
                   Edit

@@ -15,4 +15,8 @@ export interface CalendarEvent {
   recurring?: boolean;
   color?: string;
   status?: string; // sessions.status — requested/scheduled/completed/cancelled
+  /** Phase 88: sessions.cancel_reason (trainer cancel with reason) */
+  cancelReason?: string | null;
+  /** Phase 88 Item 2: clients-row id when a session is re-assigned in edit */
+  clientRecordId?: string | null;
 }
