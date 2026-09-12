@@ -41,6 +41,9 @@ import ActiveClientsTile from "./bento/ActiveClientsTile";
 import WeeklyVolumeTile from "./bento/WeeklyVolumeTile";
 import DeltaChip from "./bento/DeltaChip";
 import CoachBriefTile from "./CoachBriefTile";
+// Phase 90: Vault-style summary block (alert strip + 4 metric cards)
+// mounted directly beneath the existing header.
+import CoachSummary from "./CoachSummary";
 
 function addDays(d: Date, n: number): Date {
   const out = new Date(d);
@@ -104,7 +107,7 @@ export default function TrainerDashboard() {
   const [mounted, setMounted] = useState(false);
   const [showAddClientModal, setShowAddClientModal] = useState(false);
 
-  const { clients: healthClients, counts: attentionCounts, hasAttention } = useClientHealth();
+  const { clients: healthClients, counts: attentionCounts, hasAttention, loading: healthLoading } = useClientHealth();
   const firstName = (() => {
     const parts = (user?.full_name || "").trim().split(/\s+/).filter(Boolean);
     if (parts.length === 0) return "Marcus";
@@ -465,6 +468,12 @@ export default function TrainerDashboard() {
           </div>
         </div>
       </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          Phase 90 — Vault-style coach summary (alert strip + 4 cards),
+          above the existing dashboard content. Existing sections stay.
+          ═══════════════════════════════════════════════════════════ */}
+      <CoachSummary healthClients={healthClients} healthLoading={healthLoading} />
 
       {/* ═══════════════════════════════════════════════════════════
           NEEDS ATTENTION STRIP (conditional)

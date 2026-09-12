@@ -780,3 +780,40 @@ Drawer closes on navigate + Escape + backdrop tap; focus-trapped while open (Tab
 - **(e)** `scrollWidth ≤ 390` with drawer closed AND open; zero console errors in both tests ✅
 - Both themes at 390 + 1280 (01–04, 07–08 dark; 06, 09 light). Screenshots: `.temp/audit/shots/89/` (01 drawer 390 dark, 02 edit mode, 03 six items, 04 persisted reload, 05 plan-summary page, 06 drawer 390 light, 07 sidebar 1280 dark, 08 collapsed rail, 09 sidebar 1280 light, 10 client nav regression).
 - Gotcha note: fresh headless Chromium has no `prefers-color-scheme: dark`, so dark-theme smokes must seed `azfit-theme` via `addInitScript` (re-runs on reload — desirable here). Also: signing out by deleting `sb-*` localStorage keys does NOT drop Supabase's in-memory session (it re-persists) — role switches in specs must use the real Logout button.
+
+---
+
+## Phase 90 — Coach dashboard: Vault-style summary layout (2026-09-12, AUTONOMY)
+
+**Branch:** `feat/coach-dashboard-90` off `main` (`96f093d`, Phase 89 — precondition met). AUTONOMY merge+deploy. Phase 2 of the Vault coach-portal series (89 nav → 90 dashboard → 91 roster/schedule → 92 privacy blur). Reference: `.temp/Build/VAULT WEBSITE IDEAS/app/src/pages/Dashboard.tsx` — LAYOUT PATTERN ONLY (dotted alert banner, small-caps title → big metric → sub-line hierarchy); zero Vault black/gold/fonts/hex copied.
+
+### Item 1 — Header. DONE (satisfied by existing code).
+"Good morning/afternoon/evening, Coach [Name]" + "Here's who needs your attention today." time-aware greeting (local hour) already existed verbatim at the top of `TrainerDashboard.tsx` (Phase 59 header). No duplicate header added — `CoachSummary` mounts directly beneath it.
+
+### Item 2 — Alert strip. DONE.
+Dotted warning-token banner in `src/components/dashboard/CoachSummary.tsx`: "**N** clients missed workouts this week — [first names]" with real first names, and a FILTER action deep-linking to `/#/clients`. **Signal reuse (per spec):** inactivity = the Coach AI Daily Brief's exact definition from `src/lib/coachBrief.ts` — no `workout_logs.completed_at` in the last 7 days, or never completed one (`daysSinceLast` from `completed_at`, NOT `created_at`). When zero clients qualify: honest positive state "Everyone trained this week" — the strip never hides silently and never fakes.
+
+### Item 3 — Summary cards. DONE.
+Four cards in the Vault hierarchy (small-caps title → large bold metric → real context sub-line), 2×2 at 390px, 4-across ≥1024, full-card tap targets:
+- **ACTIVE CLIENTS** — non-archived count; sub-line "X of Y on track" from the existing `useClientHealth` statuses (passed as props — this block never re-derives them).
+- **SESSIONS THIS WEEK** — scheduled Mon 00:00 → next Mon 00:00 local (incl. today; completed still scheduled this week); "Z remaining today" sub-line only when real.
+- **AVG COMPLIANCE** — formula (documented in `coachSummary.ts` header): per non-archived client, this-week sessions with status `scheduled|completed` (cancelled/requested excluded); eligible = clients with ≥1 such session; compliance = Σ completed ÷ Σ scheduled over eligible clients. Zero-scheduled clients excluded from the denominator — missing data never scores 0%. No eligible clients → `null` → honest empty state "No sessions scheduled yet this week" (never a fabricated 0%). Sub-line "+N% vs last week" via the existing `wowDeltaPct` from `dashboardBento`; when last week has no comparable denominator, falls back to "X of Y completed" (real numbers, no invented delta).
+- **NEEDS ATTENTION** — count from the same `useClientHealth` statuses (needs_attention/at_risk); sub-line names the top 3 real names.
+- **NO REVENUE CARD** — no payment data exists; never fabricated (per spec).
+
+### Item 4 — Placement. DONE.
+`CoachSummary` mounted in `TrainerDashboard.tsx` directly under the existing greeting header, above all existing sections (`<CoachSummary healthClients={healthClients} healthLoading={healthLoading} />`; `useClientHealth` destructure extended with `loading`). No existing section deleted — Phase 91 reorganizes what sits below.
+
+### Implementation notes
+- Pure lib `src/lib/coachSummary.ts` (16 unit tests in `coachSummary.test.ts`) + `src/hooks/useCoachSummary.ts` — ONE batched fetch (4 range queries: clients, profiles-by-email, this+last-week sessions, windowed workout_logs; no N+1). Mon-start week window via a `localWeekWindow` helper (no raw UTC day keys).
+- **PostgREST gotcha (permanent, worth remembering):** PostgREST returns DB column names (`starts_at`, `client_id`, `client_record_id`) — a camelCase TypeScript type matching PostgREST rows compiles fine but every window/ownership check silently fails at runtime (smoke caught card showing 0). Wire types must be snake_case. Also re-confirmed: `workout_logs.client_id` REFERENCES `clients(id)` (clients-row id), while `sessions.client_id` → profiles.id and `sessions.client_record_id` → clients.id — lookups key by the right id per table.
+
+### Gates
+- `npx tsc -b` ✅ · `npm run lint` ✅ · `npm run test` ✅ (**723 tests**, +16: inactivity signal incl. 7d boundary + never-logged, week windows incl. DST-agnostic + cancelled/requested exclusion, compliance eligibility/zero-denominator/null, sessions-this-week + remaining-today, attention count + top-3 names, alert strip positive + name listing) · `npm run build` ✅ (404 fallback ✅) · repo e2e ✅ 4/4
+
+### Smoke (Playwright vs `npm run preview`; temp spec deleted after; fixtures `smoke90-delete@azfit.demo` / `smoke90b-delete@azfit.demo` + 5 clients, SQL-verified removed — 0 rows in clients/sessions/workout_logs/profiles + auth.users, ran with `TZ=Asia/Hong_Kong`)
+- **(a)** Card values match the SQL truth file exactly: trainerA — 5 active / 3 on track, 5 sessions this week, compliance **40% (2 of 5; delta null → honest "2 of 5 completed" sub-line)**, attention **2 (Cruz Smk90, Dora Smk90)**, alert strip "2 clients missed workouts this week — Cruz, Dora". FILTER click → `/#/clients` ✅
+- **(b)** Zero-scheduled week (trainerB): compliance card "No sessions scheduled yet this week" — never a fabricated 0% ✅
+- **(c)** Alert strip names the real at-risk fixtures ✅ · **(d)** "Everyone trained this week" positive state on the fully-active fixture ✅
+- **(e)** `scrollWidth ≤ 390`; zero console errors in both tests ✅
+- Both themes, 390 + 1280 (settled UI). Screenshots `.temp/audit/shots/90/`: 01-summary-390-dark, 02-summary-1280-dark, 03-summary-390-light, 04-empty-compliance-390-dark.
