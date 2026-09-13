@@ -469,10 +469,17 @@ function goalNamesFor(goals: string[], customGoals: DbGoal[]): string[] {
     .filter((n): n is string => !!n);
 }
 
-/* Phase 65B Item 2 — one goal tile rendered in all 5 view modes.
-   LARGE gets a branded gradient header (built from the goal accent +
-   theme tokens — the documented no-photo fallback; never hotlinked images). */
-function GoalTileView({
+/* Phase 90f — ONE shared GoalCard for every Goal Selection view mode.
+   Grid modes (large/medium/small) render identical cards in a single
+   auto-fit minmax grid with grid-auto-rows:1fr (equal row heights, no
+   fixed aspect); only the description clamp changes (hidden in small).
+   List/details are full-width rows of the same card. System and custom
+   goals differ ONLY by content — a "Custom goal" badge in the title row
+   and an Archive action in the same bottom-right slot in every mode.
+   Checkbox stays top-right (grid) / right (list); the first-selected-
+   is-primary chip logic is untouched. Archive renders OUTSIDE the toggle
+   button (no nested buttons); p-3 -m-3 gives it a 44px hit target. */
+function GoalCard({
   name,
   desc,
   color,
@@ -480,7 +487,9 @@ function GoalTileView({
   selected,
   primary,
   mode,
+  custom = false,
   onToggle,
+  onArchive,
 }: {
   name: string;
   desc: string;
@@ -489,58 +498,88 @@ function GoalTileView({
   selected: boolean;
   primary: boolean;
   mode: ViewMode;
+  custom?: boolean;
   onToggle: () => void;
+  onArchive?: () => void;
 }) {
   const selectedCls = selected
     ? 'border-[#00AEEF] bg-[#00AEEF]/5 shadow-lg shadow-[#00AEEF]/10'
     : 'border-[var(--card-border)] bg-[var(--card-bg)] hover:border-[var(--azfit-primary)]/50 hover:bg-[var(--page-bg)]';
-  const checkbox = (
-    <span className={cn('rounded border flex items-center justify-center transition-colors shrink-0', mode === 'details' ? 'w-4 h-4' : 'w-5 h-5', selected ? 'bg-[#00AEEF] border-[#00AEEF]' : 'border-[var(--card-border)] bg-[var(--page-bg)]')}>
-      {selected && <Check className={cn('text-white', mode === 'details' ? 'w-2.5 h-2.5' : 'w-3 h-3')} />}
-    </span>
-  );
   // Phase 75 Item 2b: the alpha-box iconBlock became the shared IconTile
   // (tint = the goal's pre-existing accent; active = selected state).
   const iconBlock = (size: 'sm' | 'md') => (
     <IconTile icon={Icon} size={size} tint={color} active={selected} />
   );
-  const primaryChip = primary ? <span className="text-[8px] font-bold uppercase tracking-wide text-[var(--ai-violet)]">Primary</span> : null;
+  const primaryChip = primary ? <span className="shrink-0 text-[8px] font-bold uppercase tracking-wide text-[var(--ai-violet)]">Primary</span> : null;
+  const customBadge = custom ? (
+    <span className="shrink-0 rounded-full border border-[var(--card-border)] bg-[var(--page-bg)] px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-[var(--page-text)]/50">Custom goal</span>
+  ) : null;
+  const checkbox = (boxCls: string, checkCls: string) => (
+    <span aria-hidden="true" className={cn('rounded border flex items-center justify-center transition-colors shrink-0', boxCls, selected ? 'bg-[#00AEEF] border-[#00AEEF]' : 'border-[var(--card-border)] bg-[var(--page-bg)]')}>
+      {selected && <Check className={cn('text-white', checkCls)} />}
+    </span>
+  );
+  /* Archive: same bottom-right slot in every mode, outside the toggle
+     button so buttons never nest. */
+  const archiveBtn = onArchive ? (
+    <button
+      type="button"
+      onClick={onArchive}
+      aria-label={`Archive ${name}`}
+      className="absolute bottom-0 right-0 z-10 -m-3 p-3 text-right text-[10px] font-medium leading-none text-[var(--light-text-muted)] underline underline-offset-2 hover:text-[#EF4444]"
+    >
+      <span className="block pb-0.5">Archive</span>
+    </button>
+  ) : null;
 
   if (mode === 'details') {
     return (
-      <button onClick={onToggle} className={cn('flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left transition-all', selectedCls)}>
-        {checkbox}
-        <span className="text-xs font-medium text-[var(--page-text)] truncate min-w-0 flex-1">{name}</span>
-        {primaryChip}
-      </button>
+      <div className={cn('relative flex w-full items-center rounded-lg border', selectedCls)}>
+        <button onClick={onToggle} className="flex min-w-0 flex-1 items-center gap-2.5 rounded-[inherit] px-2.5 py-1.5 pr-12 text-left transition-all">
+          {checkbox('w-4 h-4', 'w-2.5 h-2.5')}
+          <span className="text-xs font-medium text-[var(--page-text)] truncate min-w-0 flex-1">{name}</span>
+          {customBadge}
+          {primaryChip}
+        </button>
+        {archiveBtn}
+      </div>
     );
   }
   if (mode === 'list') {
     return (
-      <button onClick={onToggle} className={cn('flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all', selectedCls)}>
-        {iconBlock('sm')}
-        <span className="text-xs font-semibold text-[var(--page-text)] truncate min-w-0 flex-1">{name}</span>
-        {primaryChip}
-        {checkbox}
-      </button>
+      <div className={cn('relative flex w-full items-center rounded-xl border-2', selectedCls)}>
+        <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} onClick={onToggle} className="flex min-h-[44px] min-w-0 flex-1 items-center gap-3 rounded-[inherit] px-3 py-2 pr-14 text-left transition-all">
+          {iconBlock('sm')}
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-[var(--page-text)] truncate">{name}</span>
+              {customBadge}
+            </span>
+            {desc && <span className="block truncate text-[11px] leading-snug text-[var(--page-text)]/60">{desc}</span>}
+          </span>
+          {primaryChip}
+          {checkbox('w-5 h-5', 'w-3 h-3')}
+        </motion.button>
+        {archiveBtn}
+      </div>
     );
   }
   return (
-    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onToggle} className={cn('relative flex flex-col items-start rounded-xl border-2 transition-all text-left overflow-hidden', mode === 'large' ? '' : 'p-4', selectedCls)}>
-      {mode === 'large' && (
-        <div className="w-full h-20 flex items-end p-3" style={{ background: `linear-gradient(135deg, ${color}30, transparent), var(--card-bg)` }}>
+    <div className={cn('relative flex flex-col rounded-xl border-2 transition-all', selectedCls)}>
+      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onToggle} className="relative flex flex-1 flex-col items-start overflow-hidden rounded-[inherit] p-4 pr-12 text-left">
+        <span className="absolute right-0 top-0 z-10 p-3">{checkbox('w-5 h-5', 'w-3 h-3')}</span>
+        <div className="flex w-full items-start justify-between gap-2">
           {iconBlock('md')}
+          {primaryChip}
         </div>
-      )}
-      <div className={cn('w-full', mode === 'large' && 'p-4 pt-3')}>
-        <div className={cn('flex w-full', mode === 'small' ? 'justify-end mb-1.5' : 'items-center justify-between mb-2', mode === 'large' && 'mb-1.5')}>
-          {mode === 'medium' && iconBlock('md')}
-          <span className="flex items-center gap-1.5">{primaryChip}{checkbox}</span>
+        <div className="mt-2 flex w-full items-center gap-1.5">
+          <h4 className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--page-text)]">{name}</h4>
+          {customBadge}
         </div>
-        <h4 className="text-[var(--page-text)] font-semibold text-sm mb-1">{name}</h4>
-        {mode !== 'small' && <p className="text-[var(--page-text)]/60 text-xs leading-relaxed">{desc}</p>}
-      </div>
-    </motion.button>
+        {mode !== 'small' && desc && <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[var(--page-text)]/60">{desc}</p>}
+      </motion.button>
+      {archiveBtn}
+    </div>
   );
 }
 
@@ -573,9 +612,20 @@ function Step1Goal({ data, updateData, customGoals = [], onAddGoal, onArchiveGoa
         <p className="text-[var(--page-text)]/60 text-xs">Select one or more goals — the first selected is the primary.</p>
         <ViewModeSwitch mode={mode} onChange={setMode} />
       </div>
-      <div className={tileGridClass(mode)} data-testid="view-grid">
+      {/* Phase 90f: one auto-fit grid for ALL grid modes — minmax(160px,1fr)
+          with grid-auto-rows:1fr so every card in a row is the same height;
+          list/details stay full-width rows. */}
+      <div
+        className={mode === 'list' || mode === 'details' ? 'grid grid-cols-1 gap-1.5' : 'grid gap-3'}
+        style={
+          mode === 'list' || mode === 'details'
+            ? undefined
+            : { gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gridAutoRows: '1fr' }
+        }
+        data-testid="view-grid"
+      >
         {GOALS.map((goal) => (
-          <GoalTileView
+          <GoalCard
             key={goal.id}
             name={goal.name}
             desc={goal.desc}
@@ -587,29 +637,22 @@ function Step1Goal({ data, updateData, customGoals = [], onAddGoal, onArchiveGoa
             onToggle={() => toggleGoal(goal.id)}
           />
         ))}
-        {/* Custom DB goals (is_active) — visible to all trainers */}
+        {/* Custom DB goals (is_active) — visible to all trainers. Same card,
+            differing only by content: "Custom goal" badge + Archive. */}
         {activeCustom.map((g) => { const tid = customGoalId(g.slug); return (
-          <div key={g.id} className="relative">
-            <GoalTileView
-              name={g.name}
-              desc="Custom goal"
-              color="var(--light-text-muted)"
-              icon={Target}
-              selected={data.goals.includes(tid)}
-              primary={data.goals[0] === tid}
-              mode={mode}
-              onToggle={() => toggleGoal(tid)}
-            />
-            {onArchiveGoal && mode !== 'details' && mode !== 'list' && (
-              <button
-                onClick={() => onArchiveGoal(g.id)}
-                aria-label={`Archive ${g.name}`}
-                className="absolute bottom-2 right-3 text-[10px] font-medium text-[var(--light-text-muted)] hover:text-[#EF4444] underline underline-offset-2"
-              >
-                Archive
-              </button>
-            )}
-          </div>
+          <GoalCard
+            key={g.id}
+            name={g.name}
+            desc=""
+            color="var(--light-text-muted)"
+            icon={Target}
+            selected={data.goals.includes(tid)}
+            primary={data.goals[0] === tid}
+            mode={mode}
+            custom
+            onToggle={() => toggleGoal(tid)}
+            onArchive={onArchiveGoal ? () => onArchiveGoal(g.id) : undefined}
+          />
         ); })}
       </div>
       {/* Custom goal creation — writes the shared goals table */}

@@ -882,3 +882,26 @@ The trainer dashboard had 451px scrollWidth at 390: the Phase 90 alert strip's i
 - **(f)** ESC closes + focus returns to the Search pill (aria-label assertion); scrollWidth ≤ 390 (after the overflow fix); zero console errors in all 5 tests ✅
 - Screenshots `.temp/audit/shots/90d/`: 01-palette-empty-390-dark, 02-palette-client-filter-390-dark, 03-palette-no-results-390-dark, 04-palette-1280-light, 05-palette-client-role-390-light, 06-logo-to-dashboard-390.
 - Gotcha notes: the palette mounts only after auth resolves — smokes must wait for the pill/dashboard chrome before ⌘K; AnimatePresence exit ghosts keep a closing dialog "visible" ~150ms — assert on a settled state; pages without Layout (ClientProfile, Schedule, …) have no app bar — logo/palette assertions must use Layout-wrapped routes.
+
+---
+
+## Phase 90f — Program Creator goal cards: one consistent component (2026-09-13, AUTONOMY)
+
+**Branch:** `feat/goal-cards-90f` off `main` (`08546aa`, Phase 90d — precondition met). Pure presentational refactor; ZERO behavior change. `tileGridClass` itself is untouched (Step 2 Method Selection still uses it at AIProgramBuilder.tsx:842) — only Step 1's grid switched.
+
+### Item 1 — One shared GoalCard. DONE.
+`GoalTileView` (three divergent render branches: gradient-header large / icon-only medium / icon-less small, checkbox position jumping left/right/top, custom goals as same-tile + absolute "Archive" overlay breaking row uniformity) replaced by a single `GoalCard` used by ALL 5 view modes. One footprint: icon slot (IconTile, visible in EVERY grid mode — icons no longer vanish in small/4-col), title row (`truncate`, flex-1 so long titles like "Combat Sports (Boxing, MMA, Judo, Wrestling)" ellipsis instead of wrapping), description (`line-clamp-2` in large/medium, hidden only in small — the single permitted density difference), checkbox top-right in grid modes (44px via the card being the tap target) / right-aligned in list / left in details, primary-first chip untouched. Custom goals differ ONLY by content: a "Custom goal" pill in the title row and an Archive action in the same bottom-right slot in EVERY mode (previously hidden in list/details). Archive renders OUTSIDE the toggle button (no nested-button HTML) with p-3/-m-3 for a 44px hit target; same `onArchiveGoal` handler + `Archive ${name}` aria-label.
+- **Grid:** Step 1 grid modes now use `repeat(auto-fit, minmax(160px, 1fr))` + `gridAutoRows: 1fr` (uniform gap-3) — every card in a row is the same height/width by construction; no fixed aspect ratios; no double-width stragglers. List/details stay full-width rows (list rows min-h-[44px], same card content vertically centered).
+- Selection, multi-select, primary-first ordering, Add goal, Archive state — all identical handlers, unchanged.
+
+### Gates
+- `npx tsc -b` ✅ · `npm run lint` ✅ · `npm run test` ✅ (**751 tests**, no change — presentational only) · `npm run build` ✅ (404 fallback ✅) · repo e2e ✅ 4/4 (first run flaked on live-Supabase login timeout — a re-run passed 4/4; unrelated to this change, no code touched)
+
+### Smoke (Playwright vs preview; temp spec + config deleted after; fixture = one `goals` row `smoke90f-delete-combat-sports`, SQL-verified removed — 0 rows; no auth user needed)
+- **(a)** All 4 modes via the real ViewModeSwitch at 390px: per-row computed heights AND widths equal within 1px, every card `grid-column/row span = 1` (no double-width), >1 row per mode ✅
+- **(b)** Fixture card "SMOKE90F-DELETE Combat Sports (Boxing, MMA, Judo, Wrestling)": computed `text-overflow: ellipsis` + content clipped (scrollWidth > clientWidth) in every mode; "Custom goal" badge + Archive in the same slots ✅
+- **(c)** Selection regression: Strength then Hypertrophy → "Primary" chip on Strength only; Archive fixture card → count drops by exactly 1, fixture gone ✅
+- **(d)** scrollWidth ≤ 390 at 390px and ≤ 1280 at 1280px in every mode ✅; zero console errors ✅
+- Both themes screenshotted per mode; desktop medium/small spot-checked at 1280.
+- Screenshots `.temp/audit/shots/90f/`: large/medium/small/list × 390 dark+light, medium/small × 1280 dark+light, primary-order-390-dark, after-archive-390-dark (15 total).
+- Note: the demo DB already carries ~30 active shared custom goals (seeded taxonomy) — the grid renders 6 system + N custom; the smoke asserts ≥7 cards and locates the fixture by its unique accessible name rather than a fixed count.
