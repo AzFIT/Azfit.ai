@@ -19,4 +19,8 @@ export interface CalendarEvent {
   cancelReason?: string | null;
   /** Phase 88 Item 2: clients-row id when a session is re-assigned in edit */
   clientRecordId?: string | null;
+  /** Phase 90h Item 3: roster email for account-less picks (clientId is "")
+   * — lets the page resolve sessions.client_record_id without a second
+   * roster lookup. */
+  clientEmail?: string;
 }

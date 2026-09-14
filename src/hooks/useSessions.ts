@@ -146,7 +146,9 @@ export function useSessions() {
       try {
         const payload = {
           trainer_id: isTrainer ? myId : session.trainerId,
-          client_id: isTrainer ? session.clientId : myId,
+          // Phase 90h: account-less bookings pass "" through the Schedule UI —
+          // coerce to NULL so Postgres never sees an empty-string uuid.
+          client_id: isTrainer ? session.clientId || null : myId,
           title: session.title,
           type: session.type,
           status: isTrainer ? "scheduled" : "requested",
@@ -154,6 +156,12 @@ export function useSessions() {
           ends_at: session.endsAt,
           location: session.location,
           notes: session.notes,
+          // Phase 90h Item 3: account-less bookings key on client_record_id
+          // (clients.id). Omitted when undefined — pre-90h rows wrote NULL
+          // and account-having bookings keep that exact behavior.
+          ...(session.clientRecordId !== undefined
+            ? { client_record_id: session.clientRecordId }
+            : {}),
         };
 
         const { error } = await supabase.from("sessions").insert(payload);
@@ -320,7 +328,8 @@ export function useSessions() {
       try {
         const payloads = sessionsToCreate.map((session) => ({
           trainer_id: session.trainerId,
-          client_id: session.clientId,
+          // Same "" → NULL coercion as createSession (account-less bookings).
+          client_id: session.clientId || null,
           title: session.title,
           type: session.type,
           status: session.status,
@@ -328,6 +337,11 @@ export function useSessions() {
           ends_at: session.endsAt,
           location: session.location,
           notes: session.notes,
+          // Phase 90h Item 3: recurring account-less bookings carry the
+          // resolved clients row through each occurrence (see createSession)
+          ...(session.clientRecordId !== undefined
+            ? { client_record_id: session.clientRecordId }
+            : {}),
         }));
 
         const { error } = await supabase.from("sessions").insert(payloads);

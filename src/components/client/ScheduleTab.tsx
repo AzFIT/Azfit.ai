@@ -30,6 +30,7 @@ import {
 import { generateWeeklyOccurrences } from "@/lib/sessionConflicts";
 import { formatDateKeyLocal } from "@/lib/utils";
 import { BookSessionDialog } from "@/components/schedule/BookSessionDialog";
+import type { BookingClient } from "@/lib/bookingRoster";
 import { SessionDetailDialog } from "@/components/schedule/SessionDetailDialog";
 import {
   Dialog,
@@ -249,6 +250,17 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
     client_id: profileId ?? null,
     ...(clientsId ? { client_record_id: clientsId } : {}),
   });
+
+  // Phase 90h Item 3: the dialog's BookingClient shape for the locked
+  // single-client picker. recordId doubles as the picker key (always
+  // non-null when either id space exists, so the client stays locked).
+  const lockedBookingClient: BookingClient = {
+    profileId,
+    recordId: clientsId ?? profileId ?? "",
+    name: profileId ? profileName : recordName,
+    email: clientEmail,
+    status: "active",
+  };
 
   /* ── Booking (mirrors Schedule.tsx handleBook mapping, minus the
         conflict-check block — v1 books all occurrences) ─────────────── */
@@ -865,9 +877,9 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
           onOpenChange={setBookOpen}
           onBook={handleBook}
           isTrainer
-          clients={[{ id: profileId ?? clientsId!, name: profileId ? profileName : recordName }]}
+          clients={[lockedBookingClient]}
           initialDate={selectedDateStr || undefined}
-          initialClientId={profileId ?? clientsId!}
+          initialClientId={lockedBookingClient.recordId}
           credits={credits}
           availabilityCheck={availability ? availabilityCheck : undefined}
         />
@@ -905,8 +917,8 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
           onUpdate={handleUpdateSession}
           editingEvent={editingEvent}
           isTrainer
-          clients={[{ id: profileId ?? clientsId!, name: profileId ? profileName : recordName }]}
-          initialClientId={profileId ?? clientsId!}
+          clients={[lockedBookingClient]}
+          initialClientId={lockedBookingClient.recordId}
           availabilityCheck={availability ? availabilityCheck : undefined}
         />
       )}

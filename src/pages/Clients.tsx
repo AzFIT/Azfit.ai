@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Search, Plus, Upload, X, User, ChevronDown, Link2, AlertTriangle, MoreHorizontal } from "lucide-react";
 import Layout from "@/components/Layout";
 import QuickAddClientModal from "@/components/QuickAddClientModal";
+import ModeToggle, { type ClientsViewMode } from "@/components/ModeToggle";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { profileGaps, profileGapReason } from "@/lib/trialIntake";
@@ -51,8 +52,22 @@ const OTHER_STATUSES = CLIENT_STATUS_VALUES.filter(
   (v) => v !== "active" && v !== "paused" && v !== "archived",
 );
 
+// Phase 90h Item 2a: the Cards|Table toggle actually switches the list now
+// (it used to mutate dead state in the app bar). Persisted per device.
+const CLIENTS_VIEW_KEY = "azfit_clients_view";
+
+function readClientsView(): ClientsViewMode {
+  try {
+    return localStorage.getItem(CLIENTS_VIEW_KEY) === "table"
+      ? "table"
+      : "cards";
+  } catch {
+    return "cards";
+  }
+}
+
 export default function ClientsPage() {
-  const [mode, setMode] = useState<"dashboard" | "sheets">("dashboard");
+  const [viewMode, setViewMode] = useState<ClientsViewMode>(readClientsView);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("Active");
   const [otherMenu, setOtherMenu] = useState<{ rect: DOMRect } | null>(null);
@@ -254,8 +269,17 @@ export default function ClientsPage() {
     setLegacyClients([]);
   };
 
+  const handleViewToggle = (next: ClientsViewMode) => {
+    setViewMode(next);
+    try {
+      localStorage.setItem(CLIENTS_VIEW_KEY, next);
+    } catch {
+      // private mode — the view just won't persist
+    }
+  };
+
   return (
-    <Layout mode={mode} onModeToggle={setMode}>
+    <Layout>
       <div className="mx-auto max-w-[1200px] px-4 pt-4 pb-10 lg:px-6">
         {/* Legacy import banner */}
         {legacyClients.length > 0 && (
@@ -315,7 +339,13 @@ export default function ClientsPage() {
               </p>
             )}
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Phase 90h Item 2b: the Cards|Table toggle moved out of the
+                app bar into this page header — full row beneath the title
+                on mobile, inline with the actions at sm+. */}
+            <div className="flex w-full sm:w-auto">
+              <ModeToggle mode={viewMode} onToggle={handleViewToggle} />
+            </div>
             <button
               type="button"
               onClick={openAddClient}
@@ -446,9 +476,18 @@ export default function ClientsPage() {
               </div>
             </div>
 
-            {/* Phase 58: on narrow screens the table scrolls INSIDE the card
-                instead of pushing the page wide (no inner min-width — that
-                itself became the overflow driver) */}
+            {/* Phase 90h Item 2a: Cards|Table is a real switch now. The
+                table scrolls INSIDE its own scroller on mobile (min-width,
+                never squishes the page) — the only allowed overflow. */}
+            {viewMode === "table" ? (
+              <ClientsTableView
+                clients={filteredClients}
+                loading={loading}
+                onStatusChange={handleStatusChange}
+                onEdit={openEditClient}
+                onArchive={handleArchiveClient}
+              />
+            ) : (
             <div className="overflow-x-auto rounded-2xl border border-[var(--card-border)]">
               <div>
               {/* Phase 63: header hidden below sm (the 4-column grid describes a
@@ -705,6 +744,7 @@ export default function ClientsPage() {
               </div>
               </div>
             </div>
+            )}
           </div>
         </div>
       </div>
@@ -724,6 +764,236 @@ export default function ClientsPage() {
         clientToEdit={editingClient}
       />
     </Layout>
+  );
+}
+
+/* ── Phase 90h Item 2a: the compact Table view. Self-contained status pill
+     and row-actions menu (portal-rendered, so the table scroller's overflow
+     never clips them) exposing EXACTLY the same actions as the card rows. ── */
+
+type DbClientRow = Database["public"]["Tables"]["clients"]["Row"];
+
+function ClientsTableView({
+  clients,
+  loading,
+  onStatusChange,
+  onEdit,
+  onArchive,
+}: {
+  clients: DbClientRow[];
+  loading: boolean;
+  onStatusChange: (client: DbClientRow, next: ClientStatus) => void;
+  onEdit: (client: DbClientRow) => void;
+  onArchive: (clientId: string) => void;
+}) {
+  const navigate = useNavigate();
+  return (
+    <div
+      data-testid="clients-table-scroll"
+      className="overflow-x-auto rounded-2xl border border-[var(--card-border)]"
+    >
+      <table className="w-full min-w-[560px] text-sm">
+        <thead>
+          <tr className="bg-[var(--light-elevated)] text-left text-xs uppercase tracking-[0.2em] text-[var(--light-text-muted)]">
+            <th className="px-4 py-3 font-semibold">Client</th>
+            <th className="px-4 py-3 font-semibold">Status</th>
+            <th className="px-4 py-3 font-semibold">Goal</th>
+            <th className="px-4 py-3 text-right font-semibold">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[var(--card-border)] bg-[var(--card-bg)]">
+          {loading ? (
+            <tr>
+              <td colSpan={4} className="px-4 py-10 text-center text-sm text-[var(--light-text-muted)]">
+                Loading clients...
+              </td>
+            </tr>
+          ) : clients.length === 0 ? (
+            <tr>
+              <td colSpan={4} className="px-4 py-10 text-center text-sm text-[var(--light-text-muted)]">
+                No clients match this filter.
+              </td>
+            </tr>
+          ) : (
+            clients.map((client) => (
+              <tr
+                key={client.id}
+                onClick={() => navigate(`/client/${client.id}`)}
+                className="cursor-pointer transition hover:bg-[var(--light-elevated)]"
+              >
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                      style={{
+                        backgroundColor: "color-mix(in srgb, var(--azfit-primary) 12%, transparent)",
+                        color: "var(--azfit-primary)",
+                      }}
+                    >
+                      {client.full_name
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-[var(--page-text)]">
+                        {client.full_name}
+                      </p>
+                      <p className="truncate text-xs text-[var(--light-text-muted)]">
+                        {client.email}
+                      </p>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  <StatusPill client={client} onStatusChange={onStatusChange} />
+                </td>
+                <td className="px-4 py-3 text-[var(--page-text)]">
+                  {client.fitness_goal ? (
+                    client.fitness_goal
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (c) => c.toUpperCase())
+                  ) : (
+                    <span className="text-[var(--light-text-muted)]">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                  <RowActionsMenu
+                    client={client}
+                    onEdit={onEdit}
+                    onArchive={onArchive}
+                  />
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Same status pill + change menu the card rows expose, self-contained. */
+function StatusPill({
+  client,
+  onStatusChange,
+}: {
+  client: DbClientRow;
+  onStatusChange: (client: DbClientRow, next: ClientStatus) => void;
+}) {
+  const [menu, setMenu] = useState<{ rect: DOMRect } | null>(null);
+  const meta = clientStatusMeta(client.status);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setMenu((m) => (m ? null : { rect }));
+        }}
+        className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition hover:opacity-80"
+        style={{ backgroundColor: meta.bg, color: meta.color }}
+        title="Change status"
+      >
+        {meta.label}
+        <ChevronDown size={11} />
+      </button>
+      {menu && (
+        <PortalMenu anchor={menu.rect} onClose={() => setMenu(null)} width={240}>
+          {CLIENT_STATUS_VALUES.map((v) => {
+            const m = CLIENT_STATUSES[v];
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => {
+                  setMenu(null);
+                  onStatusChange(client, v);
+                }}
+                className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-[var(--light-elevated)]"
+              >
+                <span className="text-xs font-semibold" style={{ color: m.color }}>
+                  {m.label}
+                  {v === client.status && " ✓"}
+                </span>
+                <span className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+                  {m.description}
+                </span>
+              </button>
+            );
+          })}
+        </PortalMenu>
+      )}
+    </>
+  );
+}
+
+/** The card rows' Actions overflow (Edit / View / Archive), self-contained. */
+function RowActionsMenu({
+  client,
+  onEdit,
+  onArchive,
+}: {
+  client: DbClientRow;
+  onEdit: (client: DbClientRow) => void;
+  onArchive: (clientId: string) => void;
+}) {
+  const [menu, setMenu] = useState<{ rect: DOMRect } | null>(null);
+  const navigate = useNavigate();
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setMenu((m) => (m ? null : { rect }));
+        }}
+        className="inline-flex items-center gap-1 rounded-full border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-xs font-semibold transition hover:bg-[var(--light-elevated)]"
+        title="Actions"
+      >
+        <MoreHorizontal size={14} />
+        Actions
+        <ChevronDown size={11} />
+      </button>
+      {menu && (
+        <PortalMenu anchor={menu.rect} onClose={() => setMenu(null)} width={200}>
+          <button
+            type="button"
+            onClick={() => {
+              setMenu(null);
+              onEdit(client);
+            }}
+            className="flex w-full items-center px-3 py-2.5 text-left text-xs font-semibold hover:bg-[var(--light-elevated)]"
+            style={{ color: "var(--page-text)" }}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMenu(null);
+              navigate(`/client/${client.id}`);
+            }}
+            className="flex w-full items-center px-3 py-2.5 text-left text-xs font-semibold hover:bg-[var(--light-elevated)]"
+            style={{ color: "var(--page-text)" }}
+          >
+            View
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMenu(null);
+              onArchive(client.id);
+            }}
+            className="flex w-full items-center px-3 py-2.5 text-left text-xs font-semibold text-red-600 hover:bg-[rgba(239,68,68,0.08)]"
+          >
+            Archive
+          </button>
+        </PortalMenu>
+      )}
+    </>
   );
 }
 

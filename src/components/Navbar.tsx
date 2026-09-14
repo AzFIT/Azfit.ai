@@ -1,12 +1,9 @@
 import { useState, useEffect, type RefObject } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Menu, Search } from 'lucide-react';
-import ModeToggle from './ModeToggle';
 
 interface NavbarProps {
   onMenuOpen: () => void;
-  mode?: 'dashboard' | 'sheets';
-  onModeToggle?: (mode: 'dashboard' | 'sheets') => void;
   transparent?: boolean;
   /** Phase 89: the nav drawer returns focus here on close. */
   menuButtonRef?: RefObject<HTMLButtonElement | null>;
@@ -18,8 +15,6 @@ interface NavbarProps {
 
 export default function Navbar({
   onMenuOpen,
-  mode = 'dashboard',
-  onModeToggle,
   transparent = false,
   menuButtonRef,
   onSearchOpen,
@@ -97,7 +92,10 @@ export default function Navbar({
         </button>
       </div>
 
-      {/* Right cluster — Phase 90d: Search pill (both roles) + mode toggle */}
+      {/* Right cluster — Phase 90d: search pill (both roles).
+          Phase 90h: the Cards|Table ModeToggle moved out of the app bar
+          (it crowded the centered logo at 360–430px) — it now lives in
+          the Clients page header. */}
       <div className="ml-auto flex items-center gap-2">
         {onSearchOpen && (
           <button
@@ -113,9 +111,6 @@ export default function Navbar({
               ⌘K
             </kbd>
           </button>
-        )}
-        {onModeToggle && (
-          <ModeToggle mode={mode} onToggle={onModeToggle} />
         )}
       </div>
     </nav>

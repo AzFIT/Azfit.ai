@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarPlus, ChevronRight, User, CheckCircle, Search } from 'lucide-react';
 import { filterClients, groupClients, clientStatusLabel } from '@/lib/clientSearch';
+import type { BookingClient } from '@/lib/bookingRoster';
 import {
   endTimeFromDuration,
   durationFromTimes,
@@ -55,9 +56,10 @@ interface BookSessionDialogProps {
   onOpenChange: (open: boolean) => void;
   onBook: (event: CalendarEvent, recurringCount: number) => void;
   isTrainer?: boolean;
-  /** Phase 73 Item 2b: email/status power the searchable combobox
-   * (filter + status chips). Optional — older callers pass id+name only. */
-  clients: { id: string; name: string; avatar?: string; email?: string; status?: string }[];
+  /** Phase 90h Item 3: the FULL non-archived roster — every client is
+   * listed, account-less ones included (profileId: null, tagged in the
+   * picker). Their sessions persist via sessions.client_record_id. */
+  clients: BookingClient[];
   initialDate?: string;
   /** When provided, the client is preselected and locked (booking from a
    * client's profile is always for that client). Default unchanged. */
@@ -100,6 +102,16 @@ export function BookSessionDialog({
   editingEvent,
   onUpdate,
 }: BookSessionDialogProps) {
+  // Phase 90h Item 3: the picker key is the clients-row id (recordId — always
+  // present, unlike profileId). `roster` adapts to the search helpers, which
+  // key on `id`.
+  const roster = useMemo(
+    () => clients.map((c) => ({ ...c, id: c.recordId })),
+    [clients],
+  );
+  const findByAnyId = (key: string) =>
+    roster.find((c) => c.id === key || c.profileId === key);
+
   const isEdit = !!editingEvent;
   // Phase 88 Item 2: in edit mode the client is editable via the Phase 73
   // combobox UNLESS the wizard was opened from a client profile (locked).
@@ -107,9 +119,13 @@ export function BookSessionDialog({
   const firstStep = isEdit && lockClient ? 2 : 1;
   // Task 2: edit-mode prefill happens via useState initializers — parents
   // remount the dialog with key={editingEvent.id} (repo pattern: no
-  // setState-in-effect).
+  // setState-in-effect). The seed may be a profiles id (edit events carry
+  // clientId = profileId) — normalize to the recordId picker key.
   const [step, setStep] = useState(firstStep);
-  const [clientId, setClientId] = useState(editingEvent?.clientId || initialClientId || '');
+  const [clientId, setClientId] = useState(() => {
+    const seed = editingEvent?.clientId || initialClientId || '';
+    return seed ? (findByAnyId(seed)?.id ?? seed) : '';
+  });
   const [date, setDate] = useState(
     editingEvent?.date || initialDate || formatDateKeyLocal(new Date()),
   );
@@ -144,15 +160,15 @@ export function BookSessionDialog({
   const [highlightIdx, setHighlightIdx] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
   const visibleClients = useMemo(() => {
-    const g = groupClients(filterClients(clients, clientQuery));
+    const g = groupClients(filterClients(roster, clientQuery));
     return { ...g, flat: [...g.active, ...g.others] };
-  }, [clients, clientQuery]);
+  }, [roster, clientQuery]);
 
   // Phase 73 Item 2c: editable session title, auto-filled "<Client> PT"
   // until the trainer types their own (titleTouched).
   const [title, setTitle] = useState(() => {
     if (editingEvent?.title) return editingEvent.title;
-    const locked = initialClientId ? clients.find((c) => c.id === initialClientId) : null;
+    const locked = initialClientId ? findByAnyId(initialClientId) : null;
     return locked ? `${locked.name} PT` : '';
   });
   const [titleTouched, setTitleTouched] = useState(false);
@@ -161,7 +177,7 @@ export function BookSessionDialog({
     if (initialClientId) return; // locked when booking from a client profile
     setClientId(id);
     if (!titleTouched) {
-      const c = clients.find((x) => x.id === id);
+      const c = roster.find((x) => x.id === id);
       if (c) setTitle(`${c.name} PT`);
     }
   };
@@ -230,7 +246,7 @@ export function BookSessionDialog({
 
   const endTime = endTimeFromDuration(startTime, effectiveDuration);
 
-  const selectedClient = clients.find((c) => c.id === clientId);
+  const selectedClient = roster.find((c) => c.id === clientId);
 
   // Availability: the derived END must also fit the coach's window.
   // NOTE: Phase 50 shipped this as an amber hint only; the current brief
@@ -267,6 +283,10 @@ export function BookSessionDialog({
   };
 
   const handleBook = () => {
+    // Phase 90h Item 3: clientId is the CalendarEvent contract (a profiles
+    // id) — "" for account-less picks, with the roster identifiers carried
+    // alongside so the page can persist sessions.client_record_id.
+    const picked = selectedClient ?? null;
     const event: CalendarEvent = {
       id: `evt-${Date.now()}`,
       title: title.trim() || (selectedClient ? `${selectedClient.name} PT` : 'New Session'), // Task 4 / Phase 73: editable "{ClientName} PT"
@@ -274,7 +294,9 @@ export function BookSessionDialog({
       startTime,
       endTime,
       type: sessionType as CalendarEvent['type'],
-      clientId,
+      clientId: picked ? (picked.profileId ?? '') : clientId,
+      clientRecordId: picked?.recordId ?? null,
+      clientEmail: picked?.email || undefined,
       clientName: selectedClient?.name,
       description: notes,
       location: null,
@@ -288,6 +310,10 @@ export function BookSessionDialog({
   // Task 2: edit-mode submit — UPDATE the existing row (no new booking)
   const handleUpdate = () => {
     if (!editingEvent || !onUpdate) return;
+    // Account-less re-picks emit "" (same "never emit an empty clientId"
+    // contract as before: an unresolvable original keeps its row untouched);
+    // the page resolves client_record_id via clientEmail when it does emit.
+    const picked = selectedClient ?? null;
     onUpdate(editingEvent.id, {
       ...editingEvent,
       title: title.trim() || editingEvent.title,
@@ -295,9 +321,9 @@ export function BookSessionDialog({
       startTime,
       endTime,
       type: wizardTypeToEventType(sessionType),
-      // never emit an empty clientId — an unresolvable original client
-      // (account-less) keeps its row untouched
-      clientId: clientId || editingEvent.clientId,
+      clientId: picked ? (picked.profileId ?? '') : (clientId || editingEvent.clientId),
+      clientRecordId: picked?.recordId ?? editingEvent.clientRecordId,
+      clientEmail: picked?.email || editingEvent.clientEmail,
       clientName: selectedClient?.name ?? editingEvent.clientName,
       description: notes,
     });
@@ -400,6 +426,11 @@ export function BookSessionDialog({
                       <span className="shrink-0 rounded-full border border-[#2A3447] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#84CC16]">
                         {clientStatusLabel(client.status)}
                       </span>
+                      {!client.profileId && (
+                        <span className="shrink-0 rounded-full border border-[#64748B] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#94A3B8]">
+                          No portal account
+                        </span>
+                      )}
                       {clientId === client.id && <CheckCircle className="h-4 w-4 shrink-0 text-[#00AEEF]" />}
                     </button>
                   );
@@ -437,6 +468,11 @@ export function BookSessionDialog({
                           <span className="shrink-0 rounded-full border border-[#2A3447] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#94A3B8]">
                             {clientStatusLabel(client.status)}
                           </span>
+                          {!client.profileId && (
+                            <span className="shrink-0 rounded-full border border-[#64748B] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#94A3B8]">
+                              No portal account
+                            </span>
+                          )}
                           {clientId === client.id && <CheckCircle className="h-4 w-4 shrink-0 text-[#00AEEF]" />}
                         </button>
                       );

@@ -13,10 +13,10 @@ export interface BookableClient {
 }
 
 /** Case-insensitive name/email substring filter. Empty query = all. */
-export function filterClients(
-  clients: BookableClient[],
+export function filterClients<T extends BookableClient>(
+  clients: T[],
   query: string,
-): BookableClient[] {
+): T[] {
   const q = query.trim().toLowerCase();
   if (!q) return clients;
   return clients.filter(
@@ -26,16 +26,19 @@ export function filterClients(
   );
 }
 
-export interface ClientGroups {
-  active: BookableClient[];
-  others: BookableClient[];
+export interface ClientGroups<T extends BookableClient = BookableClient> {
+  active: T[];
+  others: T[];
 }
 
 /** Active clients first, then everyone else (archived never reaches the
- * picker — the roster query excludes them). Input order preserved. */
-export function groupClients(clients: BookableClient[]): ClientGroups {
-  const active: BookableClient[] = [];
-  const others: BookableClient[] = [];
+ * picker — the roster query excludes them). Input order preserved.
+ * Generic so callers keep their richer row type (e.g. BookingClient). */
+export function groupClients<T extends BookableClient>(
+  clients: T[],
+): ClientGroups<T> {
+  const active: T[] = [];
+  const others: T[] = [];
   for (const c of clients) {
     (c.status === undefined || c.status === "active" ? active : others).push(c);
   }

@@ -60,6 +60,59 @@ export default function ClientProfileHeader({
     endViewAs(); // stays on this profile
   };
 
+  // Phase 90h: below sm the toggle gets its own full-width row (the single
+  // flex row crowded to one-word-per-line at 320px); at sm+ it stays inline.
+  const viewToggle = (fullWidth: boolean) =>
+    showViewToggle && (
+      <div
+        data-testid={fullWidth ? "view-toggle-mobile" : "view-toggle"}
+        role="group"
+        aria-label="View mode"
+        className={`flex items-center rounded-xl border p-0.5 ${
+          fullWidth ? "w-full sm:hidden" : "hidden sm:flex"
+        }`}
+        style={{
+          backgroundColor: "var(--light-elevated)",
+          borderColor: "var(--card-border)",
+        }}
+      >
+        <button
+          type="button"
+          aria-pressed={!overrideForThis}
+          onClick={backToCoachView}
+          className={`flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors ${
+            fullWidth ? "flex-1 justify-center" : ""
+          }`}
+          style={{
+            backgroundColor: overrideForThis
+              ? "transparent"
+              : "var(--azfit-primary)",
+            color: overrideForThis ? "var(--light-text-muted)" : "#fff",
+          }}
+        >
+          Coach View
+        </button>
+        <button
+          type="button"
+          data-testid="view-toggle-client"
+          aria-pressed={overrideForThis}
+          onClick={enterClientView}
+          className={`flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors ${
+            fullWidth ? "flex-1 justify-center" : ""
+          }`}
+          style={{
+            backgroundColor: overrideForThis
+              ? "var(--azfit-primary)"
+              : "transparent",
+            color: overrideForThis ? "#fff" : "var(--light-text-muted)",
+          }}
+        >
+          <Eye size={12} />
+          Client View
+        </button>
+      </div>
+    );
+
   return (
     <motion.div
       initial={{ opacity: 0, y: -12 }}
@@ -71,7 +124,10 @@ export default function ClientProfileHeader({
         borderColor: "var(--card-border)",
       }}
     >
-      <div className="flex items-start gap-4">
+      <div className="flex flex-col gap-3">
+        {/* Phase 90h: below sm this stacks as row 1 (back + avatar + info);
+            the view toggle is row 2. At sm+ everything is one row again. */}
+        <div className="flex items-start gap-3 sm:gap-4">
         {/* Back Button */}
         <button
           onClick={() => navigate("/dashboard")}
@@ -192,50 +248,9 @@ export default function ClientProfileHeader({
 
         {/* Actions */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Phase 90e: Coach View | Client View segmented control */}
-          {showViewToggle && (
-            <div
-              data-testid="view-toggle"
-              role="group"
-              aria-label="View mode"
-              className="flex items-center rounded-xl border p-0.5"
-              style={{
-                backgroundColor: "var(--light-elevated)",
-                borderColor: "var(--card-border)",
-              }}
-            >
-              <button
-                type="button"
-                aria-pressed={!overrideForThis}
-                onClick={backToCoachView}
-                className="flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors"
-                style={{
-                  backgroundColor: overrideForThis
-                    ? "transparent"
-                    : "var(--azfit-primary)",
-                  color: overrideForThis ? "var(--light-text-muted)" : "#fff",
-                }}
-              >
-                Coach View
-              </button>
-              <button
-                type="button"
-                data-testid="view-toggle-client"
-                aria-pressed={overrideForThis}
-                onClick={enterClientView}
-                className="flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors"
-                style={{
-                  backgroundColor: overrideForThis
-                    ? "var(--azfit-primary)"
-                    : "transparent",
-                  color: overrideForThis ? "#fff" : "var(--light-text-muted)",
-                }}
-              >
-                <Eye size={12} />
-                Client View
-              </button>
-            </div>
-          )}
+          {/* Phase 90e: Coach View | Client View segmented control (sm+;
+              below sm it renders as the full-width row beneath the header) */}
+          {viewToggle(false)}
           <Button
             size="sm"
             className="gap-1.5 rounded-xl hidden sm:flex"
@@ -294,6 +309,11 @@ export default function ClientProfileHeader({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+        </div>
+
+        {/* Phase 90h: the view toggle rides its own full-width row below sm
+            (in-flow, never absolute/fixed) */}
+        {viewToggle(true)}
       </div>
     </motion.div>
   );

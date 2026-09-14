@@ -36,6 +36,7 @@ import DayActionPopup from '@/components/schedule/DayActionPopup';
 import EmojiPickerDialog from '@/components/schedule/EmojiPickerDialog';
 import { DEFAULT_COMPLETION_EMOJI } from '@/lib/scheduleEmoji';
 import { buildSessionUpdate } from '@/lib/sessionUpdate';
+import { buildBookingRoster, type BookingClient } from '@/lib/bookingRoster';
 import { durationFromTimes, endTimeFromDuration } from '@/lib/sessionDuration';
 import {
   snapMinutesToSlot,
@@ -143,11 +144,15 @@ export default function SchedulePage() {
   // day-action popup or the right-click context menu; keys the dialog so a
   // new date remounts and re-prefills (useState initializers run once).
   const [bookDate, setBookDate] = useState<string>(() => formatDateKeyLocal(new Date()));
-  // Clients for the booking picker: resolved to profiles.id via email —
-  // sessions.client_id references profiles(id), so clients WITHOUT a linked
-  // app account are omitted (they cannot have sessions).
+  // Clients for the booking picker — the FULL non-archived roster.
+  // Phase 90h Item 3: previously this looped a profiles query per client
+  // (N+1) and silently dropped clients without a linked app account; now
+  // ONE batched profiles query joins by lowercased email (Supabase
+  // lowercases auth emails — the join is case-insensitive on both sides).
+  // Account-less clients stay in the list with profileId: null — their
+  // sessions persist via sessions.client_record_id (Phase 35).
   // Phase 73 Item 2b: email + status feed the searchable combobox.
-  const [bookableClients, setBookableClients] = useState<{ id: string; name: string; avatar?: string; email?: string; status?: string }[]>([]);
+  const [bookableClients, setBookableClients] = useState<BookingClient[]>([]);
   // Phase 43 Fix 5: real roster size for the header stat (was the count of
   // clients WITH sessions this week — a meaningless "0 clients" on quiet weeks)
   const [rosterCount, setRosterCount] = useState<number | null>(null);
@@ -185,24 +190,19 @@ export default function SchedulePage() {
     (async () => {
       const { data: rows } = await supabase
         .from('clients')
-        .select('full_name, email, status')
+        .select('id, full_name, email, status')
         .eq('trainer_id', user.id)
         .neq('status', 'archived')
         .order('full_name', { ascending: true });
       if (!rows) return;
-      const out: { id: string; name: string; email: string; status: string }[] = [];
-      for (const c of rows) {
-        const { data: prof } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', c.email)
-          .maybeSingle();
-        if (prof) out.push({ id: prof.id, name: c.full_name, email: c.email, status: c.status ?? 'active' });
-      }
-      if (!cancelled) {
-        setBookableClients(out);
-        setRosterCount(rows.length);
-      }
+      const emails = rows.map((r) => r.email).filter((e): e is string => !!e);
+      const { data: profs } = emails.length
+        ? await supabase.from('profiles').select('id, email').in('email', emails)
+        : { data: [] as { id: string; email: string | null }[] };
+      if (cancelled) return;
+      setBookableClients(buildBookingRoster(rows, profs ?? []));
+      // rosterCount = the FULL non-archived roster (header stat) — unchanged
+      setRosterCount(rows.length);
     })();
     return () => {
       cancelled = true;
@@ -568,9 +568,25 @@ export default function SchedulePage() {
     const startDate = new Date(`${event.date}T${event.startTime}`);
     const endDate = new Date(`${event.date}T${event.endTime}`);
 
+    // Phase 90h Item 3: an account-less pick emits clientId: "" and carries
+    // the roster email — resolve the clients row (sessions.client_record_id,
+    // Phase 35) exactly like handleSaveEdit does. Account-having clients are
+    // unchanged: client_id = profileId, no client_record_id written.
+    let clientRecordId: string | null = null;
+    if (isTrainer && !event.clientId && event.clientEmail) {
+      const { data: crow } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('email', event.clientEmail)
+        .eq('trainer_id', user?.id || '')
+        .maybeSingle();
+      clientRecordId = (crow as { id: string } | null)?.id ?? null;
+    }
+
     const baseSession = {
       trainerId: user?.id || '',
       clientId: event.clientId || '',
+      ...(clientRecordId ? { clientRecordId } : {}),
       title: event.title,
       type: event.type === 'blocked' ? 'blocked' : '1-on-1',
       status: (isTrainer ? 'scheduled' : 'requested') as Session['status'],
@@ -718,7 +734,7 @@ export default function SchedulePage() {
     if (updates.clientId && updates.clientId !== original.clientId) {
       sessionUpdates.clientId = updates.clientId;
       finalClientId = updates.clientId;
-      const email = bookableClients.find((c) => c.id === updates.clientId)?.email;
+      const email = bookableClients.find((c) => c.profileId === updates.clientId)?.email;
       if (email) {
         const { data: crow } = await supabase
           .from('clients')

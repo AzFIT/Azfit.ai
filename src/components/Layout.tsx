@@ -61,8 +61,6 @@ interface LayoutProps {
   children: React.ReactNode;
   showNav?: boolean;
   transparentNav?: boolean;
-  mode?: "dashboard" | "sheets";
-  onModeToggle?: (mode: "dashboard" | "sheets") => void;
 }
 
 // Base secondary navigation (without Coach - added conditionally)
@@ -88,8 +86,6 @@ export default function Layout({
   children,
   showNav = true,
   transparentNav = false,
-  mode = "dashboard",
-  onModeToggle,
 }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandMore, setExpandMore] = useState(false);
@@ -303,8 +299,6 @@ export default function Layout({
       {showNav && (
         <Navbar
           onMenuOpen={() => setSidebarOpen(true)}
-          mode={mode}
-          onModeToggle={onModeToggle}
           transparent={transparentNav}
           menuButtonRef={menuButtonRef}
           onSearchOpen={() => setSearchOpen(true)}

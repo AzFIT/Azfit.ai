@@ -1,17 +1,22 @@
 import { useRef, useEffect } from "react";
 
+// Phase 90h: the toggle is a Clients-page view switcher (cards vs table) —
+// the values are the page's ClientsViewMode, persisted under
+// azfit_clients_view by the page itself.
+export type ClientsViewMode = "cards" | "table";
+
 interface ModeToggleProps {
-  mode: "dashboard" | "sheets";
-  onToggle: (mode: "dashboard" | "sheets") => void;
+  mode: ClientsViewMode;
+  onToggle: (mode: ClientsViewMode) => void;
 }
 
 export default function ModeToggle({ mode, onToggle }: ModeToggleProps) {
   const indicatorRef = useRef<HTMLDivElement>(null);
-  const dashboardRef = useRef<HTMLButtonElement>(null);
-  const sheetsRef = useRef<HTMLButtonElement>(null);
+  const cardsRef = useRef<HTMLButtonElement>(null);
+  const tableRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    const activeRef = mode === "dashboard" ? dashboardRef : sheetsRef;
+    const activeRef = mode === "cards" ? cardsRef : tableRef;
     if (activeRef.current && indicatorRef.current) {
       indicatorRef.current.style.width = `${activeRef.current.offsetWidth}px`;
       indicatorRef.current.style.transform = `translateX(${activeRef.current.offsetLeft}px)`;
@@ -20,13 +25,13 @@ export default function ModeToggle({ mode, onToggle }: ModeToggleProps) {
 
   return (
     <div
-      className="relative flex h-9 items-center rounded-full p-1"
+      className="relative flex items-center rounded-full p-1"
       style={{ backgroundColor: "var(--light-elevated)" }}
     >
-      {/* Sliding indicator */}
+      {/* Sliding indicator — inset-y so it stretches with the 44px buttons */}
       <div
         ref={indicatorRef}
-        className="absolute top-1 h-7 rounded-full"
+        className="absolute top-1 bottom-1 rounded-full"
         style={{
           backgroundColor: "var(--azfit-primary)",
           transition:
@@ -36,12 +41,12 @@ export default function ModeToggle({ mode, onToggle }: ModeToggleProps) {
 
       {/* Cards button (Phase 70 Item 2: user-language labels) */}
       <button
-        ref={dashboardRef}
-        onClick={() => onToggle("dashboard")}
-        className="relative z-10 px-3 py-1 text-[13px] font-semibold transition-colors duration-200 lg:px-4"
+        ref={cardsRef}
+        onClick={() => onToggle("cards")}
+        className="relative z-10 min-h-[44px] px-3 py-1 text-[13px] font-semibold transition-colors duration-200 lg:px-4"
         style={{
           color:
-            mode === "dashboard" ? "#FFFFFF" : "var(--light-text-secondary)",
+            mode === "cards" ? "#FFFFFF" : "var(--light-text-secondary)",
         }}
       >
         Cards
@@ -49,11 +54,11 @@ export default function ModeToggle({ mode, onToggle }: ModeToggleProps) {
 
       {/* Table button */}
       <button
-        ref={sheetsRef}
-        onClick={() => onToggle("sheets")}
-        className="relative z-10 px-3 py-1 text-[13px] font-semibold transition-colors duration-200 lg:px-4"
+        ref={tableRef}
+        onClick={() => onToggle("table")}
+        className="relative z-10 min-h-[44px] px-3 py-1 text-[13px] font-semibold transition-colors duration-200 lg:px-4"
         style={{
-          color: mode === "sheets" ? "#FFFFFF" : "var(--light-text-secondary)",
+          color: mode === "table" ? "#FFFFFF" : "var(--light-text-secondary)",
         }}
       >
         Table
