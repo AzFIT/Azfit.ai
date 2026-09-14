@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { useEffectiveClientIdentity } from "@/hooks/useViewAs";
 import { formatDateKeyLocal } from "@/lib/utils";
 import {
   buildTodayPlan,
@@ -51,6 +52,9 @@ const nextDayIso = (dateKey: string) =>
 
 export function useDailyPlan({ habits, habitLogs, checkinDue }: UseDailyPlanArgs) {
   const { user } = useAuth();
+  // Phase 90e: shared resolver — the plan card follows the view-as
+  // target under an override, the caller's own plan otherwise.
+  const eff = useEffectiveClientIdentity();
   const todayKey = formatDateKeyLocal(new Date());
 
   const [clientId, setClientId] = useState<string | null>(null);
@@ -65,13 +69,18 @@ export function useDailyPlan({ habits, habitLogs, checkinDue }: UseDailyPlanArgs
 
   useEffect(() => {
     if (!user?.id) return;
+    // Wait for the effective identity — never build today's plan from
+    // a half-resolved (or wrong) client.
+    if (!eff.resolved) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
+      // Same clients row the inline email copy resolved; keyed by the
+      // resolver's clients.id now.
       const { data: clientRow } = await supabase
         .from("clients")
         .select("id, lifestyle_targets")
-        .eq("email", user.email)
+        .eq("id", eff.clientId ?? "")
         .maybeSingle();
       if (cancelled) return;
       const row = clientRow as { id: string; lifestyle_targets: { steps?: number | null; sleep_hours?: number | null; water_ml?: number | null } | null } | null;
@@ -118,7 +127,7 @@ export function useDailyPlan({ habits, habitLogs, checkinDue }: UseDailyPlanArgs
     return () => {
       cancelled = true;
     };
-  }, [user, bump, todayKey]);
+  }, [user, eff.resolved, eff.clientId, bump, todayKey]);
 
   const items: PlanItem[] = buildTodayPlan({
     customRows,

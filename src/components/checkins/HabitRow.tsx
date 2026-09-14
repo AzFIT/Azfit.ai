@@ -29,6 +29,10 @@ export default function HabitRow({
   const today = days[6];
   const streak = currentStreak(logs, habit.id);
   const pct = weeklyCompletion(logs, habit.id);
+  // Phase 90e: today's row, when logged on the client's behalf by
+  // their coach (logged_by != null), carries an honesty marker.
+  const todayLog = logs.find((l) => l.habit_id === habit.id && l.log_date === today);
+  const loggedByCoach = todayLog?.logged_by != null;
 
   /* Phase 85: numeric habit — ArcSlider-derived stepper with a Log
      confirm. draft ?? savedToday: dragging sets draft; after the
@@ -63,6 +67,16 @@ export default function HabitRow({
             <p className="font-semibold" style={{ color: "var(--page-text)" }}>
               {habit.name}
             </p>
+            {loggedByCoach && (
+              <span
+                className="text-[10px] font-medium"
+                style={{ color: "var(--light-text-muted)" }}
+                role="note"
+                aria-label="Logged by your coach"
+              >
+                · by coach
+              </span>
+            )}
             {onToggleActive && (
               <button
                 onClick={() => onToggleActive(!habit.active)}

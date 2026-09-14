@@ -32,12 +32,15 @@ import {
   ClipboardCheck,
   CalendarRange,
   Video,
+  Undo2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Badge from "@/components/Badge";
 import AzFitChat from "@/components/chat/AzFitChat";
 import PageBreadcrumbs from "@/components/PageBreadcrumbs";
 import HistoryNav from "@/components/HistoryNav";
+import ViewAsBanner from "@/components/ViewAsBanner";
+import { useViewAs } from "@/hooks/useViewAs";
 // Phase 90d: global search palette (⌘K / app-bar pill, both roles).
 import SearchPalette, { PAGE_VISITS_KEY } from "@/components/SearchPalette";
 // Phase 89: Vault-style nav shell for the TRAINER role (drawer/sidebar,
@@ -127,6 +130,19 @@ export default function Layout({
   }, [location.pathname]);
 
   const { user, isTrainer } = useAuth();
+  // Phase 90e: while viewing as a client, LOGOUT MUST BE UNREACHABLE —
+  // signing out mid-override would drop the trainer onto the login
+  // page with the override still staged in sessionStorage. The account
+  // entries (Settings + Logout below, and the trainer nav shell's
+  // logout) are replaced by a single "Back to Coach View" action.
+  const { viewAs, endViewAs } = useViewAs();
+
+  const backToCoachView = () => {
+    if (!viewAs) return;
+    const clientId = viewAs.clientId;
+    endViewAs();
+    navigate(`/client/${clientId}`);
+  };
 
   // Dynamic navigation based on user role
   const primaryNavItems = [
@@ -474,11 +490,25 @@ export default function Layout({
           </div>
         </nav>
 
-        {/* Settings, Theme toggle, and Logout at bottom */}
+        {/* Settings, Theme toggle, and Logout at bottom.
+            Phase 90e: while viewing as a client, Settings + Logout are
+            replaced by a single "Back to Coach View" (logout is
+            unreachable mid-override by design). */}
         <div
           className="border-t p-4"
           style={{ borderColor: "var(--card-border)" }}
         >
+          {viewAs ? (
+            <button
+              onClick={backToCoachView}
+              className="flex h-12 w-full items-center gap-4 rounded-lg px-3 text-left transition-all duration-150 hover:bg-[var(--light-elevated)] active:scale-[0.98]"
+              style={{ color: "var(--azfit-primary)" }}
+            >
+              <Undo2 size={20} />
+              <span className="text-sm font-medium">Back to Coach View</span>
+            </button>
+          ) : (
+            <>
           <button
             onClick={() => handleNav("/settings")}
             className="flex h-12 w-full items-center gap-4 rounded-lg px-3 text-left transition-all duration-150 hover:bg-[var(--light-elevated)] active:scale-[0.98]"
@@ -518,6 +548,8 @@ export default function Layout({
             <LogOut size={20} />
             <span className="text-sm font-medium">Logout</span>
           </button>
+            </>
+          )}
         </div>
       </aside>
       )}
@@ -687,26 +719,40 @@ export default function Layout({
                 </div>
               </nav>
 
-              {/* Bottom section - Settings (theme/logout moved to Settings page) */}
+              {/* Bottom section - Settings (theme/logout moved to Settings page).
+                  Phase 90e: under an override this becomes "Back to Coach
+                  View" (Settings is a blocked route while viewing as a
+                  client; logout must stay unreachable). */}
               <div
                 className="border-t p-3"
                 style={{ borderColor: "var(--card-border)" }}
               >
-                <button
-                  onClick={() => handleNav("/settings")}
-                  className="flex h-12 w-full items-center gap-4 rounded-lg px-3 text-left transition-all duration-150 active:scale-[0.98]"
-                  style={{
-                    backgroundColor: isActive("/settings")
-                      ? "var(--light-elevated)"
-                      : "transparent",
-                    color: isActive("/settings")
-                      ? "var(--azfit-primary)"
-                      : "var(--light-text-muted)",
-                  }}
-                >
-                  <Settings size={20} />
-                  <span className="text-sm font-medium">Settings</span>
-                </button>
+                {viewAs ? (
+                  <button
+                    onClick={backToCoachView}
+                    className="flex h-12 w-full items-center gap-4 rounded-lg px-3 text-left transition-all duration-150 active:scale-[0.98]"
+                    style={{ color: "var(--azfit-primary)" }}
+                  >
+                    <Undo2 size={20} />
+                    <span className="text-sm font-medium">Back to Coach View</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleNav("/settings")}
+                    className="flex h-12 w-full items-center gap-4 rounded-lg px-3 text-left transition-all duration-150 active:scale-[0.98]"
+                    style={{
+                      backgroundColor: isActive("/settings")
+                        ? "var(--light-elevated)"
+                        : "transparent",
+                      color: isActive("/settings")
+                        ? "var(--azfit-primary)"
+                        : "var(--light-text-muted)",
+                    }}
+                  >
+                    <Settings size={20} />
+                    <span className="text-sm font-medium">Settings</span>
+                  </button>
+                )}
                 {/* Theme toggle and Logout moved to Settings page */}
               </div>
             </motion.aside>
@@ -736,6 +782,8 @@ export default function Layout({
           </div>
         )}
         <PageBreadcrumbs />
+        {/* Phase 90e: in-flow view-as strip rides every Layout page */}
+        <ViewAsBanner />
         {children}
       </main>
 

@@ -1,5 +1,6 @@
 import { Outlet } from "react-router";
 import HistoryNav from "@/components/HistoryNav";
+import ViewAsBanner from "@/components/ViewAsBanner";
 
 /* ═══════════════════════════════════════════════════════════════════
    ArrowsShell (Owner Tasks, Task 5) — arrows-only shell for protected
@@ -7,7 +8,9 @@ import HistoryNav from "@/components/HistoryNav";
    same HistoryNav bar). Mounted once as a nested layout route in
    App.tsx — no per-page edits. Non-sticky by design: several pages
    (Schedule, ClientProfile) ship their own sticky top-0 headers and a
-   second sticky bar would cover them.
+   second sticky bar would cover them. Phase 90e: the view-as banner
+   also mounts here (in-flow, between the nav and the page) so it
+   rides every screen, including ArrowsShell routes.
    ═══════════════════════════════════════════════════════════════════ */
 
 export default function ArrowsShell() {
@@ -22,6 +25,7 @@ export default function ArrowsShell() {
       >
         <HistoryNav />
       </div>
+      <ViewAsBanner />
       <Outlet />
     </>
   );

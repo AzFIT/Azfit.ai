@@ -16,6 +16,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import { formatDateShort } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useViewAs, useEffectiveClientIdentity } from "@/hooks/useViewAs";
+import { loggedByForWrite } from "@/lib/viewAs";
 import { isInCurrentWeek } from "@/lib/checkinWeek";
 import ArcSlider from "@/components/ui/ArcSlider";
 import type { Database } from "@/types/supabase";
@@ -55,6 +57,9 @@ interface CheckInSubmission {
   reviewed_at: string | null;
   trainer_notes: string | null;
   created_at: string;
+  /** Phase 90e: NULL = self-logged; a trainer uid = entered on the
+   *  client's behalf (the client sees a "by coach" marker) */
+  logged_by?: string | null;
   client?: { full_name: string; email: string };
   form?: { title: string };
 }
@@ -63,7 +68,11 @@ interface CheckInSubmission {
 
 export default function CheckInsPage() {
   const { isTrainer, isClient } = useAuth();
+  // Phase 90e: while viewing as a client, /check-ins renders the
+  // CLIENT branch against the target identity — never the trainer's.
+  const { viewAs } = useViewAs();
 
+  if (viewAs) return <ClientCheckIns />;
   if (isTrainer) return <TrainerCheckIns />;
   if (isClient) return <ClientCheckIns />;
 
@@ -71,6 +80,21 @@ export default function CheckInsPage() {
     <div className="min-h-[100dvh] p-6" style={{ backgroundColor: "var(--page-bg)" }}>
       <p style={{ color: "var(--text-muted)" }}>Check-ins are available for trainers and clients.</p>
     </div>
+  );
+}
+
+/** Phase 90e honesty marker — non-interactive text shown to the CLIENT
+ *  next to entries their coach logged on their behalf. */
+function ByCoachMarker() {
+  return (
+    <span
+      className="text-[10px] font-medium"
+      style={{ color: "var(--light-text-muted)" }}
+      role="note"
+      aria-label="Logged by your coach"
+    >
+      · by coach
+    </span>
   );
 }
 
@@ -622,6 +646,11 @@ function SubmissionsPanel({
 
 function ClientCheckIns() {
   const { user } = useAuth();
+  // Phase 90e: under an override this branch renders the TARGET's
+  // check-ins; writes stamp logged_by with the trainer's uid (RLS).
+  const { viewAs } = useViewAs();
+  const eff = useEffectiveClientIdentity();
+  const effClientId = eff.clientId;
   const [forms, setForms] = useState<CheckInForm[]>([]);
   const [submissions, setSubmissions] = useState<CheckInSubmission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -630,16 +659,49 @@ function ClientCheckIns() {
   // Phase 44: this week's submission is editable (update, not re-insert)
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // View-as only: the target's trainer — their active forms are the
+  // ones the client actually sees (a trainer's own forms would be
+  // dishonest data in the client's view).
+  const [targetTrainerId, setTargetTrainerId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!viewAs || !effClientId) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("clients")
+        .select("trainer_id")
+        .eq("id", effClientId)
+        .maybeSingle();
+      if (cancelled) return;
+      setTargetTrainerId(
+        (data as { trainer_id: string | null } | null)?.trainer_id ?? null,
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [viewAs, effClientId]);
 
   const loadForms = useCallback(async () => {
     if (!user) return;
     setLoading(true);
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("check_in_forms")
       .select("*")
-      .eq("active", true)
-      .order("created_at", { ascending: false });
+      .eq("active", true);
+    if (viewAs) {
+      // Scope to the target client's trainer (never the signed-in
+      // trainer's own forms).
+      if (!targetTrainerId) {
+        setForms([]);
+        setLoading(false);
+        return;
+      }
+      query = query.eq("trainer_id", targetTrainerId);
+    }
+    const { data, error } = await query.order("created_at", { ascending: false });
 
     if (error) {
       toast.error("Failed to load forms: " + error.message);
@@ -649,21 +711,25 @@ function ClientCheckIns() {
 
     setForms(((data || []) as unknown as CheckInForm[]).map((f) => ({ ...f, fields: ((f.fields as unknown) as FormField[]) || [] })));
     setLoading(false);
-  }, [user]);
+  }, [user, viewAs, targetTrainerId]);
 
   const loadSubmissions = useCallback(async () => {
     if (!user) return;
-    const { data, error } = await supabase
+    let query = supabase
       .from("check_in_submissions")
-      .select("*, form:check_in_forms(title)")
-      .order("submitted_at", { ascending: false });
+      .select("*, form:check_in_forms(title)");
+    // Key to the EFFECTIVE client — under an override the trainer's
+    // RLS can see every own-client row, so an unfiltered list would
+    // leak other clients' entries into this view.
+    if (effClientId) query = query.eq("client_id", effClientId);
+    const { data, error } = await query.order("submitted_at", { ascending: false });
 
     if (error) {
       toast.error("Failed to load submissions: " + error.message);
       return;
     }
     setSubmissions((data || []) as unknown as CheckInSubmission[]);
-  }, [user]);
+  }, [user, effClientId]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -689,13 +755,20 @@ function ClientCheckIns() {
       return;
     }
 
+    // Phase 90e: on-behalf writes stamp the trainer's uid (RLS
+    // requires it); self-logged rows keep logged_by NULL.
+    const loggedBy = loggedByForWrite(viewAs, user.id);
+
     setSaving(true);
     if (editingId) {
-      // Phase 44: update this week's entry (clients-update-own policy)
+      // Phase 44: update this week's entry (clients-update-own policy).
+      // Only a coach editing on behalf re-stamps logged_by — a client
+      // editing their own entry leaves the column untouched.
       const { error } = await supabase
         .from("check_in_submissions")
         .update({
           answers: answers as unknown as Database["public"]["Tables"]["check_in_submissions"]["Insert"]["answers"],
+          ...(loggedBy ? { logged_by: loggedBy } : {}),
         })
         .eq("id", editingId);
       setSaving(false);
@@ -710,13 +783,24 @@ function ClientCheckIns() {
       return;
     }
 
-    const { data: clientRow, error: clientError } = await supabase
-      .from("clients")
-      .select("id")
-      .eq("email", user.email)
-      .maybeSingle(); // Phase 43: no clients row → null, not a 406
+    // Phase 90e: under an override the target's clients row is already
+    // resolved — no email lookup (which would find the TRAINER).
+    let clientRowId = effClientId;
+    if (!viewAs) {
+      const { data: clientRow, error: clientError } = await supabase
+        .from("clients")
+        .select("id")
+        .eq("email", user.email)
+        .maybeSingle(); // Phase 43: no clients row → null, not a 406
 
-    if (clientError || !clientRow) {
+      if (clientError || !clientRow) {
+        setSaving(false);
+        toast.error("Could not find your client record");
+        return;
+      }
+      clientRowId = clientRow.id;
+    }
+    if (!clientRowId) {
       setSaving(false);
       toast.error("Could not find your client record");
       return;
@@ -724,8 +808,9 @@ function ClientCheckIns() {
 
     const { error } = await supabase.from("check_in_submissions").insert({
       form_id: activeForm.id,
-      client_id: clientRow.id,
+      client_id: clientRowId,
       answers: answers as unknown as Database["public"]["Tables"]["check_in_submissions"]["Insert"]["answers"],
+      logged_by: loggedBy,
     });
 
     setSaving(false);
@@ -876,6 +961,7 @@ function ClientCheckIns() {
                       <div className="mb-4 rounded-xl px-3 py-2.5" style={{ backgroundColor: "rgba(34,197,94,0.08)" }}>
                         <p className="mb-1 flex items-center gap-1 text-[11px] font-bold text-emerald-400">
                           <CheckCircle2 size={12} /> Submitted this week
+                          {thisWeek.logged_by != null && <ByCoachMarker />}
                         </p>
                         {form.fields.map((f) => {
                           const v = (thisWeek.answers as Record<string, unknown>)[f.key];
@@ -925,7 +1011,10 @@ function ClientCheckIns() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium" style={{ color: "var(--page-text)" }}>{sub.form?.title || "Check-in"}</p>
-                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>{formatDateShort(sub.submitted_at)}</p>
+                    <p className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
+                      {formatDateShort(sub.submitted_at)}
+                      {sub.logged_by != null && <ByCoachMarker />}
+                    </p>
                   </div>
                   {sub.reviewed_at ? (
                     <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-400">

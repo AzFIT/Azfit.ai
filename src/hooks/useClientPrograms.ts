@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useEffectiveClientIdentity } from "@/hooks/useViewAs";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import type { Database } from "@/types/supabase";
@@ -13,42 +14,13 @@ export interface ClientProgram extends ProgramRow {
 }
 
 function useResolvedClientId() {
-  const { user, loading: authLoading } = useAuth();
-  const email = user?.email;
-  const [clientId, setClientId] = useState<string | null>(null);
-  const [resolving, setResolving] = useState(false);
+  const { loading: authLoading } = useAuth();
+  // Phase 90e: the shared resolver (own clients row, or the view-as
+  // target) replaces this hook's inline email copy.
+  const eff = useEffectiveClientIdentity();
 
-  useEffect(() => {
-    if (!email) return;
-
-    let cancelled = false;
-
-    const resolve = async () => {
-      setResolving(true);
-      const { data, error } = await supabase
-        .from("clients")
-        .select("id")
-        .eq("email", email)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(); // Phase 43: no clients row → null, not a 406
-
-      if (cancelled) return;
-      if (error || !data) {
-        setClientId(null);
-      } else {
-        setClientId(data.id);
-      }
-      setResolving(false);
-    };
-
-    resolve();
-    return () => {
-      cancelled = true;
-    };
-  }, [email]);
-
-  return { clientId, resolving: resolving || authLoading };
+  const resolving = authLoading || !eff.resolved;
+  return { clientId: eff.clientId, resolving };
 }
 
 export function useClientPrograms() {

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
+import { useViewAs, useEffectiveClientIdentity } from "@/hooks/useViewAs";
 import { useSessions } from "@/hooks/useSessions";
 import { useInsights } from "@/hooks/useInsights";
 import { supabase } from "@/lib/supabase";
@@ -119,6 +120,11 @@ function greeting(): string {
 export default function ClientDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  // Phase 90e: "View As Client" — every identity-driven effect below
+  // resolves the TARGET client through the shared resolver while an
+  // override is active (the trainer's auth session is untouched).
+  const { viewAs } = useViewAs();
+  const eff = useEffectiveClientIdentity();
   const { nextUpcomingSession, loading: sessionsLoading } = useSessions();
   // Phase 83/84: ONE insights fetch feeds the strip AND the header streak
   // badge (the badge was a hardcoded "12-day streak" mock before Phase 84)
@@ -126,7 +132,11 @@ export default function ClientDashboard() {
   const [mounted, setMounted] = useState(false);
   const [launcherOpen, setLauncherOpen] = useState(false);
 
-  const firstName = user?.full_name?.split(" ")[0] || "Alex";
+  // Phase 90e: greeting names the person whose dashboard this is — the
+  // view-as target under an override, the signed-in client otherwise.
+  const firstName = viewAs
+    ? viewAs.name.split(" ")[0]
+    : user?.full_name?.split(" ")[0] || "Alex";
 
   // Real next session
   const nextSession = nextUpcomingSession();
@@ -143,13 +153,17 @@ export default function ClientDashboard() {
     calories: { current: 0, target: 2000 },
   });
 
+  // Macros — live from nutrition_logs + nutrition_targets, keyed to the
+  // EFFECTIVE profile (view-as target under an override). Waits for the
+  // identity instead of falling back to the signed-in user's rows.
   useEffect(() => {
+    if (!eff.profileId) return;
     let cancelled = false;
     (async () => {
       const todayStr = formatDateKeyLocal(new Date());
       const [totals, targets] = await Promise.all([
-        getDayTotals(todayStr),
-        getNutritionTargets(),
+        getDayTotals(todayStr, eff.profileId!),
+        getNutritionTargets(eff.profileId!),
       ]);
       if (cancelled) return;
       setMacros({
@@ -162,7 +176,7 @@ export default function ClientDashboard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [eff.profileId]);
 
   // Recovery
   const [recovery] = useState<RecoveryMetrics>({
@@ -195,22 +209,27 @@ export default function ClientDashboard() {
   const today = last7Days()[6];
 
   // Phase 33B data effect: today's workout, coach, check-in due, unread count
+  // Phase 90e: keyed to the EFFECTIVE client (view-as target under an
+  // override). The unread bell is the signed-in ACCOUNT's own — never
+  // shown while overriding (it would be the trainer's count, dishonest).
   useEffect(() => {
-    if (!user?.id) return;
+    if (!eff.resolved) return;
     let cancelled = false;
     (async () => {
       const { data: clientRow } = await supabase
         .from("clients")
         .select("id, trainer_id")
-        .eq("email", user.email)
+        .eq("id", eff.clientId ?? "")
         .maybeSingle();
 
-      // Unread notifications (real count)
-      const { count: unread } = await supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("read", false);
+      // Unread notifications (real count — own account only)
+      const { count: unread } = viewAs
+        ? { count: 0 }
+        : await supabase
+            .from("notifications")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user?.id ?? "")
+            .eq("read", false);
 
       let todays: WorkoutExercise[] = [];
       let wName: string | null = null;
@@ -287,17 +306,22 @@ export default function ClientDashboard() {
         setCoachName(coach);
         setCheckinDue(due);
         setUnreadNotifications(unread ?? 0);
-        setClientsId(clientRow?.id ?? null);
+        setClientsId(eff.clientId);
         setHasActiveProgram(hasProgram);
         setWorkoutLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [user]);
+  }, [eff.resolved, eff.clientId, viewAs, user?.id]);
 
-  // Phase 33B — weekly compliance from the client's real sessions this week
+  // Phase 33B — weekly compliance from the EFFECTIVE client's real
+  // sessions this week (dual-key under an override; identical query to
+  // Phase 33B when not overriding).
+  const ownProfileId = user?.id ?? null;
   useEffect(() => {
-    if (!user?.id) return;
+    if (!eff.resolved) return;
+    if (viewAs && !eff.clientId) return;
+    if (!viewAs && !ownProfileId) return;
     let cancelled = false;
     (async () => {
       const now = new Date();
@@ -307,12 +331,21 @@ export default function ClientDashboard() {
         `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       const weekEnd = new Date(monday);
       weekEnd.setDate(monday.getDate() + 7);
-      const { data } = await supabase
+      const query = supabase
         .from("sessions")
         .select("starts_at, status")
-        .eq("client_id", user.id)
         .gte("starts_at", dayKey(monday) + "T00:00:00")
         .lt("starts_at", dayKey(weekEnd) + "T00:00:00");
+      if (viewAs) {
+        query.or(
+          eff.profileId
+            ? `client_id.eq.${eff.profileId},client_record_id.eq.${eff.clientId}`
+            : `client_record_id.eq.${eff.clientId}`,
+        );
+      } else {
+        query.eq("client_id", ownProfileId!);
+      }
+      const { data } = await query;
       const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
       const out = days.map((day, i) => {
         const d = new Date(monday);
@@ -324,7 +357,7 @@ export default function ClientDashboard() {
       if (!cancelled) setComplianceData(out);
     })();
     return () => { cancelled = true; };
-  }, [user]);
+  }, [eff.resolved, eff.clientId, eff.profileId, viewAs, ownProfileId]);
 
   /* ── Derived Values ────────────────────────────────────────────── */
   const stepsPct = calcPct(stepsCurrent, stepsTarget);
@@ -1241,14 +1274,16 @@ export default function ClientDashboard() {
       {/* ═══════════════════════════════════════════════════════════
           MY PROGRESS + MY TARGETS (Phase 55)
           ═══════════════════════════════════════════════════════════ */}
-      {clientsId && user?.id && (
+      {/* Phase 90e: progress/targets key on the EFFECTIVE identity —
+          userId is the target's profiles.id under an override. */}
+      {clientsId && eff.profileId && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={mounted ? { opacity: 1, y: 0 } : {}}
           transition={{ delay: 0.32, duration: 0.5 }}
           className="space-y-6"
         >
-          <MyProgressSection clientsId={clientsId} userId={user.id} />
+          <MyProgressSection clientsId={clientsId} userId={eff.profileId} />
           <MyTargetsCard clientsId={clientsId} />
         </motion.div>
       )}

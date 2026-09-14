@@ -4,11 +4,13 @@ import * as Sentry from "@sentry/react";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { AuthProvider } from "@/hooks/useAuth";
+import { ViewAsProvider } from "@/hooks/useViewAs";
 import { ChatProvider } from "@/components/chat/ChatContext";
 import { AIContextProvider } from "@/components/ai-copilot/AIContextProvider";
 import { registerServiceWorker } from "@/lib/registerSW";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import ArrowsShell from "@/components/ArrowsShell";
+import ViewAsGuard from "@/components/ViewAsGuard";
 import { Toaster } from "@/components/ui/sonner";
 import OfflineBanner from "@/components/OfflineBanner";
 import NotFound from "@/components/NotFound";
@@ -146,6 +148,10 @@ export default function App() {
   return (
     <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
       <AuthProvider>
+        {/* Phase 90e: view-as override state lives inside AuthProvider
+            (it never alters auth itself — the trainer's session is
+            untouched). */}
+        <ViewAsProvider>
         <ThemeProvider>
           <ChatProvider>
             <AIContextProvider>
@@ -154,7 +160,13 @@ export default function App() {
               <Suspense fallback={<PageLoader />}>
                 <RouteErrorBoundary>
                 <Routes>
+                  {/* Phase 90e: account-level / trainer-own-data routes
+                      live inside ViewAsGuard — viewing as a client
+                      toasts "Not available in Client View" and redirects
+                      to /dashboard instead of rendering trainer data. */}
+                  <Route element={<ViewAsGuard />}>
                   <Route path="/demo" element={<DemoDashboard />} />
+                  </Route>
                   <Route path="/privacy" element={<PrivacyPage />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -170,6 +182,7 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  <Route element={<ViewAsGuard />}>
                   <Route
                     path="/analytics"
                     element={
@@ -186,10 +199,14 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  </Route>
                   {/* Task 5: arrows shell around every protected page that
                       doesn't self-wrap in the full Layout (Layout already
                       renders HistoryNav). Print routes stay outside. */}
                   <Route element={<ArrowsShell />}>
+                  {/* Phase 90e: blocked-while-viewing-as-client routes,
+                      nested under ViewAsGuard inside the shell group. */}
+                  <Route element={<ViewAsGuard />}>
                   <Route
                     path="/coach-ai"
                     element={
@@ -271,6 +288,7 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  </Route>{/* end ViewAsGuard (blocked ArrowsShell routes) */}
                   <Route
                     path="/check-ins"
                     element={
@@ -320,7 +338,9 @@ export default function App() {
                     }
                   />
                   {/* Phase 90b: trainer public identity — trainer-only,
-                      inside the ArrowsShell group like nearby routes. */}
+                      inside the ArrowsShell group like nearby routes.
+                      Phase 90e: also blocked while viewing as a client. */}
+                  <Route element={<ViewAsGuard />}>
                   <Route
                     path="/trainer-profile"
                     element={
@@ -329,7 +349,12 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  </Route>
                   </Route>{/* end ArrowsShell group A */}
+                  {/* Phase 90e: trainer roster — blocked while viewing
+                      as a client (the client's own profile is the way
+                      back, not the trainer's list). */}
+                  <Route element={<ViewAsGuard />}>
                   <Route
                     path="/clients"
                     element={
@@ -338,6 +363,7 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  </Route>
                   {/* Phase 74 Item 2: /leaderboard route REMOVED (dead
                       redirect to /dashboard from Phase 33B — no real
                       leaderboard page exists and no nav links point to it).
@@ -367,6 +393,9 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  {/* Phase 90e: exercise library editor — trainer-own
+                      data, blocked while viewing as a client. */}
+                  <Route element={<ViewAsGuard />}>
                   <Route
                     path="/exercises"
                     element={
@@ -375,6 +404,7 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  </Route>
                   <Route
                     path="/form-checks"
                     element={
@@ -384,6 +414,9 @@ export default function App() {
                     }
                   />
                   </Route>{/* end ArrowsShell group B */}
+                  {/* Phase 90e: trainer library — blocked while viewing
+                      as a client. */}
+                  <Route element={<ViewAsGuard />}>
                   <Route
                     path="/library"
                     element={
@@ -392,6 +425,7 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  </Route>
                   <Route
                     path="/print/program/:programId"
                     element={
@@ -424,6 +458,9 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  {/* Phase 90e: trainer plan-summary index — blocked
+                      while viewing as a client. */}
+                  <Route element={<ViewAsGuard />}>
                   <Route
                     path="/plan-summary"
                     element={
@@ -432,6 +469,7 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  </Route>
                   <Route path="*" element={<NotFound />} />
                 </Routes>
                 </RouteErrorBoundary>
@@ -439,6 +477,7 @@ export default function App() {
             </AIContextProvider>
           </ChatProvider>
         </ThemeProvider>
+        </ViewAsProvider>
       </AuthProvider>
     </Sentry.ErrorBoundary>
   );

@@ -15,6 +15,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { useEffectiveClientIdentity } from "@/hooks/useViewAs";
 import { formatDateKeyLocal } from "@/lib/utils";
 import { habitSignalsForTargets } from "@/lib/dailyPlan";
 import {
@@ -39,19 +40,34 @@ interface LifestyleTargets {
 
 export function useMetricTiles() {
   const { user } = useAuth();
+  // Phase 90e: identity comes from the shared resolver — the view-as
+  // target's clients.id + profiles.id when overriding, otherwise the
+  // caller's own (byte-identical filters to the old inline email copy).
+  const eff = useEffectiveClientIdentity();
   const [tiles, setTiles] = useState<MetricTile[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   const fetchTiles = useCallback(async () => {
     if (!user?.id || !user.email) return;
+    // Wait until the effective identity (own or override) has settled —
+    // never fetch against a half-resolved identity.
+    if (!eff.resolved) return;
+    const cid = eff.clientId;
+    // Account-less override target (no profiles row): never fall back
+    // to the signed-in trainer's id — the clients.id half only.
+    const profileId = eff.isOverride && !eff.profileId ? null : (eff.profileId ?? user.id);
+    const sessionsOr = profileId
+      ? `client_id.eq.${profileId},client_record_id.eq.${cid}`
+      : `client_record_id.eq.${cid}`;
     try {
+      // Same clients row the resolver found — re-read here only for
+      // lifestyle_targets (the resolver exposes ids, not the row).
       const { data: clientRow } = await supabase
         .from("clients")
         .select("id, lifestyle_targets")
-        .eq("email", user.email)
+        .eq("email", eff.clientEmail ?? user.email)
         .maybeSingle();
-      const cid = (clientRow as { id: string; lifestyle_targets: LifestyleTargets | null } | null)?.id ?? null;
 
       const monday = weekStartMonday();
       const mondayKey = formatDateKeyLocal(monday);
@@ -64,7 +80,7 @@ export function useMetricTiles() {
           ? supabase
               .from("sessions")
               .select("status")
-              .or(`client_id.eq.${user.id},client_record_id.eq.${cid}`)
+              .or(sessionsOr)
               .gte("starts_at", mondayIso)
               .lt("starts_at", tomorrowIso)
               .neq("status", "cancelled")
@@ -138,7 +154,7 @@ export function useMetricTiles() {
       setError(true);
       setLoading(false);
     }
-  }, [user]);
+  }, [user, eff.resolved, eff.isOverride, eff.clientId, eff.clientEmail, eff.profileId]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

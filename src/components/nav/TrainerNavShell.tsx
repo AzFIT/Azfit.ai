@@ -31,9 +31,11 @@ import {
   Pencil,
   PanelLeftClose,
   PanelLeftOpen,
+  Undo2,
   X,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useViewAs } from "@/hooks/useViewAs";
 import { useTrainerNav } from "@/hooks/useTrainerNav";
 import {
   TRAINER_NAV_ITEMS,
@@ -71,6 +73,9 @@ export default function TrainerNavShell({
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  // Phase 90e: while viewing as a client the trainer's own logout must
+  // be UNREACHABLE — the footer button becomes "Back to Coach View".
+  const { viewAs, endViewAs } = useViewAs();
   const { hiddenIds, saveHidden } = useTrainerNav(user?.id);
 
   const [editMode, setEditMode] = useState(false);
@@ -294,7 +299,30 @@ export default function TrainerNavShell({
     );
   };
 
-  const logoutButton = (condensed: boolean) => (
+  const logoutButton = (condensed: boolean) =>
+    viewAs ? (
+      <button
+        onClick={() => {
+          const clientId = viewAs.clientId;
+          endViewAs();
+          navigate(`/client/${clientId}`);
+        }}
+        aria-label="Back to Coach View"
+        className={`flex h-12 w-full items-center gap-4 rounded-lg text-left transition-all duration-150 active:scale-[0.98] ${
+          condensed ? "justify-center px-0" : "px-3"
+        }`}
+        style={{ color: "var(--azfit-primary)" }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = "var(--light-elevated)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = "transparent";
+        }}
+      >
+        <Undo2 size={20} className="shrink-0" />
+        {!condensed && <span className="text-sm font-medium">Back to Coach View</span>}
+      </button>
+    ) : (
     <button
       onClick={async () => {
         await supabase.auth.signOut();

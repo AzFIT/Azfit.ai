@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { useEffectiveClientIdentity } from "@/hooks/useViewAs";
 import { formatDateKeyLocal } from "@/lib/utils";
 import { habitSignalsForTargets } from "@/lib/dailyPlan";
 import { computeInsights, computeStreaks, type InsightCard } from "@/lib/insights";
@@ -24,6 +25,9 @@ const iso = (dateKey: string) => new Date(`${dateKey}T00:00:00`).toISOString();
 
 export function useInsights() {
   const { user } = useAuth();
+  // Phase 90e: shared resolver — target client under view-as override,
+  // own identity otherwise (identical filters when not overriding).
+  const eff = useEffectiveClientIdentity();
   const [cards, setCards] = useState<InsightCard[] | null>(null);
   // Phase 84 Item 6: the header streak badge reads the REAL computed
   // streak from this same hook (single fetch — see PROGRESS).
@@ -33,6 +37,9 @@ export function useInsights() {
 
   useEffect(() => {
     if (!user?.id || !user.email) return;
+    // Never fetch against a half-resolved identity (override profile
+    // id still resolving → wait).
+    if (!eff.resolved) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -41,7 +48,7 @@ export function useInsights() {
         const { data: clientRow } = await supabase
           .from("clients")
           .select("id, lifestyle_targets")
-          .eq("email", user.email)
+          .eq("email", eff.clientEmail ?? user.email)
           .maybeSingle();
         if (cancelled) return;
         const cid = (clientRow as { id: string; lifestyle_targets: LifestyleTargets | null } | null)?.id ?? null;
@@ -54,7 +61,15 @@ export function useInsights() {
         const lastMondayKey = formatDateKeyLocal(lastMonday);
         const ninetyAgoKey = formatDateKeyLocal(new Date(today.getTime() - 89 * 86400000));
 
-        const orFilter = cid ? `client_id.eq.${user.id},client_record_id.eq.${cid}` : `client_id.eq.${user.id}`;
+        // Account-less override target: clients.id half only (never the
+        // signed-in trainer's profile id).
+        const profileId =
+          eff.isOverride && !eff.profileId ? null : (eff.profileId ?? user.id);
+        const orFilter = cid
+          ? profileId
+            ? `client_id.eq.${profileId},client_record_id.eq.${cid}`
+            : `client_record_id.eq.${cid}`
+          : `client_id.eq.${profileId}`;
 
         const [sessRes, logsRes, habitsRes, targets, planRes, checkinRes, sess90Res, plan90Res, checkin90Res] = await Promise.all([
           // sessions: last 2 weeks
@@ -132,7 +147,7 @@ export function useInsights() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, eff.resolved, eff.isOverride, eff.clientEmail, eff.profileId]);
 
   return { cards, streak, loading, error };
 }

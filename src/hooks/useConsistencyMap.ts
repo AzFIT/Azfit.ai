@@ -19,7 +19,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/hooks/useAuth";
+import { useEffectiveClientIdentity } from "@/hooks/useViewAs";
 import { formatDateKeyLocal } from "@/lib/utils";
 import {
   buildConsistencyGrid,
@@ -47,15 +47,22 @@ export interface ActivityWindowRaw {
 }
 
 export function useConsistencyMap(opts: UseConsistencyMapOptions = {}) {
-  const { user } = useAuth();
+  // Phase 90e: with no explicit trainer props, resolution goes through
+  // the shared resolver (own identity, or the view-as target).
+  const eff = useEffectiveClientIdentity();
   const [grid, setGrid] = useState<ConsistencyGrid | null>(null);
   const [raw, setRaw] = useState<ActivityWindowRaw | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    // Trainer view needs the client's ids; client view needs own email.
-    if (opts.clientId ? !opts.clientEmail : !user?.email) return;
+    // Explicit trainer props (client drill-down views) win; otherwise
+    // the shared resolver supplies the identity. Never fetch until it
+    // has settled — a null clients.id after resolution is a REAL empty
+    // state (account-less), not a "still loading" one.
+    const explicit = !!opts.clientId;
+    const ready = explicit ? !!opts.clientEmail : eff.resolved;
+    if (!ready) return;
     let cancelled = false;
 
     (async () => {
@@ -63,10 +70,10 @@ export function useConsistencyMap(opts: UseConsistencyMapOptions = {}) {
       setError(false);
       try {
         // Resolve clients-row id (+ profiles id for sessions OR filter)
-        let cid: string | null = opts.clientId ?? null;
+        const cid: string | null = opts.clientId ?? eff.clientId;
         let profileId: string | null = null;
 
-        if (opts.clientId) {
+        if (explicit) {
           const { data: prof } = await supabase
             .from("profiles")
             .select("id")
@@ -74,18 +81,8 @@ export function useConsistencyMap(opts: UseConsistencyMapOptions = {}) {
             .maybeSingle();
           if (cancelled) return;
           profileId = (prof as { id: string } | null)?.id ?? null;
-          cid = opts.clientId;
         } else {
-          const { data: clientRow } = await supabase
-            .from("clients")
-            .select("id")
-            .eq("email", user!.email!)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (cancelled) return;
-          cid = (clientRow as { id: string } | null)?.id ?? null;
-          profileId = user!.id;
+          profileId = eff.profileId;
         }
 
         const { startKey, todayKey } = consistencyRange();
@@ -101,7 +98,16 @@ export function useConsistencyMap(opts: UseConsistencyMapOptions = {}) {
               .eq("status", "completed")
               .gte("starts_at", iso(startKey))
               .lt("starts_at", tomorrow.toISOString())
-          : Promise.resolve({ data: [] });
+          : cid
+            ? // Account-less target (no profiles row): clients.id half only
+              supabase
+                .from("sessions")
+                .select("starts_at")
+                .or(`client_record_id.eq.${cid}`)
+                .eq("status", "completed")
+                .gte("starts_at", iso(startKey))
+                .lt("starts_at", tomorrow.toISOString())
+            : Promise.resolve({ data: [] });
 
         const [sessRes, planRes, habitRes, checkinRes] = await Promise.all([
           sessionsQuery,
@@ -166,8 +172,8 @@ export function useConsistencyMap(opts: UseConsistencyMapOptions = {}) {
     return () => {
       cancelled = true;
     };
-     
-  }, [user, opts.clientId, opts.clientEmail]);
+
+  }, [eff.resolved, eff.clientId, eff.profileId, opts.clientId, opts.clientEmail]);
 
   return { grid, raw, loading, error };
 }

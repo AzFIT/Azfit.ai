@@ -14,6 +14,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { useEffectiveClientIdentity } from "@/hooks/useViewAs";
 import { formatDateKeyLocal } from "@/lib/utils";
 import { habitSignalsForTargets } from "@/lib/dailyPlan";
 import { computeClientScore, type ClientScoreResult } from "@/lib/clientScore";
@@ -28,12 +29,16 @@ const dayStartIso = (dateKey: string) => new Date(`${dateKey}T00:00:00`).toISOSt
 
 export function useClientScore() {
   const { user } = useAuth();
+  // Phase 90e: shared resolver (view-as target under override, own
+  // identity otherwise).
+  const eff = useEffectiveClientIdentity();
   const [result, setResult] = useState<ClientScoreResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
     if (!user?.id || !user.email) return;
+    if (!eff.resolved) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -42,7 +47,7 @@ export function useClientScore() {
         const { data: clientRow } = await supabase
           .from("clients")
           .select("id, lifestyle_targets")
-          .eq("email", user.email)
+          .eq("email", eff.clientEmail ?? user.email)
           .maybeSingle();
         if (cancelled) return;
         const cid = (clientRow as { id: string; lifestyle_targets: LifestyleTargets | null } | null)?.id ?? null;
@@ -148,7 +153,7 @@ export function useClientScore() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, eff.resolved, eff.clientEmail]);
 
   return { result, loading, error };
 }

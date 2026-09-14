@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { useEffectiveClientIdentity } from "@/hooks/useViewAs";
 import { toast } from "sonner";
 import { formatDateKeyLocal } from "@/lib/utils";
 import { findSessionConflicts, type ConflictCandidate } from "@/lib/sessionConflicts";
@@ -59,6 +60,10 @@ function getDateKey(d: Date): string {
 
 export function useSessions() {
   const { user } = useAuth();
+  // Phase 90e: under a view-as override the "client view" is the
+  // TARGET's — sessions resolve through the shared identity (dual-key
+  // OR filter with the target's profiles.id + clients.id).
+  const eff = useEffectiveClientIdentity();
   const myId = user?.id;
   const isTrainer = user?.role === "admin" || user?.role === "trainer";
 
@@ -74,21 +79,29 @@ export function useSessions() {
 
     try {
       // Phase 35 ITEM 2d: account-less sessions key on client_record_id
-      // (clients.id). Resolve the caller's clients row (client role) so their
-      // sessions booked pre-account still show up; embed names from BOTH FKs.
-      let myClientsId: string | null = null;
-      if (!isTrainer && user?.email) {
-        const { data: cr } = await supabase
-          .from("clients")
-          .select("id")
-          .eq("email", user.email)
-          .maybeSingle();
-        myClientsId = cr?.id ?? null;
+      // (clients.id). The dual-key OR filter uses the EFFECTIVE client
+      // (own, or the view-as target); embed names from BOTH FKs.
+      const asTrainer = isTrainer && !eff.isOverride;
+      let orClause: string;
+      if (asTrainer) {
+        orClause = `trainer_id.eq.${myId}`;
+      } else {
+        // Client view (own or override): wait until the effective
+        // identity has settled — never list the wrong person's sessions.
+        if (!eff.resolved) {
+          setLoading(false);
+          return;
+        }
+        if (eff.isOverride && !eff.profileId) {
+          // Account-less target: no profiles row — clients.id only.
+          orClause = `client_record_id.eq.${eff.clientId}`;
+        } else {
+          const profileKey = eff.profileId ?? myId;
+          orClause = eff.clientId
+            ? `client_id.eq.${profileKey},client_record_id.eq.${eff.clientId}`
+            : `client_id.eq.${profileKey}`;
+        }
       }
-
-      const clientFilter = myClientsId
-        ? `client_id.eq.${myId},client_record_id.eq.${myClientsId}`
-        : `client_id.eq.${myId}`;
 
       const { data, error } = await supabase
         .from("sessions")
@@ -98,7 +111,7 @@ export function useSessions() {
           trainer:profiles!sessions_trainer_id_fkey(full_name),
           clientRecord:clients!sessions_client_record_id_fkey(full_name)
         `)
-        .or(isTrainer ? `trainer_id.eq.${myId}` : clientFilter)
+        .or(orClause)
         .order("starts_at", { ascending: true });
 
       if (error) throw error;
@@ -122,7 +135,7 @@ export function useSessions() {
     } finally {
       setLoading(false);
     }
-  }, [myId, isTrainer, user?.email]);
+  }, [myId, isTrainer, eff.isOverride, eff.resolved, eff.profileId, eff.clientId]);
 
   /* ── Create session ────────────────────────────────────────────── */
   const createSession = useCallback(

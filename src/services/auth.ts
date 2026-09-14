@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { clearViewAsStorage } from '@/lib/viewAs';
 import type { Database } from '@/types/supabase';
 
 export type UserRole = 'admin' | 'trainer' | 'client';
@@ -103,6 +104,10 @@ export async function adminLogin(): Promise<AuthUser> {
 
 // Sign out
 export async function signOut() {
+  // Phase 90e: a view-as override can never outlive the trainer's
+  // session — clear the staged override before tearing the session down
+  // (ViewAsProvider also re-checks on the next init when no session).
+  clearViewAsStorage();
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
 }

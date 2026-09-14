@@ -10,9 +10,12 @@ import {
   MoreHorizontal,
   Dumbbell,
   Printer,
+  Eye,
 } from "lucide-react";
 import type { Client } from "@/types/client";
 import { clientStatusMeta } from "@/lib/clientStatus";
+import { useAuth } from "@/hooks/useAuth";
+import { useViewAs } from "@/hooks/useViewAs";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -35,8 +38,27 @@ export default function ClientProfileHeader({
   onExportPlanPack,
 }: ClientProfileHeaderProps) {
   const navigate = useNavigate();
+  const { isTrainer } = useAuth();
+  // Phase 90e: "View As Client" segmented control. Trainers only;
+  // hidden while overriding for a DIFFERENT client (the banner's
+  // "Back to Coach View" is the way back in that case). Requires an
+  // email — the override resolves the target's profiles row by it.
+  const { viewAs, beginViewAs, endViewAs } = useViewAs();
+  const overrideForThis = viewAs?.clientId === client.id;
+  const showViewToggle =
+    isTrainer && !!client.email && (!viewAs || overrideForThis);
 
   const statusMeta = clientStatusMeta(client.status);
+
+  const enterClientView = () => {
+    if (overrideForThis) return;
+    beginViewAs({ clientId: client.id, email: client.email, name: client.name });
+    navigate("/dashboard");
+  };
+
+  const backToCoachView = () => {
+    endViewAs(); // stays on this profile
+  };
 
   return (
     <motion.div
@@ -170,6 +192,50 @@ export default function ClientProfileHeader({
 
         {/* Actions */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Phase 90e: Coach View | Client View segmented control */}
+          {showViewToggle && (
+            <div
+              data-testid="view-toggle"
+              role="group"
+              aria-label="View mode"
+              className="flex items-center rounded-xl border p-0.5"
+              style={{
+                backgroundColor: "var(--light-elevated)",
+                borderColor: "var(--card-border)",
+              }}
+            >
+              <button
+                type="button"
+                aria-pressed={!overrideForThis}
+                onClick={backToCoachView}
+                className="flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors"
+                style={{
+                  backgroundColor: overrideForThis
+                    ? "transparent"
+                    : "var(--azfit-primary)",
+                  color: overrideForThis ? "var(--light-text-muted)" : "#fff",
+                }}
+              >
+                Coach View
+              </button>
+              <button
+                type="button"
+                data-testid="view-toggle-client"
+                aria-pressed={overrideForThis}
+                onClick={enterClientView}
+                className="flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors"
+                style={{
+                  backgroundColor: overrideForThis
+                    ? "var(--azfit-primary)"
+                    : "transparent",
+                  color: overrideForThis ? "#fff" : "var(--light-text-muted)",
+                }}
+              >
+                <Eye size={12} />
+                Client View
+              </button>
+            </div>
+          )}
           <Button
             size="sm"
             className="gap-1.5 rounded-xl hidden sm:flex"

@@ -1174,6 +1174,7 @@ export type Database = {
           submitted_at: string;
           reviewed_at: string | null;
           trainer_notes: string | null;
+          logged_by: string | null;
           created_at: string;
         };
         Insert: {
@@ -1184,6 +1185,7 @@ export type Database = {
           submitted_at?: string;
           reviewed_at?: string | null;
           trainer_notes?: string | null;
+          logged_by?: string | null;
           created_at?: string;
         };
         Update: {
@@ -1194,6 +1196,7 @@ export type Database = {
           submitted_at?: string;
           reviewed_at?: string | null;
           trainer_notes?: string | null;
+          logged_by?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -1369,6 +1372,7 @@ export type Database = {
           log_date: string;
           done: boolean;
           value: number | null;
+          logged_by: string | null;
           created_at: string;
         };
         Insert: {
@@ -1378,6 +1382,7 @@ export type Database = {
           log_date: string;
           done?: boolean;
           value?: number | null;
+          logged_by?: string | null;
           created_at?: string;
         };
         Update: {
@@ -1387,6 +1392,7 @@ export type Database = {
           log_date?: string;
           done?: boolean;
           value?: number | null;
+          logged_by?: string | null;
           created_at?: string;
         };
         Relationships: [

@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { useViewAs, useEffectiveClientIdentity } from "@/hooks/useViewAs";
+import { loggedByForWrite } from "@/lib/viewAs";
 import { formatDateKeyLocal } from "@/lib/utils";
 import type { Database } from "@/types/supabase";
 
@@ -15,51 +17,30 @@ interface UseHabitsOptions {
 
 export function useHabits({ role, clientId: propClientId }: UseHabitsOptions) {
   const { user } = useAuth();
+  const { viewAs } = useViewAs();
+  // Phase 90e: under a view-as override the habits row is the TARGET's
+  // (the role prop is ignored for resolution) — reads AND writes. The
+  // shared resolver performs the async clients-row lookup, so the
+  // resolved id is derived (null while the resolver is still working).
+  const eff = useEffectiveClientIdentity();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [logs, setLogs] = useState<HabitLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [resolvedClientId, setResolvedClientId] = useState<string | null>(propClientId || null);
-
-  /* Resolve client id from email when viewing as a client */
-  useEffect(() => {
-    if (role !== "client" || propClientId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setResolvedClientId(propClientId || null);
-      return;
-    }
-    if (!user?.email) return;
-
-    let cancelled = false;
-
-    const resolve = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("clients")
-        .select("id")
-        .eq("email", user.email)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(); // Phase 43: no clients row → null, not a 406
-
-      if (cancelled) return;
-      if (error || !data) {
-        setResolvedClientId(null);
-      } else {
-        setResolvedClientId(data.id);
-      }
-      setLoading(false);
-    };
-
-    resolve();
-    return () => {
-      cancelled = true;
-    };
-  }, [role, propClientId, user?.email]);
+  const resolvedClientId =
+    propClientId ?? (viewAs ? eff.clientId : role === "client" ? eff.clientId : null);
+  // Client role resolving their own row: the resolver is async — keep
+  // the loading skeleton until it settles (a resolved null is the real
+  // "no clients row" empty state).
+  const awaitingResolution =
+    !propClientId && !viewAs && role === "client" && !eff.resolved;
 
   const refresh = useCallback(async () => {
     if (!resolvedClientId) {
       setHabits([]);
       setLogs([]);
+      // Keep the skeleton while the shared resolver is still finding
+      // the client's row; a RESOLVED null = no row → honest empty state.
+      if (!awaitingResolution) setLoading(false);
       return;
     }
 
@@ -100,7 +81,7 @@ export function useHabits({ role, clientId: propClientId }: UseHabitsOptions) {
     setHabits((habitsResult.data || []) as Habit[]);
     setLogs((logsResult.data || []) as HabitLog[]);
     setLoading(false);
-  }, [resolvedClientId, role]);
+  }, [resolvedClientId, role, awaitingResolution]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -115,12 +96,16 @@ export function useHabits({ role, clientId: propClientId }: UseHabitsOptions) {
       }
 
       const today = formatDateKeyLocal(new Date());
+      // Phase 90e: on-behalf writes stamp the trainer's uid (RLS);
+      // self-logged rows keep logged_by NULL.
+      const loggedBy = loggedByForWrite(viewAs, user?.id ?? "");
       const { error } = await supabase.from("habit_logs").upsert(
         {
           habit_id: habitId,
           client_id: resolvedClientId,
           log_date: today,
           done,
+          logged_by: loggedBy,
         },
         { onConflict: "habit_id,log_date" }
       );
@@ -133,7 +118,7 @@ export function useHabits({ role, clientId: propClientId }: UseHabitsOptions) {
       window.dispatchEvent(new Event("azfit:habit-logs-changed"));
       await refresh();
     },
-    [resolvedClientId, refresh]
+    [resolvedClientId, refresh, viewAs, user?.id]
   );
 
   /* Phase 85: log a numeric value for today (numeric-target habits).
@@ -146,6 +131,9 @@ export function useHabits({ role, clientId: propClientId }: UseHabitsOptions) {
       }
 
       const today = formatDateKeyLocal(new Date());
+      // Phase 90e: on-behalf writes stamp logged_by (RLS); self-logged
+      // rows keep it NULL.
+      const loggedBy = loggedByForWrite(viewAs, user?.id ?? "");
       const { error } = await supabase.from("habit_logs").upsert(
         {
           habit_id: habitId,
@@ -153,6 +141,7 @@ export function useHabits({ role, clientId: propClientId }: UseHabitsOptions) {
           log_date: today,
           done: true,
           value,
+          logged_by: loggedBy,
         },
         { onConflict: "habit_id,log_date" }
       );
@@ -165,7 +154,7 @@ export function useHabits({ role, clientId: propClientId }: UseHabitsOptions) {
       window.dispatchEvent(new Event("azfit:habit-logs-changed"));
       await refresh();
     },
-    [resolvedClientId, refresh]
+    [resolvedClientId, refresh, viewAs, user?.id]
   );
 
   return {

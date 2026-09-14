@@ -588,6 +588,8 @@ CREATE TABLE IF NOT EXISTS check_in_submissions (
   submitted_at TIMESTAMPTZ DEFAULT NOW(),
   reviewed_at TIMESTAMPTZ,
   trainer_notes TEXT,
+  -- Phase 90e: NULL = self-logged; trainer auth uid = logged on behalf (View As Client)
+  logged_by UUID REFERENCES auth.users(id),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -625,6 +627,8 @@ CREATE TABLE IF NOT EXISTS habit_logs (
   -- Phase 85: optional numeric value for numeric-target habits
   -- (NULL on all pre-Phase-85 rows — done-flag only, never backfilled)
   value NUMERIC CHECK (value IS NULL OR value >= 0),
+  -- Phase 90e: NULL = self-logged; trainer auth uid = logged on behalf (View As Client)
+  logged_by UUID REFERENCES auth.users(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (habit_id, log_date)
 );
@@ -727,10 +731,23 @@ CREATE POLICY "Clients can update own submissions"
   );
 
 -- Phase 44: trainers may enter a check-in on behalf of a client (account-less entry)
+-- Phase 90e: replaced to require logged_by stamping (all trainer-side entries are
+-- on-behalf by definition) + new on-behalf UPDATE policy for editing this week's entry.
 CREATE POLICY "Trainers can insert submissions for their clients"
   ON check_in_submissions FOR INSERT
   WITH CHECK (
-    form_id IN (SELECT id FROM check_in_forms WHERE trainer_id = auth.uid())
+    logged_by = auth.uid()
+    AND form_id IN (SELECT id FROM check_in_forms WHERE trainer_id = auth.uid())
+    AND client_id IN (SELECT id FROM clients WHERE trainer_id = auth.uid())
+  );
+
+CREATE POLICY "Trainers can update submissions for their clients"
+  ON check_in_submissions FOR UPDATE
+  USING (
+    client_id IN (SELECT id FROM clients WHERE trainer_id = auth.uid())
+  )
+  WITH CHECK (
+    logged_by = auth.uid()
     AND client_id IN (SELECT id FROM clients WHERE trainer_id = auth.uid())
   );
 
@@ -804,6 +821,27 @@ CREATE POLICY "Trainers can read logs for their habits"
     habit_id IN (
       SELECT id FROM habits WHERE trainer_id = auth.uid()
     )
+  );
+
+-- Phase 90e: trainer on-behalf logging (View As Client audit trail). INSERT +
+-- UPDATE because the habit toggle is an upsert — flipping an existing row is
+-- an UPDATE. logged_by = auth.uid() stamps WHOSE hand wrote it; the client
+-- subquery restricts writes to the trainer's OWN clients (RLS-proven in smoke).
+CREATE POLICY "Trainers can insert habit logs for their clients"
+  ON habit_logs FOR INSERT
+  WITH CHECK (
+    logged_by = auth.uid()
+    AND client_id IN (SELECT id FROM clients WHERE trainer_id = auth.uid())
+  );
+
+CREATE POLICY "Trainers can update habit logs for their clients"
+  ON habit_logs FOR UPDATE
+  USING (
+    client_id IN (SELECT id FROM clients WHERE trainer_id = auth.uid())
+  )
+  WITH CHECK (
+    logged_by = auth.uid()
+    AND client_id IN (SELECT id FROM clients WHERE trainer_id = auth.uid())
   );
 
 -- ============================================================

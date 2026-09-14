@@ -11,7 +11,9 @@ import type { Database } from "@/types/supabase";
    /check-ins: this-week submitted/due, latest entry (week, weight delta
    vs previous, ratings, notes), sorted most-overdue-first. Includes an
    "Enter" action for trainer-side entry on behalf of account-less
-   clients (trainer-insert policy added in Phase 44).
+   clients (trainer-insert policy added in Phase 44; Phase 90e: those
+   inserts are on-behalf by definition and MUST stamp logged_by — the
+   new RLS policy rejects them otherwise).
    ═══════════════════════════════════════════════════════════════════ */
 
 interface FormField {
@@ -124,7 +126,7 @@ export default function TrainerCheckInOverview({ forms }: { forms: FormRow[] }) 
   };
 
   const submitEntry = async () => {
-    if (!activeForm || !entryClient || saving) return;
+    if (!activeForm || !entryClient || saving || !user) return;
     const missing = activeForm.fields.filter((f) => {
       const v = answers[f.key];
       return v === undefined || v === "" || v === null;
@@ -134,10 +136,13 @@ export default function TrainerCheckInOverview({ forms }: { forms: FormRow[] }) 
       return;
     }
     setSaving(true);
+    // Phase 90e: trainer-side entries are on-behalf BY DEFINITION —
+    // the new RLS policy rejects inserts without logged_by.
     const { error } = await supabase.from("check_in_submissions").insert({
       form_id: activeForm.id,
       client_id: entryClient.id,
       answers: answers as unknown as Database["public"]["Tables"]["check_in_submissions"]["Insert"]["answers"],
+      logged_by: user.id,
     });
     setSaving(false);
     if (error) {

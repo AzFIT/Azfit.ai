@@ -14,6 +14,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { useEffectiveClientIdentity } from "@/hooks/useViewAs";
 import { formatDateKeyLocal } from "@/lib/utils";
 import { useConsistencyMap } from "@/hooks/useConsistencyMap";
 import { findNumericHabit, weekValues, type NumericLogLike } from "@/lib/numericHabits";
@@ -21,6 +22,9 @@ import { computeAchievements, type Achievement } from "@/lib/achievements";
 
 export function useAchievements() {
   const { user } = useAuth();
+  // Phase 90e: shared resolver — the wrapped useConsistencyMap() also
+  // resolves through it; here it feeds the achievement-only queries.
+  const eff = useEffectiveClientIdentity();
   const { raw, loading: windowLoading, error: windowError } = useConsistencyMap();
   const [achievements, setAchievements] = useState<Achievement[] | null>(null);
   const [fetchError, setFetchError] = useState(false);
@@ -33,27 +37,27 @@ export function useAchievements() {
   useEffect(() => {
     if (windowLoading || windowError || !raw) return;
     if (!user?.id || !user.email) return;
+    if (!eff.resolved) return;
     let cancelled = false;
 
     (async () => {
       setFetchError(false);
       try {
         const { startKey, todayKey } = raw;
-        const cidRows = await supabase
-          .from("clients")
-          .select("id")
-          .eq("email", user.email)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (cancelled) return;
-        const cid = (cidRows.data as { id: string } | null)?.id ?? null;
+        const cid = eff.clientId;
+        // Account-less override target (no profiles row): clients.id
+        // half only — never the signed-in trainer's profile id.
+        const profileId =
+          eff.isOverride && !eff.profileId ? null : (eff.profileId ?? user.id);
+        const sessionsOr = profileId
+          ? `client_id.eq.${profileId},client_record_id.eq.${cid}`
+          : `client_record_id.eq.${cid}`;
 
         const [countRes, habitsRes, logsRes] = await Promise.all([
           supabase
             .from("sessions")
             .select("id", { count: "exact", head: true })
-            .or(`client_id.eq.${user.id},client_record_id.eq.${cid}`)
+            .or(sessionsOr)
             .eq("status", "completed"),
           cid
             ? supabase.from("habits").select("id, name, active, target_value, unit").eq("client_id", cid).eq("active", true)
@@ -115,7 +119,7 @@ export function useAchievements() {
     return () => {
       cancelled = true;
     };
-  }, [user, windowLoading, windowError, raw]);
+  }, [user, eff.resolved, eff.isOverride, eff.clientId, eff.profileId, windowLoading, windowError, raw]);
 
   return { achievements, loading, error };
 }

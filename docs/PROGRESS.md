@@ -1025,3 +1025,63 @@ CREATE POLICY "trainer-assets: owner insert" ON storage.objects FOR INSERT TO au
 - Dark 390: QR modules mean luminance **245.4** vs card `rgb(21,29,39)` lum **28.0** → Δ217 ✅ (previously modules ≈ card bg)
 - Light 390: modules lum **22.7** vs card `rgb(255,255,255)` lum **255.0** → Δ232 ✅ (unchanged behaviour)
 - Zero console errors ✅. Screenshots: `.temp/audit/shots/90b-fix/qr-dark-390.png`, `qr-light-390.png`. Temp smoke script deleted.
+
+---
+
+## Phase 90e — View As Client: client-view toggle on client profile + on-behalf logging
+**Branch:** `feat/view-as-client-90e` → fast-forwarded to main. Baseline 775 → **834 tests** (+59).
+
+### Schema (additive, applied live 2026-09-14 via pooler, `supabase/view-as-client-90e.sql`)
+```sql
+ALTER TABLE public.habit_logs ADD COLUMN IF NOT EXISTS logged_by UUID REFERENCES auth.users(id);
+ALTER TABLE public.check_in_submissions ADD COLUMN IF NOT EXISTS logged_by UUID REFERENCES auth.users(id);
+-- semantics: NULL = self-logged; trainer auth uid = logged on behalf
+
+CREATE POLICY "Trainers can insert habit logs for their clients" ON public.habit_logs FOR INSERT
+  WITH CHECK (logged_by = auth.uid()
+    AND client_id IN (SELECT id FROM public.clients WHERE trainer_id = auth.uid()));
+CREATE POLICY "Trainers can update habit logs for their clients" ON public.habit_logs FOR UPDATE
+  USING (client_id IN (SELECT id FROM public.clients WHERE trainer_id = auth.uid()))
+  WITH CHECK (logged_by = auth.uid()
+    AND client_id IN (SELECT id FROM public.clients WHERE trainer_id = auth.uid()));
+-- check_in_submissions: Phase 44 trainer INSERT policy REPLACED to require logged_by
+-- (all trainer-side entries are on-behalf by definition) + new on-behalf UPDATE.
+CREATE POLICY "Trainers can insert submissions for their clients" ON public.check_in_submissions FOR INSERT
+  WITH CHECK (logged_by = auth.uid()
+    AND form_id IN (SELECT id FROM public.check_in_forms WHERE trainer_id = auth.uid())
+    AND client_id IN (SELECT id FROM public.clients WHERE trainer_id = auth.uid()));
+CREATE POLICY "Trainers can update submissions for their clients" ON public.check_in_submissions FOR UPDATE ...; -- same shape
+```
+- habit_logs needed INSERT **and** UPDATE because the habit toggle is an upsert (onConflict) — flipping an existing row is an UPDATE.
+- Mirrored into `supabase/schema.sql` + `src/types/supabase.ts`.
+- **OWNER DECISION POINT (documented):** `logged_by REFERENCES auth.users(id)` defaults to NO ACTION — deleting a trainer auth user is BLOCKED while their on-behalf rows exist (FK 23503, hit during fixture cleanup). Deliberate audit-integrity constraint: deleting a trainer requires reassigning/cleaning their on-behalf rows first. Say the word if you'd rather have `ON DELETE SET NULL` (degrades audit to "self-logged" — dishonest) or a soft-delete convention.
+
+### Architecture (core mechanism — documented wiring)
+- `src/hooks/useViewAs.tsx` — `ViewAsProvider` + `useViewAs()` + **`useEffectiveClientIdentity()`**, the shared resolver: override active → target `{ clientId, email, profileId, resolved }`; no override + client role → own row; trainer no override → nulls. sessionStorage keys `azfit:view-as:<clientId>` (scoped to the client id per spec, `savedAt` tie-break, malformed keys purged); cleared on logout (`services/auth.ts signOut` + provider no-session effect).
+- **Threaded through the existing hook layer (no component forks):** useMetricTiles, useInsights, useClientScore, useAchievements, useDailyPlan, useSessions, useClientPrograms, useHabits, useConsistencyMap, useDayDetail all resolve via the shared resolver (explicit `clientId/clientEmail` props still win where they existed). Sessions dual-key OR filter uses the target's profiles.id + clients.id. `resolved` flag distinguishes "still resolving" from "account-less target" (degrades to client_record_id-only, never leaks the trainer's id).
+- `DashboardRouter`: override active → `ClientDashboard` for ANY role (auth session untouched — data-level only). ClientDashboard inline effects (macros, 33B stats, compliance, meals/sessions cards) key on the effective identity; greeting shows the target's name.
+- **Toggle:** segmented "Coach View | Client View" in `ClientProfileHeader` (trainer-only; hidden while overriding a different client; requires client email). Client View → `beginViewAs` + `/dashboard`.
+- **Banner:** `ViewAsBanner` in-flow (NOT fixed) mounted in BOTH `Layout` (above children) and `ArrowsShell` (above Outlet) so it rides every screen; cyan `var(--azfit-primary)` accents (NOT violet — AI-only); "Viewing as {client} — you're logged in as {trainer}" + 44px "Back to Coach View" (→ `/client/{id}`). While overriding, Layout + TrainerNavShell account menus replace logout/settings with a single "Back to Coach View" — **logout is unreachable in Client View** (signOut also clears the storage keys as defense in depth).
+- **Guardrails:** `ViewAsGuard` wraps all 15 blocked routes — `/settings /trainer-profile /onboarding /bioprint /progress-photos /analytics /coach /coach-ai /sheets /workouts /plan-summary /clients /exercises /library /demo` → toast "Not available in Client View" + redirect `/dashboard`. Everything else stays reachable; sessions cancel under override is ALLOWED (trainer could do it from Coach View anyway) — **sessions has no logged_by column; stamping skipped this phase (documented)**.
+- **On-behalf stamping:** habit upserts (toggle + numeric), client check-in insert + this-week UPDATE stamp `logged_by: loggedByForWrite(viewAs, user.id)`; `TrainerCheckInOverview.submitEntry` now stamps `logged_by: user.id` (REQUIRED — the replaced RLS policy rejects unstamped trainer inserts). Self-service client writes keep logged_by NULL (untouched policies).
+- **"By coach" markers** (client-visible honesty): HabitRow + CheckInsPage this-week summary & past submissions render "· by coach" (`aria-label="Logged by your coach"`) when `logged_by != null`; self-logged rows never show it. Under override, `ClientCheckIns` scopes forms to the TARGET's trainer and submissions to the target client (prevents other-client leakage under trainer RLS).
+- `AzFitChat` untouched (trainer's own assistant — documented out of scope).
+
+### Gates
+`npx tsc -b` ✅ · `npm run lint` ✅ · **834/834** (59 new: viewAs lib 48 — parse/serialize/key-scope/loggedBy/blocklist; useViewAs provider 11 — init/restore/malformed-cleanup/logout-safety/resolver) ✅ · build + 404 ✅ · e2e **4/4** ✅.
+
+### Smoke (fixtures smoke90e-trainer1/trainer2/client@azfit.demo; fixture SQL in ONE transaction; 26/26 assertions)
+- (a) toggle on client profile (trainer) ✅; absent for client role; client role sees no banner ✅
+- (b) Client View renders REAL pre-seeded data: "7.5 of 8 h" sleep metric + client greeting — never an empty shell ✅
+- (c) on-behalf habit toggle → SQL `logged_by = trainer1` + "by coach" marker ✅; on-behalf check-in submission → SQL `logged_by = trainer1` with answers ✅; client's own self-toggle afterwards → `logged_by NULL` ✅
+- (d) RLS denial: second trainer's on-behalf insert via REST **rejected, 0 rows** ✅ (proven, not assumed)
+- (e) banner dark-390/light-390/dark-1280 ✅; names client + trainer ✅; refresh mid-view persists ✅; "Back to Coach View" → client profile, banner gone ✅
+- (f) `/settings` while overriding → toast "Not available in Client View" + redirect to `/dashboard`, no write ✅
+- (g) scrollWidth ≤390 ✅ · zero console errors ✅
+- Screenshots `.temp/audit/shots/90e/`: a-toggle, b-client-view-dark-390, c-by-coach-marker, c-checkin-by-coach, e-banner-dark-390/light-390/dark-1280, f-guardrail-toast. Temp scripts deleted.
+- **Fixtures SQL-verified removed: 0 auth.users / profiles / clients / habits / habit_logs / check_in_forms / check_in_submissions** (cleanup surfaced the FK note above).
+
+### Deviations
+1. `useSessions` is global per spec: any mounted consumer under override (e.g. `/schedule`, deliberately not blocked) lists the target's sessions.
+2. `ClientCheckIns` under override also scopes FORMS to the target's trainer (spec only required the branch switch; without it the trainer would see their own forms under the client's page — dishonest data).
+3. `logged_by` FK deletion constraint documented as an owner decision point (above).

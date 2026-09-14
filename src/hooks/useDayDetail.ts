@@ -21,7 +21,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/hooks/useAuth";
+import { useEffectiveClientIdentity } from "@/hooks/useViewAs";
 import { TARGET_HABIT_KEYWORDS } from "@/lib/dailyPlan";
 import { formatHabitValue } from "@/lib/dayDetail";
 
@@ -76,7 +76,9 @@ const isoDayEnd = (dateKey: string) =>
   new Date(new Date(`${dateKey}T00:00:00`).getTime() + 86400000).toISOString();
 
 export function useDayDetail(opts: { clientId?: string; clientEmail?: string }) {
-  const { user } = useAuth();
+  // Phase 90e: with no explicit trainer props, the tapped day resolves
+  // through the shared resolver (own identity or the view-as target).
+  const eff = useEffectiveClientIdentity();
   const [detail, setDetail] = useState<DayDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -89,32 +91,27 @@ export function useDayDetail(opts: { clientId?: string; clientEmail?: string }) 
       setDetail(futureDetail(dateKey));
       return;
     }
-    // Trainer view needs the client's ids; client view needs own email.
-    if (opts.clientId ? !opts.clientEmail : !user?.email) return;
+    // Explicit trainer props win; otherwise wait for the shared
+    // resolver — never open the sheet for the wrong person's day.
+    const explicit = !!opts.clientId;
+    const ready = explicit ? !!opts.clientEmail : eff.resolved;
+    if (!ready) return;
 
     setLoading(true);
     try {
-      let cid: string | null = opts.clientId ?? null;
+      let cid: string | null = opts.clientId ?? eff.clientId;
       let profileId: string | null = null;
 
-      if (opts.clientId) {
+      if (explicit) {
         const { data: prof } = await supabase
           .from("profiles")
           .select("id")
           .eq("email", opts.clientEmail!)
           .maybeSingle();
         profileId = (prof as { id: string } | null)?.id ?? null;
-        cid = opts.clientId;
+        cid = opts.clientId ?? null;
       } else {
-        const { data: clientRow } = await supabase
-          .from("clients")
-          .select("id")
-          .eq("email", user!.email!)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        cid = (clientRow as { id: string } | null)?.id ?? null;
-        profileId = user!.id;
+        profileId = eff.profileId;
       }
 
       const startIso = isoDayStart(dateKey);
@@ -127,7 +124,15 @@ export function useDayDetail(opts: { clientId?: string; clientEmail?: string }) 
             .or(`client_id.eq.${profileId},client_record_id.eq.${cid}`)
             .gte("starts_at", startIso)
             .lt("starts_at", endIso)
-        : Promise.resolve({ data: [] });
+        : cid
+          ? // Account-less target: clients.id half of the ownership only
+            supabase
+              .from("sessions")
+              .select("status")
+              .or(`client_record_id.eq.${cid}`)
+              .gte("starts_at", startIso)
+              .lt("starts_at", endIso)
+          : Promise.resolve({ data: [] });
 
       const [sessRes, workoutRes, habitsRes, logsRes, foodRes] = await Promise.all([
         sessionsQuery,
