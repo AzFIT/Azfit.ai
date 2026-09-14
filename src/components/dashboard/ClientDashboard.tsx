@@ -1,3 +1,4 @@
+import { formatDateKeyLocal } from "@/lib/utils";
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
@@ -145,7 +146,7 @@ export default function ClientDashboard() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const todayStr = new Date().toISOString().split("T")[0];
+      const todayStr = formatDateKeyLocal(new Date());
       const [totals, targets] = await Promise.all([
         getDayTotals(todayStr),
         getNutritionTargets(),

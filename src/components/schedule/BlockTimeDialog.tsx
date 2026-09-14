@@ -1,3 +1,4 @@
+import { formatDateKeyLocal } from "@/lib/utils";
 import { useState } from 'react';
 import { Clock } from 'lucide-react';
 import {
@@ -36,7 +37,7 @@ const TIME_SLOTS = Array.from({ length: 33 }, (_, i) => {
 const REASONS = ['Personal', 'Out of Office', 'Lunch', 'Other'];
 
 export function BlockTimeDialog({ open, onOpenChange, onBlock }: BlockTimeDialogProps) {
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(formatDateKeyLocal(new Date()));
   const [startTime, setStartTime] = useState('12:00');
   const [endTime, setEndTime] = useState('13:00');
   const [reason, setReason] = useState('Personal');
@@ -44,7 +45,7 @@ export function BlockTimeDialog({ open, onOpenChange, onBlock }: BlockTimeDialog
   const [recurring, setRecurring] = useState(false);
 
   const resetForm = () => {
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate(formatDateKeyLocal(new Date()));
     setStartTime('12:00');
     setEndTime('13:00');
     setReason('Personal');

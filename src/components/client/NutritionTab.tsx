@@ -1,3 +1,4 @@
+import { formatDateKeyLocal } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Flame, Utensils, Pencil, ClipboardList } from "lucide-react";
@@ -146,7 +147,7 @@ export default function NutritionTab({ clientId, clientEmail }: NutritionTabProp
       setTargets(t);
       setDraft(t);
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = formatDateKeyLocal(new Date());
       const [log, dayTotals] = await Promise.all([
         getDailyLog(today, prof.id),
         getDayTotals(today, prof.id),

@@ -4,6 +4,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import type { Database, Json } from "@/types/supabase";
+import { formatDateKeyLocal } from "@/lib/utils";
 import { normalizeOrderLabels } from "@/lib/exerciseLabels";
 import type {
   ProgramData,
@@ -147,10 +148,18 @@ export function buildProgramInsert(
   const activeDays = data.split.filter((d) => d.active).length;
 
   const isAssigned = !!assignedClientId;
-  const startDate = isAssigned ? new Date() : null;
-  const endDate = startDate
-    ? new Date(startDate.getTime() + durationWeeks * 7 * 24 * 60 * 60 * 1000)
-    : null;
+  // Phase 90g: date KEYS are local yyyy-MM-dd (formatDateKeyLocal) — never
+  // the UTC date part of a Date (that was yesterday for 00:00–08:00 local).
+  // End date derives arithmetically from the start key (TZ-invariant), the
+  // same discipline as manualProgram.buildProgramInsert.
+  const startKey = isAssigned ? formatDateKeyLocal(new Date()) : null;
+  const endKey = (() => {
+    if (!startKey) return null;
+    const [y, m, d] = startKey.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, d) + durationWeeks * 7 * 86400000)
+      .toISOString()
+      .split("T")[0];
+  })();
 
   // Phase 48: the 30A method selection (slug) rides in the phases jsonb —
   // additive key on the first active phase (or the single-phase fallback),
@@ -169,8 +178,8 @@ export function buildProgramInsert(
     duration_weeks: durationWeeks || 4,
     frequency_per_week: activeDays || 1,
     status: isAssigned ? "active" : "draft",
-    start_date: startDate ? startDate.toISOString().split("T")[0] : null,
-    end_date: endDate ? endDate.toISOString().split("T")[0] : null,
+    start_date: startKey,
+    end_date: endKey,
     // Phase 30B: persist the ACTIVE phase structure (all fields) as jsonb
     phases: phasesToWrite.length > 0 ? (phasesToWrite as unknown as Json) : null,
     // Phase 30D: persist progression rules (empty list -> null)

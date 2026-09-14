@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { fetchHealthData, getAtRiskClients, daysBetween } from "@/lib/clientHealthQueries";
+import { formatDateKeyLocal } from "@/lib/utils";
 import type { Database } from "@/types/supabase";
 
 export type DbWorkoutLog = Database["public"]["Tables"]["workout_logs"]["Row"];
@@ -197,7 +198,7 @@ export async function getActiveHabits(clientId: string) {
 }
 
 export async function upsertHabitLog(habitId: string, clientId: string, done: boolean) {
-  const today = new Date().toISOString().split("T")[0];
+  const today = formatDateKeyLocal(new Date());
   const { error } = await supabase
     .from("habit_logs")
     .upsert(
@@ -213,7 +214,7 @@ export async function getHabitStreak(habitId: string, clientId: string): Promise
   for (let i = 0; i < 30; i++) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split("T")[0];
+    const dateStr = formatDateKeyLocal(d);
     const { data, error } = await supabase
       .from("habit_logs")
       .select("log_date, done")

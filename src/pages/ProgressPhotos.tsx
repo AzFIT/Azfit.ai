@@ -1,3 +1,4 @@
+import { formatDateKeyLocal } from "@/lib/utils";
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -27,7 +28,7 @@ export default function ProgressPhotosPage() {
   // Upload form state
   const [file, setFile] = useState<File | null>(null);
   const [category, setCategory] = useState<PhotoCategory>('Front');
-  const [takenOn, setTakenOn] = useState(new Date().toISOString().split('T')[0]);
+  const [takenOn, setTakenOn] = useState(formatDateKeyLocal(new Date()));
   const [weight, setWeight] = useState('');
   const [bodyFat, setBodyFat] = useState('');
   const [notes, setNotes] = useState('');

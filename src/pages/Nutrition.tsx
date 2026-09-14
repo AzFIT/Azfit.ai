@@ -194,7 +194,9 @@ async function loadTargets(): Promise<Targets> {
 /* ── Main Component ────────────────────────────────────── */
 
 export default function NutritionPage() {
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  // Phase 90g: local day — a UTC key defaulted the page to yesterday for
+  // 00:00–08:00 local users, while logging/reads are all client-local.
+  const [date, setDate] = useState(todayLocal());
   const [log, setLog] = useState<DailyLog>(() => emptyLog(date));
   const [showFoodSearch, setShowFoodSearch] = useState<string | null>(null);
   const [targets, setTargets] = useState<Targets>({ ...DEFAULT_TARGETS, water: DEFAULT_WATER });

@@ -1,3 +1,4 @@
+import { formatDateKeyLocal } from "@/lib/utils";
 import { useState, useMemo, Fragment } from "react";
 import { motion } from "framer-motion";
 import {
@@ -615,7 +616,7 @@ function AddEntryDialog({
 }) {
   const [type, setType] = useState<"weight" | "bodyFat">(open ?? "weight");
   const [value, setValue] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(() => formatDateKeyLocal(new Date()));
   const [time, setTime] = useState(() => {
     const now = new Date();
     return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
@@ -625,7 +626,7 @@ function AddEntryDialog({
   const isWeight = type === "weight";
   const num = parseFloat(value);
   const valueValid = Number.isFinite(num) && (isWeight ? num >= 20 && num <= 300 : num >= 2 && num <= 60);
-  const today = new Date().toISOString().split("T")[0];
+  const today = formatDateKeyLocal(new Date());
   const dateValid = !!date && date <= today;
   const valid = valueValid && dateValid && !!time;
 

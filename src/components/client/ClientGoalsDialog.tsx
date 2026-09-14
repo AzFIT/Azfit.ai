@@ -8,7 +8,7 @@ import {
   type ClientGoalRow,
   type ClientGoalType,
 } from "@/lib/clientGoals";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatDateKeyLocal } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -41,12 +41,12 @@ export default function ClientGoalsDialog({
   const [customLabel, setCustomLabel] = useState("");
   const [targetWeight, setTargetWeight] = useState("");
   const [targetBf, setTargetBf] = useState("");
-  const [startDate, setStartDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [startDate, setStartDate] = useState(() => formatDateKeyLocal(new Date()));
   const [targetDate, setTargetDate] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = formatDateKeyLocal(new Date());
   const needsTarget = goalType === "lose_weight" || goalType === "reduce_body_fat";
   const addValid =
     (goalType !== "custom" || customLabel.trim() !== "") &&

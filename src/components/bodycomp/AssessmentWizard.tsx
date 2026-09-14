@@ -1,3 +1,4 @@
+import { formatDateKeyLocal } from "@/lib/utils";
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -151,7 +152,7 @@ export function AssessmentWizard({ clientId: propClientId, isOpen, onClose, onSa
   const [gender, setGender] = useState<Gender | "">("");
   const [weightKg, setWeightKg] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
-  const [measuredDate, setMeasuredDate] = useState<string>(() => new Date().toISOString().split("T")[0]);
+  const [measuredDate, setMeasuredDate] = useState<string>(() => formatDateKeyLocal(new Date()));
   const [measuredTime, setMeasuredTime] = useState<string>(() => {
     const now = new Date();
     return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
@@ -491,7 +492,7 @@ export function AssessmentWizard({ clientId: propClientId, isOpen, onClose, onSa
                         <Input
                           type="date"
                           value={measuredDate}
-                          max={new Date().toISOString().split("T")[0]}
+                          max={formatDateKeyLocal(new Date())}
                           onChange={(e) => setMeasuredDate(e.target.value)}
                           className="w-full"
                         />

@@ -1,3 +1,4 @@
+import { formatDateKeyLocal } from "@/lib/utils";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
@@ -523,7 +524,7 @@ function LogEntryModal({
   onClose: () => void;
 }) {
   const [form, setForm] = useState<LogForm>({
-    recorded_at: entry ? new Date(entry.recorded_at).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+    recorded_at: entry ? formatDateKeyLocal(new Date(entry.recorded_at)) : formatDateKeyLocal(new Date()),
     weight_kg: entry?.weight_kg?.toString() || "",
     body_fat_percentage: entry?.body_fat_percentage?.toString() || "",
     chest_cm: entry?.chest_cm?.toString() || "",

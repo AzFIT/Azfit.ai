@@ -21,7 +21,7 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { getDayTotals, type MacroTotals } from "@/lib/foodApi";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatDateKeyLocal } from "@/lib/utils";
 import {
   parseLifestyleTargets,
   lifestyleChips,
@@ -538,7 +538,7 @@ function NutritionCard({ clientEmail, onClick }: { clientEmail: string; onClick?
         return;
       }
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = formatDateKeyLocal(new Date());
       const [{ data: t }, dayTotals] = await Promise.all([
         supabase
           .from("nutrition_targets")

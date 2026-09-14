@@ -1,3 +1,4 @@
+import { formatDateKeyLocal } from "@/lib/utils";
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
@@ -88,7 +89,7 @@ export default function DeloadDetectionPage() {
 
   const handleSubmit = () => {
     const entry: ReadinessEntry = {
-      date: new Date().toISOString().split('T')[0],
+      date: formatDateKeyLocal(new Date()),
       sleep,
       soreness,
       energy,

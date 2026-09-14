@@ -310,7 +310,8 @@ export default function TrainerDashboard() {
               s.status !== "cancelled" &&
               ((prof && s.clientId === prof.id) || s.clientRecordId === c.id)
           )
-          .map((s) => s.endsAt.split("T")[0])
+          // Phase 90g: local day of the UTC instant, not the UTC date part.
+          .map((s) => formatDateKeyLocal(new Date(s.endsAt)))
           .sort()
           .pop();
         if (latestEnd && latestEnd >= todayStr && latestEnd <= in7) {
@@ -329,11 +330,11 @@ export default function TrainerDashboard() {
     (s) =>
       s.type === "holiday" &&
       s.status !== "cancelled" &&
-      todayStr >= s.startsAt.split("T")[0] &&
-      todayStr <= s.endsAt.split("T")[0],
+      todayStr >= formatDateKeyLocal(new Date(s.startsAt)) &&
+      todayStr <= formatDateKeyLocal(new Date(s.endsAt)),
   );
   const remindersToday = allSessions.filter(
-    (s) => s.type === "reminder" && s.status !== "cancelled" && s.startsAt.split("T")[0] === todayStr,
+    (s) => s.type === "reminder" && s.status !== "cancelled" && formatDateKeyLocal(new Date(s.startsAt)) === todayStr,
   );
 
   // Mixed glance items, sorted by time

@@ -905,3 +905,51 @@ The trainer dashboard had 451px scrollWidth at 390: the Phase 90 alert strip's i
 - Both themes screenshotted per mode; desktop medium/small spot-checked at 1280.
 - Screenshots `.temp/audit/shots/90f/`: large/medium/small/list × 390 dark+light, medium/small × 1280 dark+light, primary-order-390-dark, after-archive-390-dark (15 total).
 - Note: the demo DB already carries ~30 active shared custom goals (seeded taxonomy) — the grid renders 6 system + N custom; the smoke asserts ≥7 cards and locates the fixture by its unique accessible name rather than a fixed count.
+
+---
+
+## Phase 90g — FIX: booking off-by-one date bug (2026-09-13, AUTONOMY, LIVE DATA BUG)
+
+**Branch:** `feat/booking-date-90g` off `main` (`28bb316`, Phase 90f — precondition met). Root-caused first, no assumptions.
+
+### ROOT CAUSE (quoted for the permanent record)
+The client schedule (`ScheduleTab.tsx`, the `/client/:id → Schedule` tab) **stored sessions correctly but rendered them by UTC date**. Trace of the repro (pick Monday Sep 14, 06:30, Asia/Hong_Kong):
+1. Day tap → `selectedDateStr` = local key `"2026-09-14"` ✓; day sheet shows "Monday, September 14" ✓.
+2. `BookSessionDialog` summary shows Date 2026-09-14, Time 06:30–07:30 ✓.
+3. INSERT: `new Date("2026-09-14T06:30")` (LOCAL parse — no Z suffix) → `.toISOString()` → **`2026-09-13T22:30:00.000Z`** — a CORRECT instant (06:30 HKT Sep 14). Verified in the live row `39c9cae3` (created 2026-09-13T07:14Z, title "Ben Sabre PT", status scheduled, trainer_id set, client_record_id set — uniquely matches this path).
+4. Read-back: `date: s.starts_at.split("T")[0]` → `"2026-09-13"` ← **THE BUG (suspect c)**: the UTC date part used as the calendar day key. `getEventsForDay` then compared a LOCAL `dayStr` against these UTC keys. Any session before 08:00 local renders one day early; the booking wizard and the calendar disagreed.
+
+**Why old sessions "looked correct":** every pre-existing row was stored as a correct instant at wall times where UTC date == local date (≥ 08:00 local). Only the owner's 06:30 series crossed the boundary. The six rows at 22:30Z are in fact a coherent **Mon/Thu 06:30 HKT** schedule (Aug 31, Sep 3, 7, 10, 14 + one Jul GBC session) — the calendar had been displaying them one day early (Sun/Wed…) all along.
+
+### THE CONVENTION (locked, permanent gotcha)
+- **Timestamptz columns (sessions.starts_at/ends_at, completed_at, submitted_at, created_at…): the stored UTC instant is canonical and is already correct everywhere.** Never "fix" storage. Render/day-key ONLY via local getters — `formatDateKeyLocal(new Date(iso))` — NEVER `iso.split("T")[0]`.
+- **Date-key columns (habit_logs.log_date, nutrition_logs.logged_date, programs.start_date…): the key IS a local yyyy-MM-DD day** — write `formatDateKeyLocal(new Date())`, read with local keys. NEVER `new Date().toISOString().split("T")[0]`.
+- `new Date("yyyy-MM-ddTHH:mm")` (no Z) = LOCAL parse → `.toISOString()` = correct instant. `new Date("yyyy-MM-dd")` (date-only) = UTC midnight parse — never used for day keys. `formatDateKeyUtc` remains ONLY for genuinely UTC-keyed legacy comparisons.
+- Sessions WRITE paths (Schedule.tsx `handleBook`/recurring/block, ScheduleTab book/holiday/reminder/update) were ALL already correct (local parse → instant) — one convention, no write-side change needed.
+
+### FIXES (16 files)
+- **ScheduleTab.tsx** — the bug: event `date` + `getEventsForDay` coverage now `formatDateKeyLocal(new Date(starts_at/ends_at))`. Also added missing a11y names: day cells `aria-label` = local date key; month nav "Previous month"/"Next month".
+- **TrainerDashboard.tsx** — holiday end / holidaysToday / remindersToday compared local `todayStr` against UTC `split('T')[0]` → local keys (same latent bug).
+- **habit_logs convention unified to LOCAL** (the Phase 82–90c readers — useMetricTiles/useConsistencyMap/useInsights/useDailyPlan/useDayDetail/useAchievements/useClientScore — were ALL local already): legacy UTC writers converted — `useHabits.ts` (fetch window, `toggleToday`, `logValueToday`, `last7Days`, `currentStreak`) and `chatData.ts` (`upsertHabitLog`, `getHabitStreak`).
+- **"Today" defaults** (`new Date().toISOString().split("T")[0]` → `formatDateKeyLocal(new Date())`): ClientDashboard macros, OverviewTab + NutritionTab nutrition day, BlockTimeDialog date, AssessmentWizard measuredDate (+max), BioHistoryTab, ClientGoalsDialog startDate, BioPrintPage recorded_at prefill, ProgressPhotos takenOn, DeloadDetection readiness date, Nutrition.tsx page date (→ its existing `todayLocal()`).
+- **aiProgramMapper.ts** — `start_date` was the UTC date part of `new Date()` (yesterday for morning assigners); now `formatDateKeyLocal`, `end_date` derived arithmetically from the start key (TZ-invariant, same discipline as `manualProgram.buildProgramInsert`).
+
+### SWEEP — verified ALREADY CORRECT / left alone
+Session write paths & Schedule.tsx read path (`sessionToEvent` → formatDateKeyLocal, Phase 64); `sessions.completed_at` (instant semantics in CoachBriefTile/MyProgressSection); `check_in_submissions.submitted_at` (timestamptz, readers convert via formatDateKeyLocal); nutrition WRITES (Nutrition.tsx `todayLocal()`); `numericHabits.weekValues` (local iteration); `manualProgram` + AIProgramBuilder end_date recompute (key arithmetic, TZ-invariant); `MessageThread.formatTime` (instant → local display); `clientGoals.nearestToDate` (sub-day heuristic, both sides consistent); `icsFilename`/`ExportShare`/`TimerModes` ids (cosmetic UTC filenames); photo requests (no client date-write path exists). `formatDateKeyUtc` now has ZERO callers outside utils.ts but is kept (documented legacy helper).
+
+### DATA REPORT — NO MIGRATION NEEDED (nothing stored wrong)
+- **sessions: all rows are correct UTC instants.** 6 rows have UTC-date ≠ HK-local-date and will VISIBLY MOVE one day later to their true local day: the 5 "Ben Sabre PT" 06:30 series (`4e01d4e4` Aug 30Z→Aug 31, `165489fd` Sep 2Z→3, `a6230a92` Sep 6Z→7, `659d87a7` Sep 9Z→10, `39c9cae3` Sep 13Z→14 — the repro row) + `c41cc2dd` (Jul 18 18:00Z → Jul 19 02:00 HKT). No data is rewritten — the read fix corrects their display.
+- **habit_logs: 0 rows** misattributed (`log_date != HK date of created_at`) — historical logs were all written ≥ 08:00 local. The writer-side fix only protects 00:00–08:00 local logging going forward.
+- No migration run; no schema change.
+
+### Gates
+- `npx tsc -b` ✅ · `npm run lint` ✅ · `npm run test` ✅ (**751/751**) · `npm run build` ✅ (404 fallback ✅) · repo e2e ✅ **4/4**
+
+### Smoke (Playwright, browser forced to `timezoneId: 'Asia/Hong_Kong'` — the repro TZ; temp spec + config deleted; fixtures = 3 sessions titled SMOKE90G-DELETE for the demo client, SQL-verified removed — 0 rows; no auth user created)
+- **(A)** The repro row renders on its TRUE local day (panel lists "Ben Sabre PT 06:30–07:30" on Sep 14) and the UTC day (Sep 13) is clean ✅
+- **(B)** Book tomorrow 07:00 → chip on the picked day; SQL `starts_at` = `2026-09-14T23:00:00Z` (exact local-parse instant) ✅
+- **(C)** Book today 06:30 → chip on today; SQL `2026-09-12T22:30:00Z` ✅
+- **(D)** Book last day of month (Sep 30) 06:30 → chip on Sep 30; SQL `2026-09-29T22:30:00Z` (UTC month differs) ✅
+- **(E)** Phase 88 edit moves the month-end session +1 day (Sep 30 → Oct 1) → chip leaves Sep 30, renders on Oct 1 after month nav; SQL `2026-09-30T22:30:00Z`; summary Date shown pre-confirm = picked key in every booking ✅
+- Light theme + 1280 desktop regression ✅ · scrollWidth in bounds ✅ · zero console errors ✅
+- Screenshots `.temp/audit/shots/90g/`: a1-repro-row-true-day-panel, a2-utc-day-clean, b-book-tomorrow, c-book-today, d-book-month-end, e-edit-moved-next-day, f-light-theme-390, g-desktop-1280-dark.

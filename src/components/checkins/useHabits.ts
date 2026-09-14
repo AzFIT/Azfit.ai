@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
-import { formatDateKeyUtc } from "@/lib/utils";
+import { formatDateKeyLocal } from "@/lib/utils";
 import type { Database } from "@/types/supabase";
 
 export type Habit = Database["public"]["Tables"]["habits"]["Row"];
@@ -85,8 +85,8 @@ export function useHabits({ role, clientId: propClientId }: UseHabitsOptions) {
         .from("habit_logs")
         .select("*")
         .eq("client_id", resolvedClientId)
-        .gte("log_date", formatDateKeyUtc(sevenDaysAgo))
-        .lte("log_date", formatDateKeyUtc(today))
+        .gte("log_date", formatDateKeyLocal(sevenDaysAgo))
+        .lte("log_date", formatDateKeyLocal(today))
         .order("log_date", { ascending: true }),
     ]);
 
@@ -114,7 +114,7 @@ export function useHabits({ role, clientId: propClientId }: UseHabitsOptions) {
         return;
       }
 
-      const today = formatDateKeyUtc(new Date());
+      const today = formatDateKeyLocal(new Date());
       const { error } = await supabase.from("habit_logs").upsert(
         {
           habit_id: habitId,
@@ -145,7 +145,7 @@ export function useHabits({ role, clientId: propClientId }: UseHabitsOptions) {
         return;
       }
 
-      const today = formatDateKeyUtc(new Date());
+      const today = formatDateKeyLocal(new Date());
       const { error } = await supabase.from("habit_logs").upsert(
         {
           habit_id: habitId,
@@ -185,7 +185,7 @@ export function last7Days(): string[] {
   for (let i = 6; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(today.getDate() - i);
-    days.push(formatDateKeyUtc(d));
+    days.push(formatDateKeyLocal(d));
   }
   return days;
 }
@@ -206,14 +206,14 @@ export function currentStreak(logs: HabitLog[], habitId: string): number {
 
   let streak = 0;
   const d = new Date();
-  const today = formatDateKeyUtc(d);
+  const today = formatDateKeyLocal(d);
 
   // Start from today if done, otherwise from yesterday
   if (!dates.has(today)) {
     d.setDate(d.getDate() - 1);
   }
 
-  while (dates.has(formatDateKeyUtc(d))) {
+  while (dates.has(formatDateKeyLocal(d))) {
     streak++;
     d.setDate(d.getDate() - 1);
   }

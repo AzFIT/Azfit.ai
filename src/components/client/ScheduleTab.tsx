@@ -28,6 +28,7 @@ import {
   type AvailabilityWindow,
 } from "@/lib/creditsAvailability";
 import { generateWeeklyOccurrences } from "@/lib/sessionConflicts";
+import { formatDateKeyLocal } from "@/lib/utils";
 import { BookSessionDialog } from "@/components/schedule/BookSessionDialog";
 import { SessionDetailDialog } from "@/components/schedule/SessionDetailDialog";
 import {
@@ -175,7 +176,10 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
       const mapped: TabEvent[] = ((rows as SessionRow[]) || []).map((s) => ({
         id: s.id,
         title: s.title,
-        date: s.starts_at.split("T")[0],
+        // Phase 90g: local date key — starts_at is a UTC instant; the day it
+        // belongs to is its LOCAL day, never the UTC date part (split('T')[0]
+        // landed pre-08:00 local bookings one day early on the calendar).
+        date: formatDateKeyLocal(new Date(s.starts_at)),
         startTime: s.starts_at,
         endTime: s.ends_at,
         type:
@@ -219,8 +223,8 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
   const getEventsForDay = (day: number) => {
     const dayStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     return events.filter((e) => {
-      const startDay = e.startTime.split("T")[0];
-      const endDay = e.endTime.split("T")[0];
+      const startDay = formatDateKeyLocal(new Date(e.startTime));
+      const endDay = formatDateKeyLocal(new Date(e.endTime));
       return dayStr >= startDay && dayStr <= endDay;
     });
   };
@@ -501,6 +505,7 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
       <div className="flex items-center justify-between">
         <button
           onClick={prevMonth}
+          aria-label="Previous month"
           className="p-2 rounded-xl border hover:opacity-80 transition-opacity"
           style={{
             backgroundColor: "var(--card-bg)",
@@ -520,6 +525,7 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
         </h3>
         <button
           onClick={nextMonth}
+          aria-label="Next month"
           className="p-2 rounded-xl border hover:opacity-80 transition-opacity"
           style={{
             backgroundColor: "var(--card-bg)",
@@ -574,6 +580,7 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
             return (
               <button
                 key={day}
+                aria-label={`${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`}
                 onClick={() => setSelectedDay(isSelected ? null : day)}
                 className="min-h-[64px] sm:min-h-[80px] border-b border-r p-0.5 sm:p-1 relative text-left transition-colors hover:bg-[var(--light-elevated)]"
                 style={{
