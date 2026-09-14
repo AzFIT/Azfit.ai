@@ -1005,3 +1005,23 @@ CREATE POLICY "trainer-assets: owner insert" ON storage.objects FOR INSERT TO au
 - QR *content* decode is not asserted in smoke (no decoder dep); precedence is unit-tested in `trainerProfile.test.ts` and presence/aria asserted in smoke.
 - Edit form honours 44px targets; mobile-first 390 fit-width, no horizontal scroll in either theme.
 - **DEFERRED (not built, owner-approved):** video intro, resume/PDF export, availability calendar rebuild, team collaboration section. Client-visible trainer profile page (client role) is also deferred — clients can read the data via RLS but no UI surface yet.
+
+---
+
+## Phase 90b-fix — QR code invisible on dark theme (theme-lock violation)
+
+**Defect (master-audited):** `TrainerProfile.tsx` rendered the QR with hardcoded `color: { dark: "#1a1a2e", ... }` — a THEME LOCK violation and near-identical to the dark card surface (`--card-bg: #151D27`), so the QR was invisible in dark theme (the default). Light theme rendered correctly.
+
+**Fix:** new pure helper `src/lib/qrTheme.ts` — `qrColorsForTheme(_resolvedTheme, pageText)` returns the QR lib colors from the ACTIVE theme's `--page-text` token, read at render time via `getComputedStyle(document.documentElement)`; `theme` is an effect dep so the QR re-renders on theme change. No hex literals anywhere in src — the value flows from the CSS token.
+- **Documented token deviation:** the phase suggested `--foreground`, but that token is an HSL-space triplet (`0 0% 98%`) for shadcn internals, and the `qrcode` lib only accepts HEX (`hex2rgba` throws otherwise — verified in node_modules; this silently produced NO QR on the first fix attempt). `--page-text` is the app's own per-theme full-hex text token with exactly the required semantics (light `#F2F6FA` in dark theme, dark `#0F172A` in light theme).
+- **Race note (permanent gotcha):** child effects run before the ThemeProvider's effect on a toggle, so the component mirrors the `data-theme` attribute before reading the token (the provider's write is identical/idempotent).
+- Empty token → helper returns null → QR skipped rather than falling back to a hardcoded color.
+
+**Tests:** 6 new in `src/lib/qrTheme.test.ts` (775 total): both themes, distinct module colors per theme, passthrough (never hardcoded), null on empty token, trim, transparent bg constant.
+
+**Gates:** tsc ✅ · lint ✅ · **775/775** ✅ · build + 404 ✅ · e2e **4/4** ✅.
+
+**Smoke (no new fixture — demo trainer profile temporarily set via SQL, restored to original value after; pixel-asserted, not presence-only):**
+- Dark 390: QR modules mean luminance **245.4** vs card `rgb(21,29,39)` lum **28.0** → Δ217 ✅ (previously modules ≈ card bg)
+- Light 390: modules lum **22.7** vs card `rgb(255,255,255)` lum **255.0** → Δ232 ✅ (unchanged behaviour)
+- Zero console errors ✅. Screenshots: `.temp/audit/shots/90b-fix/qr-dark-390.png`, `qr-light-390.png`. Temp smoke script deleted.

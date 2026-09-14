@@ -36,6 +36,8 @@ import {
   HeartHandshake,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useTheme } from "@/hooks/useTheme";
+import { qrColorsForTheme } from "@/lib/qrTheme";
 import {
   useTrainerProfile,
   trainerAssetUrl,
@@ -105,10 +107,30 @@ export default function TrainerProfilePage() {
   const backgroundInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
-  /* ── QR code (view only; only when a contact target exists) ── */
+  /* ── QR code (view only; only when a contact target exists) ──
+     Phase 90b-fix: module colors come from the ACTIVE theme's
+     `--page-text` token (read via getComputedStyle) — dark theme gets
+     light modules, light theme dark modules. `--page-text` (not
+     `--foreground`) because the qrcode lib only accepts hex and
+     `--foreground` is an HSL triplet; see src/lib/qrTheme.ts. `theme` is
+     an effect dep so the QR re-renders on theme change. The data-theme
+     attribute is mirrored here before reading because child effects run
+     before the ThemeProvider's effect on a toggle — without the mirror
+     we'd read the previous theme's token. The provider's own write is
+     identical and idempotent. */
+  const { theme } = useTheme();
   useEffect(() => {
     const target = profile ? qrContactTarget(profile.contact) : null;
     if (!target) {
+      setQrUrl(null);
+      return;
+    }
+    document.documentElement.setAttribute("data-theme", theme);
+    const colors = qrColorsForTheme(
+      theme,
+      getComputedStyle(document.documentElement).getPropertyValue("--page-text"),
+    );
+    if (!colors) {
       setQrUrl(null);
       return;
     }
@@ -116,7 +138,7 @@ export default function TrainerProfilePage() {
     QRCode.toDataURL(target, {
       margin: 1,
       width: 220,
-      color: { dark: "#1a1a2e", light: "#00000000" },
+      color: colors,
     })
       .then((url) => {
         if (!cancelled) setQrUrl(url);
@@ -127,7 +149,7 @@ export default function TrainerProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [profile]);
+  }, [profile, theme]);
 
   /* ── Edit-mode lifecycle ── */
   const openEdit = (p: TrainerProfile | null) => {
