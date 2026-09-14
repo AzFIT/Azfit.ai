@@ -3,6 +3,7 @@ import {
   wowDeltaPct,
   weeklyComplianceShare,
   weeklyVolumeByDay,
+  weeklySetCount,
   formatVolumeKg,
   initialsOf,
   timelineChip,
@@ -63,6 +64,24 @@ describe("weeklyVolumeByDay", () => {
     const r = weeklyVolumeByDay([]);
     expect(r.maxDayIdx).toBe(-1);
     expect(formatVolumeKg(r.total)).toBeNull();
+  });
+});
+
+describe("weeklySetCount (Phase 92 panel badge)", () => {
+  it("sums min(weight.length, reps.length) across rows", () => {
+    const rows = [
+      { completed_at: "2026-08-03T10:00:00", weight_per_set: [60, 60], reps_per_set: [8, 8] },
+      { completed_at: "2026-08-05T10:00:00", weight_per_set: [80, 80, 80], reps_per_set: [6] },
+    ];
+    expect(weeklySetCount(rows)).toBe(3);
+  });
+  it("null arrays count as zero sets; empty list is zero", () => {
+    expect(
+      weeklySetCount([
+        { completed_at: "2026-08-03T10:00:00", weight_per_set: null, reps_per_set: null },
+      ])
+    ).toBe(0);
+    expect(weeklySetCount([])).toBe(0);
   });
 });
 

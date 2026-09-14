@@ -1,17 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_PANELS,
   DEFAULT_PRIVACY,
+  collapsePanel,
+  expandPanel,
   hideId,
   moveId,
   normalizeDashboardPreferences,
   normalizeOrderHide,
+  normalizePanels,
   normalizePrivacy,
   showId,
   toggleHiddenId,
+  togglePanel,
   visibleOrder,
 } from "./dashboardPrefs";
 
 const CARDS = ["a", "b", "c", "d"];
+const PANELS = ["today", "weekly-volume", "coach-brief"];
 
 describe("normalizeOrderHide", () => {
   it("null → canonical order, nothing hidden", () => {
@@ -121,19 +127,67 @@ describe("normalizeDashboardPreferences", () => {
         privacy: { enabled: true, autoReblurSec: 60 },
       },
       CARDS,
-      ["s1", "s2", "s3"]
+      ["s1", "s2", "s3"],
+      PANELS
     );
     expect(r.cards.order).toEqual(["d", "a", "b", "c"]);
     expect(r.cards.hidden).toEqual(["b"]);
     expect(r.profileSections.order).toEqual(["s2", "s1", "s3"]);
     expect(r.profileSections.hidden).toEqual([]);
     expect(r.privacy).toEqual({ enabled: true, autoReblurSec: 60 });
+    expect(r.panels).toEqual(DEFAULT_PANELS);
+  });
+
+  it("panel ids passed explicitly are normalized against the panel registry", () => {
+    const r = normalizeDashboardPreferences(
+      { panels: { collapsed: ["coach-brief", "ghost", "today"] } },
+      CARDS,
+      ["s1"],
+      PANELS
+    );
+    expect(r.panels.collapsed).toEqual(["coach-brief", "today"]);
   });
 
   it("fully null JSONB → all defaults", () => {
-    const r = normalizeDashboardPreferences(null, CARDS, ["s1"]);
+    const r = normalizeDashboardPreferences(null, CARDS, ["s1"], PANELS);
     expect(r.cards).toEqual({ hidden: [], order: CARDS });
+    expect(r.panels).toEqual(DEFAULT_PANELS);
     expect(r.profileSections).toEqual({ hidden: [], order: ["s1"] });
     expect(r.privacy).toEqual(DEFAULT_PRIVACY);
+  });
+});
+
+describe("normalizePanels", () => {
+  it("null → nothing collapsed", () => {
+    expect(normalizePanels(null, PANELS)).toEqual({ collapsed: [] });
+  });
+
+  it("drops unknown ids and dedupes", () => {
+    const r = normalizePanels(
+      { collapsed: ["today", "ghost", "today", "weekly-volume"] },
+      PANELS
+    );
+    expect(r.collapsed).toEqual(["today", "weekly-volume"]);
+  });
+});
+
+describe("panel operations", () => {
+  const base = { collapsed: ["today"] };
+
+  it("collapsePanel adds once (duplicate-safe)", () => {
+    const once = collapsePanel(base, "coach-brief");
+    expect(once.collapsed).toEqual(["today", "coach-brief"]);
+    expect(collapsePanel(once, "coach-brief")).toBe(once);
+  });
+
+  it("expandPanel removes only the target", () => {
+    expect(expandPanel(base, "today").collapsed).toEqual([]);
+    expect(expandPanel(base, "zzz").collapsed).toEqual(["today"]);
+  });
+
+  it("togglePanel flips both ways", () => {
+    const open = togglePanel(base, "today");
+    expect(open.collapsed).toEqual([]);
+    expect(togglePanel(open, "today").collapsed).toEqual(["today"]);
   });
 });

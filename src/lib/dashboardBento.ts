@@ -68,6 +68,21 @@ export function formatVolumeKg(kg: number): string | null {
   return `${Math.round(kg)} kg`;
 }
 
+/**
+ * Phase 92 — total sets logged this week for the Weekly Volume panel badge.
+ * A set counts when BOTH weight and reps arrays have a slot for it
+ * (same partial-set rule as weeklyVolumeByDay: skip, never zero-fill).
+ */
+export function weeklySetCount(rows: VolumeEntryRow[]): number {
+  let n = 0;
+  for (const r of rows) {
+    const w = r.weight_per_set ?? [];
+    const reps = r.reps_per_set ?? [];
+    n += Math.min(w.length, reps.length);
+  }
+  return n;
+}
+
 /** Avatar initials from a full name ("Jonny Mclarnon" → "JM", "HK" → "HK"). */
 export function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);

@@ -17,6 +17,7 @@ import {
   type DashboardPreferences,
 } from "@/lib/dashboardPrefs";
 import {
+  BENTO_GROUP,
   DASHBOARD_CARD_IDS,
   PROFILE_SECTION_IDS,
 } from "@/lib/dashboardRegistry";
@@ -86,10 +87,18 @@ export function useDashboardPrefs(userId: string | undefined): DashboardPrefsSta
         .eq("id", userId)
         .maybeSingle();
       if (cancelled) return;
+      // Phase 92: an optimistic save may have landed while the fetch was
+      // in flight (trainer toggles a panel right after login). That save
+      // is newer than this server snapshot — never clobber it.
+      if (cache.has(userId)) {
+        setLoaded(true);
+        return;
+      }
       const normalized = normalizeDashboardPreferences(
         data?.dashboard_preferences ?? null,
         DASHBOARD_CARD_IDS,
-        PROFILE_SECTION_IDS
+        PROFILE_SECTION_IDS,
+        BENTO_GROUP
       );
       cache.set(userId, normalized);
       publish(userId);
@@ -108,7 +117,8 @@ export function useDashboardPrefs(userId: string | undefined): DashboardPrefsSta
       const normalized = normalizeDashboardPreferences(
         next,
         DASHBOARD_CARD_IDS,
-        PROFILE_SECTION_IDS
+        PROFILE_SECTION_IDS,
+        BENTO_GROUP
       );
       cache.set(userId, normalized);
       publish(userId);
@@ -118,6 +128,7 @@ export function useDashboardPrefs(userId: string | undefined): DashboardPrefsSta
         .eq("id", userId);
       if (error) {
         // Revert — the UI keeps working with the previous state (honest rule).
+        console.warn("dashboard prefs save failed — reverting:", error.message);
         if (prev) cache.set(userId, prev);
         else cache.delete(userId);
         publish(userId);
@@ -133,7 +144,8 @@ export function useDashboardPrefs(userId: string | undefined): DashboardPrefsSta
   const fallback = normalizeDashboardPreferences(
     null,
     DASHBOARD_CARD_IDS,
-    PROFILE_SECTION_IDS
+    PROFILE_SECTION_IDS,
+    BENTO_GROUP
   );
   return { prefs: cached ?? fetched ?? fallback, loaded, save };
 }

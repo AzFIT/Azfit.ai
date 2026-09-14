@@ -574,3 +574,26 @@
     transform: rotate(360deg);
   }
 }
+
+/* Phase 92 — CollapsiblePanel at-risk alert: one-shot 2-cycle pulse.
+   Applied via .panel-badge-pulse (badge re-mounts with a new key when
+   the at-risk count rises). Token color so both themes work. */
+@keyframes panel-badge-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.75;
+  }
+}
+.panel-badge-pulse {
+  animation: panel-badge-pulse 0.6s ease-in-out 2;
+  transform-origin: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel-badge-pulse {
+    animation: none;
+  }
+}

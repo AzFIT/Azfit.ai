@@ -1165,3 +1165,57 @@ Two `useDashboardPrefs` instances (Navbar + TrainerDashboard) went stale after s
 1. Registry has 9 dashboard cards, not the spec's 8 — "Active Clients" exists twice in the real UI; documented above, both registered with disambiguated labels ("Active Clients" = summary metric, "Active Clients (roster)" = names tile).
 2. Settings sheet is a hand-rolled portaled sheet (not shadcn Dialog) because Dialog's `bg-black/50` overlay would hide the live dashboard preview — the spec's "apply live behind the modal" requirement.
 3. Reorder interaction = up/down arrows on BOTH desktop and mobile (one interaction, documented) — drag was optional in the spec and dnd-kit is not installed.
+
+
+## Phase 92 — Collapsible Panel Framework (trainer dashboard) (2026-09-15, AUTONOMY)
+**Branch:** `feat/collapsible-panels-92` → fast-forwarded to main. Baseline 861 → **874 tests** (+13: dashboardPrefs panels 4 — normalize 1 + ops 3, panelBadges 5, dashboardBento weeklySetCount 2, +1 prefs normalize case).
+
+### Schema
+**No DDL.** Additive JSONB key inside Phase 91's existing `profiles.dashboard_preferences`:
+```json
+{ "panels": { "collapsed": ["weekly-volume", "coach-brief"] } }
+```
+NULL/absent = all expanded (Phase 91's zero-visual-change rule extends to panels). Normalized on read AND write against the panel registry (unknown ids dropped, deduped) — `normalizePanels` in `src/lib/dashboardPrefs.ts`, panel ops `collapsePanel/expandPanel/togglePanel` (unknown-id tolerant). `useDashboardPrefs` passes `BENTO_GROUP` as the panel registry.
+
+### Panel registry (stable ids = BENTO_GROUP in src/lib/dashboardRegistry.ts — future dashboard sections MUST use CollapsiblePanel with a registered id)
+| id | title | badge (real-only) |
+|---|---|---|
+| today | Today | "N sessions remaining" (0 → hidden) |
+| client-compliance | Client Compliance | — |
+| active-clients-roster | Active Clients | — |
+| weekly-volume | Weekly Volume | "N sets this week" (0 → hidden) |
+| coach-brief | Coach AI Daily Brief | "N clients at risk", danger tone (0 → hidden) |
+
+Badge signals reuse existing data — no parallel query layer: Today = `remainingToday(allSessions)` from `src/lib/coachSummary.ts` (Phase 90); Weekly Volume = new pure helper `weeklySetCount(rows)` in `src/lib/dashboardBento.ts` (Σ min(weight_per_set.length, reps_per_set.length), same partial-set rule as weeklyVolumeByDay); at-risk = `useClientHealth` `at_risk` status count (the existing no-workout-7d inactivity signal). Badge text helper `src/lib/panelBadges.ts` `countBadge()` returns null for count ≤ 0 — **no badge is better than a zero badge**.
+
+### Framework component — src/components/ui/CollapsiblePanel.tsx (THE mount point for future dashboard sections)
+Spec props `{ id, title, icon?, badge?: {text, tone}, children, defaultExpanded }` + `pulseKey`. Transparent wrapper (no own card chrome — the wrapped bento tiles keep their GlassCard headers, so no double headers; the header bar is a slim title + badge + chevron row). 44px header tap target, `aria-expanded`/`aria-controls`, real `<button>` (Enter/Space native), Framer Motion height animation (app-wide lib, documented choice) with `useReducedMotion` → instant toggle, badge tones map to existing tokens only (neutral `var(--light-text-muted)` / warning `var(--warning)` / danger `var(--danger)` on `var(--light-elevated)` chip — zero new hex). **Lazy mount: content renders on first expand and stays mounted** (collapsed-from-birth panels have nothing in the DOM). Controlled (`expanded`/`onToggle`) for prefs-driven state, uncontrolled otherwise.
+
+### Panel state + at-risk pulse (TrainerDashboard wiring)
+- Toggle persists via the Phase 91 single-UPDATE save (`{...prefs, panels}`), revert-on-failure unchanged.
+- **Auto-expand + pulse:** when the at-risk count INCREASES between dashboard loads (comparison persisted in `sessionStorage["azfit:atrisk:<userId>"]`), the Coach AI panel force-expands even if the trainer collapsed it, and its badge pulses once (2 × 0.6s keyframes `panel-badge-pulse` in index.css, suppressed under reduced-motion; triggered by remounting the badge with a new `pulseKey`). **Force-expand is ephemeral — prefs are untouched**; a manual header click clears it and the saved collapsed state wins. Count unchanged on reload → panel stays as the trainer left it (smoke-proven).
+- Integration rules honored: a card hidden by Phase 91 renders no panel; `PrivacyBlur` stays inside panel bodies (blur works collapsed or expanded); the Phase 90 summary row is NOT panels (always visible); client role untouched.
+
+### Smoke-caught fix (documented — permanent gotcha candidate)
+**`useDashboardPrefs` fetch-clobber race:** the profiles SELECT could resolve AFTER an optimistic save landed (trainer toggles a panel right after login), overwriting the newer cached prefs with the stale server snapshot — the toggle silently reverted. Fixed: on fetch resolution, if the cache was populated mid-flight (only a save can do that), keep the saved value. Also added a `console.warn` on save failure (the revert was previously silent).
+
+### Gates
+`npx tsc -b` ✅ · `npm run lint` ✅ · **874/874** ✅ · build + 404 fallback copy ✅ · e2e **4/4** ✅.
+
+### Smoke (fixture `smoke92-delete@azfit.demo` trainer + 2 today sessions; 28/28 assertions across two full runs, zero console errors)
+- (a) collapsed Weekly Volume + Coach AI → reload persists ✅; pooler SELECT proves `panels.collapsed` server-side ✅; restored NULL after ✅
+- (b) Today badge "2 sessions remaining" from 2 real future sessions ✅; zero-set week → NO Weekly Volume badge (absence asserted, not text) ✅
+- (c) inserted an at-risk client → count 0→1 → coach-brief auto-expanded + "1 client at risk" danger badge + pulse class ✅; force-expand ephemeral (JSONB still collapsed) ✅; manual collapse + reload with unchanged count → stays collapsed ✅
+- (d) Phase 91 integration: hid Active Clients (roster) → its panel absent ✅; privacy ON → real `blur(8px)` computed inside the client-compliance panel body ✅
+- (e) lazy render: collapsed-from-birth panel content absent from DOM; expanding mounts it ✅
+- (f) both themes, 390 + 1280, scrollWidth ≤ viewport, zero console errors ✅
+- Screenshots `.temp/audit/shots/92/`: expanded-dark-1280, collapsed-dark-1280, atrisk-autoexpand-dark-1280, hidden-card-blur-dark-1280, dashboard-{dark,light}-{390,1280}, dashboard-light-1280. Temp scripts deleted.
+- **Fixtures SQL-verified removed: 0 sessions / clients / profiles rows; auth user deleted via admin API.**
+
+### Known flaky-test note (documented, no product action)
+An intermittent Playwright-timing race can swallow the FIRST synthesized click of a fresh context: the click event provably reaches the DOM button (capture listeners fire) but React's delegated handler intermittently does not run; ANY instrumentation (response listener, fetch wrapper, trace listeners) perturbs timing and hides it, and 24+ probe runs pass. All panel-toggle interactions in the smoke use click-until-state retries. No user-facing impact observed; kept under watch.
+
+### Deviations
+1. CollapsiblePanel is a transparent wrapper (slim header bar, no own card surface) rather than a self-contained card — the wrapped Phase 59 tiles already render their own GlassCard headers with meaningful actions (Today "View all", Coach AI identity); a chrome-owning panel would double every header. Documented choice, spec's "wrap, don't restructure" preserved literally.
+2. Badge tones use semantic token colors (warning/danger) rather than brand cyan for at-risk — danger red is the honest signal for at-risk; cyan reserved for neutral counts (theme lock: zero new hex).
+3. No DDL (additive JSONB key only) — the spec anticipated "additive extension of 91's schema"; nothing to migrate.

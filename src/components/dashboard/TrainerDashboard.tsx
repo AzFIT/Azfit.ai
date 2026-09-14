@@ -32,6 +32,7 @@ import { weekWindow } from "@/lib/weeklyDigest";
 import {
   weeklyComplianceShare,
   weeklyVolumeByDay,
+  weeklySetCount,
   wowDeltaPct,
   type VolumeEntryRow,
   type WeeklyVolume,
@@ -56,8 +57,17 @@ import { useAutoReblur, usePrivacyRevealed } from "@/hooks/usePrivacy";
 import DashboardSettingsSheet from "./DashboardSettingsSheet";
 import PrivacyBlur from "./PrivacyBlur";
 import { isSensitiveCard } from "@/lib/privacySensitivity";
-import { visibleOrder, type DashboardPreferences } from "@/lib/dashboardPrefs";
+import {
+  visibleOrder,
+  collapsePanel,
+  expandPanel,
+  type DashboardPreferences,
+} from "@/lib/dashboardPrefs";
 import { BENTO_GROUP, DASHBOARD_CARD_IDS } from "@/lib/dashboardRegistry";
+// Phase 92 — collapsible panel framework.
+import CollapsiblePanel from "@/components/ui/CollapsiblePanel";
+import { countBadge, type PanelBadge } from "@/lib/panelBadges";
+import { remainingToday } from "@/lib/coachSummary";
 
 function addDays(d: Date, n: number): Date {
   const out = new Date(d);
@@ -92,6 +102,16 @@ const scaleIn = {
     scale: 1,
     transition: { duration: 0.4, ease: "easeOut" as const },
   },
+};
+
+/* Phase 92 — panel registry titles (ids = BENTO_GROUP in
+   dashboardRegistry.ts; documented in PROGRESS.md). */
+const PANEL_TITLES: Record<string, string> = {
+  today: "Today",
+  "client-compliance": "Client Compliance",
+  "active-clients-roster": "Active Clients",
+  "weekly-volume": "Weekly Volume",
+  "coach-brief": "Coach AI Daily Brief",
 };
 
 /* ── Types ───────────────────────────────────────────────────────── */
@@ -160,6 +180,85 @@ export default function TrainerDashboard() {
     () => visibleOrder(prefs.cards).filter((id) => BENTO_GROUP.includes(id)),
     [prefs.cards]
   );
+
+  /* ── Phase 92: collapsible panels ───────────────────────────────
+     Panel registry = BENTO_GROUP ids (documented in PROGRESS.md).
+     Badges are real-only (countBadge hides zeros). At-risk count is
+     the existing useClientHealth at_risk status — the same inactivity
+     signal the Coach AI brief computes, no parallel query layer. ── */
+  const atRiskCount = useMemo(
+    () => healthClients.filter((c) => c.status === "at_risk").length,
+    [healthClients]
+  );
+  const remainingTodayCount = useMemo(
+    () =>
+      remainingToday(
+        allSessions.map((s) => ({
+          client_id: s.clientId,
+          client_record_id: s.clientRecordId ?? null,
+          status: s.status,
+          starts_at: s.startsAt,
+        }))
+      ),
+    [allSessions]
+  );
+
+  const [forceOpenPanel, setForceOpenPanel] = useState<string | null>(null);
+  const [badgePulseKey, setBadgePulseKey] = useState(0);
+
+  // At-risk pulse + auto-expand: when the count INCREASES between
+  // loads (compared in sessionStorage per trainer), the Coach AI
+  // panel force-expands once and its badge pulses. Force-expand is
+  // ephemeral — prefs stay untouched; clicking the header clears it.
+  useEffect(() => {
+    if (!user?.id || healthLoading) return;
+    const key = `azfit:atrisk:${user.id}`;
+    let prev: number | null = null;
+    try {
+      const raw = sessionStorage.getItem(key);
+      prev = raw === null ? null : Number(raw);
+    } catch {
+      prev = null;
+    }
+    if (prev !== null && Number.isFinite(prev) && atRiskCount > prev) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- legit load-time event: the count-rise comparison fires once per load, not a render-loop sync
+      setForceOpenPanel("coach-brief");
+      setBadgePulseKey((k) => k + 1);
+    }
+    try {
+      sessionStorage.setItem(key, String(atRiskCount));
+    } catch {
+      /* storage blocked — pulse simply won't fire next load */
+    }
+  }, [user?.id, healthLoading, atRiskCount]);
+
+  const isPanelExpanded = (id: string): boolean =>
+    forceOpenPanel === id || !prefs.panels.collapsed.includes(id);
+
+  const panelBadgeFor = (id: string): PanelBadge | null => {
+    switch (id) {
+      case "today":
+        return countBadge(
+          remainingTodayCount,
+          "session remaining",
+          "sessions remaining"
+        );
+      case "weekly-volume":
+        return countBadge(weeklySets, "set this week", "sets this week");
+      case "coach-brief":
+        return countBadge(atRiskCount, "client at risk", "clients at risk", "danger");
+      default:
+        return null;
+    }
+  };
+
+  const togglePanelById = (id: string, next: boolean): void => {
+    // A manual toggle dismisses a force-expand; the trainer's saved
+    // collapsed state is what persists.
+    setForceOpenPanel((f) => (f === id ? null : f));
+    const panels = next ? expandPanel(prefs.panels, id) : collapsePanel(prefs.panels, id);
+    void savePrefs({ ...prefs, panels });
+  };
 
   const firstName = (() => {
     const parts = (user?.full_name || "").trim().split(/\s+/).filter(Boolean);
@@ -268,6 +367,7 @@ export default function TrainerDashboard() {
   const [newThisMonth, setNewThisMonth] = useState<number | null>(null);
   const [activeClientNames, setActiveClientNames] = useState<string[]>([]);
   const [weeklyVolume, setWeeklyVolume] = useState<WeeklyVolume | null>(null);
+  const [weeklySets, setWeeklySets] = useState(0);
   const [volumeLoading, setVolumeLoading] = useState(true);
 
   useEffect(() => {
@@ -309,6 +409,7 @@ export default function TrainerDashboard() {
       const clientIds = ((clientsRes.data as { id: string }[] | null) ?? []).map((c) => c.id);
       if (clientIds.length === 0) {
         setWeeklyVolume(weeklyVolumeByDay([]));
+        setWeeklySets(0);
         setVolumeLoading(false);
         return;
       }
@@ -323,6 +424,7 @@ export default function TrainerDashboard() {
       const logRows = (logs as { id: string; completed_at: string }[] | null) ?? [];
       if (logRows.length === 0) {
         setWeeklyVolume(weeklyVolumeByDay([]));
+        setWeeklySets(0);
         setVolumeLoading(false);
         return;
       }
@@ -340,6 +442,7 @@ export default function TrainerDashboard() {
         }))
         .filter((r) => r.completed_at));
       setWeeklyVolume(weeklyVolumeByDay(rows));
+      setWeeklySets(weeklySetCount(rows));
       setVolumeLoading(false);
     })();
     return () => {
@@ -773,9 +876,18 @@ export default function TrainerDashboard() {
               >
                 {bentoOrder.map((id) => (
                   <motion.div key={id} variants={fadeInUp} data-card-id={id}>
-                    <PrivacyBlur blur={blurredIds.has(id)}>
-                      {bentoCard(id)}
-                    </PrivacyBlur>
+                    <CollapsiblePanel
+                      id={id}
+                      title={PANEL_TITLES[id] ?? id}
+                      badge={panelBadgeFor(id)}
+                      pulseKey={id === "coach-brief" ? badgePulseKey : undefined}
+                      expanded={isPanelExpanded(id)}
+                      onToggle={(next) => togglePanelById(id, next)}
+                    >
+                      <PrivacyBlur blur={blurredIds.has(id)}>
+                        {bentoCard(id)}
+                      </PrivacyBlur>
+                    </CollapsiblePanel>
                   </motion.div>
                 ))}
               </div>
@@ -789,36 +901,58 @@ export default function TrainerDashboard() {
             {/* Row A */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]">
               <motion.div variants={fadeInUp} className="md:col-span-2 lg:col-span-1">
-                <TodayTimelineTile
-                  sessions={todaysSessionList}
-                  extras={timelineExtras}
-                  loading={sessionsLoading}
-                  checkinDueNames={checkinDueNames}
-                  onOpenSchedule={() => navigate("/schedule")}
-                  onClientClick={(id) => navigate(`/client/${id}`)}
-                />
+                <CollapsiblePanel
+                  id="today"
+                  title={PANEL_TITLES.today}
+                  badge={panelBadgeFor("today")}
+                  expanded={isPanelExpanded("today")}
+                  onToggle={(next) => togglePanelById("today", next)}
+                >
+                  <TodayTimelineTile
+                    sessions={todaysSessionList}
+                    extras={timelineExtras}
+                    loading={sessionsLoading}
+                    checkinDueNames={checkinDueNames}
+                    onOpenSchedule={() => navigate("/schedule")}
+                    onClientClick={(id) => navigate(`/client/${id}`)}
+                  />
+                </CollapsiblePanel>
               </motion.div>
               <motion.div variants={fadeInUp}>
-                <PrivacyBlur blur={blurredIds.has("client-compliance")}>
-                  <ComplianceHeroTile
-                    pct={compliancePctNow}
-                    onTrack={onTrackCount}
-                    total={healthClients.length}
-                    deltaPct={complianceDelta}
-                    onClick={() => navigate("/analytics")}
-                  />
-                </PrivacyBlur>
+                <CollapsiblePanel
+                  id="client-compliance"
+                  title={PANEL_TITLES["client-compliance"]}
+                  expanded={isPanelExpanded("client-compliance")}
+                  onToggle={(next) => togglePanelById("client-compliance", next)}
+                >
+                  <PrivacyBlur blur={blurredIds.has("client-compliance")}>
+                    <ComplianceHeroTile
+                      pct={compliancePctNow}
+                      onTrack={onTrackCount}
+                      total={healthClients.length}
+                      deltaPct={complianceDelta}
+                      onClick={() => navigate("/analytics")}
+                    />
+                  </PrivacyBlur>
+                </CollapsiblePanel>
               </motion.div>
               <motion.div variants={fadeInUp}>
-                <PrivacyBlur blur={blurredIds.has("active-clients-roster")}>
-                  <ActiveClientsTile
-                    active={clientStats?.active ?? null}
-                    newThisMonth={newThisMonth}
-                    atRisk={clientStats?.atRisk ?? null}
-                    names={activeClientNames}
-                    onClick={() => navigate("/clients")}
-                  />
-                </PrivacyBlur>
+                <CollapsiblePanel
+                  id="active-clients-roster"
+                  title={PANEL_TITLES["active-clients-roster"]}
+                  expanded={isPanelExpanded("active-clients-roster")}
+                  onToggle={(next) => togglePanelById("active-clients-roster", next)}
+                >
+                  <PrivacyBlur blur={blurredIds.has("active-clients-roster")}>
+                    <ActiveClientsTile
+                      active={clientStats?.active ?? null}
+                      newThisMonth={newThisMonth}
+                      atRisk={clientStats?.atRisk ?? null}
+                      names={activeClientNames}
+                      onClick={() => navigate("/clients")}
+                    />
+                  </PrivacyBlur>
+                </CollapsiblePanel>
               </motion.div>
             </div>
 
@@ -827,11 +961,28 @@ export default function TrainerDashboard() {
                 keeps the 59 structure intact at every breakpoint) */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-[1fr_2fr]">
               <motion.div variants={fadeInUp}>
-                <WeeklyVolumeTile volume={weeklyVolume} loading={volumeLoading} />
+                <CollapsiblePanel
+                  id="weekly-volume"
+                  title={PANEL_TITLES["weekly-volume"]}
+                  badge={panelBadgeFor("weekly-volume")}
+                  expanded={isPanelExpanded("weekly-volume")}
+                  onToggle={(next) => togglePanelById("weekly-volume", next)}
+                >
+                  <WeeklyVolumeTile volume={weeklyVolume} loading={volumeLoading} />
+                </CollapsiblePanel>
               </motion.div>
               <motion.div variants={fadeInUp} className="space-y-4">
                 <NutritionCommandCenter />
-                <CoachBriefTile sessionsToday={todaysSessionList.length} />
+                <CollapsiblePanel
+                  id="coach-brief"
+                  title={PANEL_TITLES["coach-brief"]}
+                  badge={panelBadgeFor("coach-brief")}
+                  pulseKey={badgePulseKey}
+                  expanded={isPanelExpanded("coach-brief")}
+                  onToggle={(next) => togglePanelById("coach-brief", next)}
+                >
+                  <CoachBriefTile sessionsToday={todaysSessionList.length} />
+                </CollapsiblePanel>
               </motion.div>
             </div>
           </>

@@ -1,20 +1,25 @@
 // Phase 91 — dashboard customization preferences: pure shape, normalization,
 // and order/hide operations. One JSONB (profiles.dashboard_preferences) holds
-// THREE preference docs — trainer-dashboard cards, client-profile sections,
-// and privacy mode — so Phase 92's collapsibles can extend this exact shape.
+// the preference docs; Phase 92 extended it additively with panels.
 //
 // Shape (stored server-side, per user):
 //   {
 //     cards:           { hidden: string[], order: string[] },
+//     panels:          { collapsed: string[] },              // Phase 92
 //     profileSections: { hidden: string[], order: string[] },
 //     privacy:         { enabled: boolean, autoReblurSec: number | null }
 //   }
-// NULL column = default layout everywhere (zero visual change).
+// NULL column / absent keys = defaults everywhere (zero visual change).
 // autoReblurSec: null = never auto re-blur.
 
 export interface OrderHidePrefs {
   hidden: string[];
   order: string[];
+}
+
+/** Phase 92: collapsed panel ids. Absent/NULL = all expanded. */
+export interface PanelsPrefs {
+  collapsed: string[];
 }
 
 export interface PrivacyPrefs {
@@ -25,6 +30,7 @@ export interface PrivacyPrefs {
 
 export interface DashboardPreferences {
   cards: OrderHidePrefs;
+  panels: PanelsPrefs;
   profileSections: OrderHidePrefs;
   privacy: PrivacyPrefs;
 }
@@ -32,6 +38,10 @@ export interface DashboardPreferences {
 export const DEFAULT_PRIVACY: PrivacyPrefs = {
   enabled: false,
   autoReblurSec: null,
+};
+
+export const DEFAULT_PANELS: PanelsPrefs = {
+  collapsed: [],
 };
 
 const isStrArr = (v: unknown): v is string[] =>
@@ -73,6 +83,18 @@ export function normalizeOrderHide(
   return { hidden, order };
 }
 
+/**
+ * Phase 92 panels: drop unknown ids, dedupe, keep registry order semantics —
+ * `collapsed` is a set, so order is irrelevant, but storing known ids only
+ * keeps the JSONB clean as the panel registry evolves.
+ */
+export function normalizePanels(raw: unknown, knownIds: string[]): PanelsPrefs {
+  const rec = asRecord(raw);
+  const rawCollapsed = rec && isStrArr(rec.collapsed) ? rec.collapsed : [];
+  const known = new Set(knownIds);
+  return { collapsed: [...new Set(rawCollapsed.filter((id) => known.has(id)))] };
+}
+
 export function normalizePrivacy(raw: unknown): PrivacyPrefs {
   const rec = asRecord(raw);
   if (!rec) return { ...DEFAULT_PRIVACY };
@@ -83,15 +105,17 @@ export function normalizePrivacy(raw: unknown): PrivacyPrefs {
   return { enabled, autoReblurSec };
 }
 
-/** Normalize a raw JSONB value (or NULL) against both registries. */
+/** Normalize a raw JSONB value (or NULL) against the card/section/panel registries. */
 export function normalizeDashboardPreferences(
   raw: unknown,
   cardIds: string[],
-  sectionIds: string[]
+  sectionIds: string[],
+  panelIds: string[] = []
 ): DashboardPreferences {
   const rec = asRecord(raw);
   return {
     cards: normalizeOrderHide(rec ? rec.cards : null, cardIds),
+    panels: normalizePanels(rec ? rec.panels : null, panelIds),
     profileSections: normalizeOrderHide(rec ? rec.profileSections : null, sectionIds),
     privacy: normalizePrivacy(rec ? rec.privacy : null),
   };
@@ -134,4 +158,21 @@ export function moveId(
 export function visibleOrder(prefs: OrderHidePrefs): string[] {
   const hidden = new Set(prefs.hidden);
   return prefs.order.filter((id) => !hidden.has(id));
+}
+
+/* ── Phase 92 panel operations (duplicate-safe, unknown-id tolerant) ── */
+
+export function collapsePanel(panels: PanelsPrefs, id: string): PanelsPrefs {
+  if (panels.collapsed.includes(id)) return panels;
+  return { ...panels, collapsed: [...panels.collapsed, id] };
+}
+
+export function expandPanel(panels: PanelsPrefs, id: string): PanelsPrefs {
+  return { ...panels, collapsed: panels.collapsed.filter((c) => c !== id) };
+}
+
+export function togglePanel(panels: PanelsPrefs, id: string): PanelsPrefs {
+  return panels.collapsed.includes(id)
+    ? expandPanel(panels, id)
+    : collapsePanel(panels, id);
 }
