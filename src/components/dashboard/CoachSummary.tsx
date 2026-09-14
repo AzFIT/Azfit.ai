@@ -17,6 +17,8 @@
 import { Users, Calendar, Percent, AlertTriangle, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useCoachSummary } from "@/hooks/useCoachSummary";
+import PrivacyBlur from "@/components/dashboard/PrivacyBlur";
+import { SUMMARY_GROUP } from "@/lib/dashboardRegistry";
 import {
   localWeekWindow,
   inactiveClients,
@@ -33,6 +35,14 @@ interface CoachSummaryProps {
   /** Existing useClientHealth output — reused, never re-derived here. */
   healthClients: ClientHealthItem[];
   healthLoading: boolean;
+  /**
+   * Phase 91: registry-driven rendering. When absent, all four summary cards
+   * render in canonical order (identical to pre-91). `order`/`hidden` are
+   * the SUMMARY_GROUP subset of the dashboard card registry.
+   */
+  renderCards?: { order: string[]; hidden: string[] };
+  /** Phase 91: ids (from the summary group) currently privacy-blurred. */
+  blurredIds?: ReadonlySet<string>;
 }
 
 const cardShell =
@@ -91,7 +101,111 @@ function SubLine({ children, tone }: { children: React.ReactNode; tone?: "warn" 
   );
 }
 
-export default function CoachSummary({ healthClients, healthLoading }: CoachSummaryProps) {
+/* ── Phase 91 registry renderers ─────────────────────────────────────── */
+
+interface SummaryCardCtx {
+  clientsCount: number;
+  onTrack: { onTrack: number; total: number };
+  weekCount: number;
+  remaining: number;
+  thisCompliance: { pct: number | null; completed: number; scheduled: number };
+  delta: number | null;
+  attention: { count: number; topNames: string[] };
+  navigate: ReturnType<typeof useNavigate>;
+}
+
+const SUMMARY_CARD_RENDERERS: Record<string, (ctx: SummaryCardCtx) => React.ReactNode> = {
+  "active-clients": ({ clientsCount, onTrack, navigate }) => (
+    <Shell onClick={() => navigate("/clients")} label="Active clients" testId="card-active-clients">
+      <span className="flex items-center gap-1.5">
+        <Users className="h-3.5 w-3.5" style={{ color: "var(--azfit-primary)" }} aria-hidden />
+        <CardTitle>Active clients</CardTitle>
+      </span>
+      <Metric>{clientsCount}</Metric>
+      <SubLine tone={onTrack.onTrack < onTrack.total ? "default" : "success"}>
+        {onTrack.onTrack} of {onTrack.total} on track
+      </SubLine>
+    </Shell>
+  ),
+  "sessions-week": ({ weekCount, remaining, navigate }) => (
+    <Shell onClick={() => navigate("/schedule")} label="Sessions this week" testId="card-sessions-week">
+      <span className="flex items-center gap-1.5">
+        <Calendar className="h-3.5 w-3.5" style={{ color: "var(--azfit-primary)" }} aria-hidden />
+        <CardTitle>Sessions this week</CardTitle>
+      </span>
+      <Metric>{weekCount}</Metric>
+      {remaining > 0 && <SubLine>{remaining} remaining today</SubLine>}
+    </Shell>
+  ),
+  "avg-compliance": ({ thisCompliance, delta, navigate }) => (
+    <Shell onClick={() => navigate("/schedule")} label="Average compliance" testId="card-compliance">
+      <span className="flex items-center gap-1.5">
+        <Percent className="h-3.5 w-3.5" style={{ color: "var(--azfit-primary)" }} aria-hidden />
+        <CardTitle>Avg compliance</CardTitle>
+      </span>
+      {thisCompliance.pct === null ? (
+        <>
+          <Metric>—</Metric>
+          <SubLine>No sessions scheduled yet this week</SubLine>
+        </>
+      ) : (
+        <>
+          <Metric>{thisCompliance.pct}%</Metric>
+          {delta !== null ? (
+            <SubLine tone={delta >= 0 ? "success" : "warn"}>
+              {delta >= 0 ? "+" : "−"}
+              {Math.abs(delta)}% vs last week
+            </SubLine>
+          ) : (
+            <SubLine>
+              {thisCompliance.completed} of {thisCompliance.scheduled} completed
+            </SubLine>
+          )}
+        </>
+      )}
+    </Shell>
+  ),
+  "needs-attention": ({ attention, navigate }) => (
+    <Shell onClick={() => navigate("/clients")} label="Needs attention" testId="card-needs-attention">
+      <span className="flex items-center gap-1.5">
+        <AlertTriangle className="h-3.5 w-3.5" style={{ color: "var(--warning)" }} aria-hidden />
+        <CardTitle>Needs attention</CardTitle>
+      </span>
+      <Metric>{attention.count}</Metric>
+      {attention.topNames.length > 0 ? (
+        <SubLine tone="warn">
+          {attention.topNames.join(", ")}
+          {attention.count > 3 ? ` +${attention.count - 3} more` : ""}
+        </SubLine>
+      ) : (
+        <SubLine tone="success">No one flagged right now</SubLine>
+      )}
+    </Shell>
+  ),
+};
+
+/** Summary-group ids in prefs order (unknown dropped, missing appended). */
+function orderedSummaryCards(renderCards?: {
+  order: string[];
+  hidden: string[];
+}): string[] {
+  if (!renderCards) return [...SUMMARY_GROUP];
+  const hidden = new Set(renderCards.hidden);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const id of renderCards.order) {
+    if (SUMMARY_GROUP.includes(id) && !seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+    }
+  }
+  for (const id of SUMMARY_GROUP) {
+    if (!seen.has(id)) out.push(id);
+  }
+  return out.filter((id) => !hidden.has(id));
+}
+
+export default function CoachSummary({ healthClients, healthLoading, renderCards, blurredIds }: CoachSummaryProps) {
   const navigate = useNavigate();
   const { clients, sessions, logs, loading, error } = useCoachSummary();
 
@@ -181,70 +295,24 @@ export default function CoachSummary({ healthClients, healthLoading }: CoachSumm
         </div>
       )}
 
-      {/* ── Four summary cards: 2×2 at 390, 4-across ≥1024 ── */}
+      {/* ── Four summary cards: 2×2 at 390, 4-across ≥1024 ──
+          Phase 91: rendered from a registry map so hide/reorder (settings
+          sheet) and privacy blur apply per card. Default = canonical order. */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Shell onClick={() => navigate("/clients")} label="Active clients" testId="card-active-clients">
-          <span className="flex items-center gap-1.5">
-            <Users className="h-3.5 w-3.5" style={{ color: "var(--azfit-primary)" }} aria-hidden />
-            <CardTitle>Active clients</CardTitle>
-          </span>
-          <Metric>{clients.length}</Metric>
-          <SubLine tone={onTrack.onTrack < onTrack.total ? "default" : "success"}>
-            {onTrack.onTrack} of {onTrack.total} on track
-          </SubLine>
-        </Shell>
-
-        <Shell onClick={() => navigate("/schedule")} label="Sessions this week" testId="card-sessions-week">
-          <span className="flex items-center gap-1.5">
-            <Calendar className="h-3.5 w-3.5" style={{ color: "var(--azfit-primary)" }} aria-hidden />
-            <CardTitle>Sessions this week</CardTitle>
-          </span>
-          <Metric>{weekCount}</Metric>
-          {remaining > 0 && <SubLine>{remaining} remaining today</SubLine>}
-        </Shell>
-
-        <Shell onClick={() => navigate("/schedule")} label="Average compliance" testId="card-compliance">
-          <span className="flex items-center gap-1.5">
-            <Percent className="h-3.5 w-3.5" style={{ color: "var(--azfit-primary)" }} aria-hidden />
-            <CardTitle>Avg compliance</CardTitle>
-          </span>
-          {thisCompliance.pct === null ? (
-            <>
-              <Metric>—</Metric>
-              <SubLine>No sessions scheduled yet this week</SubLine>
-            </>
-          ) : (
-            <>
-              <Metric>{thisCompliance.pct}%</Metric>
-              {delta !== null ? (
-                <SubLine tone={delta >= 0 ? "success" : "warn"}>
-                  {delta >= 0 ? "+" : "−"}
-                  {Math.abs(delta)}% vs last week
-                </SubLine>
-              ) : (
-                <SubLine>
-                  {thisCompliance.completed} of {thisCompliance.scheduled} completed
-                </SubLine>
-              )}
-            </>
-          )}
-        </Shell>
-
-        <Shell onClick={() => navigate("/clients")} label="Needs attention" testId="card-needs-attention">
-          <span className="flex items-center gap-1.5">
-            <AlertTriangle className="h-3.5 w-3.5" style={{ color: "var(--warning)" }} aria-hidden />
-            <CardTitle>Needs attention</CardTitle>
-          </span>
-          <Metric>{attention.count}</Metric>
-          {attention.topNames.length > 0 ? (
-            <SubLine tone="warn">
-              {attention.topNames.join(", ")}
-              {attention.count > 3 ? ` +${attention.count - 3} more` : ""}
-            </SubLine>
-          ) : (
-            <SubLine tone="success">No one flagged right now</SubLine>
-          )}
-        </Shell>
+        {orderedSummaryCards(renderCards).map((id) => (
+          <PrivacyBlur key={id} blur={blurredIds?.has(id) ?? false}>
+            {SUMMARY_CARD_RENDERERS[id]({
+              clientsCount: clients.length,
+              onTrack,
+              weekCount,
+              remaining,
+              thisCompliance,
+              delta,
+              attention,
+              navigate,
+            })}
+          </PrivacyBlur>
+        ))}
       </div>
     </div>
   );

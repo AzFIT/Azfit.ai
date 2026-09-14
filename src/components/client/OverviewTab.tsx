@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import {
   User,
   Mail,
@@ -15,6 +16,11 @@ import {
   Plus,
   Pencil,
   Check,
+  ArrowUp,
+  ArrowDown,
+  Eye,
+  EyeOff,
+  LayoutGrid,
 } from "lucide-react";
 import type { Client } from "@/types/client";
 import { Progress } from "@/components/ui/progress";
@@ -39,6 +45,12 @@ import SessionPackageCard from "@/components/client/SessionPackageCard";
 import ConsistencyCalendar from "@/components/dashboard/ConsistencyCalendar";
 import { useBodyComposition } from "@/components/bodycomp/useBodyComposition";
 import { AssessmentWizard } from "@/components/bodycomp/AssessmentWizard";
+// Phase 91: per-coach section hide/reorder (same JSONB as dashboard cards).
+import { useDashboardPrefs } from "@/hooks/useDashboardPrefs";
+import { useViewAs } from "@/hooks/useViewAs";
+import { useAuth } from "@/hooks/useAuth";
+import { moveId, toggleHiddenId, visibleOrder, type DashboardPreferences } from "@/lib/dashboardPrefs";
+import { PROFILE_SECTIONS, PROFILE_SECTION_IDS, registryLabel } from "@/lib/dashboardRegistry";
 
 interface OverviewTabProps {
   client: Client;
@@ -128,19 +140,69 @@ export default function OverviewTab({
     ? +(currentWeight - client.goalWeight).toFixed(1)
     : 0;
 
-  return (
-    <div className="space-y-4">
-      {/* Phase 50: session credit packages (trainer view) */}
-      <SessionPackageCard clientId={clientId} />
+  // ── Phase 91: per-coach section hide/reorder ─────────────────────
+  // One preference set per COACH (their view of ANY client), stored in the
+  // same profiles.dashboard_preferences JSONB as the dashboard cards.
+  // Hidden while View-As-Client is active (prefs belong to the coach).
+  const { user } = useAuth();
+  const viewAs = useViewAs();
+  const { prefs: savedPrefs, save: savePrefs } = useDashboardPrefs(user?.id);
+  const [sectionsDraft, setSectionsDraft] = useState<DashboardPreferences | null>(null);
+  const [editingSections, setEditingSections] = useState(false);
+  const effPrefs = sectionsDraft ?? savedPrefs;
+  const canCustomize = viewAs.viewAs === null;
+  const sectionsCustomized =
+    effPrefs.profileSections.hidden.length > 0 ||
+    effPrefs.profileSections.order.join(" ") !== PROFILE_SECTION_IDS.join(" ");
+  const orderedVisibleSections = visibleOrder(effPrefs.profileSections);
 
-      {/* Phase 90c: compact consistency calendar — this client's real
-          data (RLS: trainer reads own clients' rows only); the Phase 86
-          heatmap opens full-width via "View insights" */}
+  const startEditing = () => {
+    setSectionsDraft(savedPrefs);
+    setEditingSections(true);
+  };
+  const stopEditing = () => {
+    setSectionsDraft(null);
+    setEditingSections(false);
+  };
+  const saveEditing = async () => {
+    if (!sectionsDraft) return stopEditing();
+    const ok = await savePrefs(sectionsDraft);
+    if (!ok) {
+      toast.error("Could not save layout — keeping your previous settings");
+      onPreviewRestore();
+      return;
+    }
+    toast.success("Profile layout saved");
+    stopEditing();
+  };
+  // Cancel restores the last saved layout behind the page.
+  const onPreviewRestore = () => setSectionsDraft(savedPrefs);
+
+  const moveSection = (id: string, delta: -1 | 1) =>
+    sectionsDraft &&
+    setSectionsDraft({
+      ...sectionsDraft,
+      profileSections: moveId(sectionsDraft.profileSections, id, delta),
+    });
+  const toggleSection = (id: string) =>
+    sectionsDraft &&
+    setSectionsDraft({
+      ...sectionsDraft,
+      profileSections: toggleHiddenId(sectionsDraft.profileSections, id),
+    });
+
+  // Phase 91: the eight overview sections keyed by registry id, so the
+  // default layout, the customized flat layout, and edit mode share them.
+  const nodes: Record<string, React.ReactNode> = {
+    "session-packages": <SessionPackageCard clientId={clientId} />,
+
+    consistency: (
       <motion.div {...fadeUp}>
         <ConsistencyCalendar clientId={clientId} clientEmail={client.email} />
       </motion.div>
+    ),
 
-      {/* Quick Stats Row */}
+    stats: (
       <motion.div {...fadeUp} className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard
           icon={Weight}
@@ -194,8 +256,9 @@ export default function OverviewTab({
           color="#F59E0B"
         />
       </motion.div>
+    ),
 
-      {/* Progress Section */}
+    progress: (
       <motion.div
         {...fadeUp}
         className="rounded-2xl border p-4"
@@ -350,8 +413,9 @@ export default function OverviewTab({
           </div>
         </div>
       </motion.div>
+    ),
 
-      {/* Lifestyle Targets (Phase 55) — client-owned, read-only for the trainer */}
+    lifestyle: (
       <motion.div
         {...fadeUp}
         className="rounded-2xl border p-4"
@@ -387,98 +451,98 @@ export default function OverviewTab({
           </p>
         )}
       </motion.div>
+    ),
 
-      {/* Profile Info + Nutrition Side by Side */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Profile Details */}
-        <motion.div
-          {...fadeUp}
-          className="rounded-2xl border p-4"
-          style={{
-            backgroundColor: "var(--card-bg)",
-            borderColor: "var(--card-border)",
-          }}
-        >
-          <div className="mb-3 flex items-center justify-between">
-            <h3
-              className="text-sm font-semibold"
-              style={{ color: "var(--page-text)" }}
+    details: (
+      <motion.div
+        {...fadeUp}
+        className="rounded-2xl border p-4"
+        style={{
+          backgroundColor: "var(--card-bg)",
+          borderColor: "var(--card-border)",
+        }}
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <h3
+            className="text-sm font-semibold"
+            style={{ color: "var(--page-text)" }}
+          >
+            Profile Details
+          </h3>
+          {onEditClient && (
+            <button
+              onClick={onEditClient}
+              className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition hover:opacity-80"
+              style={{ color: "var(--azfit-primary)" }}
             >
-              Profile Details
-            </h3>
-            {onEditClient && (
-              <button
-                onClick={onEditClient}
-                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition hover:opacity-80"
-                style={{ color: "var(--azfit-primary)" }}
-              >
-                <Pencil size={12} />
-                Edit
-              </button>
-            )}
-          </div>
-          <div className="space-y-2.5">
-            <InfoRow icon={User} label="Name" value={client.name} />
-            <InfoRow icon={Mail} label="Email" value={client.email} />
-            {client.phone && (
-              <InfoRow icon={Phone} label="Phone" value={client.phone} />
-            )}
-            <InfoRow
-              icon={Calendar}
-              label="Date of Birth"
-              value={
-                client.dateOfBirth
-                  ? new Date(client.dateOfBirth).toLocaleDateString("en-US", {
-                      month: "long",
-                      day: "numeric",
-                      year: "numeric",
-                    })
-                  : "—"
-              }
-            />
-            <InfoRow
-              icon={Ruler}
-              label="Height"
-              value={client.height ? `${client.height} cm` : "—"}
-            />
-            <InfoRow
-              icon={Dumbbell}
-              label="Experience"
-              value={
-                client.trainingExperience
-                  ? client.trainingExperience.charAt(0).toUpperCase() +
-                    client.trainingExperience.slice(1)
-                  : "—"
-              }
-            />
-            <InfoRow
-              icon={Target}
-              label="Primary Goal"
-              value={
-                client.primaryGoal
-                  ? client.primaryGoal
-                      .replace(/_/g, " ")
-                      .replace(/\b\w/g, (c) => c.toUpperCase())
-                  : "—"
-              }
-            />
-            <InfoRow
-              icon={Activity}
-              label="Training Frequency"
-              value={
-                client.trainingFrequency
-                  ? `${client.trainingFrequency} days/week`
-                  : "—"
-              }
-            />
-          </div>
-        </motion.div>
+              <Pencil size={12} />
+              Edit
+            </button>
+          )}
+        </div>
+        <div className="space-y-2.5">
+          <InfoRow icon={User} label="Name" value={client.name} />
+          <InfoRow icon={Mail} label="Email" value={client.email} />
+          {client.phone && (
+            <InfoRow icon={Phone} label="Phone" value={client.phone} />
+          )}
+          <InfoRow
+            icon={Calendar}
+            label="Date of Birth"
+            value={
+              client.dateOfBirth
+                ? new Date(client.dateOfBirth).toLocaleDateString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })
+                : "—"
+            }
+          />
+          <InfoRow
+            icon={Ruler}
+            label="Height"
+            value={client.height ? `${client.height} cm` : "—"}
+          />
+          <InfoRow
+            icon={Dumbbell}
+            label="Experience"
+            value={
+              client.trainingExperience
+                ? client.trainingExperience.charAt(0).toUpperCase() +
+                  client.trainingExperience.slice(1)
+                : "—"
+            }
+          />
+          <InfoRow
+            icon={Target}
+            label="Primary Goal"
+            value={
+              client.primaryGoal
+                ? client.primaryGoal
+                    .replace(/_/g, " ")
+                    .replace(/\b\w/g, (c) => c.toUpperCase())
+                : "—"
+            }
+          />
+          <InfoRow
+            icon={Activity}
+            label="Training Frequency"
+            value={
+              client.trainingFrequency
+                ? `${client.trainingFrequency} days/week`
+                : "—"
+            }
+          />
+        </div>
+      </motion.div>
+    ),
 
-        {/* Nutrition Targets */}
-        <NutritionCard clientEmail={client.email} onClick={() => onNavigate("nutrition")} />
-      </div>
+    nutrition: (
+      <NutritionCard clientEmail={client.email} onClick={() => onNavigate("nutrition")} />
+    ),
 
-      {/* Body Composition */}
+    "body-composition": (
       <BodyCompositionCard
         loading={loading}
         latestBodyComposition={latestBodyComposition}
@@ -486,7 +550,154 @@ export default function OverviewTab({
         assessments={assessments}
         onNewAssessment={() => setShowWizard(true)}
       />
+    ),
+  };
 
+  return (
+    <div className="space-y-4">
+      {/* Phase 91: "Customize layout" affordance (coach view only, never
+          while View-As-Client is active — the prefs belong to the coach). */}
+      {canCustomize && !editingSections && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={startEditing}
+            data-testid="customize-layout-btn"
+            className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium"
+            style={{
+              borderColor: "var(--card-border)",
+              backgroundColor: "var(--card-bg)",
+              color: "var(--page-text)",
+            }}
+          >
+            <LayoutGrid size={13} aria-hidden />
+            Customize layout
+          </button>
+        </div>
+      )}
+
+      {/* Edit-mode bar: draft previews live; Save persists, Cancel restores. */}
+      {editingSections && (
+        <div
+          className="flex items-center justify-between gap-2 rounded-xl border px-3 py-2"
+          style={{
+            borderColor: "color-mix(in srgb, var(--azfit-primary) 45%, var(--card-border))",
+            backgroundColor: "color-mix(in srgb, var(--azfit-primary) 8%, var(--card-bg))",
+          }}
+          data-testid="sections-edit-bar"
+        >
+          <span className="text-xs font-semibold" style={{ color: "var(--page-text)" }}>
+            Customizing layout
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onPreviewRestore}
+              className="h-10 rounded-lg border px-3 text-xs font-medium"
+              style={{ borderColor: "var(--card-border)", color: "var(--page-text)" }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={saveEditing}
+              data-testid="sections-save"
+              className="h-10 rounded-lg px-3 text-xs font-medium text-white"
+              style={{ backgroundColor: "var(--azfit-primary)" }}
+            >
+              Save layout
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT MODE: flat preview of ALL sections — hidden ones stay visible
+          dimmed so the eye restores them. Details/Nutrition render stacked
+          here because the flat customized layout has no side-by-side grid. */}
+      {editingSections ? (
+        <div className="space-y-3">
+          {effPrefs.profileSections.order.map((id, idx) => {
+            const hidden = effPrefs.profileSections.hidden.includes(id);
+            const label = registryLabel(PROFILE_SECTIONS, id);
+            return (
+              <div
+                key={id}
+                data-testid={`section-${id}`}
+                className="rounded-xl border p-2"
+                style={{ borderColor: "var(--card-border)", backgroundColor: "var(--page-bg)" }}
+              >
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-xs font-semibold" style={{ color: "var(--page-text)" }}>
+                    {label}
+                    {hidden && (
+                      <span className="ml-2 text-[10px] font-medium" style={{ color: "var(--light-text-muted)" }}>
+                        — hidden
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`Move ${label} up`}
+                    disabled={idx === 0}
+                    onClick={() => moveSection(id, -1)}
+                    className="flex h-11 w-11 items-center justify-center rounded-lg border disabled:opacity-30"
+                    style={{ borderColor: "var(--card-border)", color: "var(--page-text)" }}
+                  >
+                    <ArrowUp size={14} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Move ${label} down`}
+                    disabled={idx === effPrefs.profileSections.order.length - 1}
+                    onClick={() => moveSection(id, 1)}
+                    className="flex h-11 w-11 items-center justify-center rounded-lg border disabled:opacity-30"
+                    style={{ borderColor: "var(--card-border)", color: "var(--page-text)" }}
+                  >
+                    <ArrowDown size={14} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={hidden}
+                    aria-label={hidden ? `Show ${label}` : `Hide ${label}`}
+                    onClick={() => toggleSection(id)}
+                    className="flex h-11 w-11 items-center justify-center rounded-lg border"
+                    style={{
+                      borderColor: "var(--card-border)",
+                      color: hidden ? "var(--light-text-muted)" : "var(--azfit-primary)",
+                    }}
+                  >
+                    {hidden ? <EyeOff size={14} aria-hidden /> : <Eye size={14} aria-hidden />}
+                  </button>
+                </div>
+                <div style={{ opacity: hidden ? 0.45 : 1 }}>{nodes[id]}</div>
+              </div>
+            );
+          })}
+        </div>
+      ) : sectionsCustomized ? (
+        /* CUSTOMIZED: flat ordered visible sections (per-coach, every client). */
+        <div className="space-y-4" data-testid="sections-custom-layout">
+          {orderedVisibleSections.map((id) => (
+            <div key={id}>{nodes[id]}</div>
+          ))}
+        </div>
+      ) : (
+        /* DEFAULT (NULL prefs): the exact pre-91 layout — zero visual change. */
+        <>
+          {nodes["session-packages"]}
+          {nodes.consistency}
+          {nodes.stats}
+          {nodes.progress}
+          {nodes.lifestyle}
+          {/* Profile Details + Nutrition side by side */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {nodes.details}
+            {nodes.nutrition}
+          </div>
+          {nodes["body-composition"]}
+        </>
+      )}
       <AssessmentWizard
         clientId={clientId}
         isOpen={showWizard}

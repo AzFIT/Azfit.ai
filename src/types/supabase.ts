@@ -19,6 +19,7 @@ export type Database = {
           calendar_emoji: string | null;
           nav_preferences: Json | null;
           trainer_profile: Json | null;
+          dashboard_preferences: Json | null;
           role: "admin" | "trainer" | "client";
           created_at: string;
           updated_at: string;
@@ -31,6 +32,7 @@ export type Database = {
           calendar_emoji?: string | null;
           nav_preferences?: Json | null;
           trainer_profile?: Json | null;
+          dashboard_preferences?: Json | null;
           role?: "trainer" | "client";
           created_at?: string;
           updated_at?: string;
@@ -43,6 +45,7 @@ export type Database = {
           calendar_emoji?: string | null;
           nav_preferences?: Json | null;
           trainer_profile?: Json | null;
+          dashboard_preferences?: Json | null;
           role?: "trainer" | "client";
           created_at?: string;
           updated_at?: string;

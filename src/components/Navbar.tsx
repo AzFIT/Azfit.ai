@@ -1,6 +1,10 @@
 import { useState, useEffect, type RefObject } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { Menu, Search } from 'lucide-react';
+import { Menu, Search, Eye, EyeOff } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useDashboardPrefs } from '@/hooks/useDashboardPrefs';
+import { usePrivacyRevealed } from '@/hooks/usePrivacy';
+import { setPrivacyRevealed } from '@/lib/privacyReveal';
 
 interface NavbarProps {
   onMenuOpen: () => void;
@@ -23,6 +27,14 @@ export default function Navbar({
   const [scrolled, setScrolled] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Phase 91: floating privacy eye (trainer only, only when privacy mode is
+  // enabled). Flips the ephemeral reveal shared with the blurred cards;
+  // auto re-blur re-engages after the prefs' idle period.
+  const { user, isTrainer } = useAuth();
+  const { prefs } = useDashboardPrefs(user?.id);
+  const revealed = usePrivacyRevealed();
+  const showPrivacyEye = isTrainer && prefs.privacy.enabled;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -97,6 +109,18 @@ export default function Navbar({
           (it crowded the centered logo at 360–430px) — it now lives in
           the Clients page header. */}
       <div className="ml-auto flex items-center gap-2">
+        {showPrivacyEye && (
+          <button
+            type="button"
+            data-testid="privacy-eye"
+            onClick={() => setPrivacyRevealed(!revealed)}
+            aria-label={revealed ? 'Blur sensitive dashboard data' : 'Reveal sensitive dashboard data'}
+            aria-pressed={revealed}
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--card-border)] bg-[var(--page-bg)] text-[var(--azfit-primary)] transition-colors active:scale-[0.92]"
+          >
+            {revealed ? <EyeOff size={17} /> : <Eye size={17} />}
+          </button>
+        )}
         {onSearchOpen && (
           <button
             ref={searchButtonRef}

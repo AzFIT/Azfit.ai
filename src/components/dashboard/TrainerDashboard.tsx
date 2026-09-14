@@ -14,6 +14,7 @@ import {
   Megaphone,
   Dumbbell,
   Scale,
+  Settings2,
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
@@ -49,6 +50,14 @@ import CoachSummary from "./CoachSummary";
 // not set up yet.
 import { useTrainerProfile, trainerAssetUrl } from "@/hooks/useTrainerProfile";
 import TrainerAvatar from "@/components/trainer/TrainerAvatar";
+// Phase 91: card customization (settings sheet) + privacy blur.
+import { useDashboardPrefs } from "@/hooks/useDashboardPrefs";
+import { useAutoReblur, usePrivacyRevealed } from "@/hooks/usePrivacy";
+import DashboardSettingsSheet from "./DashboardSettingsSheet";
+import PrivacyBlur from "./PrivacyBlur";
+import { isSensitiveCard } from "@/lib/privacySensitivity";
+import { visibleOrder, type DashboardPreferences } from "@/lib/dashboardPrefs";
+import { BENTO_GROUP, DASHBOARD_CARD_IDS } from "@/lib/dashboardRegistry";
 
 function addDays(d: Date, n: number): Date {
   const out = new Date(d);
@@ -114,6 +123,44 @@ export default function TrainerDashboard() {
   const [showAddClientModal, setShowAddClientModal] = useState(false);
 
   const { clients: healthClients, counts: attentionCounts, hasAttention, loading: healthLoading } = useClientHealth();
+
+  // ── Phase 91: customization + privacy ────────────────────────────
+  const {
+    prefs: savedPrefs,
+    save: savePrefs,
+  } = useDashboardPrefs(user?.id);
+  const [prefsPreview, setPrefsPreview] = useState<DashboardPreferences | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // Effective prefs = live sheet draft while open, saved otherwise.
+  const prefs = prefsPreview ?? savedPrefs;
+
+  const revealed = usePrivacyRevealed();
+  useAutoReblur(prefs.privacy.enabled, revealed, prefs.privacy.autoReblurSec);
+  const privacyBlurOn = prefs.privacy.enabled && !revealed;
+  const blurredIds = useMemo(
+    () =>
+      new Set(
+        DASHBOARD_CARD_IDS.filter((id) => privacyBlurOn && isSensitiveCard(id))
+      ),
+    [privacyBlurOn]
+  );
+
+  // Cards render in registry mode only once the user actually customized
+  // (hidden non-empty or order ≠ canonical) — NULL prefs keep the exact
+  // Phase 59/90 bento layout (zero visual change for existing users).
+  const cardsCustomized = useMemo(() => {
+    const c = prefs.cards;
+    return (
+      c.hidden.length > 0 || c.order.join(" ") !== DASHBOARD_CARD_IDS.join(" ")
+    );
+  }, [prefs.cards]);
+
+  // Bento-group cards, in the user's visible order.
+  const bentoOrder = useMemo(
+    () => visibleOrder(prefs.cards).filter((id) => BENTO_GROUP.includes(id)),
+    [prefs.cards]
+  );
+
   const firstName = (() => {
     const parts = (user?.full_name || "").trim().split(/\s+/).filter(Boolean);
     if (parts.length === 0) return "Marcus";
@@ -433,6 +480,49 @@ export default function TrainerDashboard() {
     return wowDeltaPct(weeklyStats.cancelled, lw?.cancelled);
   };
 
+  // Phase 91: registry-mode bento tile renderers (id → tile).
+  const bentoCard = (id: string): React.ReactNode => {
+    switch (id) {
+      case "today":
+        return (
+          <TodayTimelineTile
+            sessions={todaysSessionList}
+            extras={timelineExtras}
+            loading={sessionsLoading}
+            checkinDueNames={checkinDueNames}
+            onOpenSchedule={() => navigate("/schedule")}
+            onClientClick={(id) => navigate(`/client/${id}`)}
+          />
+        );
+      case "client-compliance":
+        return (
+          <ComplianceHeroTile
+            pct={compliancePctNow}
+            onTrack={onTrackCount}
+            total={healthClients.length}
+            deltaPct={complianceDelta}
+            onClick={() => navigate("/analytics")}
+          />
+        );
+      case "active-clients-roster":
+        return (
+          <ActiveClientsTile
+            active={clientStats?.active ?? null}
+            newThisMonth={newThisMonth}
+            atRisk={clientStats?.atRisk ?? null}
+            names={activeClientNames}
+            onClick={() => navigate("/clients")}
+          />
+        );
+      case "weekly-volume":
+        return <WeeklyVolumeTile volume={weeklyVolume} loading={volumeLoading} />;
+      case "coach-brief":
+        return <CoachBriefTile sessionsToday={todaysSessionList.length} />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="mx-auto max-w-[1400px] px-4 pt-4 pb-20 lg:px-6 lg:pb-8">
       {/* ═══════════════════════════════════════════════════════════
@@ -495,6 +585,22 @@ export default function TrainerDashboard() {
               </div>
             )}
             <div className="mt-3 flex items-center gap-3 sm:mt-0">
+            {/* Phase 91: Dashboard Settings (cards + privacy) */}
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setSettingsOpen(true)}
+              data-testid="dashboard-settings-btn"
+              aria-label="Dashboard settings"
+              className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-all"
+              style={{
+                backgroundColor: "var(--card-bg)",
+                borderColor: "var(--card-border)",
+                color: "var(--page-text)",
+              }}
+            >
+              <Settings2 className="h-4 w-4" />
+              <span className="hidden lg:inline">Customize</span>
+            </motion.button>
             {/* Notification Bell */}
             <motion.button
               whileTap={{ scale: 0.95 }}
@@ -535,7 +641,12 @@ export default function TrainerDashboard() {
           Phase 90 — Vault-style coach summary (alert strip + 4 cards),
           above the existing dashboard content. Existing sections stay.
           ═══════════════════════════════════════════════════════════ */}
-      <CoachSummary healthClients={healthClients} healthLoading={healthLoading} />
+      <CoachSummary
+        healthClients={healthClients}
+        healthLoading={healthLoading}
+        renderCards={prefs.cards}
+        blurredIds={blurredIds}
+      />
 
       {/* ═══════════════════════════════════════════════════════════
           NEEDS ATTENTION STRIP (conditional)
@@ -651,50 +762,80 @@ export default function TrainerDashboard() {
         animate={mounted ? "visible" : "hidden"}
         className="mb-6 space-y-4"
       >
-        {/* Row A */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]">
-          <motion.div variants={fadeInUp} className="md:col-span-2 lg:col-span-1">
-            <TodayTimelineTile
-              sessions={todaysSessionList}
-              extras={timelineExtras}
-              loading={sessionsLoading}
-              checkinDueNames={checkinDueNames}
-              onOpenSchedule={() => navigate("/schedule")}
-              onClientClick={(id) => navigate(`/client/${id}`)}
-            />
-          </motion.div>
-          <motion.div variants={fadeInUp}>
-            <ComplianceHeroTile
-              pct={compliancePctNow}
-              onTrack={onTrackCount}
-              total={healthClients.length}
-              deltaPct={complianceDelta}
-              onClick={() => navigate("/analytics")}
-            />
-          </motion.div>
-          <motion.div variants={fadeInUp}>
-            <ActiveClientsTile
-              active={clientStats?.active ?? null}
-              newThisMonth={newThisMonth}
-              atRisk={clientStats?.atRisk ?? null}
-              names={activeClientNames}
-              onClick={() => navigate("/clients")}
-            />
-          </motion.div>
-        </div>
+        {/* Phase 91: default (NULL prefs) = legacy bento rows verbatim;
+            customized = one registry grid ordered by prefs, NCC full-width. */}
+        {cardsCustomized ? (
+          <>
+            {bentoOrder.length > 0 && (
+              <div
+                className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
+                data-testid="bento-registry-grid"
+              >
+                {bentoOrder.map((id) => (
+                  <motion.div key={id} variants={fadeInUp} data-card-id={id}>
+                    <PrivacyBlur blur={blurredIds.has(id)}>
+                      {bentoCard(id)}
+                    </PrivacyBlur>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+            <motion.div variants={fadeInUp}>
+              <NutritionCommandCenter />
+            </motion.div>
+          </>
+        ) : (
+          <>
+            {/* Row A */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]">
+              <motion.div variants={fadeInUp} className="md:col-span-2 lg:col-span-1">
+                <TodayTimelineTile
+                  sessions={todaysSessionList}
+                  extras={timelineExtras}
+                  loading={sessionsLoading}
+                  checkinDueNames={checkinDueNames}
+                  onOpenSchedule={() => navigate("/schedule")}
+                  onClientClick={(id) => navigate(`/client/${id}`)}
+                />
+              </motion.div>
+              <motion.div variants={fadeInUp}>
+                <PrivacyBlur blur={blurredIds.has("client-compliance")}>
+                  <ComplianceHeroTile
+                    pct={compliancePctNow}
+                    onTrack={onTrackCount}
+                    total={healthClients.length}
+                    deltaPct={complianceDelta}
+                    onClick={() => navigate("/analytics")}
+                  />
+                </PrivacyBlur>
+              </motion.div>
+              <motion.div variants={fadeInUp}>
+                <PrivacyBlur blur={blurredIds.has("active-clients-roster")}>
+                  <ActiveClientsTile
+                    active={clientStats?.active ?? null}
+                    newThisMonth={newThisMonth}
+                    atRisk={clientStats?.atRisk ?? null}
+                    names={activeClientNames}
+                    onClick={() => navigate("/clients")}
+                  />
+                </PrivacyBlur>
+              </motion.div>
+            </div>
 
-        {/* Row B — Phase 60: the Coach AI brief stacks under the NCC in the
-            2fr column (a third grid cell would crowd the row; the column
-            keeps the 59 structure intact at every breakpoint) */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-[1fr_2fr]">
-          <motion.div variants={fadeInUp}>
-            <WeeklyVolumeTile volume={weeklyVolume} loading={volumeLoading} />
-          </motion.div>
-          <motion.div variants={fadeInUp} className="space-y-4">
-            <NutritionCommandCenter />
-            <CoachBriefTile sessionsToday={todaysSessionList.length} />
-          </motion.div>
-        </div>
+            {/* Row B — Phase 60: the Coach AI brief stacks under the NCC in the
+                2fr column (a third grid cell would crowd the row; the column
+                keeps the 59 structure intact at every breakpoint) */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-[1fr_2fr]">
+              <motion.div variants={fadeInUp}>
+                <WeeklyVolumeTile volume={weeklyVolume} loading={volumeLoading} />
+              </motion.div>
+              <motion.div variants={fadeInUp} className="space-y-4">
+                <NutritionCommandCenter />
+                <CoachBriefTile sessionsToday={todaysSessionList.length} />
+              </motion.div>
+            </div>
+          </>
+        )}
 
         {/* Row C — stat tiles with honest WoW delta chips (no basis → no chip) */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -823,6 +964,20 @@ export default function TrainerDashboard() {
       <QuickAddClientModal
         open={showAddClientModal}
         onClose={() => setShowAddClientModal(false)}
+      />
+
+      {/* Phase 91: Dashboard Settings sheet — card hide/reorder + privacy.
+          Draft previews live; Save persists; Cancel restores. */}
+      <DashboardSettingsSheet
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        prefs={savedPrefs}
+        onPreview={(d) => setPrefsPreview(d)}
+        onSave={async (next) => {
+          const ok = await savePrefs(next);
+          if (ok) setPrefsPreview(null);
+          return ok;
+        }}
       />
     </div>
   );

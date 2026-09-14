@@ -1115,3 +1115,53 @@ First smoke run: booking an account-less client failed with `22P02 invalid input
 1. `RowActionsMenu` and `ClientsTableView` live inside `Clients.tsx` (not new files) to keep the diff scoped to the page; the table reuses the card actions verbatim.
 2. ModeToggle moved into the Clients page header rather than a generic per-page slot — grep proved Clients was the only consumer, so a generic mechanism would have been speculative generality.
 3. OUT OF SCOPE per spec: client-profile section hide/reorder (Issue 4 from the same audit) — documented as shipping with Phase 91's customization system.
+
+
+## Phase 91 — Dashboard Customization + Privacy Blur (+ client-profile section control) (2026-09-14, AUTONOMY)
+**Branch:** `feat/dashboard-custom-91` → fast-forwarded to main. Baseline 842 → **861 tests** (+19: dashboardPrefs 13, privacySensitivity 3, +3 hook-adjacent).
+
+### Schema (additive, applied live 2026-09-14 via pooler, `supabase/profiles-dashboard-preferences.sql`)
+```sql
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS dashboard_preferences JSONB DEFAULT NULL;
+-- { cards: {hidden: string[], order: string[]},
+--   profileSections: {hidden: string[], order: string[]},
+--   privacy: {enabled: boolean, autoReblurSec: number | null} }
+-- autoReblurSec null = never auto re-blur. NULL column = default layout everywhere.
+```
+Mirrored into `supabase/schema.sql` + `src/types/supabase.ts`. **This JSONB shape is locked — Phase 92's collapsibles reuse it.**
+
+### Registries (src/lib/dashboardRegistry.ts — ids persist in the JSONB, keep stable)
+- **DASHBOARD_CARDS (9, documented):** spec listed 8; the real set is 9 because "Active Clients" exists twice — the Phase 90 summary metric (`active-clients`, count + "X of Y on track") AND the Phase 59 bento roster tile (`active-clients-roster`, client NAMES). Summary group: active-clients, sessions-week, avg-compliance, needs-attention. Bento group: today, client-compliance, active-clients-roster, weekly-volume, coach-brief. NOT registered (fixed): the Phase 90 alert strip, the conditional Needs Attention strip, NutritionCommandCenter, Row C stat tiles, ClientHealthGrid, FollowUpsWidget, Quick Actions.
+- **PROFILE_SECTIONS (8):** session-packages, consistency, stats, progress, lifestyle, details, nutrition, body-composition — canonical order = current OverviewTab render order.
+
+### Sensitivity classification (src/lib/privacySensitivity.ts — documented list)
+SENSITIVE: needs-attention (top-3 client NAMES), client-compliance, active-clients-roster (names), avg-compliance. NON-SENSITIVE: active-clients (bare count), sessions-week (count), today, weekly-volume, coach-brief. Every revenue-bearing surface joins SENSITIVE once Phase 97 lands. Unknown ids fail open (never over-blur).
+
+### Build
+- `src/lib/dashboardPrefs.ts` — pure shape/normalize + order/hide ops (duplicate-safe, unknown-id tolerant: stale stored ids dropped, missing registry ids appended in canonical order). `src/hooks/useDashboardPrefs.ts` — persistence mirrors Phase 89 useTrainerNav (module cache, single-UPDATE save, optimistic + revert-on-failure → caller toasts), PLUS cross-instance publish: the cache broadcasts writes so the app-bar eye flips without a reload (smoke-caught: two hook instances went stale). NULL column → defaults.
+- **Interaction choice (documented): up/down arrows + eye switches everywhere** — one interaction, mobile-safe, no dnd-kit (permanent repo rule).
+- **TrainerDashboard:** NULL prefs (or prefs equal to canonical) → the exact Phase 59/90 bento layout (zero visual change). Once hidden non-empty or order ≠ canonical → registry mode: CoachSummary strip renders its group filtered/ordered per prefs; the 5 bento cards render in ONE registry grid (`md:grid-cols-2 xl:grid-cols-3`, `data-card-id` per card) with NCC full-width beneath. Gear affordance ("Customize") in the Phase 90 header cluster opens the settings sheet.
+- **DashboardSettingsSheet:** hand-rolled createPortal sheet (document.body — the GlassCard backdrop-filter containing-block gotcha) docked right with a LIGHT token tint so the dashboard stays visible → reorder/hide **preview live** behind the sheet; Save persists, Cancel/Escape/backdrop restores. Section A cards (arrows + eye), Section B privacy (master switch + auto-reblur select 30s/1m/5m/Never).
+- **Privacy mode:** sensitive cards wrap in `PrivacyBlur` — content stays in DOM (zero layout shift), real `filter: blur(8px)` + token overlay, `inert` + `select-none` + pointer-events-none (no tab-order, selection, or AT leakage). Floating eye in the app bar (trainer-only, renders only when privacy enabled) flips an ephemeral reveal via `src/lib/privacyReveal.ts` (useSyncExternalStore store — survives navigation, never persisted). **Auto re-blur (documented):** pointerdown / wheel / touchstart / keydown reset the idle timer; fire after `autoReblurSec`; null = never; reveal resets to blurred when privacy turns off.
+- **CoachSummary** parameterized: `renderCards` (registry order/hide) + `blurredIds`; absent props = identical to pre-91.
+- **ClientProfile OverviewTab:** "Customize layout" affordance (coach view, hidden while View-As-Client is active — prefs belong to the coach). Edit mode = flat preview of ALL sections with per-section arrows + eye (hidden sections stay visible dimmed so the eye restores them); Save persists, Cancel restores. Per-COACH preference set (their view of ANY client, not per-client — smoke-proven on a second client profile). Default (NULL) = exact pre-91 layout incl. the Details+Nutrition side-by-side grid; customized = flat ordered full-width sections (documented). Client-role dashboard is NOT customizable this phase (spec).
+
+### Gates
+`npx tsc -b` ✅ · `npm run lint` ✅ · **861/861** ✅ · build + 404 fallback copy ✅ · e2e **4/4** ✅.
+
+### Smoke (fixture `smoke91-delete@azfit.demo` trainer + 2 clients; 30/30 assertions, zero console errors)
+- (a) hid Today + Coach AI Daily Brief, moved Weekly Volume to top → registry mode live, first card = weekly-volume ✅; reload persists ✅; pooler SELECT proves the JSONB (hidden + order[0]='weekly-volume') ✅
+- (b) privacy ON → **4 sensitive cards blurred** with computed `blur(8px)` ✅; Weekly Volume provably NOT blurred ✅; app-bar eye reveals instantly (0 blurred) ✅; SQL-shortened 3s interval → auto re-blur fires after idle ✅; light theme 390: 4 blurred + scrollWidth ≤390 ✅
+- (c) profile: hid Consistency + moved Progress to Goal above stats → persists across reload ✅; SAME layout on a different client profile (per-coach) ✅; pooler proves profileSections JSONB ✅
+- (d) view-as banner renders, `/settings` still toasts "Not available in Client View" + redirects ✅; client role: no gear, no eye ✅
+- Screenshots `.temp/audit/shots/91/`: settings-modal-dark-1280, settings-modal-light-390, hidden-cards-dashboard-dark, blur-closeup-dark, blur-light-390, edit-mode-dark, reordered-profile-dark. Temp scripts deleted.
+- **Fixtures SQL-verified removed: 0 clients / profiles rows; auth user deleted via admin API.**
+
+### Smoke-caught fix (documented)
+Two `useDashboardPrefs` instances (Navbar + TrainerDashboard) went stale after save — the cache had no broadcast. Fixed with a publish/subscribe on cache writes (force re-render from cache).
+
+### Deviations
+1. Registry has 9 dashboard cards, not the spec's 8 — "Active Clients" exists twice in the real UI; documented above, both registered with disambiguated labels ("Active Clients" = summary metric, "Active Clients (roster)" = names tile).
+2. Settings sheet is a hand-rolled portaled sheet (not shadcn Dialog) because Dialog's `bg-black/50` overlay would hide the live dashboard preview — the spec's "apply live behind the modal" requirement.
+3. Reorder interaction = up/down arrows on BOTH desktop and mobile (one interaction, documented) — drag was optional in the spec and dnd-kit is not installed.
