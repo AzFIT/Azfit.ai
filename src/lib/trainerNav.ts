@@ -2,7 +2,8 @@
 // trainerNav (Phase 89) — curated trainer navigation model + pure
 // visibility logic for the Vault-style nav shell (Item 1 & 2).
 //
-// NAV ITEMS: exactly these 8, in this order (owner-curated). The
+// NAV ITEMS: exactly these 9, in this order (owner-curated; Phase 90b
+// appended "profile" — the trainer's public identity page). The
 // trainer's many other routes (messages, exercises, library, weekly
 // digest, check-ins, …) stay reachable via deep links / in-page
 // widgets — they are intentionally NOT in this nav.
@@ -30,6 +31,7 @@ import {
   Table2,
   FileText,
   Settings,
+  UserCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -51,6 +53,9 @@ export const TRAINER_NAV_ITEMS: TrainerNavItem[] = [
   { id: "sheets", label: "Sheets", path: "/sheets", icon: Table2, permanent: false },
   { id: "plan-summary", label: "Plan Summary", path: "/plan-summary", icon: FileText, permanent: false },
   { id: "settings", label: "Settings", path: "/settings", icon: Settings, permanent: false },
+  // Phase 90b: trainer public identity page — toggleable like the other
+  // non-dashboard items; last in the list.
+  { id: "profile", label: "Profile", path: "/trainer-profile", icon: UserCircle, permanent: false },
 ];
 
 const KNOWN_TOGGLEABLE_IDS = new Set(

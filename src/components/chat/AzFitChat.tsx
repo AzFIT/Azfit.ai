@@ -55,7 +55,7 @@ export default function AzFitChat() {
   // ~1.2s after scrolling stops (never hidden near the top or when open).
   const [fabHidden, setFabHidden] = useState(false);
   const lastScrollY = useRef(0);
-  const scrollStopTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const scrollStopTimer = useRef<number | undefined>(undefined);
   useEffect(() => {
     const onScroll = () => {
       const y = window.scrollY;

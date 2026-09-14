@@ -8,7 +8,7 @@ import {
 } from "./trainerNav";
 
 describe("TRAINER_NAV_ITEMS", () => {
-  it("has exactly the 8 curated items in order", () => {
+  it("has exactly the 9 curated items in order", () => {
     expect(TRAINER_NAV_ITEMS.map((i) => i.id)).toEqual([
       "dashboard",
       "coach",
@@ -18,6 +18,7 @@ describe("TRAINER_NAV_ITEMS", () => {
       "sheets",
       "plan-summary",
       "settings",
+      "profile",
     ]);
   });
 
@@ -73,9 +74,9 @@ describe("normalizeNavPreferences", () => {
 });
 
 describe("visibleNavItems", () => {
-  it("returns all 8 in order when nothing is hidden", () => {
-    expect(visibleNavItems([])).toHaveLength(8);
-    expect(visibleNavItems(["unknown-id"])).toHaveLength(8);
+  it("returns all 9 in order when nothing is hidden", () => {
+    expect(visibleNavItems([])).toHaveLength(9);
+    expect(visibleNavItems(["unknown-id"])).toHaveLength(9);
   });
 
   it("hides toggleable items, keeps dashboard, preserves order", () => {
@@ -87,13 +88,14 @@ describe("visibleNavItems", () => {
       "schedule",
       "plan-summary",
       "settings",
+      "profile",
     ]);
   });
 
   it("dashboard can never be hidden", () => {
     const visible = visibleNavItems(["dashboard"]);
     expect(visible.map((i) => i.id)).toContain("dashboard");
-    expect(visible).toHaveLength(8);
+    expect(visible).toHaveLength(9);
   });
 });
 

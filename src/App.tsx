@@ -70,6 +70,8 @@ const PrintPlanSummaryPage = lazy(() => import("@/pages/PrintPlanSummary"));
 // Phase 89: "Plan Summary" nav destination — roster index deep-linking to
 // each client's existing Plan Summary tab (see PlanSummaryIndex header).
 const PlanSummaryIndexPage = lazy(() => import("@/pages/PlanSummaryIndex"));
+// Phase 90b: trainer public identity — /trainer-profile (view + edit form).
+const TrainerProfilePage = lazy(() => import("@/pages/TrainerProfile"));
 
 // Loading fallback
 function PageLoader() {
@@ -314,6 +316,16 @@ export default function App() {
                     element={
                       <ProtectedRoute>
                         <ClientProfile />
+                      </ProtectedRoute>
+                    }
+                  />
+                  {/* Phase 90b: trainer public identity — trainer-only,
+                      inside the ArrowsShell group like nearby routes. */}
+                  <Route
+                    path="/trainer-profile"
+                    element={
+                      <ProtectedRoute requireTrainer>
+                        <TrainerProfilePage />
                       </ProtectedRoute>
                     }
                   />

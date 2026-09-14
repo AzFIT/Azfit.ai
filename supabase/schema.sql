@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   calendar_emoji TEXT NULL, -- Phase 68 Item 3c: per-user completion emoji (applied live 2026-09-02, supabase/profiles-calendar-emoji.sql)
-  nav_preferences JSONB DEFAULT NULL -- Phase 89: trainer nav visibility prefs {"hidden":["analytics",...]}; NULL = all visible; dashboard permanent (applied live 2026-09-12, supabase/profiles-nav-preferences.sql)
+  nav_preferences JSONB DEFAULT NULL, -- Phase 89: trainer nav visibility prefs {"hidden":["analytics",...]}; NULL = all visible; dashboard permanent (applied live 2026-09-12, supabase/profiles-nav-preferences.sql)
+  trainer_profile JSONB DEFAULT NULL -- Phase 90b: trainer public identity doc (shape in src/lib/trainerProfile.ts; applied live 2026-09-14, supabase/trainer-profile-90b.sql)
 );
 
 -- ============================================================

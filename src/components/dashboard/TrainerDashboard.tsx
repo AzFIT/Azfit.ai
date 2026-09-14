@@ -44,6 +44,11 @@ import CoachBriefTile from "./CoachBriefTile";
 // Phase 90: Vault-style summary block (alert strip + 4 metric cards)
 // mounted directly beneath the existing header.
 import CoachSummary from "./CoachSummary";
+// Phase 90b: trainer public identity header (avatar + display name)
+// with honest fallback to the existing greeting when the profile is
+// not set up yet.
+import { useTrainerProfile, trainerAssetUrl } from "@/hooks/useTrainerProfile";
+import TrainerAvatar from "@/components/trainer/TrainerAvatar";
 
 function addDays(d: Date, n: number): Date {
   const out = new Date(d);
@@ -103,6 +108,7 @@ function greeting(): string {
 export default function TrainerDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { profile: trainerProfile, setUp: trainerProfileSetUp } = useTrainerProfile(user?.id);
   const { todaySessions, loading: sessionsLoading, sessions: allSessions } = useSessions();
   const [mounted, setMounted] = useState(false);
   const [showAddClientModal, setShowAddClientModal] = useState(false);
@@ -114,6 +120,22 @@ export default function TrainerDashboard() {
     // Skip a leading "Coach" honorific so the greeting doesn't read "Coach Coach"
     return parts[0] === "Coach" ? (parts[1] || "Marcus") : parts[0];
   })();
+
+  // Phase 90b — public identity header. Decorative background band is
+  // rendered behind the header area only (low opacity, object-cover) and
+  // only when the trainer uploaded one; content keeps its token colors.
+  const headerBgUrl =
+    trainerProfileSetUp && trainerProfile?.background_path
+      ? trainerAssetUrl(trainerProfile.background_path)
+      : null;
+  const identitySegments = trainerProfile
+    ? [
+        trainerProfile.title.trim(),
+        trainerProfile.years_experience !== null
+          ? `${trainerProfile.years_experience} yrs experience`
+          : "",
+      ].filter((s) => s !== "")
+    : [];
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 50);
@@ -422,19 +444,57 @@ export default function TrainerDashboard() {
         transition={{ duration: 0.4 }}
         className="mb-6"
       >
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1
-              className="text-2xl font-bold tracking-tight lg:text-3xl"
-              style={{ color: "var(--page-text)" }}
-            >
-              {greeting()}, Coach {firstName}
-            </h1>
-            <p className="mt-1 text-sm" style={{ color: "var(--light-text-muted)" }}>
-              Here&apos;s who needs your attention today
-            </p>
-          </div>
-          <div className="mt-3 flex items-center gap-3 sm:mt-0">
+        <div className={headerBgUrl ? "relative overflow-hidden rounded-2xl" : undefined}>
+          {headerBgUrl && (
+            <img
+              src={headerBgUrl}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 h-full w-full rounded-2xl object-cover opacity-15"
+            />
+          )}
+          <div className="relative flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            {trainerProfileSetUp && trainerProfile ? (
+              /* Phase 90b identity block — avatar + display name, links
+                 to the full /trainer-profile screen. */
+              <button
+                onClick={() => navigate("/trainer-profile")}
+                aria-label="View and edit your trainer profile"
+                className="flex min-h-[44px] items-center gap-3 text-left"
+              >
+                <TrainerAvatar
+                  profile={trainerProfile}
+                  nameFallback={user?.full_name ?? "Trainer"}
+                  size={56}
+                />
+                <span className="min-w-0">
+                  <span
+                    className="block truncate text-2xl font-bold uppercase tracking-wide lg:text-3xl"
+                    style={{ color: "var(--page-text)" }}
+                  >
+                    {trainerProfile.display_name}
+                  </span>
+                  {identitySegments.length > 0 && (
+                    <span className="mt-1 block text-sm" style={{ color: "var(--light-text-muted)" }}>
+                      {identitySegments.join(" · ")}
+                    </span>
+                  )}
+                </span>
+              </button>
+            ) : (
+              <div>
+                <h1
+                  className="text-2xl font-bold tracking-tight lg:text-3xl"
+                  style={{ color: "var(--page-text)" }}
+                >
+                  {greeting()}, Coach {firstName}
+                </h1>
+                <p className="mt-1 text-sm" style={{ color: "var(--light-text-muted)" }}>
+                  Here&apos;s who needs your attention today
+                </p>
+              </div>
+            )}
+            <div className="mt-3 flex items-center gap-3 sm:mt-0">
             {/* Notification Bell */}
             <motion.button
               whileTap={{ scale: 0.95 }}
@@ -466,6 +526,7 @@ export default function TrainerDashboard() {
               <UserPlus className="h-4 w-4" />
               Add Client
             </motion.button>
+          </div>
           </div>
         </div>
       </motion.div>

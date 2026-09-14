@@ -953,3 +953,55 @@ Session write paths & Schedule.tsx read path (`sessionToEvent` → formatDateKey
 - **(E)** Phase 88 edit moves the month-end session +1 day (Sep 30 → Oct 1) → chip leaves Sep 30, renders on Oct 1 after month nav; SQL `2026-09-30T22:30:00Z`; summary Date shown pre-confirm = picked key in every booking ✅
 - Light theme + 1280 desktop regression ✅ · scrollWidth in bounds ✅ · zero console errors ✅
 - Screenshots `.temp/audit/shots/90g/`: a1-repro-row-true-day-panel, a2-utc-day-clean, b-book-tomorrow, c-book-today, d-book-month-end, e-edit-moved-next-day, f-light-theme-390, g-desktop-1280-dark.
+
+---
+
+## Phase 90b — Trainer Profile: identity header, credentials, gallery, custom background, contact + QR
+**Branch:** `feat/trainer-profile-90b` → fast-forwarded to main. Baseline 751 tests → **769**.
+
+### Schema (additive, applied live 2026-09-14 via pooler, project gcurvjprfwecbchreieu)
+Migration `supabase/trainer-profile-90b.sql`, mirrored into `supabase/schema.sql`, types in `src/types/supabase.ts`:
+
+```sql
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS trainer_profile JSONB DEFAULT NULL;
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('trainer-assets','trainer-assets',true,10485760,
+  ARRAY['image/jpeg','image/png','image/webp','image/gif']) ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "trainer-assets: authenticated read" ON storage.objects FOR SELECT TO authenticated
+  USING (bucket_id = 'trainer-assets');
+CREATE POLICY "trainer-assets: owner insert" ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'trainer-assets' AND (storage.foldername(name))[1] = auth.uid()::text);
+-- owner update/delete: same USING/WITH CHECK pattern.
+```
+
+- **JSONB choice (documented):** the profile is a nested marketing document (lists of credentials, gallery entries, contact block, philosophy) read/written as a whole — 15+ flat columns would be harder to validate/extend. Never mix flat columns with this JSONB. Shape: `{ display_name, title, years_experience, qualifications:[{name,issuer,year}], specialties:[], languages:[], affiliations:[], philosophy:{approach,mission,values}, contact:{whatsapp,email,instagram,website}, photo_path, photo_variant('photo'|'blur'|'initials'|'stock'), background_path, gallery:[{path,caption}] }`. Validated client-side by `parseTrainerProfile` (never throws; unknown variant → 'initials').
+- **Bucket verified live** after apply (public, 10MB, image mimes); 4 storage policies verified present.
+- **Visibility model (documented choice):** `trainer_profile` is marketing data, not PII. Any authenticated user can SELECT profiles rows (existing table policy from the 27B pattern); writes stay owner-only via the existing `auth.uid() = id` UPDATE policy. No new table-level policy added.
+
+### Items
+1. **Dashboard header** — `TrainerDashboard.tsx`: when `isProfileSetUp` (trimmed display_name AND title), the Phase 59 greeting is replaced by an identity block: TrainerAvatar (56px) + display_name rendered `uppercase` + font-weight ≥700 (stored normal, transformed at render) + muted `title · N yrs experience` meta (segments omitted when absent). Whole block is a 44px button deep-linking `/trainer-profile` (aria-label "View and edit your trainer profile"). `background_path` renders as an absolutely-positioned `opacity-15 object-cover` decorative band inside `relative overflow-hidden rounded-2xl` — text keeps token colours so both themes stay readable (image never under text at full strength). trainer_profile NULL → greeting fallback byte-for-byte unchanged.
+2. **Edit form** — `src/pages/TrainerProfile.tsx` (view + in-page edit toggle, no modal — avoids the GlassCard `position:fixed` trap): every field editable; dynamic credential rows; comma-list inputs for specialties/languages/affiliations; photo upload + 3-variant toggle (photo/blur/initials — 'stock' exists in the type but has no UI option); background upload/remove; multi-file gallery with per-photo caption + remove. Uploads validate mime + 10MB, paths `{uid}/profile/{kind}-{ts}-{sanitized-name}`. Failed uploads never mutate the form; save writes the whole JSONB in one UPDATE — on failure local state reverts + sonner toast (never half-saves). Save bar is `sticky bottom-4` (not fixed, so no portal needed).
+3. **View + QR** — read-only view: identity block, credentials, specialty chips, languages/affiliations, philosophy (absent sections omitted, never placeholder text), transformation gallery (absent when empty, captions always), contact row (wa.me digits-only, mailto, instagram handle-stripped, website). QR via `qrcode@1.5.4` (only new dep; `@types/qrcode` dev). **Documented precedence:** whatsapp → `https://wa.me/<digits>`; else email → `mailto:`; else website; else no QR rendered. Rendered only when a target exists.
+4. **Nav** — `TRAINER_NAV_ITEMS` gains `{ id:"profile", label:"Profile", path:"/trainer-profile", icon:UserCircle, permanent:false }` as item 9 (after Settings) — automatically respects Phase 89 hide/show customization and appears in the SearchPalette surface. `trainerNav.test.ts` updated for the 9-item list (deliberate spec change). Route: `<ProtectedRoute requireTrainer>` inside the ArrowsShell group in `App.tsx`. Client role: no nav change, no client-side profile page (documented deferral).
+
+### Gates
+`npx tsc -b` ✅ · `npm run lint` ✅ · **769/769** (18 new `trainerProfile` tests: sanitizer, setUp gating, initials, wa.me digits, all 4 QR precedence orders) ✅ · `npm run build` (404 fallback copied) ✅ · e2e **4/4** ✅.
+
+### Smoke (fixture `smoke90b-delete@azfit.demo`, created via admin API with `role:'trainer'` metadata; 40/40 assertions; temp scripts deleted after)
+- (a) Fresh fixture → greeting fallback header, no identity button, no errors ✅
+- (b) Full form fill via UI incl. 2 credentials, 3 gallery uploads + captions, photo variant=blur, background → SQL verified JSONB field-by-field (display_name, 2 qualifications, variant+uid-scoped path, background, 3 captioned gallery entries, all 4 contact fields) ✅; view renders name/credentials/chips/philosophy/captions/wa.me link; QR present (whatsapp precedence) ✅
+- Header: computed styles prove `text-transform:uppercase` + `font-weight 700` + blurred avatar (`filter: blur`); light theme at 390 ✅; scrollWidth ≤390 ✅
+- (d) hard reload → profile persists (server-backed, not local state) ✅
+- (c) variant photo → initials ("AR" tile, azfit-primary bg) → photo → SQL back to blur ✅
+- (e) RLS as demo client: SELECT `trainer_profile` 200+row ✅; PATCH denied (0 rows, demo profile unchanged by attack payload) ✅
+- Zero console errors ✅. Screenshots `.temp/audit/shots/90b/`: a-header-fallback-dark-390, b-edit-form-filled, b-header-identity-dark/light-390, b-profile-view-dark/light-390, b-qr-closeup, c-variant-initials, f-header/f-profile-desktop-1280.
+- Fixture cleanup SQL-verified: 0 storage.objects, 0 auth.users, 0 profiles rows for the fixture uid/email.
+
+### Deviations & notes
+- `pg` re-added as an explicit devDependency: it was previously an unlisted transitive dep that `npm install qrcode` pruned, breaking `.temp/apply-sql.mjs`. Restoration of previously-working tooling, not a new capability.
+- One-line pre-existing type fix in `src/components/chat/AzFitChat.tsx:58` (`useRef<ReturnType<typeof setTimeout>>` → `useRef<number | undefined>`) — verified present at HEAD via stash; blocked the tsc gate.
+- QR *content* decode is not asserted in smoke (no decoder dep); precedence is unit-tested in `trainerProfile.test.ts` and presence/aria asserted in smoke.
+- Edit form honours 44px targets; mobile-first 390 fit-width, no horizontal scroll in either theme.
+- **DEFERRED (not built, owner-approved):** video intro, resume/PDF export, availability calendar rebuild, team collaboration section. Client-visible trainer profile page (client role) is also deferred — clients can read the data via RLS but no UI surface yet.
