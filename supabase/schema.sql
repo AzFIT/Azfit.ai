@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   nav_preferences JSONB DEFAULT NULL, -- Phase 89: trainer nav visibility prefs {"hidden":["analytics",...]}; NULL = all visible; dashboard permanent (applied live 2026-09-12, supabase/profiles-nav-preferences.sql)
   trainer_profile JSONB DEFAULT NULL, -- Phase 90b: trainer public identity doc (shape in src/lib/trainerProfile.ts; applied live 2026-09-14, supabase/trainer-profile-90b.sql)
   dashboard_preferences JSONB DEFAULT NULL -- Phase 91: { cards: {hidden, order}, profileSections: {hidden, order}, privacy: {enabled, autoReblurSec} }; NULL = default layout everywhere (applied live 2026-09-14, supabase/profiles-dashboard-preferences.sql)
+, -- (comma on its own line keeps phase-comment lines append-only)
+  notifications JSONB DEFAULT NULL -- Phase 94: notification prefs { types: {session_reminder, checkin_due, missed_workout, streak_at_risk, achievement_unlocked}, quietHours: {from,to}|null }; NULL = defaults; master switch = push_subscriptions row (applied live 2026-09-15, supabase/notifications-prefs-94.sql)
 );
 
 -- ============================================================

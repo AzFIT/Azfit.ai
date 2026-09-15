@@ -14,6 +14,7 @@ import ViewAsGuard from "@/components/ViewAsGuard";
 import { Toaster } from "@/components/ui/sonner";
 import OfflineBanner from "@/components/OfflineBanner";
 import NotFound from "@/components/NotFound";
+import { supabase } from "@/lib/supabase";
 
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
 if (sentryDsn) {
@@ -136,8 +137,26 @@ function SheetsRedirect() {
 
 export default function App() {
   useAnalytics();
+  // Phase 94: register the service worker only once a session exists (push
+  // plumbing is authenticated-only; public pages stay SW-free). Auth state
+  // gives us both the persisted-session reload case (INITIAL_SESSION) and
+  // fresh sign-in (SIGNED_IN) — registration itself is idempotent.
   useEffect(() => {
-    registerServiceWorker();
+    let cancelled = false;
+    const registerIfSignedIn = (session: unknown) => {
+      if (!cancelled && session) registerServiceWorker();
+    };
+    void supabase.auth.getSession().then(({ data }) => registerIfSignedIn(data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) =>
+      registerIfSignedIn(session),
+    );
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
     // One-time dev test error to verify Sentry wiring (replace with real DSN to see it in dashboard)
     if (import.meta.env.DEV && sentryDsn && !sessionStorage.getItem("sentry-test-sent")) {
       Sentry.captureException(new Error("Sentry test error from AzFIT dev"));

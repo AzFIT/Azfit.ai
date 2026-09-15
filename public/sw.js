@@ -188,14 +188,23 @@ self.addEventListener('push', (event) => {
   const title = typeof data.title === 'string' && data.title ? data.title : 'AzFIT';
   const body = typeof data.body === 'string' && data.body ? data.body : 'You have a new notification';
   const icon = self.registration.scope + 'azfit-logo.png';
+  const url = typeof data.url === 'string' ? data.url : null;
 
+  // Relay to every open app window so the page can react in-app (and so
+  // delivery can be verified end-to-end without native notification UI).
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      icon,
-      badge: icon,
-      data: { url: typeof data.url === 'string' ? data.url : null },
-    })
+    self.clients.matchAll({ includeUncontrolled: true, type: 'window' }).then((clients) => {
+      clients.forEach((client) => {
+        client.postMessage({ type: 'PUSH_RECEIVED', title, body, url, icon });
+      });
+    }).then(() =>
+      self.registration.showNotification(title, {
+        body,
+        icon,
+        badge: icon,
+        data: { url },
+      })
+    )
   );
 });
 

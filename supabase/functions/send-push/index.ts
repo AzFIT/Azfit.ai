@@ -16,7 +16,9 @@ import webpush from "npm:web-push@3.6.7";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  // x-app-name: the app's global supabase-js header (src/lib/supabase.ts) —
+  // without it in this list the browser CORS-blocks every functions.invoke.
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-app-name",
 };
 
 interface PushPayload {
@@ -109,6 +111,9 @@ serve(async (req) => {
           .eq("id", row.id);
       } catch (err) {
         const statusCode = (err as { statusCode?: number })?.statusCode;
+        // Prune policy (mirror of src/lib/pushPrune.ts — the unit-tested
+        // source of truth; edge functions can't import from src/): 404/410
+        // = subscription gone → DELETE. 429/5xx/undefined = transient, keep.
         if (statusCode === 404 || statusCode === 410) {
           // Subscription is gone — prune it.
           await admin.from("push_subscriptions").delete().eq("id", row.id);

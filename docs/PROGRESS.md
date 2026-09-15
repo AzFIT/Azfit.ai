@@ -1273,3 +1273,52 @@ Entry point: **"Paste Import" button in Step 6 (Exercise Review) toolbar**, besi
 2. No DDL — exercise_library inserts use the existing trainer-manage policy and existing columns only.
 3. Auto-matched rows resolve by derivation (explicit picks override) rather than a setState-on-mount effect — the repo lint rule bans setState-in-effect; behavior is identical from the user's view.
 4. Pasted "Training Method: Free-form" intentionally does NOT map (no such method in the catalog) — the honest no-fabrication rule; documented in the import handler comment.
+
+
+## Phase 94 — Notifications Infrastructure (web push plumbing) (2026-09-15, AUTONOMY)
+
+Branch `feat/notifications-infra-94` off `9ebb638` (Phase 93 live). Plumbing only — composer UI + event triggers are Phase 95.
+
+### Schema
+- **Only DDL this phase** (applied live via pooler + mirrored to `supabase/schema.sql` + `src/types/supabase.ts`):
+  ```sql
+  ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS notifications JSONB DEFAULT NULL;
+  ```
+  Shape: `{ types: { session_reminder, checkin_due, missed_workout, streak_at_risk, achievement_unlocked }, quietHours: { from, to } | null }`. NULL = all types on / no quiet hours. **Master switch is deliberately NOT in the JSONB** — master on/off = presence of the user's `push_subscriptions` row (Phase 24A pattern); the JSONB governs which alert types + quiet hours apply (enforced server-side when Phase 95 triggers ship — this phase stores only, per spec).
+- `push_subscriptions` (id, user_id, endpoint, **subscription jsonb** holding the full PushSubscription JSON, user_agent, created_at, last_seen_at) **pre-existed from Phase 24A with owner-only RLS** — spec said verify first; verified live + mirrored in `supabase/schema.sql`. No DDL needed. (Spec sketched a `keys jsonb` shape; the live table stores the whole subscription object instead — kept as-is, deviation noted.)
+
+### What shipped
+1. **Service worker** (`public/sw.js`, Phase 1 cache-first PWA SW): push handler extended to relay `{type:'PUSH_RECEIVED', title, body, url, icon}` to every open window via `clients.matchAll` + `postMessage` BEFORE `showNotification` — delivery-observability mechanism for smokes and future in-app toasts. `notificationclick` handler unchanged (focus/navigate to `payload.url`, AzFIT logo icon, scope-safe for the `/Azfit.ai/` subpath).
+2. **Registration discipline** (`src/lib/registerSW.ts` rework): module-level idempotence guard + `document.readyState === 'complete'` check (the old load-listener-only code could miss registration when called post-load). `src/main.tsx` no longer registers (public pages stay SW-free per spec); `src/App.tsx` registers on session present (`getSession` + `onAuthStateChange`) — after login, never auto-prompting permission.
+3. **Settings UI** (`src/pages/Settings.tsx`, inside the existing Notifications card): "Alert preferences" block renders when push is enabled — 5 per-type ToggleRows from `NOTIFICATION_TYPES` + quiet-hours row (two `input[type="time"]` with aria-labels "Quiet hours from"/"Quiet hours to", Clear affordance, description notes enforcement ships with Phase 95 triggers). Load: `profiles.notifications` → `normalizeNotificationPrefs`; save: optimistic single-UPDATE, revert + toast on failure (89/91 pattern). Also removed a fabricated "3 active" count badge that sat on the Email Notifications header (honest-data fix).
+4. **Pure libs + tests**: `src/lib/notificationPrefs.ts` (types/tolerant normalizer/quiet-hours interval incl. overnight wrap; invalid input returns prefs unchanged) and `src/lib/pushPrune.ts` (`classifyPushSendError`: 404/410 → prune, 429/5xx/undefined → retryable, other 4xx → failed — the unit-tested source of truth; the edge function mirrors it in a comment since edge functions can't import from src/). **20 new tests** (`notificationPrefs.test.ts`, `pushPrune.test.ts`).
+5. **Smoke-caught production bug — the "Send test" button never worked from the browser** (Phase 24A shipped it broken): the app's global supabase-js header `x-app-name` (`src/lib/supabase.ts`) is not in the deployed function's `Access-Control-Allow-Headers`, so the browser CORS-blocked every `supabase.functions.invoke` with an opaque `TypeError: Failed to fetch` (proven by replaying the captured request byte-identical). Two fixes: (a) `supabase/functions/send-push/index.ts` CORS list gains `x-app-name` — **repo-side fix only; the function could not be redeployed (no SUPABASE_ACCESS_TOKEN on this machine — `supabase functions deploy` needs owner auth). The deployed function still lacks the header; the app works around it until the next deploy.** (b) `src/lib/push.ts sendTestPush` now calls the function with plain `fetch` + session token, sending only CORS-safe headers (apikey/authorization/content-type) — verified working end-to-end. **Action for owner: run `supabase functions deploy send-push --project-ref gcurvjprfwecbchreieu` so the CORS fix goes live; future client-side `functions.invoke` callers (Phase 95) need it.**
+
+### VAPID / secrets (from `supabase/functions/send-push/README.md`, unchanged this phase)
+Keys generated via `web-push` (`npx web-push generate-vapid-keys`); public key committed in `.env.example` (`VITE_VAPID_PUBLIC_KEY`), private key in `.env.local` only (never committed). Secrets on the project: `supabase secrets set VAPID_PUBLIC_KEY=… VAPID_PRIVATE_KEY=… VAPID_SUBJECT=mailto:admin@azfit.ai`. Prune policy: 404/410 endpoints deleted, 429/5xx kept (transient), others kept-and-counted.
+
+### Gates
+`npx tsc -b` ✅ · `npm run lint` ✅ · **937/937** (917 + 20 new) ✅ · build + 404 fallback copy + `dist/sw.js` present ✅ · e2e **4/4** ✅.
+
+### Smoke (fixture `smoke94-delete@azfit.demo`; **24/24 assertions, zero console errors**; both themes, 390 + 1280)
+- (a) master toggle ON → SQL `push_subscriptions` row appears (real FCM endpoint); OFF → row removed; back ON → row again ✅
+- (b) UI "Send test" → **real push received in-page** (SW relay) with title `AzFIT`, body `Push is working!`, icon `…/azfit-logo.png` ✅ · synthetic `notificationclick` in the SW → app navigates to `payload.url` ✅
+- (c) Session Reminders + Check-in Due toggled off → pooler SELECT proves `profiles.notifications` JSONB; quiet hours 21:00→07:00 persisted ✅
+- (d) `PushManager` deleted → honest "Push is not supported in this browser" + disabled master switch, zero errors ✅
+- (e) unauthenticated `send-push` → **401** ✅
+- (f) scrollWidth 375 ≤ 390, zero unexpected console errors ✅
+- Screenshots `.temp/audit/shots/94/`: settings-dark-390, settings-light-390, settings-1280, received-push, permission-flow, unsupported-state.
+- **Fixtures SQL-verified removed: 0 rows in push_subscriptions / profiles; auth user deleted via admin API; 0 rows in auth.users.**
+
+### Automation gotchas (permanent, cost real debugging time)
+1. **Chromium's Push API is disabled in Playwright's ephemeral contexts** ("incognito mode" restriction, crbug.com/41124656) — `pushManager.subscribe` rejects with an undetectable-by-design error. Push smokes must use `launchPersistentContext` (headed, throwaway profile dir) + `permissions: ['notifications']`; `Notification.permission`/`requestPermission` also need in-page overrides since the permission prompt can't be answered programmatically.
+2. **`NotificationEvent` is NOT synthesizable** — its constructor requires a real `Notification` instance (unconstructible in a SW). Test `notificationclick` by dispatching `new ExtendableEvent('notificationclick')` with an own `notification` property `{ close(){}, data:{url} }`; the handler's `event.waitUntil` then works natively.
+3. **Playwright's `newCDPSession` accepts Page/Frame only on BrowserContext** (Browser in this build lacks it) — attach to a service worker via `--remote-debugging-port` + `Runtime.evaluate` over the target's WS URL.
+4. Known scope-external console noise (filtered, NOT a Phase 94 issue): a fresh user with no `clients` row lands the client dashboard issuing `sessions`/`clients` queries with an empty `id=eq.` filter → five 400s. Pre-existing; flagged for a future cleanup phase.
+
+### Deviations
+1. `push_subscriptions` keeps the Phase 24A `subscription jsonb` shape instead of the spec's `keys jsonb` (additive-equivalent, already live; changing it would touch RLS + the deployed function for no gain).
+2. `sendTestPush` uses plain fetch instead of `supabase.functions.invoke` until the function's CORS list is redeployed with `x-app-name` (above; owner action needed).
+3. Legacy local-state-only Settings toggles (Workout Reminders etc.) left untouched — out of scope, they predate the prefs JSONB.
+4. SW registers post-login only (public pages SW-free) — trades the Phase 1 PWA offline shell on public pages for the spec's "no registration before login" rule.
+5. Quiet hours are stored, not enforced, this phase (spec).

@@ -151,9 +151,24 @@ export interface SendPushResult {
 
 /** Calls the send-push edge function (must be deployed separately). */
 export async function sendTestPush(userId: string): Promise<SendPushResult> {
-  const { data, error } = await supabase.functions.invoke('send-push', {
-    body: { user_id: userId, title: 'AzFIT', body: 'Push is working!', url: '/#/dashboard' },
+  // NOTE: plain fetch, not supabase.functions.invoke — the app's global
+  // supabase-js header `x-app-name` (src/lib/supabase.ts) is not in the
+  // deployed function's Access-Control-Allow-Headers, so the browser
+  // CORS-blocks invoke with a TypeError. The function's CORS list is fixed
+  // in the repo (supabase/functions/send-push) and applies on next deploy;
+  // until then this path sends only CORS-safe headers.
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) throw new Error('Not signed in');
+  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-push`, {
+    method: 'POST',
+    headers: {
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ user_id: userId, title: 'AzFIT', body: 'Push is working!', url: '/#/dashboard' }),
   });
-  if (error) throw new Error(error.message || 'send-push failed (is the edge function deployed?)');
-  return data as SendPushResult;
+  if (!res.ok) throw new Error(`send-push failed (${res.status}) — is the edge function deployed?`);
+  return (await res.json()) as SendPushResult;
 }

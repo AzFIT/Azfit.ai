@@ -2,10 +2,12 @@ import { createRoot } from 'react-dom/client'
 import { HashRouter } from 'react-router'
 import './index.css'
 import App from './App.tsx'
-import { registerServiceWorker } from '@/lib/registerSW'
 
-// Register PWA service worker (production only)
-registerServiceWorker()
+// Phase 94: the service worker is registered AFTER LOGIN (App.tsx subscribes
+// to auth state), not here — public pages stay SW-free and the one-shot
+// Notification permission ask is never burned on an anonymous first load.
+// (PWA offline caching matters for signed-in training use; the app is
+// auth-gated.)
 
 // Phase 56 Item 7: stale-chunk recovery. After a deploy, an open tab (or an
 // old service worker) can hold a chunk map whose files no longer exist —

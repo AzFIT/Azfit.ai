@@ -40,6 +40,16 @@ import {
   sendTestPush,
   type PushState,
 } from '@/lib/push';
+import {
+  DEFAULT_NOTIFICATION_PREFS,
+  NOTIFICATION_TYPES,
+  clearQuietHours,
+  normalizeNotificationPrefs,
+  setNotificationType,
+  setQuietHours,
+  type NotificationPrefs,
+} from '@/lib/notificationPrefs';
+import type { Json } from '@/types/supabase';
 
 /* ------------------------------------------------------------------ */
 /*  Animation helpers                                                  */
@@ -359,6 +369,52 @@ export default function Settings() {
       setTestSending(false);
     }
   }, [user?.id, testSending]);
+
+  /* ---- Phase 94: notification preferences (profiles.notifications JSONB) ----
+     Master on/off lives in push_subscriptions (the toggle above); these prefs
+     govern WHICH alert types a subscribed device receives + quiet hours.
+     Server-side enforcement ships with the Phase 95 triggers; stored now. */
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(() => ({
+    ...DEFAULT_NOTIFICATION_PREFS,
+    types: { ...DEFAULT_NOTIFICATION_PREFS.types },
+  }));
+  const [notifPrefsLoaded, setNotifPrefsLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('notifications')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (!cancelled) {
+        setNotifPrefs(normalizeNotificationPrefs(data?.notifications));
+        setNotifPrefsLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  const saveNotifPrefs = useCallback(
+    async (next: NotificationPrefs) => {
+      if (!user?.id || next === notifPrefs) return;
+      const prev = notifPrefs;
+      setNotifPrefs(next); // optimistic; reverted on failure (never half-saved)
+      const { error } = await supabase
+        .from('profiles')
+        .update({ notifications: next as unknown as Json })
+        .eq('id', user.id);
+      if (error) {
+        setNotifPrefs(prev);
+        toast.error('Could not save notification preferences');
+      }
+    },
+    [user?.id, notifPrefs],
+  );
 
   /* ---- connected devices ---- */
   const devices: DeviceItem[] = [
@@ -730,12 +786,6 @@ export default function Settings() {
             <h3 className="text-lg font-bold" style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}>
               Notifications
             </h3>
-            <span
-              className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold"
-              style={{ backgroundColor: 'color-mix(in srgb, var(--azfit-primary) 15%, transparent)', color: 'var(--azfit-primary)' }}
-            >
-              3 active
-            </span>
           </div>
 
           {/* Master toggles */}
@@ -789,6 +839,78 @@ export default function Settings() {
                 <Send size={12} />
                 {testSending ? 'Sending…' : 'Send test'}
               </button>
+            </div>
+          )}
+          {/* Phase 94 — per-type prefs + quiet hours (persisted server-side in
+              profiles.notifications; enforced at send time when Phase 95
+              triggers ship). Only meaningful while push is enabled. */}
+          {pushEnabled && notifPrefsLoaded && (
+            <div className="pt-1">
+              <p
+                className="pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider"
+                style={{ color: 'var(--light-text-muted)' }}
+              >
+                Alert preferences
+              </p>
+              {NOTIFICATION_TYPES.map((t) => (
+                <ToggleRow
+                  key={t.id}
+                  label={t.label}
+                  description={t.description}
+                  checked={notifPrefs.types[t.id]}
+                  onCheckedChange={(v) => void saveNotifPrefs(setNotificationType(notifPrefs, t.id, v))}
+                />
+              ))}
+              <div
+                className="flex flex-wrap items-center justify-between gap-2 py-3"
+                style={{ borderBottom: '1px solid var(--light-border)' }}
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium" style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}>
+                    Quiet hours
+                  </p>
+                  <p className="mt-0.5 text-xs" style={{ color: 'var(--light-text-muted)' }}>
+                    {notifPrefs.quietHours
+                      ? `Alerts held ${notifPrefs.quietHours.from}–${notifPrefs.quietHours.to} (enforced when triggers ship)`
+                      : 'No quiet hours set'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="time"
+                    aria-label="Quiet hours from"
+                    value={notifPrefs.quietHours?.from ?? ''}
+                    onChange={(e) => {
+                      if (!e.target.value) return;
+                      const to = notifPrefs.quietHours?.to ?? '07:00';
+                      void saveNotifPrefs(setQuietHours(notifPrefs, e.target.value, to));
+                    }}
+                    className="h-8 w-[5.5rem] rounded-md border border-[var(--card-border)] bg-[var(--page-bg)] px-2 text-xs text-[var(--page-text)]"
+                  />
+                  <span className="text-xs" style={{ color: 'var(--light-text-muted)' }}>to</span>
+                  <input
+                    type="time"
+                    aria-label="Quiet hours to"
+                    value={notifPrefs.quietHours?.to ?? ''}
+                    onChange={(e) => {
+                      if (!e.target.value) return;
+                      const from = notifPrefs.quietHours?.from ?? '21:00';
+                      void saveNotifPrefs(setQuietHours(notifPrefs, from, e.target.value));
+                    }}
+                    className="h-8 w-[5.5rem] rounded-md border border-[var(--card-border)] bg-[var(--page-bg)] px-2 text-xs text-[var(--page-text)]"
+                  />
+                  {notifPrefs.quietHours && (
+                    <button
+                      type="button"
+                      onClick={() => void saveNotifPrefs(clearQuietHours(notifPrefs))}
+                      className="h-8 rounded-md border px-2 text-[11px] font-medium"
+                      style={{ borderColor: 'var(--card-border)', color: 'var(--light-text-muted)' }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
           <ToggleRow
