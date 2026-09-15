@@ -12,6 +12,7 @@ import {
   Trash2,
   Sun,
   Moon,
+  Layers,
   Phone,
   Calendar,
   User,
@@ -49,6 +50,7 @@ import {
   setQuietHours,
   type NotificationPrefs,
 } from '@/lib/notificationPrefs';
+import { applyUiVariant, currentUiVariant, type UiVariant } from '@/lib/uiVariant';
 import type { Json } from '@/types/supabase';
 
 /* ------------------------------------------------------------------ */
@@ -380,6 +382,51 @@ export default function Settings() {
   }));
   const [notifPrefsLoaded, setNotifPrefsLoaded] = useState(false);
 
+  /* ---- Phase 92c: card style variant (profiles.ui_variant; NULL/'default'
+     = classic, 'metal' = Pulse Metal opt-in finish) ---- */
+  const [cardVariant, setCardVariant] = useState<UiVariant>(() => currentUiVariant());
+  const [cardVariantLoaded, setCardVariantLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('ui_variant')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (!cancelled) {
+        const variant: UiVariant = data?.ui_variant === 'metal' ? 'metal' : 'default';
+        setCardVariant(variant);
+        applyUiVariant(variant === 'metal' ? 'metal' : null);
+        setCardVariantLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  const handleCardVariantChange = useCallback(
+    async (next: UiVariant) => {
+      if (!user?.id || next === cardVariant) return;
+      const previous = cardVariant;
+      setCardVariant(next); // optimistic; reverted on failure (never half-saved)
+      applyUiVariant(next === 'metal' ? 'metal' : null);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ ui_variant: next === 'metal' ? 'metal' : null })
+        .eq('id', user.id);
+      if (error) {
+        setCardVariant(previous);
+        applyUiVariant(previous === 'metal' ? 'metal' : null);
+        toast.error('Could not save card style — reverted to the previous style');
+      }
+    },
+    [user?.id, cardVariant],
+  );
+
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
@@ -686,6 +733,52 @@ export default function Settings() {
               </div>
             </div>
             <Switch checked={isDark} onCheckedChange={toggleTheme} />
+          </div>
+
+          {/* Phase 92c: Card style — opt-in "Pulse Metal" brushed-metal finish */}
+          <div
+            className="flex items-center justify-between gap-3 py-3"
+            style={{ borderBottom: '1px solid var(--light-border)' }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="flex h-8 w-8 items-center justify-center rounded-lg"
+                style={{ color: 'var(--azfit-primary)' }}
+              >
+                <Layers size={16} />
+              </div>
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}>
+                  Card style
+                </p>
+                <p className="mt-0.5 text-xs" style={{ color: 'var(--light-text-muted)' }}>
+                  Pulse Metal is a brushed-metal finish trial — Default keeps the classic look
+                </p>
+              </div>
+            </div>
+            <div
+              className="flex shrink-0 rounded-lg border p-0.5"
+              style={{ borderColor: 'var(--light-border)' }}
+              role="group"
+              aria-label="Card style"
+            >
+              {(['default', 'metal'] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  aria-pressed={cardVariantLoaded && cardVariant === v}
+                  disabled={!cardVariantLoaded}
+                  onClick={() => void handleCardVariantChange(v)}
+                  className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50"
+                  style={{
+                    backgroundColor: cardVariant === v ? 'var(--azfit-primary)' : 'transparent',
+                    color: cardVariant === v ? '#FFFFFF' : 'var(--page-text)',
+                  }}
+                >
+                  {v === 'default' ? 'Default' : 'Pulse Metal'}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Theme Preview */}

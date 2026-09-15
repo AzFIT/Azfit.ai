@@ -113,6 +113,12 @@ export function useDashboardPrefs(userId: string | undefined): DashboardPrefsSta
   const save = useCallback(
     async (next: DashboardPreferences): Promise<boolean> => {
       if (!userId) return false;
+      // Never persist a doc built on unsaved defaults: if the server row
+      // hasn't been read at least once, `next` may have been composed from
+      // the fallback prefs (e.g. the panel toggle racing the initial fetch)
+      // and would write default privacy/order state over real preferences.
+      // The 92c smoke caught exactly this wiping server-side privacy.
+      if (!cache.has(userId)) return false;
       const prev = cache.get(userId) ?? null;
       const normalized = normalizeDashboardPreferences(
         next,

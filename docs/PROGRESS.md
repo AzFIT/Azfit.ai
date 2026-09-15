@@ -1322,3 +1322,96 @@ Keys generated via `web-push` (`npx web-push generate-vapid-keys`); public key c
 3. Legacy local-state-only Settings toggles (Workout Reminders etc.) left untouched — out of scope, they predate the prefs JSONB.
 4. SW registers post-login only (public pages SW-free) — trades the Phase 1 PWA offline shell on public pages for the spec's "no registration before login" rule.
 5. Quiet hours are stored, not enforced, this phase (spec).
+## Phase 92c — "Pulse Metal" opt-in card finish (owner trial)
+
+Branch `feat/metal-cards-92c` off main `627f545` (Phase 94 live). The owner's
+trial of the brushed-metal card aesthetic from the Neon Redesign integration
+guide (`.temp/Build/AzFIT Neon Redesign — Integration Guide`, VISUAL
+REFERENCE ONLY — its CSS was never pasted). The finish is a per-user opt-in
+"Card style" in Settings; default OFF = classic rendering byte-identical.
+
+**Schema (additive):**
+```sql
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS ui_variant TEXT DEFAULT NULL;
+-- NULL / 'default' = classic; 'metal' = Pulse Metal variant. Per-user by
+-- design (app_settings is global — same reasoning as Phases 89/91).
+```
+Applied live via pooler; mirrored in `supabase/schema.sql` +
+`src/types/supabase.ts` (Row/Insert/Update). Migration file:
+`supabase/profiles-ui-variant-92c.sql`.
+
+**Tokens + activation (src/index.css):**
+- Activation: `data-ui-variant="metal"` on `<html>`. Absent attribute = every
+  92c rule inert, byte-identical classic. Chosen over a class because all
+  surface tokens live on `:root`/`[data-theme]` and useTheme already owns
+  `data-theme` on `<html>` — one root element owns both switches.
+- Specificity gotcha (smoke-caught): the dark block
+  `[data-theme='dark'][data-ui-variant='metal']` carries TWO attribute
+  selectors; the light block must be `:root:not([data-theme='dark'])[data-ui-variant='metal']`
+  or source order gives the dark ramp BOTH themes.
+- Mechanism: cards consume `--card-bg` via `backgroundColor:` inline styles
+  (89 files) and gradients are INVALID as background-color — so the metal
+  layers live on a fixed `body::before` (base ramp + brush grain + brand-cyan
+  tint + static sheen, composited once, z-index -1) and `body::after` (slow
+  diagonal sheen sweep, transform-only 16s animation, disabled under
+  `prefers-reduced-motion`). Under the attribute `--card-bg` becomes
+  translucent steel revealing the layer, `--page-bg: transparent`,
+  `--card-border` from `--metal-border`. Full card coverage with ZERO
+  component changes.
+- Light theme: lighter etched-metal ramp (guide had none) — neutral steel
+  tones only, no new accent hexes (theme lock). Dark steel values per the
+  guide (#1E2736/#161E2C/#10151F) with the guide's neon cyan replaced by
+  brand cyan rgba(0,174,239,0.05).
+- Performance guardrail: `@media (max-width:639px)` removes
+  `backdrop-filter` from `.glass` under the variant; no backdrop-filter on
+  every card at any breakpoint.
+
+**Files:** `src/index.css` (92c block), `src/lib/uiVariant.ts` (new —
+`applyUiVariant`/`currentUiVariant`), `src/App.tsx` (boot effect: apply on
+load + auth transitions, clear on sign-out), `src/pages/Settings.tsx`
+(Appearance → "Card style" segmented control, optimistic apply + single
+UPDATE, revert + toast on failure), plus schema/types above.
+
+**Smoke-caught product fixes (permanent gotchas):**
+1. `useDashboardPrefs.save` had a first-write-wins race: a panel toggle
+   landing BEFORE the initial profiles fetch resolved persisted a doc built
+   from fallback defaults, silently wiping server-side privacy/hidden-card
+   state (92c d4 smoke caught it zeroing a privacy-enabled fixture). Fix:
+   `save` refuses to persist until the server row has been read at least
+   once (`!cache.has(userId) → return false`). UI keeps working; the toggle
+   just isn't persisted in that pre-load window.
+2. `App.tsx` boot effects (92c ui-variant + Phase 94 SW registration) had
+   unguarded `getSession().then(...)` chains; a boot fetch racing a reload
+   surfaced an unhandled "TypeError: Failed to fetch" pageerror. Both chains
+   now `.catch(() => {})` — boot must never crash on a network blip.
+3. Phase 94 service-worker registration raced the login request burst: the
+   SW taking control while the boot getUser fetches were in flight
+   intermittently killed one (network-level "Failed to fetch", surfaced via
+   Sentry's global handler). Proven by diagnostic smokes with SW
+   registration blocked (2/2 clean vs ~every normal run blipped). Fix: SW
+   registration defers ~3s past the auth event (idle window; Settings'
+   push flow already handles "not active yet" honestly).
+4. Smoke hygiene note (not an app bug): the 90d palette's fixed z-80
+   backdrop swallows app-bar clicks if a synthesized Escape misses React
+   (documented Playwright heisenbug) — the smoke now closes with
+   retry-until-overlay-gone. Verified in isolation that one real Escape
+   closes the palette cleanly.
+
+**Deviations (documented, not hidden):** the neon palette swap (cyan
+#35E0FF etc.) is explicitly OUT OF SCOPE — brand colors and the AI-violet
+rule untouched. Under the variant, stacked translucent cards darken
+card-on-card areas (inherent to the layered-translucency mechanism).
+
+**Gates (branch + re-run on merged main):**
+- tsc clean · lint clean · tests 937/937 · build + 404 copy clean · e2e 4/4.
+
+**Smoke (.temp/audit/shots/92c/):** 21/21 assertions, TWO consecutive full
+passes in normal mode (SW active), zero console errors. (a) default = no
+attribute, classic token #151D27 byte-identical; (b) metal token
+rgba(21,29,42,0.82) dark / rgba(255,255,255,0.78) light via pooler-verified
+`ui_variant`, OFF reverts, survives reload; (c) light etched ramp verified
+at 390 + 1280; (d) integration under metal: 92 panels toggle, 90d palette
+opens, 91 privacy blur(8px) applies + eye reveal removes it, 90e view-as
+banner round trip — all green; (e) scrollWidth 390 both variants. Fixtures
+SMOKE92C-DELETE (lowercase) SQL-verified removed — 0 rows everywhere
+including auth.users. Screenshots: default/metal × dark/light × 390/1280.

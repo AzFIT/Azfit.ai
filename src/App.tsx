@@ -8,6 +8,7 @@ import { ViewAsProvider } from "@/hooks/useViewAs";
 import { ChatProvider } from "@/components/chat/ChatContext";
 import { AIContextProvider } from "@/components/ai-copilot/AIContextProvider";
 import { registerServiceWorker } from "@/lib/registerSW";
+import { applyUiVariant } from "@/lib/uiVariant";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import ArrowsShell from "@/components/ArrowsShell";
 import ViewAsGuard from "@/components/ViewAsGuard";
@@ -141,15 +142,70 @@ export default function App() {
   // plumbing is authenticated-only; public pages stay SW-free). Auth state
   // gives us both the persisted-session reload case (INITIAL_SESSION) and
   // fresh sign-in (SIGNED_IN) — registration itself is idempotent.
+  // 92c smoke-hardening: DEFER registration ~3s past the auth event. The
+  // 92c smoke proved registering mid-boot races the login request burst —
+  // the SW taking control while supabase getUser fetches are in flight
+  // intermittently kills one ("Failed to fetch", surfaced via Sentry's
+  // global handler). A short defer puts registration in the idle window;
+  // Settings' push flow already handles "not active yet" honestly.
   useEffect(() => {
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const registerIfSignedIn = (session: unknown) => {
-      if (!cancelled && session) registerServiceWorker();
+      if (cancelled || !session) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!cancelled) registerServiceWorker();
+      }, 3000);
     };
-    void supabase.auth.getSession().then(({ data }) => registerIfSignedIn(data.session));
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => registerIfSignedIn(data.session))
+      .catch(() => {});
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) =>
       registerIfSignedIn(session),
     );
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  // Phase 92c: apply the per-user card-style variant (profiles.ui_variant).
+  // Runs on boot for the persisted-session reload case and on every auth
+  // transition; signing out clears the attribute so the next user's
+  // classic/metal choice never leaks across accounts.
+  useEffect(() => {
+    let cancelled = false;
+    const applyForSession = async (session: unknown) => {
+      if (!session) {
+        applyUiVariant(null);
+        return;
+      }
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        const user = userData.user;
+        if (!user || cancelled) return;
+        const { data } = await supabase
+          .from("profiles")
+          .select("ui_variant")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (!cancelled) applyUiVariant(data?.ui_variant === "metal" ? "metal" : null);
+      } catch {
+        // Read raced a reload / network blip: keep the current variant
+        // (never crash boot, never wipe the user's choice).
+        if (!cancelled) applyUiVariant(null);
+      }
+    };
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => applyForSession(data.session))
+      .catch(() => {});
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      applyForSession(session).catch(() => {});
+    });
     return () => {
       cancelled = true;
       sub.subscription.unsubscribe();

@@ -21,6 +21,7 @@ export type Database = {
           trainer_profile: Json | null;
           dashboard_preferences: Json | null;
           notifications: Json | null;
+          ui_variant: string | null;
           role: "admin" | "trainer" | "client";
           created_at: string;
           updated_at: string;
@@ -35,6 +36,7 @@ export type Database = {
           trainer_profile?: Json | null;
           dashboard_preferences?: Json | null;
           notifications?: Json | null;
+          ui_variant?: string | null;
           role?: "trainer" | "client";
           created_at?: string;
           updated_at?: string;
@@ -49,6 +51,7 @@ export type Database = {
           trainer_profile?: Json | null;
           dashboard_preferences?: Json | null;
           notifications?: Json | null;
+          ui_variant?: string | null;
           role?: "trainer" | "client";
           created_at?: string;
           updated_at?: string;

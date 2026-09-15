@@ -597,3 +597,127 @@
     animation: none;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Phase 92c — "Pulse Metal" opt-in card finish (owner trial)
+   ───────────────────────────────────────────────────────────────────
+   ACTIVATION: `data-ui-variant="metal"` on <html>. Absent attribute =
+   every rule below is inert and rendering is byte-identical to classic.
+   Chosen over a class because all surface tokens live on :root /
+   [data-theme] and useTheme already owns data-theme on <html> — one
+   root element owns both switches.
+
+   MECHANISM: cards consume --card-bg via `backgroundColor:` inline
+   styles (89 files), and gradients are INVALID as background-color —
+   so the metal LAYERS live on a fixed body pseudo-layer and --card-bg
+   becomes translucent steel that reveals it. Full card coverage with
+   zero component changes. Neutral steel tones only (no new accent
+   hexes); the guide's neon cyan is replaced by brand cyan rgba.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Metal layer tokens — light (etched metal) ── */
+/* :not([data-theme='dark']) keeps this block's specificity above the dark
+   block below (two attribute selectors) so the light etched ramp wins when
+   the light theme is active — equal specificity would let source order give
+   the dark ramp both themes. */
+:root:not([data-theme='dark'])[data-ui-variant='metal'] {
+  --metal-base:
+    linear-gradient(180deg, #EDF1F6 0%, #E4EAF1 42%, #D8E0E9 100%);
+  --metal-brush:
+    repeating-linear-gradient(90deg,
+      rgba(15, 23, 42, 0.020) 0px, rgba(15, 23, 42, 0.020) 1px,
+      transparent 1px, transparent 4px),
+    repeating-linear-gradient(0deg,
+      rgba(255, 255, 255, 0.35) 0px, rgba(255, 255, 255, 0.35) 1px,
+      transparent 1px, transparent 3px);
+  --metal-sheen:
+    linear-gradient(115deg,
+      transparent 32%,
+      rgba(255, 255, 255, 0.16) 46%,
+      rgba(255, 255, 255, 0.06) 54%,
+      transparent 68%);
+  --metal-tint:
+    radial-gradient(120% 90% at 50% 0%, rgba(0, 174, 239, 0.06), transparent 55%);
+  --metal-border: rgba(15, 23, 42, 0.12);
+  --metal-edge-highlight: rgba(255, 255, 255, 0.85);
+  --metal-card: rgba(255, 255, 255, 0.78);
+
+  /* Card surfaces become translucent steel over the page metal layer */
+  --page-bg: transparent;
+  --card-bg: var(--metal-card);
+  --card-border: var(--metal-border);
+}
+
+/* ── Metal layer tokens — dark (steel, per the integration guide) ── */
+[data-theme='dark'][data-ui-variant='metal'] {
+  --metal-base:
+    linear-gradient(180deg, #1E2736 0%, #161E2C 42%, #10151F 100%);
+  --metal-brush:
+    repeating-linear-gradient(90deg,
+      rgba(255, 255, 255, 0.014) 0px, rgba(255, 255, 255, 0.014) 1px,
+      transparent 1px, transparent 4px),
+    repeating-linear-gradient(0deg,
+      rgba(0, 0, 0, 0.05) 0px, rgba(0, 0, 0, 0.05) 1px,
+      transparent 1px, transparent 3px);
+  --metal-sheen:
+    linear-gradient(115deg,
+      transparent 32%,
+      rgba(255, 255, 255, 0.050) 46%,
+      rgba(255, 255, 255, 0.018) 54%,
+      transparent 68%);
+  --metal-tint:
+    radial-gradient(120% 90% at 50% 0%, rgba(0, 174, 239, 0.05), transparent 55%);
+  --metal-border: rgba(196, 222, 255, 0.12);
+  --metal-edge-highlight: rgba(255, 255, 255, 0.09);
+  --metal-card: rgba(21, 29, 42, 0.82);
+
+  --page-bg: transparent;
+  --card-bg: var(--metal-card);
+  --card-border: var(--metal-border);
+}
+
+/* ── The metal face: static brushed layer (fixed = composited once) ── */
+:root[data-ui-variant='metal'] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    var(--metal-sheen),
+    var(--metal-brush),
+    var(--metal-tint),
+    var(--metal-base);
+}
+
+/* ── Sheen sweep: a slow diagonal light pass (transform-only, cheap) ── */
+:root[data-ui-variant='metal'] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  width: 200%;
+  background: linear-gradient(115deg,
+    transparent 42%,
+    rgba(255, 255, 255, 0.035) 50%,
+    transparent 58%);
+  animation: metal-sheen-sweep 16s ease-in-out infinite;
+}
+@keyframes metal-sheen-sweep {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-25%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-ui-variant='metal'] body::after {
+    animation: none;
+  }
+}
+
+/* ── Performance guardrail: no backdrop-filter on small screens ── */
+@media (max-width: 639px) {
+  :root[data-ui-variant='metal'] .glass {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
