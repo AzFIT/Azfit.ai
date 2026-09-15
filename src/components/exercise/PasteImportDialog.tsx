@@ -26,11 +26,13 @@ import {
   Check,
   CheckCircle2,
   ClipboardPaste,
+  Copy,
   Loader2,
   Plus,
   TriangleAlert,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,6 +44,16 @@ import {
 } from "@/lib/exerciseMatch";
 import { parseProgramPaste } from "@/lib/programImport";
 import type { ParseResult, ParsedRow } from "@/lib/programImport";
+import { GBC_DAY_PROMPT, PROGRAM_FORMAT_TEMPLATE } from "@/lib/promptTemplates";
+import {
+  clearRejection,
+  buildImportSelection,
+  importButtonLabel,
+  rejectSuggestion,
+  reviewCounts,
+  skipLine,
+  undoSkip,
+} from "@/lib/importReview";
 import type { LibraryExercise } from "./ExercisePickerDialog";
 
 export type ImportResolutions = Map<number, LibraryExercise>; // keyed by ParsedRow.line
@@ -73,6 +85,40 @@ export default function PasteImportDialog({
   const [addOpenFor, setAddOpenFor] = useState<number | null>(null); // row line
   const [adding, setAdding] = useState(false);
   const [addForm, setAddForm] = useState({ name: "", muscle: "", equipment: "", difficulty: "Intermediate" as (typeof DIFFICULTIES)[number] });
+  // Phase 92c-fix Item 3: rejected "Did you mean?" rows drop to the top-3
+  // picker; skipped rows are excluded from the import (undoable until the
+  // dialog closes).
+  const [rejectedLines, setRejectedLines] = useState<Set<number>>(new Set());
+  const [skippedLines, setSkippedLines] = useState<Set<number>>(new Set());
+
+  /* Clipboard with an honest fallback: clipboard API → legacy execCommand
+     → loud failure toast. Never pretends a copy succeeded. */
+  const copyText = useCallback(async (text: string, okMessage: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(okMessage);
+      return;
+    } catch {
+      /* fall through to the legacy path */
+    }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      if (ok) {
+        toast.success(okMessage);
+        return;
+      }
+    } catch {
+      /* fall through to the failure toast */
+    }
+    toast.error("Could not copy automatically — select and copy the text manually");
+  }, []);
 
   // Fetch the catalog once per open (same query as ExercisePickerDialog).
   useEffect(() => {
@@ -101,6 +147,8 @@ export default function PasteImportDialog({
     setResolutions(new Map());
     setAddOpenFor(null);
     setLibraryError(null);
+    setRejectedLines(new Set());
+    setSkippedLines(new Set());
   }, []);
 
   const parsed: ParseResult = useMemo(
@@ -129,20 +177,28 @@ export default function PasteImportDialog({
   // Effective resolution per row: an explicit pick (suggestion accepted /
   // picker choice / add-to-library) wins; otherwise a score in the auto band
   // resolves to the best match without needing state (repo lint rule bans
-  // setState-in-effect for this kind of prefill).
+  // setState-in-effect for this kind of prefill). Skipped rows never
+  // resolve — they are excluded from the import entirely.
   const resolutionFor = useCallback(
     (line: number) => {
+      if (skippedLines.has(line)) return null;
       const explicit = resolutions.get(line);
       if (explicit) return { lib: explicit, auto: false as const };
       const m = matchByLine.get(line);
       if (m?.best) return { lib: m.best, auto: true as const };
       return null;
     },
-    [resolutions, matchByLine],
+    [resolutions, matchByLine, skippedLines],
   );
 
-  const resolvedCount = parsed.rows.filter((r) => resolutionFor(r.line) != null).length;
-  const allResolved = parsed.rows.length > 0 && resolvedCount === parsed.rows.length;
+  const resolvedLines = useMemo(
+    () => parsed.rows.filter((r) => resolutionFor(r.line) != null).map((r) => r.line),
+    [parsed.rows, resolutionFor],
+  );
+  const counts = reviewCounts(resolvedLines, skippedLines);
+  // Item 3 FIX B: import is enabled whenever at least one row imports —
+  // it never gates on "remaining" unresolved rows.
+  const canImport = counts.importable > 0;
 
   const muscleOptions = useMemo(() => {
     const fromLib = [...new Set(library.map((l) => l.primary_muscle))].sort();
@@ -195,21 +251,21 @@ export default function PasteImportDialog({
     const created = data as LibraryExercise;
     setLibrary((prev) => [...prev, created]);
     setResolutions((prev) => new Map(prev).set(row.line, created));
+    setRejectedLines((prev) => clearRejection(prev, row.line));
     setAddOpenFor(null);
   }, [addForm, adding]);
 
   const handleConfirm = () => {
-    if (!allResolved) return;
-    // Fold derived auto-matches into the final map (onImport expects a
-    // complete resolution for every row).
-    const final = new Map(resolutions);
-    for (const r of parsed.rows) {
-      if (!final.has(r.line)) {
-        const m = matchByLine.get(r.line);
-        if (m?.best) final.set(r.line, m.best);
-      }
-    }
-    onImport(parsed, final);
+    if (!canImport) return;
+    // Skipped rows AND unresolved rows never enter the program; auto-matches
+    // fold in exactly once. Accept-all = the Phase 93 result byte-for-byte.
+    const { rows, resolutions: final } = buildImportSelection({
+      rows: parsed.rows,
+      explicit: resolutions,
+      skippedLines,
+      autoMatchFor: (line) => matchByLine.get(line)?.best ?? null,
+    });
+    onImport({ ...parsed, rows }, final);
     resetState();
     onOpenChange(false);
   };
@@ -283,6 +339,40 @@ export default function PasteImportDialog({
                     className="text-xs font-mono bg-[var(--page-bg)] border-[var(--card-border)] text-[var(--page-text)] resize-y"
                     data-testid="paste-import-textarea"
                   />
+                  {/* Item 2 — "Need the format?" helper. Hidden once the
+                      textarea has content (de-emphasized by absence). */}
+                  {!raw.trim() && (
+                    <div
+                      className="rounded-xl border border-dashed border-[var(--card-border)] px-3 py-2.5 space-y-2"
+                      data-testid="paste-import-format-helper"
+                    >
+                      <p className="text-[11px] font-semibold text-[var(--page-text)]/70">
+                        Need the format?
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => void copyText(PROGRAM_FORMAT_TEMPLATE, "Template copied")}
+                          className="inline-flex items-center gap-1.5 h-[44px] px-3 rounded-lg border border-[var(--card-border)] text-[11px] font-medium text-[var(--page-text)]/80 hover:text-[#00AEEF] hover:border-[#00AEEF]/50 transition-colors"
+                          data-testid="copy-format-template"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          Copy format template
+                        </button>
+                        <button
+                          onClick={() => void copyText(GBC_DAY_PROMPT, "Prompt copied")}
+                          className="inline-flex items-center gap-1.5 h-[44px] px-3 rounded-lg border border-[var(--card-border)] text-[11px] font-medium text-[var(--page-text)]/80 hover:text-[#00AEEF] hover:border-[#00AEEF]/50 transition-colors"
+                          data-testid="copy-ai-prompt"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          Copy AI prompt
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-[var(--page-text)]/50 leading-relaxed">
+                        Paste the prompt into your AI chat, then paste the program table it
+                        writes back here — the importer reads exactly this format.
+                      </p>
+                    </div>
+                  )}
                   {raw.trim() && (
                     <div className="space-y-2" data-testid="paste-import-preview">
                       <p className="text-[11px] text-[var(--page-text)]/60">
@@ -333,22 +423,38 @@ export default function PasteImportDialog({
                     </p>
                   )}
                   <p className="text-[11px] text-[var(--page-text)]/60">
-                    Match each pasted exercise to the library.{" "}
+                    Match each pasted exercise to the library — or skip rows
+                    you don't want.{" "}
                     <strong className="text-[var(--page-text)]">
-                      {resolvedCount} of {parsed.rows.length}
+                      {counts.importable} of {parsed.rows.length}
                     </strong>{" "}
-                    resolved.
+                    will import
+                    {counts.skipped > 0 && (
+                      <>
+                        {" "}· <strong className="text-[var(--page-text)]">{counts.skipped}</strong> skipped
+                      </>
+                    )}
+                    .
                   </p>
                   <div className="space-y-2">
                     {parsed.rows.map((row) => {
                       const res = resolutionFor(row.line);
                       const m = matchByLine.get(row.line);
-                      const suggested = !res && m && m.score >= SUGGEST_THRESHOLD && m.score < AUTO_MATCH_THRESHOLD && m.suggestions[0];
-                      const unmatched = !res && (!m || m.score < SUGGEST_THRESHOLD);
+                      const skipped = skippedLines.has(row.line);
+                      // A rejected suggestion drops the row to the picker
+                      // state (top-3 + add-to-library + skip).
+                      const rejected = rejectedLines.has(row.line);
+                      const suggested =
+                        !res && !rejected && m &&
+                        m.score >= SUGGEST_THRESHOLD && m.score < AUTO_MATCH_THRESHOLD &&
+                        m.suggestions[0];
+                      const unmatched = !res && (rejected || !m || m.score < SUGGEST_THRESHOLD);
                       return (
                         <div
                           key={row.line}
-                          className="rounded-xl border border-[var(--card-border)] px-3 py-2 space-y-1.5"
+                          className={`rounded-xl border border-[var(--card-border)] px-3 py-2 space-y-1.5 ${
+                            skipped ? "opacity-60" : ""
+                          }`}
                           data-testid={`import-row-${row.line}`}
                         >
                           <div className="flex items-center gap-2 text-xs">
@@ -361,9 +467,28 @@ export default function PasteImportDialog({
                                 Alt: {row.alternate}
                               </span>
                             )}
+                            {skipped && (
+                              <>
+                                <span
+                                  className="shrink-0 text-[9px] font-semibold uppercase tracking-wide border border-[var(--card-border)] rounded-full px-2 py-0.5 text-[var(--page-text)]/50"
+                                  data-testid="import-row-skipped-badge"
+                                >
+                                  Skipped
+                                </span>
+                                <button
+                                  onClick={() => setSkippedLines((prev) => undoSkip(prev, row.line))}
+                                  className="shrink-0 h-[44px] px-2 text-[11px] text-[#00AEEF] hover:underline"
+                                  aria-label={`Undo skip for ${row.exercise}`}
+                                  data-testid="import-row-undo-skip"
+                                >
+                                  Undo
+                                </button>
+                              </>
+                            )}
                           </div>
-                          {/* Resolution state */}
-                          {res ? (
+                          {/* Resolution state (skipped rows show only the
+                              badge + undo above) */}
+                          {!skipped && res ? (
                             <p className="flex items-center gap-1.5 text-[11px] text-[#22C55E]" data-testid="import-row-resolved">
                               <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                               <span className="truncate">{res.lib.name}</span>
@@ -383,22 +508,41 @@ export default function PasteImportDialog({
                             <div className="flex items-center gap-1.5 text-[11px] flex-wrap">
                               <span className="text-[#F59E0B] shrink-0">Did you mean</span>
                               <button
-                                onClick={() => setResolutions((prev) => new Map(prev).set(row.line, suggested))}
+                                onClick={() => {
+                                  setResolutions((prev) => new Map(prev).set(row.line, suggested));
+                                  setRejectedLines((prev) => clearRejection(prev, row.line));
+                                }}
                                 className="px-2 py-1 rounded-lg border border-[#F59E0B]/50 text-[#F59E0B] hover:bg-[#F59E0B]/10 font-medium transition-colors"
                                 data-testid="import-accept-suggestion"
                               >
                                 {suggested.name}? — tap to accept
+                              </button>
+                              {/* Item 3 FIX A — a wrong suggestion now has a
+                                  reject path into the resolution menu. */}
+                              <button
+                                onClick={() => setRejectedLines((prev) => rejectSuggestion(prev, row.line))}
+                                className="inline-flex items-center gap-1 h-[44px] px-2 rounded-lg text-[var(--page-text)]/50 hover:text-[var(--page-text)] hover:bg-[var(--page-bg)] transition-colors"
+                                aria-label="Reject suggestion"
+                                data-testid="import-reject-suggestion"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                Not this
                               </button>
                             </div>
                           ) : unmatched ? (
                             <div className="space-y-1.5">
                               {m && m.suggestions.length > 0 && (
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-[11px] text-[var(--page-text)]/50 shrink-0">No close match — pick one:</span>
+                                  <span className="text-[11px] text-[var(--page-text)]/50 shrink-0">
+                                    {rejected ? "Pick a different exercise:" : "No close match — pick one:"}
+                                  </span>
                                   {m.suggestions.map((s) => (
                                     <button
                                       key={s.id}
-                                      onClick={() => setResolutions((prev) => new Map(prev).set(row.line, s))}
+                                      onClick={() => {
+                                        setResolutions((prev) => new Map(prev).set(row.line, s));
+                                        setRejectedLines((prev) => clearRejection(prev, row.line));
+                                      }}
                                       className="px-2 py-1 rounded-lg border border-[var(--card-border)] text-[var(--page-text)]/70 hover:border-[#00AEEF]/50 hover:text-[#00AEEF] text-[11px] font-medium transition-colors"
                                     >
                                       {s.name}
@@ -478,6 +622,21 @@ export default function PasteImportDialog({
                                   <Plus className="w-3 h-3" /> Add “{row.exercise}” to library
                                 </button>
                               )}
+                              {/* Item 3 — resolution menu option 3: skip.
+                                  Excluded from the import, undoable on the
+                                  row until the dialog closes. */}
+                              <button
+                                onClick={() => {
+                                  setSkippedLines((prev) => skipLine(prev, row.line));
+                                  setAddOpenFor((prev) => (prev === row.line ? null : prev));
+                                }}
+                                className="inline-flex items-center gap-1 h-[44px] px-2 rounded-lg text-[11px] font-medium text-[var(--page-text)]/50 hover:text-[var(--page-text)] hover:bg-[var(--page-bg)] transition-colors"
+                                aria-label={`Skip ${row.exercise}`}
+                                data-testid="import-skip-row"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                Skip this row
+                              </button>
                             </div>
                           ) : null}
                         </div>
@@ -511,12 +670,12 @@ export default function PasteImportDialog({
                   </Button>
                   <Button
                     onClick={handleConfirm}
-                    disabled={!allResolved}
+                    disabled={!canImport}
                     className="ml-auto bg-[#00AEEF] text-white hover:bg-[#00AEEF]/90 text-xs disabled:opacity-40"
                     data-testid="paste-import-confirm"
                   >
                     <Check className="w-3.5 h-3.5 mr-1" />
-                    Import {resolvedCount}/{parsed.rows.length}
+                    {importButtonLabel(counts)}
                   </Button>
                 </>
               )}

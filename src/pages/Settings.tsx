@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router';
 import {
@@ -50,7 +50,8 @@ import {
   setQuietHours,
   type NotificationPrefs,
 } from '@/lib/notificationPrefs';
-import { applyUiVariant, currentUiVariant, type UiVariant } from '@/lib/uiVariant';
+import { applyUiVariant, currentUiVariant, persistUiVariant, type UiVariant } from '@/lib/uiVariant';
+import { UiVariantSaveController } from '@/lib/uiVariantSave';
 import type { Json } from '@/types/supabase';
 
 /* ------------------------------------------------------------------ */
@@ -383,48 +384,83 @@ export default function Settings() {
   const [notifPrefsLoaded, setNotifPrefsLoaded] = useState(false);
 
   /* ---- Phase 92c: card style variant (profiles.ui_variant; NULL/'default'
-     = classic, 'metal' = Pulse Metal opt-in finish) ---- */
+     = classic, 'metal' = Pulse Metal opt-in finish). Phase 92c-fix: the
+     save runs through UiVariantSaveController — a click before the row
+     read resolves is QUEUED (persisted exactly once when the read lands)
+     instead of being dropped by the disabled gate, and the persist uses
+     fetch keepalive so the Phase 33A SW-controllerchange reload can never
+     silently abort it. Control, html attribute, and DB move together;
+     any failure reverts control + attribute and toasts loudly. ---- */
   const [cardVariant, setCardVariant] = useState<UiVariant>(() => currentUiVariant());
-  const [cardVariantLoaded, setCardVariantLoaded] = useState(false);
+  const variantCtrlRef = useRef(new UiVariantSaveController(currentUiVariant()));
+
+  const persistVariant = useCallback(
+    async (variant: UiVariant) => {
+      const ctrl = variantCtrlRef.current;
+      if (!user?.id) {
+        const revert = ctrl.saveFailed();
+        setCardVariant(revert);
+        applyUiVariant(revert === 'metal' ? 'metal' : null);
+        toast.error('Could not save card style — you are not signed in');
+        return;
+      }
+      const res = await persistUiVariant(user.id, variant, async () => {
+        const { data } = await supabase.auth.getSession();
+        return data.session?.access_token ?? null;
+      });
+      if (res.ok) {
+        ctrl.saveSucceeded();
+      } else {
+        // Revert BOTH the control and the attribute — they never diverge.
+        const revert = ctrl.saveFailed();
+        setCardVariant(revert);
+        applyUiVariant(revert === 'metal' ? 'metal' : null);
+        console.error('ui_variant save failed:', res.error);
+        toast.error('Could not save card style — reverted to the previous style');
+      }
+    },
+    [user?.id],
+  );
 
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('ui_variant')
         .eq('id', user.id)
         .maybeSingle();
-      if (!cancelled) {
-        const variant: UiVariant = data?.ui_variant === 'metal' ? 'metal' : 'default';
-        setCardVariant(variant);
-        applyUiVariant(variant === 'metal' ? 'metal' : null);
-        setCardVariantLoaded(true);
+      if (cancelled) return;
+      const ctrl = variantCtrlRef.current;
+      if (error) {
+        // Read failure must never block the control (the save path does
+        // not depend on the read) and must never wipe the current look.
+        ctrl.readFailed();
+        console.error('ui_variant read failed:', error.message);
+      } else {
+        const queued = ctrl.readResolved(data?.ui_variant === 'metal' ? 'metal' : 'default');
+        setCardVariant(ctrl.value);
+        applyUiVariant(ctrl.value === 'metal' ? 'metal' : null);
+        // A click landed before the read: persist it now, exactly once.
+        if (queued) void persistVariant(queued);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [user?.id, persistVariant]);
 
   const handleCardVariantChange = useCallback(
-    async (next: UiVariant) => {
-      if (!user?.id || next === cardVariant) return;
-      const previous = cardVariant;
-      setCardVariant(next); // optimistic; reverted on failure (never half-saved)
-      applyUiVariant(next === 'metal' ? 'metal' : null);
-      const { error } = await supabase
-        .from('profiles')
-        .update({ ui_variant: next === 'metal' ? 'metal' : null })
-        .eq('id', user.id);
-      if (error) {
-        setCardVariant(previous);
-        applyUiVariant(previous === 'metal' ? 'metal' : null);
-        toast.error('Could not save card style — reverted to the previous style');
-      }
+    (next: UiVariant) => {
+      const ctrl = variantCtrlRef.current;
+      const toSave = ctrl.select(next);
+      // Control and attribute always move together, even for queued clicks.
+      setCardVariant(ctrl.value);
+      applyUiVariant(ctrl.value === 'metal' ? 'metal' : null);
+      if (toSave) void persistVariant(toSave);
     },
-    [user?.id, cardVariant],
+    [persistVariant],
   );
 
   useEffect(() => {
@@ -766,10 +802,9 @@ export default function Settings() {
                 <button
                   key={v}
                   type="button"
-                  aria-pressed={cardVariantLoaded && cardVariant === v}
-                  disabled={!cardVariantLoaded}
-                  onClick={() => void handleCardVariantChange(v)}
-                  className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50"
+                  aria-pressed={cardVariant === v}
+                  onClick={() => handleCardVariantChange(v)}
+                  className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors"
                   style={{
                     backgroundColor: cardVariant === v ? 'var(--azfit-primary)' : 'transparent',
                     color: cardVariant === v ? '#FFFFFF' : 'var(--page-text)',
