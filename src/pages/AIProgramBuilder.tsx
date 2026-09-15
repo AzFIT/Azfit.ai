@@ -12,7 +12,7 @@ import {
   Dumbbell, TrendingUp, Flame, Wind, HeartPulse, Pencil, Trash2,
   Plus, BarChart3, X, Target, Award, Sparkles, GripVertical,
   AlertTriangle, Layers, Calendar, Users, Play, ArrowLeft, Upload, ShieldAlert, Loader2, Copy, Link2, Printer,
-  ChevronUp, ChevronDown, Shuffle, Wand2, type LucideIcon,
+  ChevronUp, ChevronDown, Shuffle, Wand2, ClipboardPaste, type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -79,6 +79,9 @@ const BUILDER_DRAFT_KEY = 'program-builder';
 import { nextSeriesLetter } from '@/lib/exerciseLabels';
 import { pairingStyleForMethod, assignPairGroups } from '@/lib/supersets';
 import ExercisePickerDialog, { type LibraryExercise } from '@/components/exercise/ExercisePickerDialog';
+import PasteImportDialog, { type ImportResolutions } from '@/components/exercise/PasteImportDialog';
+import { formatRest, formatTempo } from '@/lib/programImport';
+import type { ParseResult, ParsedRow } from '@/lib/programImport';
 import {
   PROGRESSION_PRESETS,
   progressionNoteForWeek,
@@ -114,7 +117,7 @@ import { Textarea } from '@/components/ui/textarea';
 export interface ClientContext { experience: string; availability: string; limitations: string[]; otherLimitation: string; }
 export interface ProgramPhase { id: string; name: string; weeks: number; focus: string; color: string; active: boolean; intensityTarget?: string; volumeTarget?: string; }
 export interface ProgramSplit { day: string; active: boolean; workout: string; dbId?: string; }
-export interface ProgramExercise { code: string; name: string; sets: number; reps: string; pct1RM: string; tempo: string; rest: string; dbId?: string; isSubstituted?: boolean; safetyNote?: string; supersetGroup?: string; }
+export interface ProgramExercise { code: string; name: string; sets: number; reps: string; pct1RM: string; tempo: string; rest: string; dbId?: string; isSubstituted?: boolean; safetyNote?: string; supersetGroup?: string; importNote?: string; }
 // Phase 56: goal → goals (multi-select; goals[0] is the primary for generation mapping)
 export interface ProgramData { id?: string; goals: string[]; method: string; clientContext: ClientContext; phases: ProgramPhase[]; split: ProgramSplit[]; exercises: ProgramExercise[]; workoutExercises?: Record<number, ProgramExercise[]>; progressionRules: ProgressionRule[]; programName: string; description: string; tags: string[]; isPublic: boolean; assignedClient: string; }
 export interface SavedProgram { id: string; createdAt: string; updatedAt: string; data: ProgramData; }
@@ -1587,6 +1590,92 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
   const openAddPicker = () => { setSwapIdx(null); setPickerOpen(true); };
   const openSwapPicker = (idx: number) => { setSwapIdx(idx); setPickerOpen(true); };
 
+  // Phase 93 — Paste Import: populate per-day exercise lists from a pasted
+  // program (Sheets/AI chat). Day mapping: paste day N → Nth ACTIVE split day
+  // (Mon→Sun order); if there aren't enough active days, trailing inactive
+  // days are activated. Replaces the mapped days' lists wholesale.
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const handlePasteImport = useCallback(
+    (result: ParseResult, resolutions: ImportResolutions) => {
+      const pasteDays = [...new Set(result.rows.map((r) => r.day))].sort((a, b) => a - b);
+      let firstMappedKey: number | null = null;
+      updateData((prev) => {
+        let split = prev.split;
+        const activeCount = split.filter((d) => d.active).length;
+        if (activeCount < pasteDays.length) {
+          // Activate trailing inactive days (Mon→Sun order) so every pasted
+          // day has a slot; 'Rest Day' labels become an honest 'Workout'.
+          const toActivate = split
+            .filter((d) => !d.active)
+            .sort((a, b) => (SPLIT_DAY_INDEX[a.day] ?? 0) - (SPLIT_DAY_INDEX[b.day] ?? 0))
+            .slice(0, pasteDays.length - activeCount);
+          const days = new Set(toActivate.map((d) => d.day));
+          split = split.map((d) =>
+            days.has(d.day)
+              ? { ...d, active: true, workout: d.workout === 'Rest Day' ? 'Workout' : d.workout }
+              : d,
+          );
+        }
+        const orderedActive = split
+          .filter((d) => d.active)
+          .sort((a, b) => (SPLIT_DAY_INDEX[a.day] ?? 0) - (SPLIT_DAY_INDEX[b.day] ?? 0));
+        const dayKeyByPasteDay = new Map<number, number>();
+        pasteDays.forEach((pd, i) => {
+          const d = orderedActive[i];
+          if (d) dayKeyByPasteDay.set(pd, SPLIT_DAY_INDEX[d.day] ?? 0);
+        });
+        const rowsByPasteDay = new Map<number, ParsedRow[]>();
+        for (const r of result.rows) {
+          const l = rowsByPasteDay.get(r.day) ?? [];
+          l.push(r);
+          rowsByPasteDay.set(r.day, l);
+        }
+        const workoutExercises = { ...(prev.workoutExercises ?? {}) };
+        for (const [pd, rows] of rowsByPasteDay) {
+          const key = dayKeyByPasteDay.get(pd);
+          if (!key) continue;
+          if (firstMappedKey == null) firstMappedKey = key;
+          workoutExercises[key] = rows.map((r) => {
+            const lib = resolutions.get(r.line);
+            const noteBits = [
+              r.notes ? `Note: ${r.notes}` : null,
+              r.alternate ? `Alternate: ${r.alternate}` : null,
+            ].filter(Boolean).join(' · ');
+            return {
+              code: r.order,
+              name: lib?.name ?? r.exercise,
+              sets: r.sets,
+              reps: r.reps,
+              pct1RM: 'N/A',
+              tempo: formatTempo(r.tempo),
+              rest: formatRest(r.restSec),
+              dbId: lib?.id,
+              importNote: noteBits || undefined,
+            };
+          });
+        }
+        const partial: Partial<ProgramData> = { split, workoutExercises };
+        if (result.meta.name) partial.programName = result.meta.name;
+        if (result.meta.description) partial.description = result.meta.description;
+        if (result.meta.weeks != null && prev.phases.length > 0) {
+          partial.phases = prev.phases.map((p, i) => (i === 0 ? { ...p, weeks: result.meta.weeks! } : p));
+        }
+        // Method: only when the pasted method name matches a real db method
+        // (honest — never fabricate a method mapping).
+        if (result.meta.method) {
+          const m = dbMethods.find(
+            (dm) => dm.name.trim().toLowerCase() === result.meta.method!.trim().toLowerCase(),
+          );
+          if (m) partial.method = m.slug;
+        }
+        return partial;
+      });
+      if (firstMappedKey != null) setSelectedDay(firstMappedKey);
+      toast.success(`Imported ${result.rows.length} exercises across ${pasteDays.length} day${pasteDays.length === 1 ? '' : 's'}`);
+    },
+    [updateData, dbMethods],
+  );
+
   // Phase 65A — Change-exercise dialog (Similar / Swap-from-day / Custom) +
   // taxonomy-driven pattern chips. The taxonomy query is shared app-wide via
   // useExerciseTaxonomy's module cache; unknown names stay unflagged (never
@@ -1736,6 +1825,7 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={handleAutoFill} className="border-[var(--ai-violet)] text-[var(--ai-violet)] hover:bg-[var(--ai-violet)]/10 text-xs"><Sparkles className="w-3.5 h-3.5 mr-1" />AI Auto-Fill</Button>
         <Button variant="outline" size="sm" onClick={openAddPicker} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs"><Plus className="w-3.5 h-3.5 mr-1" />Add Exercise</Button>
+        <Button variant="outline" size="sm" onClick={() => setPasteOpen(true)} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs"><ClipboardPaste className="w-3.5 h-3.5 mr-1" />Paste Import</Button>
         <div className="ml-auto"><ViewModeSwitch mode={mode} onChange={setMode} /></div>
       </div>
 
@@ -1938,6 +2028,13 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
                         </button>
                       </div>
                     </div>
+                    {/* Phase 93: import notes preserved from Paste Import
+                        (parenthetical instructions + "or" alternates). */}
+                    {exercise.importNote && (
+                      <p className="px-3 pb-3 -mt-1 text-[10px] text-[var(--page-text)]/50 bg-[var(--page-bg)]">
+                        {exercise.importNote}
+                      </p>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -2034,6 +2131,12 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
         onOpenChange={setPickerOpen}
         onSelect={handlePicked}
         limitations={limitations ?? []}
+      />
+      {/* Phase 93 — paste import (Sheets / AI chat → per-day lists). */}
+      <PasteImportDialog
+        open={pasteOpen}
+        onOpenChange={setPasteOpen}
+        onImport={handlePasteImport}
       />
       {/* Phase 65A — key-remount resets the tab state per row (repo lint rule
           bans setState-in-effect for dialog prefill). */}

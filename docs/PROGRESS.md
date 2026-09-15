@@ -1219,3 +1219,57 @@ An intermittent Playwright-timing race can swallow the FIRST synthesized click o
 1. CollapsiblePanel is a transparent wrapper (slim header bar, no own card surface) rather than a self-contained card — the wrapped Phase 59 tiles already render their own GlassCard headers with meaningful actions (Today "View all", Coach AI identity); a chrome-owning panel would double every header. Documented choice, spec's "wrap, don't restructure" preserved literally.
 2. Badge tones use semantic token colors (warning/danger) rather than brand cyan for at-risk — danger red is the honest signal for at-risk; cyan reserved for neutral counts (theme lock: zero new hex).
 3. No DDL (additive JSONB key only) — the spec anticipated "additive extension of 91's schema"; nothing to migrate.
+
+
+## Phase 93 — Program Paste Import (canonical sheet/AI format → program builder) (2026-09-15, AUTONOMY)
+**Branch:** `feat/paste-import-93` → fast-forwarded to main. Baseline 874 → **917 tests** (+43: programImport parser 28, exerciseMatch matcher 15). The owner's #1 admin-speed feature: paste a program from Google Sheets or an AI chat straight into the Program Creator — no manual exercise-by-exercise entry.
+
+### Canonical format + parser contract (src/lib/programImport.ts — the owner's locked format; the AI program prompt in canonical.md targets exactly this)
+```
+**Program Name:** 5-Day GBC: Strength & Stamina
+**Weeks:** 4
+**Training Method:** Free-form
+**Description:** 4 sets per exercise (12/10/8/6) ascending load. 45s rest between paired sets.
+| Day | Order | Exercise | Sets | Reps | Tempo | Rest |
+| 1 | A1 | Front Squat (Barbell) | 4 | 12/10/8/6 | 4010 | 45s |
+```
+- `parseProgramPaste(raw) → { meta: {name?, weeks?, method?, description?}, rows: ParsedRow[], errors: ParseError[] }`. Auto-detects markdown table / TSV / CSV (one format per paste; a CSV line is only a row when the header established CSV).
+- Day = number or "Day 1" (out-of-range → line error); order codes verbatim uppercased; **reps kept VERBATIM** ("12/10/8/6", "6-12" — never reinterpreted); tempo "4010"/"3-0-1-0" → 4 digits; rest "45s"/"90"/"1:16" → whole seconds.
+- "Hack Squat or Leg Press" → `exercise: "Hack Squat"` (primary, used for matching) + `alternate: "Leg Press"` (flagged in review, preserved into the builder row's `importNote`); "(Use lifting straps)" → stripped from the match name, kept in `notes` (also into `importNote`).
+- Blank lines and `|---|---|` separator rows skipped; **every other unparseable line reported in `errors` with its 1-based source line number and content — nothing silently dropped** (HONEST DATA).
+- `ParsedRow.line` = the row's real source line number (the table header row is not a row), used as the resolution key end-to-end.
+- Display helpers `formatTempo` ("4010"→"4-0-1-0", the builder's dashed convention) and `formatRest` (<60 → "45s", ≥60 → "m:ss", matching the builder's "3:00" style).
+
+### Exercise matcher (src/lib/exerciseMatch.ts — pure, NO new dependency)
+`matchExercise(name, library) → { best, score, suggestions[3] }` on normalized names (lowercase, parentheticals/punctuation stripped). Score = 0.55·token-coverage (per-token best fuzzy sim ≥0.6 counts, ÷ max token count) + 0.35·bigram Dice + prefix bonus (same first token +0.10 / full prefix +0.15) + **full-coverage bonus +0.15** (every query token fuzzy-matched — covers misspellings against qualified real-library names like "Hac Sqaut" → "Machine Hack Squat", the actual row in the 628-row library; smoke-caught: without it the score fell at 0.40, just under the band, and the row was offered no did-you-mean).
+Bands (named constants, unit-tested): `AUTO_MATCH_THRESHOLD = 0.8` (auto-match), `SUGGEST_THRESHOLD = 0.5` (tap-to-accept "Did you mean?"), below = unmatched (top-3 picker + add-to-library). `best` is null below 0.8; suggestions exclude best, top 3 otherwise.
+
+### UI — src/components/exercise/PasteImportDialog.tsx (portaled to document.body — GlassCard backdrop-filter traps position:fixed, permanent gotcha)
+Entry point: **"Paste Import" button in Step 6 (Exercise Review) toolbar**, beside "Add Exercise" (`AIProgramBuilder.tsx`). The Library's template flow does NOT share this editor — paste import is a wizard-builder feature only (documented choice). Three surfaces in one overlay:
+1. **Paste** — textarea + live parse preview grouped by day with order codes + honest line-numbered error list. Metadata summary line ("20 exercises across 5 days · {name}").
+2. **Review** — every row matched against the live `exercise_library` (same query as ExercisePickerDialog): ≥0.8 renders a green `✓ name` chip (derived, no state write — repo lint bans setState-in-effect; explicit picks win over the derivation); 0.5–0.8 shows a one-tap "Did you mean X?"; <0.5 shows the top-3 picker + **inline add-to-library form** (name prefilled/editable + muscle/equipment/difficulty selects — options derived from the live library, fallbacks seeded) which INSERTs the exercise (`code`/`exercise_code` = unique slug suffix — the generated Insert type demands them though the columns are nullable; NOT NULL set: name, slug, primary_muscle, equipment, difficulty, exercise_type, is_active) under the existing "Trainers can manage exercise_library" policy, appends it to the local catalog, and the row auto-resolves to it. Alternate shown as an "Alt: {name}" chip. Confirm disabled until all rows resolve; count shown on the button ("Import 17/20").
+3. **Confirm** → `onImport(result, resolutions)` — Step 6's `handlePasteImport` populates the builder through its existing `updateData` state API (no parallel program model): paste day N → Nth ACTIVE split day (Mon→Sun order); if the split has fewer active days than pasted days, trailing inactive days are activated ('Rest Day' labels become honest 'Workout'); mapped days' lists are REPLACED wholesale with `{code: order, name: resolved library name, sets, reps (verbatim), pct1RM: 'N/A', tempo: formatTempo, rest: formatRest, dbId, importNote}`. Metadata: programName/description always when parsed; weeks → phases[0].weeks; **method only when the pasted method name case-insensitively matches a real db method name — never fabricated** ("Free-form" matches nothing in the 16-method catalog → builder method unchanged, honest). Parenthetical notes + alternate preserved on the row as `importNote` (new additive optional `ProgramExercise.importNote`, rendered as a quiet read-only line in the expanded edit row). First mapped day auto-selected.
+
+### Gates
+`npx tsc -b` ✅ · `npm run lint` ✅ · **917/917** ✅ · build + 404 fallback copy ✅ · e2e **4/4** ✅.
+
+### Smoke (fixture trainer `smoke93-delete@azfit.demo`; **26/26 assertions across TWO consecutive full runs**, zero console errors; both themes, 390 + 1280)
+- (a) full 5-day GBC canonical paste → 20 rows / 5 days, zero parse errors; metadata lands; 16/20 auto-matched on entry; all 20 resolved → confirm → dialog closes, **5 active split day chips (4 default Upper/Lower + 1 auto-activated for the 5th paste day)**; Day 1 renders Front Squat / Pull up - Pronated Grip / Machine Hack Squat with verbatim "12/10/8/6" reps and dashed "4-0-1-0" tempo ✅
+- (b) "Hack Squat or Leg Press (Use lifting straps)" → "Alt: Leg Press" chip on the row, primary matched, notes preserved into importNote ✅
+- (c) "Hac Sqaut" → did-you-mean "Machine Hack Squat? — tap to accept"; one tap resolves ✅
+- (d) unknown "Zottman Quantum Curl XYZ" → no auto resolution; add-to-library form prefills the pasted name; **SQL proves the exercise_library row was created**; row auto-resolves ✅
+- (e) malformed paste → "Line 4: …" junk-line error AND "Line 5: …" out-of-range Day 9 error, both with content; the one valid row still parsed — nothing silently dropped ✅
+- (f) CSV paste from Sheets → identical parse (2 exercises / 1 day, zero errors) + metadata ✅
+- (g) scrollWidth = 390 both themes, ≤1280 at desktop, zero console errors ✅
+- Screenshots `.temp/audit/shots/93/`: a-paste-preview-{dark-390,dark-1280,light-390}, a-review-matched-{dark-390,dark-1280,light-390}, c-review-suggestion-dark-390, d-add-to-library-dark-390 (also evidences the unmatched state), e-malformed-line-dark-390, f-csv-preview-dark-390, g-populated-builder-dark-390.
+- **Fixtures SQL-verified removed: 0 rows in exercise_library / profiles / clients / programs; auth user deleted via admin API (200).** Temp scripts deleted.
+
+### Smoke-caught fixes (documented)
+1. **Matcher full-coverage bonus** (above) — real-library names are qualified ("Machine Hack Squat", not "Hack Squat"); misspellings of those fell at 0.40, under SUGGEST_THRESHOLD, so the spec's core "Hac Sqaut must suggest Hack Squat" case silently degraded to unmatched against the real catalog.
+2. **Admin list-users `?email=` filter is unreliable** — an early fixture script reused `users[0]` and promoted/reset-password'd a REAL user account (`azwarhktrl@gmail.com`, the owner-side trainer account) before the mismatch was caught. Fixture scripts must exact-match `u.email.toLowerCase()` client-side and CREATE when no match. **Side effect to disclose: that account's password was reset to `AzFitDemo2026!` during debugging — the owner should reset it via Forgot password.** All subsequent fixture work used the exact-match pattern.
+
+### Deviations
+1. Entry point is Step 6 only (the wizard's exercise step) — the Library template flow does not share the builder's editor, so no second entry was added (documented choice per spec's "if it shares the editor").
+2. No DDL — exercise_library inserts use the existing trainer-manage policy and existing columns only.
+3. Auto-matched rows resolve by derivation (explicit picks override) rather than a setState-on-mount effect — the repo lint rule bans setState-in-effect; behavior is identical from the user's view.
+4. Pasted "Training Method: Free-form" intentionally does NOT map (no such method in the catalog) — the honest no-fabrication rule; documented in the import handler comment.
