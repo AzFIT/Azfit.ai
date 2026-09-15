@@ -27,6 +27,7 @@ import {
   Brain,
   Users,
   Calendar as CalendarIcon,
+  CreditCard,
   BarChart3,
   Table2,
   FileText,
@@ -49,6 +50,8 @@ export const TRAINER_NAV_ITEMS: TrainerNavItem[] = [
   { id: "coach", label: "Coach", path: "/coach", icon: Brain, permanent: false },
   { id: "clients", label: "Clients", path: "/clients", icon: Users, permanent: false },
   { id: "schedule", label: "Schedule", path: "/schedule", icon: CalendarIcon, permanent: false },
+  // Phase 96: payments/packages/attendance — toggleable like the others.
+  { id: "payments", label: "Payments", path: "/payments", icon: CreditCard, permanent: false },
   { id: "analytics", label: "Analytics", path: "/analytics", icon: BarChart3, permanent: false },
   { id: "sheets", label: "Sheets", path: "/sheets", icon: Table2, permanent: false },
   { id: "plan-summary", label: "Plan Summary", path: "/plan-summary", icon: FileText, permanent: false },

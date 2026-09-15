@@ -43,6 +43,7 @@ import InsightsStrip from "./InsightsStrip";
 import ConsistencyCalendar from "./ConsistencyCalendar";
 import AchievementsGrid from "./AchievementsGrid";
 import SessionsRemainingCard from "./SessionsRemainingCard";
+import PaidPackageCard from "./PaidPackageCard";
 import MyProgressSection from "./MyProgressSection";
 import MyTargetsCard from "./MyTargetsCard";
 
@@ -855,6 +856,9 @@ export default function ClientDashboard() {
 
       {/* SESSIONS REMAINING (Phase 50) — only when a package exists */}
       {clientsId && <SessionsRemainingCard clientId={clientsId} />}
+
+      {/* PAID PACKAGE (Phase 96, client view) — read-only, prices hidden */}
+      {clientsId && <PaidPackageCard clientId={clientsId} />}
 
       {/* ═══════════════════════════════════════════════════════════
           CHECK-IN DUE CARD (conditional)

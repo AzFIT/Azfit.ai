@@ -124,6 +124,30 @@ export type Database = {
         };
         Relationships: [];
       };
+      client_rates: {
+        Row: {
+          client_id: string;
+          rate_cents: number;
+          billing_unit: string;
+          updated_by: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          client_id: string;
+          rate_cents: number;
+          billing_unit?: string;
+          updated_by?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          client_id?: string;
+          rate_cents?: number;
+          billing_unit?: string;
+          updated_by?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
       programs: {
         Row: {
           id: string;
@@ -1958,6 +1982,84 @@ export type Database = {
             referencedColumns: ["id"];
           }
         ];
+      };
+      packages: {
+        Row: {
+          id: string;
+          client_id: string;
+          name: string;
+          total_sessions: number;
+          sessions_used: number;
+          price_cents: number;
+          purchased_at: string | null;
+          expires_at: string | null;
+          active: boolean;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          name: string;
+          total_sessions: number;
+          sessions_used?: number;
+          price_cents: number;
+          purchased_at?: string | null;
+          expires_at?: string | null;
+          active?: boolean;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          client_id?: string;
+          name?: string;
+          total_sessions?: number;
+          sessions_used?: number;
+          price_cents?: number;
+          purchased_at?: string | null;
+          expires_at?: string | null;
+          active?: boolean;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
+      payments: {
+        Row: {
+          id: string;
+          client_id: string;
+          package_id: string | null;
+          amount_cents: number;
+          kind: string;
+          note: string | null;
+          paid_at: string | null;
+          logged_by: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          package_id?: string | null;
+          amount_cents: number;
+          kind: string;
+          note?: string | null;
+          paid_at?: string | null;
+          logged_by?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          client_id?: string;
+          package_id?: string | null;
+          amount_cents?: number;
+          kind?: string;
+          note?: string | null;
+          paid_at?: string | null;
+          logged_by?: string | null;
+          created_at?: string | null;
+        };
+        Relationships: [];
       };
       client_goals: {
         Row: {

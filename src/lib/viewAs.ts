@@ -68,6 +68,7 @@ export function loggedByForWrite(
 export const VIEW_AS_BLOCKED_PREFIXES = [
   "/settings",
   "/trainer-profile",
+  "/payments",
   "/onboarding",
   "/bioprint",
   "/progress-photos",

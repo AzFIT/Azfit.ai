@@ -74,6 +74,8 @@ const PrintPlanSummaryPage = lazy(() => import("@/pages/PrintPlanSummary"));
 // Phase 89: "Plan Summary" nav destination — roster index deep-linking to
 // each client's existing Plan Summary tab (see PlanSummaryIndex header).
 const PlanSummaryIndexPage = lazy(() => import("@/pages/PlanSummaryIndex"));
+// Phase 96: payments, packages & attendance (trainer money page).
+const PaymentsPage = lazy(() => import("@/pages/Payments"));
 // Phase 90b: trainer public identity — /trainer-profile (view + edit form).
 const TrainerProfilePage = lazy(() => import("@/pages/TrainerProfile"));
 
@@ -352,6 +354,16 @@ export default function App() {
                     element={
                       <ProtectedRoute>
                         <SchedulePage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  {/* Phase 96: financial data — trainer-only, and blocked
+                      while viewing as a client (ViewAsGuard toast + redirect). */}
+                  <Route
+                    path="/payments"
+                    element={
+                      <ProtectedRoute requireTrainer>
+                        <PaymentsPage />
                       </ProtectedRoute>
                     }
                   />

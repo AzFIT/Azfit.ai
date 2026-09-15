@@ -18,6 +18,8 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { formatDateKeyLocal, formatDayMonth } from '@/lib/utils';
+import { formatCents } from '@/lib/money';
+import { confirmSessionBilling } from '@/services/payments';
 import { useSessions } from '@/hooks/useSessions';
 import type { Session } from '@/hooks/useSessions';
 import { findSessionConflicts, generateWeeklyOccurrences, formatConflictList } from '@/lib/sessionConflicts';
@@ -804,6 +806,36 @@ export default function SchedulePage() {
   const handleMarkCompleted = async (id: string) => {
     const ok = await updateSession(id, { status: 'completed' });
     if (ok) toast.success('Session marked completed');
+    // Phase 96: billing side-effect — decrement the client's active paid
+    // package by 1 (guarded) and auto-log the per-session payment unless
+    // the package was prepaid. Never blocks the confirm; honest toasts.
+    if (ok) {
+      const session = sessions.find((s) => s.id === id);
+      try {
+        const outcome = await confirmSessionBilling(
+          session?.clientRecordId,
+          session?.clientName,
+        );
+        if (outcome.outcome === 'logged') {
+          toast.success(
+            `Package "${outcome.packageName}": ${outcome.remaining} remaining · payment ${formatCents(outcome.amountCents)} logged`,
+          );
+        } else if (outcome.outcome === 'decremented') {
+          toast.success(
+            `Package "${outcome.packageName}": ${outcome.remaining} remaining (prepaid — no extra charge)`,
+          );
+        } else if (outcome.outcome === 'no_package') {
+          toast.info('No active package — log a payment from the Payments page');
+        } else if (outcome.outcome === 'blocked') {
+          toast.warning(
+            `Package not charged (${outcome.reason}) — check the Payments page`,
+          );
+        }
+      } catch (err) {
+        console.error('Session billing hook failed:', err);
+        toast.error('Session completed, but billing could not update — check the Payments page');
+      }
+    }
     setDetailOpen(false);
   };
 

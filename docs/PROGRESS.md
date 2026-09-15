@@ -1550,3 +1550,121 @@ MyTargetsCard, RevenueSnapshot, GlassCard) unchanged and benefitting.
 
 ### No tests added (documented)
 Pure UI mounts + one CSS token — no logic unit warranted; 973/973 baseline held.
+
+
+## Phase 96 — Payments, Packages & Attendance (feat/payments-96)
+
+**Owner ask:** trainers set per-client rates and packages, payments auto-log
+when a session is confirmed, attendance/packages/revenue become real trackable
+data. Phase 90 deliberately shipped no revenue card because no payment data
+existed — this phase creates that data.
+
+### Money handling (permanent decision)
+- **ALL money is integer cents** — DB columns are `INT …_cents`; JS never does
+  float math on money. `src/lib/money.ts` is the only boundary:
+  `parseMoneyInput` ("45.50"/"$45.50" → 4550, rejects negatives & >2 decimals),
+  `formatCents` (display only), `sumCents`. Currency is the named constant
+  `PAYMENT_CURRENCY = "USD"` — change in one place when the owner picks a
+  currency.
+- **Displayed revenue is always `SUM(payments.amount_cents)`** — never derived,
+  never fabricated. Missing data renders an honest "—"/absent state, never 0.
+
+### Schema (supabase/payments-96.sql — applied live, mirrored in schema.sql + types)
+```sql
+CREATE TABLE IF NOT EXISTS public.client_rates (
+  client_id UUID PRIMARY KEY REFERENCES public.clients(id) ON DELETE CASCADE,
+  rate_cents INT NOT NULL CHECK (rate_cents > 0),
+  billing_unit TEXT NOT NULL DEFAULT 'session' CHECK (billing_unit IN ('session','month')),
+  updated_by UUID REFERENCES auth.users(id), updated_at TIMESTAMPTZ DEFAULT now());
+CREATE TABLE IF NOT EXISTS public.packages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+  name TEXT NOT NULL, total_sessions INT NOT NULL CHECK (total_sessions > 0),
+  sessions_used INT NOT NULL DEFAULT 0 CHECK (sessions_used >= 0),
+  price_cents INT NOT NULL CHECK (price_cents >= 0),
+  purchased_at TIMESTAMPTZ DEFAULT now(), expires_at TIMESTAMPTZ NULL,
+  active BOOLEAN NOT NULL DEFAULT true, created_at/updated_at,
+  CHECK (sessions_used <= total_sessions));
+CREATE TABLE IF NOT EXISTS public.payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+  package_id UUID NULL REFERENCES public.packages(id) ON DELETE SET NULL,
+  amount_cents INT NOT NULL CHECK (amount_cents >= 0),
+  kind TEXT NOT NULL CHECK (kind IN ('package','package_session','single_session','other')),
+  note TEXT, paid_at TIMESTAMPTZ DEFAULT now(), logged_by UUID REFERENCES auth.users(id));
+```
+RLS on all three (27B pattern): trainer FOR ALL on own clients' rows; client
+SELECT-only on their own (profiles-email join). `/payments` added to
+`VIEW_AS_BLOCKED_PREFIXES` — financial data never renders in Client View.
+- **Coexistence (documented):** Phase 50 `session_packages` = the FREE,
+  derivative credit model (no money, no counter — untouched). The new
+  `packages` = the PAID model (bundle price + used counter + expiry). Client
+  dashboard shows both cards, clearly separate ("Session Package" vs "My
+  Sessions Package").
+- **Attendance is DERIVED, not stored** (spec-compliant, no table):
+  `sessions WHERE client_record_id = <clients.id> AND status = 'completed'`
+  (account-having clients also via `client_id = profiles(id)`).
+
+### Money model + session-confirm hook (the reconciliation rule)
+- Package `price_cents` is the bundle price (feeds 96b profitability). The
+  per-session money event uses the client's `client_rates.rate_cents`.
+- Trainer marks a session completed (existing flow, `Schedule.tsx
+  handleMarkCompleted`) → `confirmSessionBilling()` (src/services/payments.ts):
+  1. Pick the client's oldest eligible package (active, not expired,
+     remaining > 0, `purchased_at` ASC — fair drawdown).
+  2. Guarded decrement: `UPDATE … SET sessions_used = sessions_used + 1
+     WHERE id AND sessions_used < total_sessions` — race-safe, never below
+     zero (DB CHECK backs it).
+  3. **PREPAID GUARD:** if a `kind='package'` payment row already exists for
+     that package (client paid upfront — linked via the log-payment form's
+     package select), the confirm decrements ONLY. An extra per-session row
+     would double-count revenue. (Smoke-proven: payments ¢19000→19000.)
+  4. Otherwise auto-insert `kind='package_session'` for the rate; when no
+     rate is set the amount is 0 with an honest "amount unknown" note — never
+     a fabricated number.
+  5. No active package → the UI toasts the honest "No active package — log a
+     payment from the Payments page" prompt. Billing failure never blocks the
+     confirm (toast + console.error).
+- Pure decisions live in `src/lib/sessionBilling.ts` (`decideSessionBilling`,
+  expiry window = 7 days) — unit-tested; the service only executes them.
+
+### UI
+- `/payments` (requireTrainer, Phase 89 nav item "payments" — toggleable like
+  the others; nav test updated 9→10): client picker reuses the Phase 90h
+  roster (one clients query + one profiles `.in` join, case-insensitive —
+  account-less clients included, tagged "no portal account"), rate form
+  (amount + per session/per month), package cards (remaining/total progress,
+  "expires soon" warning inside 7 days in `--warning`, exhausted/expired
+  states in `--danger`, activate/deactivate), package form (optional expiry
+  date → end-of-day UTC), log-payment form (amount/kind/optional package
+  link/note), payment history + revenue total. Attendance count per client.
+- Client view (Item 3): `PaidPackageCard` on ClientDashboard — read-only,
+  remaining sessions per active package. **Price amounts hidden from clients
+  this phase** (owner decision, documented).
+
+### Gates & smoke
+- tsc, lint, **991/991** (+18: money + sessionBilling + nav 10-item), build +
+  404 copy, e2e 4/4.
+- Smoke **22/22, two consecutive passes** (fixtures smoke96{t,t2,c}-delete,
+  lowercase, one-transaction, SQL-verified 0 rows incl. auth.users after):
+  (a) rate+package UI→SQL; (b) confirm → used 0→1 + auto payment 4500¢;
+  (c) 2nd confirm → 2/2, 3rd → blocked, used stays 2, no extra payment,
+  "Exhausted" renders; prepaid guard; (d) 3-day expiry warns, 30-day doesn't;
+  (e) revenue "$215.00" == SQL SUM to the cent; (f) second trainer sees 0
+  rows, client reads own but PATCH/INSERT denied (row unchanged, 403); client
+  card renders remaining with prices hidden; scrollWidth 390, zero console
+  errors. Screenshots in `.temp/audit/shots/96/`.
+
+### Smoke-script gotchas (permanent)
+- Playwright `isVisible({ timeout })` IGNORES the timeout (returns
+  immediately) — async-resolving cards need `waitFor({ state: 'visible' })`.
+- Same-context second login overwrites the shared localStorage auth token —
+  use a separate browser context per role.
+- Schedule day view only offers "Mark completed" on PAST sessions; the
+  day-selector strip renders only in Day view (default is month).
+- An RLS-denied REST PATCH returns **204 with 0 rows affected**, not an error
+  status — assert the row is unchanged, not the HTTP status.
+
+### Deferred (Phase 96b, documented)
+Gym rent + trainer revenue dashboard, per-client profitability, payment
+history charts.
