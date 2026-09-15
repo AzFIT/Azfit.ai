@@ -9,6 +9,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import LogoHomeButton from '@/components/LogoHomeButton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { calculateBMI, calculateBMR, calculateTDEE } from '@/lib/utils';
@@ -263,6 +264,10 @@ export default function OnboardingPage() {
     <div className="min-h-[100dvh] pb-20" style={{ backgroundColor: 'var(--page-bg)' }}>
       {/* Header */}
       <div className="sticky top-0 z-30 border-b backdrop-blur-xl" style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }}>
+        {/* Phase 96a: AzFIT logo → dashboard */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <LogoHomeButton />
+        </div>
         <div className="mx-auto max-w-2xl px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

@@ -7,6 +7,7 @@ import {
   Weight, Target, Clock, Calculator,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import LogoHomeButton from "@/components/LogoHomeButton";
 import { Input } from "@/components/ui/input";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -275,6 +276,10 @@ export default function BioPrintPage() {
   return (
     <div className="min-h-[100dvh] pb-20" style={{ backgroundColor: "var(--page-bg)" }}>
       <div className="mx-auto max-w-4xl px-4 py-6">
+        {/* Phase 96a: AzFIT logo → dashboard */}
+        <div className="flex justify-center pb-2">
+          <LogoHomeButton />
+        </div>
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>Bio Print Tracker</h1>
           <div className="flex gap-2">

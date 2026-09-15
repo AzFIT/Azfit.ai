@@ -1471,3 +1471,82 @@ Why the 92c fixture smoke missed it: a fresh profile's reload fires before the s
 **Smoke-harness gotchas (permanent):** (1) Chrome's Async Clipboard `readText()` NORMALIZES newlines to CRLF — assert clipboard equality after `\r\n`→`\n` normalization (probe-verified the raw strings are byte-identical). (2) 44px targets: assert on `getComputedStyle().height`, not `getBoundingClientRect()` — Chromium rendered the border-box rect at 42.68px while computed height was exactly 44px. (3) NEVER write unbounded `while (locator.count() > 0)` click loops in smokes — one missed click (the known first-click heisenbug) spins forever; bound every loop with max attempts. (4) Test-content interference: a smoke that adds "Zorbleflop Snatch" to the library makes LATER nonsense rows ("Zorbleflop Alpha") fuzzy-match it into the suggestion band — smoke exercise names must not share tokens with rows created earlier in the same run.
 
 **Files touched:** `src/lib/uiVariant.ts` (keepalive persistUiVariant), `src/lib/uiVariantSave.ts` + `.test.ts` (new), `src/pages/Settings.tsx` (controller wiring, loud failures, aria-pressed, no disabled gate), `src/lib/promptTemplates.ts` + `.test.ts` (new), `src/components/exercise/PasteImportDialog.tsx` (format helper + copy buttons + reject/skip UI), `src/lib/importReview.ts` + `.test.ts` (new).
+
+
+## Phase 96a — AzFIT Logo Home Button on Every App Page (feat/logo-home-96a)
+
+**Goal:** the real AzFIT logo, functional as a one-tap "Go to dashboard" button, on
+EVERY authenticated app page — not just the 6 Layout-wrapped pages that got the app
+bar in Phase 90d (Schedule, CheckIns, Nutrition, Settings and ~20 more rendered
+their own headers with no way home).
+
+### Item 1 — Real logo asset + theme treatment
+- New asset `public/azfit-logo-header.png`: the owner's real logo (metallic AzFIT
+  glyph, same family already in the repo), box-downsampled from the 456KB original
+  (`azfit-logo.png`) to **21.6KB at 233x192** via a pngjs script (`.temp/optimize-logo-96a.mjs`,
+  deleted after). Rendered at 28px, so DPR 2x+ stays crisp; alpha preserved.
+- Light theme: the metallic glyph is silver-on-transparent and was washing out on
+  white surfaces. Treatment = token `--logo-filter: brightness(0.62) contrast(1.15)
+  saturate(1.25)` on `:root`, reset to `none` under `[data-theme="dark"]` — zero new
+  hex, theme-lock clean. Dark theme renders the asset natively. Chose a CSS filter
+  over a second asset file: one file, both themes, owner swaps the asset later
+  without touching code.
+
+### Item 2 — Shared component + mount sweep
+- New `src/components/LogoHomeButton.tsx` (default export, props
+  `{ transparent?, className? }`): 44px hit target, aria-label "Go to dashboard",
+  current-route safe no-op (no double history entry). Default variant serves
+  `azfit-logo-header.png` with `filter: var(--logo-filter, none)`; `transparent`
+  variant keeps the Phase 90d public-hero behavior (`azfit-logo-text.png`, no
+  filter) so 90d is byte-identical.
+- `Navbar.tsx` swaps its inline logo button for `<LogoHomeButton transparent={isTransparent} />`.
+- Mounted into every standalone-header page (both roles where the page differs):
+  SheetsPage, Notifications, OnboardingPage, AIProgramBuilder, ProgressPhotos,
+  ExportShare, TimerModes, WarmupGenerator, DeloadDetection, FormChecks, CheckInsPage
+  (3 headers), AIChatInterface, Schedule, Nutrition, BioPrintPage, Messages,
+  ExercisesPage, WeeklyDigest, TrainerProfile, ManualProgramBuilder, Settings,
+  ClientProfileHeader. Sticky headers get an absolutely-centered wrapper; Schedule
+  and ClientProfileHeader get a responsive variant (full-width centered row below
+  sm, absolute-centered at sm+) because those headers are crowded on mobile;
+  headerless pages get a centered wrapper above the title; Settings gets a chip
+  treatment in its hero.
+
+### Item 3 — Route coverage
+| Route family | Button source |
+|---|---|
+| /dashboard, /analytics, /coach, /coach-ai, /clients, /library, /plan-summary | Phase 90d app bar (Layout) — unchanged |
+| All routes listed in Item 2 | Mounted this phase |
+| /print/* | **Excluded by design** — print layouts carry no app chrome |
+| Public/marketing routes (/, /login, /signup, /invite, /privacy, /demo, /forgot-password, /reset-password) | **Excluded by design** — no app chrome |
+| NotFound | **Excluded by design** — transient error surface |
+| ManualProgramBuilder no-client fallback | Transient guard state; the main return has the button. Documented. |
+
+### Smoke-caught drive-by fix (permanent gotcha)
+Invalid `<button>` inside `<button>`: `FollowUpsWidget`'s "View all" button sat
+inside `CollapsibleSection`'s whole-header toggle button — React console error
+spam on every dashboard load, both roles. `CollapsibleSection`
+(`src/components/dashboard/shared/CollapsibleSection.tsx`) header restructured:
+header is now a div row; title area is the flex-1 toggle button; the right side
+carries the existing `headerAction` slot plus a dedicated chevron toggle button
+(`aria-label` = `{title} section toggle`). Same toggle handler; all other
+headerAction consumers (AIInsightsPanel, TodayTimelineTile, ClientDashboard,
+MyTargetsCard, RevenueSnapshot, GlassCard) unchanged and benefitting.
+
+### Verification
+- Gates: tsc, lint, **973/973**, build + 404 copy (dist/azfit-logo-header.png
+  present), e2e 4/4.
+- Smoke 28/28 (demo accounts — no DB writes this phase, no fixture needed;
+  documented): both roles navigate Schedule/CheckIns/Nutrition/Settings → /#/dashboard,
+  dashboard no-op proven via history.length unchanged, 44px computed target,
+  scrollWidth 390 on all four pages at 390, zero console errors both roles.
+  Theme: computed filter on the img is `none` in dark, `brightness(0.62)
+  contrast(1.15) saturate(1.25)` in light at both 390 and 1280 — proven by
+  computed style, not assumption. 16 settled screenshots in
+  `.temp/audit/shots/96a/`.
+- Smoke-script gotcha worth remembering: `addInitScript` re-runs on EVERY
+  document load — setting the theme seed there silently stomped per-theme
+  localStorage sets across reloads and cost two debug cycles. Seed only auth
+  state in init scripts; set scenario state after navigation.
+
+### No tests added (documented)
+Pure UI mounts + one CSS token — no logic unit warranted; 973/973 baseline held.

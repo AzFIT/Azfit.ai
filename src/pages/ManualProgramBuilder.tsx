@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import ExercisePickerDialog from "@/components/exercise/ExercisePickerDialog";
+import LogoHomeButton from "@/components/LogoHomeButton";
 import PresetInput from "@/components/ui/PresetInput";
 import {
   SETS_PRESETS,
@@ -290,6 +291,10 @@ export default function ManualProgramBuilder() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 pb-32">
+      {/* Phase 96a: AzFIT logo → dashboard */}
+      <div className="flex justify-center pb-2">
+        <LogoHomeButton />
+      </div>
       {/* Header */}
       <div className="mb-5 flex items-center gap-3">
         <button

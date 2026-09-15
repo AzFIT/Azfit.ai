@@ -1,10 +1,10 @@
 import { useState, useEffect, type RefObject } from 'react';
-import { useLocation, useNavigate } from 'react-router';
 import { Menu, Search, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardPrefs } from '@/hooks/useDashboardPrefs';
 import { usePrivacyRevealed } from '@/hooks/usePrivacy';
 import { setPrivacyRevealed } from '@/lib/privacyReveal';
+import LogoHomeButton from '@/components/LogoHomeButton';
 
 interface NavbarProps {
   onMenuOpen: () => void;
@@ -25,8 +25,6 @@ export default function Navbar({
   searchButtonRef,
 }: NavbarProps) {
   const [scrolled, setScrolled] = useState(false);
-  const navigate = useNavigate();
-  const location = useLocation();
 
   // Phase 91: floating privacy eye (trainer only, only when privacy mode is
   // enabled). Flips the ephemeral reveal shared with the blurred cards;
@@ -45,14 +43,6 @@ export default function Navbar({
   }, []);
 
   const isTransparent = transparent && !scrolled;
-
-  /* Phase 90d Item 2: the logo navigates to /dashboard. Current-route
-     safe — a no-op when already there (no double history entry). */
-  const goDashboard = () => {
-    if (location.pathname !== '/dashboard' && location.pathname !== '/') {
-      navigate('/dashboard');
-    }
-  };
 
   return (
     <nav
@@ -85,23 +75,10 @@ export default function Navbar({
         />
       </button>
 
-      {/* AzFIT Logo (center) — Phase 90d: tap → /dashboard (both roles) */}
+      {/* AzFIT Logo (center) — Phase 90d: tap → /dashboard (both roles).
+          Phase 96a: the button lives in the shared LogoHomeButton. */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-        <button
-          type="button"
-          onClick={goDashboard}
-          aria-label="Go to dashboard"
-          className="flex h-11 items-center justify-center rounded-lg px-2 transition-transform duration-100 active:scale-[0.92]"
-        >
-          <img
-            src={isTransparent ?  './azfit-logo-text.png' :  './azfit-logo.png'}
-            alt="AzFIT"
-            className="h-7 object-contain"
-            style={{
-              filter: isTransparent ? 'none' : 'var(--logo-filter, none)',
-            }}
-          />
-        </button>
+        <LogoHomeButton transparent={isTransparent} />
       </div>
 
       {/* Right cluster — Phase 90d: search pill (both roles).

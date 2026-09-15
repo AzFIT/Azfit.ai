@@ -6,6 +6,7 @@ import {
   ArrowLeft, Video, Upload, X, Play, Trash2, ClipboardCheck,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import LogoHomeButton from '@/components/LogoHomeButton';
 import { formatDateShort } from '@/lib/utils';
 import { getAllExercisesFlat } from '@/data/exerciseDatabase';
 import {
@@ -32,6 +33,10 @@ export default function FormChecksPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-white">
       <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/90 backdrop-blur-xl">
+        {/* Phase 96a: AzFIT logo → dashboard */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <LogoHomeButton />
+        </div>
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
           <button
             onClick={() => navigate('/dashboard')}

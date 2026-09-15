@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router';
 import { ArrowLeft, Clock, Dumbbell, Target, TrendingUp, CheckCircle2, Pause, Play, Plus, X, Vibrate, Timer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SessionExerciseCard } from '@/components/session/SessionExerciseCard';
+import LogoHomeButton from '@/components/LogoHomeButton';
 import { SessionSummaryModal } from '@/components/session/SessionSummaryModal';
 import { useActiveWorkoutSession } from '@/hooks/useActiveWorkoutSession';
 import { useRestTimer } from '@/hooks/useRestTimer';
@@ -216,6 +217,10 @@ export default function SheetsPage() {
     <div className="min-h-screen" style={{ backgroundColor: 'var(--page-bg)' }}>
       {/* Sticky Header */}
       <header className="sticky top-0 z-30 backdrop-blur-xl border-b border-[var(--card-border)]" style={{ backgroundColor: 'var(--card-bg)', opacity: 0.95 }}>
+        {/* Phase 96a: AzFIT logo → dashboard */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <LogoHomeButton />
+        </div>
         <div className="max-w-3xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex min-w-0 items-center gap-3">

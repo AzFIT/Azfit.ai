@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router';
+import LogoHomeButton from '@/components/LogoHomeButton';
 import {
   Palette,
   Ruler,
@@ -550,6 +551,13 @@ export default function Settings() {
           backgroundPosition: 'center 60%',
         }}
       >
+        {/* Phase 96a: AzFIT logo → dashboard (chip keeps it readable over the image) */}
+        <div
+          className="absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-full border px-1.5"
+          style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }}
+        >
+          <LogoHomeButton />
+        </div>
         {/* Overlay gradient */}
         <div
           className="absolute inset-0"

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import FAB from "@/components/FAB";
+import LogoHomeButton from "@/components/LogoHomeButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import PulseRing from "@/components/ui/PulseRing";
@@ -365,6 +366,10 @@ export default function NutritionPage() {
       style={{ backgroundColor: "var(--page-bg)" }}
     >
       <div className="mx-auto max-w-2xl px-4 py-6">
+        {/* Phase 96a: AzFIT logo → dashboard */}
+        <div className="flex justify-center pb-2">
+          <LogoHomeButton />
+        </div>
         <h1
           className="mb-4 text-2xl font-bold"
           style={{ color: "var(--text-primary)" }}

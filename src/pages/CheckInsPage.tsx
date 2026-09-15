@@ -14,6 +14,7 @@ import {
   Circle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import LogoHomeButton from "@/components/LogoHomeButton";
 import { formatDateShort } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useViewAs, useEffectiveClientIdentity } from "@/hooks/useViewAs";
@@ -223,6 +224,10 @@ function TrainerCheckIns() {
   return (
     <div className="min-h-[100dvh]" style={{ backgroundColor: "var(--page-bg)" }}>
       <header className="sticky top-0 z-20 border-b px-4 py-3" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}>
+        {/* Phase 96a: AzFIT logo → dashboard */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <LogoHomeButton />
+        </div>
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <div className="flex items-center gap-3">
             {selectedFormId ? (
@@ -828,6 +833,10 @@ function ClientCheckIns() {
     return (
       <div className="min-h-[100dvh]" style={{ backgroundColor: "var(--page-bg)" }}>
         <header className="sticky top-0 z-20 border-b px-4 py-3" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}>
+          {/* Phase 96a: AzFIT logo → dashboard */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <LogoHomeButton />
+          </div>
           <div className="mx-auto flex max-w-2xl items-center gap-3">
             <button onClick={() => setActiveForm(null)} className="p-2 rounded-lg hover:bg-white/5" style={{ color: "var(--light-text-muted)" }}>
               <ArrowLeft size={20} />
@@ -933,6 +942,10 @@ function ClientCheckIns() {
   return (
     <div className="min-h-[100dvh]" style={{ backgroundColor: "var(--page-bg)" }}>
       <header className="sticky top-0 z-20 border-b px-4 py-3" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}>
+        {/* Phase 96a: AzFIT logo → dashboard */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <LogoHomeButton />
+        </div>
         <div className="mx-auto max-w-5xl">
           <h1 className="text-lg font-bold" style={{ color: "var(--page-text)" }}>Check-ins</h1>
         </div>

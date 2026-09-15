@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { Input } from '@/components/ui/input';
 import IconTile from '@/components/ui/IconTile';
+import LogoHomeButton from '@/components/LogoHomeButton';
 
 interface Exercise {
   ExerciseID: string;
@@ -476,6 +477,10 @@ export default function ExercisesPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6" style={{ backgroundColor: 'var(--page-bg)' }}>
+      {/* Phase 96a: AzFIT logo → dashboard */}
+      <div className="flex justify-center pb-2">
+        <LogoHomeButton />
+      </div>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

@@ -12,6 +12,7 @@ import {
   Ticket,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import LogoHomeButton from "@/components/LogoHomeButton";
 import { useAuth } from "@/hooks/useAuth";
 import {
   weekWindow,
@@ -267,6 +268,10 @@ export default function WeeklyDigest() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
+      {/* Phase 96a: AzFIT logo → dashboard */}
+      <div className="flex justify-center pb-2">
+        <LogoHomeButton />
+      </div>
       {/* Header + week nav */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">

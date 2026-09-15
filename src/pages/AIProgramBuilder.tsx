@@ -15,6 +15,7 @@ import {
   ChevronUp, ChevronDown, Shuffle, Wand2, ClipboardPaste, type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import LogoHomeButton from '@/components/LogoHomeButton';
 import {
   generateProgram, saveGeneratedProgram,
   type GeneratedProgram, type GeneratedWorkout, type GeneratedExercise, type ClientProfile,
@@ -3180,6 +3181,10 @@ export default function AIProgramBuilderPage() {
     <div className="min-h-screen bg-[var(--page-bg)] text-[var(--page-text)]">
       {/* Header */}
       <div className="border-b border-[var(--card-border)] bg-[var(--card-bg)] sticky top-0 z-50">
+        {/* Phase 96a: AzFIT logo → dashboard */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <LogoHomeButton />
+        </div>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">

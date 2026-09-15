@@ -17,6 +17,7 @@ import { clientStatusMeta } from "@/lib/clientStatus";
 import { useAuth } from "@/hooks/useAuth";
 import { useViewAs } from "@/hooks/useViewAs";
 import { Button } from "@/components/ui/button";
+import LogoHomeButton from "@/components/LogoHomeButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -124,7 +125,11 @@ export default function ClientProfileHeader({
         borderColor: "var(--card-border)",
       }}
     >
-      <div className="flex flex-col gap-3">
+      <div className="relative flex flex-col gap-3">
+        {/* Phase 96a: AzFIT logo → dashboard */}
+        <div className="order-first flex w-full justify-center sm:absolute sm:left-1/2 sm:top-1/2 sm:w-auto sm:-translate-x-1/2 sm:-translate-y-1/2">
+          <LogoHomeButton />
+        </div>
         {/* Phase 90h: below sm this stacks as row 1 (back + avatar + info);
             the view toggle is row 2. At sm+ everything is one row again. */}
         <div className="flex items-start gap-3 sm:gap-4">

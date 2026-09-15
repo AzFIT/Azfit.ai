@@ -13,6 +13,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import LogoHomeButton from '@/components/LogoHomeButton';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -848,6 +849,11 @@ export default function SchedulePage() {
       <header className="sticky top-0 z-30 bg-[var(--card-bg)] backdrop-blur-xl border-b border-[var(--card-border)]">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
+            {/* Phase 96a: AzFIT logo → dashboard. Crowded header: own centered row on
+                mobile (order-first w-full), absolute center at sm+ like the app bar. */}
+            <div className="order-first flex w-full justify-center sm:absolute sm:left-1/2 sm:top-1/2 sm:w-auto sm:-translate-x-1/2 sm:-translate-y-1/2">
+              <LogoHomeButton />
+            </div>
             <div className="flex items-center gap-3">
               <h1 className="text-lg font-bold text-[var(--page-text)] flex items-center gap-2">
                 <CalendarIcon className="w-5 h-5 text-[#00AEEF]" />

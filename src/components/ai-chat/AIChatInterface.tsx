@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Send, Sparkles, X, Bot, User, ChevronRight, ThumbsUp, ThumbsDown } from "lucide-react";
 import { useNavigate } from "react-router";
+import LogoHomeButton from "@/components/LogoHomeButton";
 import { useChatContext } from "../chat/ChatContext";
 import { classifyIntent, getPageContext } from "../chat/intentClassifier";
 import { generateResponse } from "../chat/responseGenerator";
@@ -294,9 +295,13 @@ export function AIChatInterface({ onClose }: AIChatInterfaceProps) {
     <div className="flex h-[100dvh] flex-col" style={{ backgroundColor: "var(--page-bg)" }}>
       {/* Header */}
       <div
-        className="flex items-center justify-between border-b px-4 py-3"
+        className="relative flex items-center justify-between border-b px-4 py-3"
         style={{ borderColor: "var(--card-border)", backgroundColor: "var(--card-bg)" }}
       >
+        {/* Phase 96a: AzFIT logo → dashboard */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <LogoHomeButton />
+        </div>
         <div className="flex items-center gap-3">
           <div
             className="flex h-10 w-10 items-center justify-center rounded-xl"

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
+import LogoHomeButton from '@/components/LogoHomeButton';
 import {
   ArrowLeft, Bell, BellRing, Droplets, Dumbbell, Scale,
   Moon, Flame, Clock,
@@ -93,6 +94,10 @@ export default function NotificationsPage() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--page-bg)', color: 'var(--page-text)' }}>
       <header className="sticky top-0 z-30 backdrop-blur-xl border-b" style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }}>
+        {/* Phase 96a: AzFIT logo → dashboard */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <LogoHomeButton />
+        </div>
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
           <button onClick={() => navigate('/dashboard')} className="p-2 rounded-lg transition-colors" style={{ color: 'var(--light-text-muted)' }}>
             <ArrowLeft className="w-5 h-5" />

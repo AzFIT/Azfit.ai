@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
+import LogoHomeButton from '@/components/LogoHomeButton';
 import {
   ArrowLeft, Download, FileSpreadsheet, FileText, Share2,
   Calendar as CalendarIcon, TrendingUp, Dumbbell, Flame,
@@ -214,6 +215,10 @@ export default function ExportSharePage() {
     <div className="min-h-screen bg-slate-950 text-white">
       {/* Header */}
       <header className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-xl border-b border-slate-800">
+        {/* Phase 96a: AzFIT logo → dashboard */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <LogoHomeButton />
+        </div>
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
           <button onClick={() => navigate('/dashboard')} className="p-2 rounded-lg hover:bg-slate-800 transition-colors">
             <ArrowLeft className="w-5 h-5 text-slate-400" />

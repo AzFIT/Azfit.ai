@@ -8,6 +8,7 @@ import {
 import { useWorkoutSession } from '@/hooks/useWorkoutSession';
 import OfflineBanner from '@/components/OfflineBanner';
 import { useAuth } from '@/hooks/useAuth';
+import LogoHomeButton from '@/components/LogoHomeButton';
 
 type TimerMode = 'tabata' | 'emom' | 'circuit' | 'stopwatch';
 
@@ -231,6 +232,10 @@ export default function TimerModesPage() {
     <div className="min-h-screen bg-slate-950 text-white">
       {/* Header */}
       <header className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-xl border-b border-slate-800">
+        {/* Phase 96a: AzFIT logo → dashboard */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <LogoHomeButton />
+        </div>
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={() => navigate('/dashboard')} className="p-2 rounded-lg hover:bg-slate-800 transition-colors">

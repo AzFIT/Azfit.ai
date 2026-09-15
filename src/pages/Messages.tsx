@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
+import LogoHomeButton from "@/components/LogoHomeButton";
 import { useMessaging } from "@/components/messaging/useMessaging";
 import ConversationList from "@/components/messaging/ConversationList";
 import MessageThread from "@/components/messaging/MessageThread";
@@ -48,6 +49,10 @@ export default function Messages() {
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 pt-4 pb-20 lg:px-6 lg:pb-8">
+      {/* Phase 96a: AzFIT logo → dashboard */}
+      <div className="flex justify-center pb-2">
+        <LogoHomeButton />
+      </div>
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}

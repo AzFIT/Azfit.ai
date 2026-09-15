@@ -82,27 +82,31 @@ export function CollapsibleSection({
       )}
       style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}
     >
-      {/* Header — always visible */}
-      <button
-        type="button"
-        onClick={handleToggle}
-        disabled={disabled}
-        className={cn(
-          "w-full flex items-center justify-between px-5 py-4",
-          "text-left transition-colors duration-200",
-          "hover:bg-[var(--light-elevated)]/60",
-          disabled && "opacity-50 cursor-not-allowed",
-          accentColor && "border-l-[3px]",
-          accentColor && isExpanded && "border-l-[3px]"
-        )}
+      {/* Header — always visible. The row is a DIV (not one big button):
+          the headerAction slot can hold a real <button>, and <button> inside
+          <button> is invalid HTML (React logs a hydration-style error).
+          Title area + chevron are separate toggle buttons, same handler. The
+          accent border moved to the row so it stays continuous. */}
+      <div
+        className={cn("flex items-stretch", accentColor && "border-l-[3px]")}
         style={
           accentColor
             ? { borderLeftColor: isExpanded ? accentColor : "transparent" }
             : undefined
         }
-        aria-expanded={isExpanded}
       >
-        <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={handleToggle}
+          disabled={disabled}
+          className={cn(
+            "flex flex-1 items-center gap-3 px-5 py-4",
+            "text-left transition-colors duration-200",
+            "hover:bg-[var(--light-elevated)]/60",
+            disabled && "opacity-50 cursor-not-allowed"
+          )}
+          aria-expanded={isExpanded}
+        >
           {icon && (
             <span className="flex-shrink-0" style={{ color: "var(--light-text-muted)" }}>
               {icon}
@@ -112,23 +116,32 @@ export function CollapsibleSection({
             {title}
           </span>
           {badge && <div className="flex-shrink-0">{badge}</div>}
-        </div>
+        </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 px-4">
           {headerAction && <div className="flex-shrink-0">{headerAction}</div>}
-          <motion.div
-            animate={{ rotate: isExpanded ? 180 : 0 }}
-            transition={
-              animateChevron
-                ? { duration: 0.25, ease: "easeInOut" }
-                : { duration: 0 }
-            }
-            style={{ color: "var(--light-text-muted)" }}
+          <button
+            type="button"
+            onClick={handleToggle}
+            disabled={disabled}
+            aria-expanded={isExpanded}
+            aria-label={typeof title === "string" ? `${title} section toggle` : "Toggle section"}
+            className={cn("p-1", disabled && "opacity-50 cursor-not-allowed")}
           >
-            <ChevronDown className="h-4 w-4" />
-          </motion.div>
+            <motion.div
+              animate={{ rotate: isExpanded ? 180 : 0 }}
+              transition={
+                animateChevron
+                  ? { duration: 0.25, ease: "easeInOut" }
+                  : { duration: 0 }
+              }
+              style={{ color: "var(--light-text-muted)" }}
+            >
+              <ChevronDown className="h-4 w-4" />
+            </motion.div>
+          </button>
         </div>
-      </button>
+      </div>
 
       {/* Collapsible content */}
       <AnimatePresence initial={false}>

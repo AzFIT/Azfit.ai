@@ -16,6 +16,7 @@
 
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { useNavigate } from "react-router";
+import LogoHomeButton from "@/components/LogoHomeButton";
 import { toast } from "sonner";
 import QRCode from "qrcode";
 import {
@@ -825,6 +826,10 @@ export default function TrainerProfilePage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 pt-4 pb-20 lg:pb-8">
+      {/* Phase 96a: AzFIT logo → dashboard */}
+      <div className="flex justify-center pb-2">
+        <LogoHomeButton />
+      </div>
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <button
