@@ -149,8 +149,18 @@ export interface SendPushResult {
   pruned: number;
 }
 
-/** Calls the send-push edge function (must be deployed separately). */
-export async function sendTestPush(userId: string): Promise<SendPushResult> {
+/**
+ * Calls the send-push edge function as the signed-in user (self-send).
+ * `type` (one of the Phase 94 notification types) enables the Phase 95
+ * server-side prefs enforcement (toggle OFF / quiet hours → the
+ * function returns 200 { suppressed: true } and sends nothing).
+ */
+export async function sendPushToSelf(
+  title: string,
+  body: string,
+  url?: string,
+  type?: string,
+): Promise<SendPushResult> {
   // NOTE: plain fetch, not supabase.functions.invoke — the app's global
   // supabase-js header `x-app-name` (src/lib/supabase.ts) is not in the
   // deployed function's Access-Control-Allow-Headers, so the browser
@@ -158,8 +168,9 @@ export async function sendTestPush(userId: string): Promise<SendPushResult> {
   // in the repo (supabase/functions/send-push) and applies on next deploy;
   // until then this path sends only CORS-safe headers.
   const { data: sessionData } = await supabase.auth.getSession();
-  const token = sessionData.session?.access_token;
-  if (!token) throw new Error('Not signed in');
+  const session = sessionData.session;
+  if (!session) throw new Error('Not signed in');
+  const token = session.access_token;
   const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-push`, {
     method: 'POST',
     headers: {
@@ -167,8 +178,20 @@ export async function sendTestPush(userId: string): Promise<SendPushResult> {
       authorization: `Bearer ${token}`,
       'content-type': 'application/json',
     },
-    body: JSON.stringify({ user_id: userId, title: 'AzFIT', body: 'Push is working!', url: '/#/dashboard' }),
+    body: JSON.stringify({
+      user_id: session.user.id,
+      title,
+      body,
+      url,
+      ...(type ? { type } : {}),
+    }),
   });
   if (!res.ok) throw new Error(`send-push failed (${res.status}) — is the edge function deployed?`);
   return (await res.json()) as SendPushResult;
+}
+
+/** Test path (Phase 24A settings button). */
+export async function sendTestPush(userId: string): Promise<SendPushResult> {
+  void userId; // self-send — the session's own user is the target.
+  return sendPushToSelf('AzFIT', 'Push is working!', '/#/dashboard');
 }

@@ -1921,6 +1921,44 @@ export type Database = {
           }
         ];
       };
+      notification_log: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: string;
+          ref_key: string;
+          sent_at: string | null;
+          suppressed_reason: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: string;
+          ref_key: string;
+          sent_at?: string | null;
+          suppressed_reason?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: string;
+          ref_key?: string;
+          sent_at?: string | null;
+          suppressed_reason?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notification_log_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       client_goals: {
         Row: {
           id: string;

@@ -11,7 +11,7 @@
    RLS-safe: client reads own rows only.
    ═══════════════════════════════════════════════════════════════ */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffectiveClientIdentity } from "@/hooks/useViewAs";
@@ -19,6 +19,7 @@ import { formatDateKeyLocal } from "@/lib/utils";
 import { useConsistencyMap } from "@/hooks/useConsistencyMap";
 import { findNumericHabit, weekValues, type NumericLogLike } from "@/lib/numericHabits";
 import { computeAchievements, type Achievement } from "@/lib/achievements";
+import { newUnlocks, notifyNewAchievements } from "@/lib/achievementNotify";
 
 export function useAchievements() {
   const { user } = useAuth();
@@ -28,6 +29,10 @@ export function useAchievements() {
   const { raw, loading: windowLoading, error: windowError } = useConsistencyMap();
   const [achievements, setAchievements] = useState<Achievement[] | null>(null);
   const [fetchError, setFetchError] = useState(false);
+  // Phase 95: previously-unlocked id set (null = first observation).
+  // Used to fire "Achievement Unlocked" pushes ONLY for genuinely new
+  // unlocks — pre-existing unlocks never re-notify.
+  const prevUnlockedRef = useRef<Set<string> | null>(null);
 
   // Derived (avoids set-state-in-effect): error if the shared window fetch
   // failed or our achievement queries failed; loading until both settle.
@@ -120,6 +125,26 @@ export function useAchievements() {
       cancelled = true;
     };
   }, [user, eff.resolved, eff.isOverride, eff.clientId, eff.profileId, windowLoading, windowError, raw]);
+
+  // Phase 95 — app-fired achievement pushes. NOT under a 90e view-as
+  // override (the trainer viewing a client must never fire the CLIENT's
+  // push), and only for unlocks that are new since the last observation.
+  useEffect(() => {
+    if (!achievements) return;
+    const unlockedIds = new Set(
+      achievements.filter((a) => a.unlocked).map((a) => a.id),
+    );
+    if (eff.isOverride || !user?.id) {
+      // Never notify from a 90e override; reset the baseline so the
+      // first own-data observation after leaving it is silent (adopting
+      // the target's set here would false-fire "new unlocks").
+      prevUnlockedRef.current = null;
+      return;
+    }
+    const fresh = newUnlocks(prevUnlockedRef.current, achievements);
+    prevUnlockedRef.current = unlockedIds;
+    if (fresh.length > 0) void notifyNewAchievements(user.id, fresh);
+  }, [achievements, user?.id, eff.isOverride]);
 
   return { achievements, loading, error };
 }
