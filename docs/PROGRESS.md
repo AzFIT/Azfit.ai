@@ -1822,3 +1822,23 @@ lowercases emails while clients rows may hold original casing**. Two layers:
   matches nothing.
 - Playwright fresh-context first-click flake absorbed via retry-until-state
   (standing heisenbug, still under watch).
+
+### Phase 99a — post-merge verifier notes
+
+- **invite-client edge function DEPLOYED v1** (ACTIVE, verify_jwt=true) by the
+  verifier via Supabase MCP. Contract verified live: 403 cross-trainer,
+  200 already_has_account, 401 gateway, 400 missing client_id.
+- **Happy-path invite currently returns 500 "Could not send the invitation
+  email"** — GoTrue rolls back the invited user when the email send fails
+  (auth audit logs prove rollback, 0 orphans). ROOT CAUSE: project
+  transactional email delivery is failing/capped. OWNER ACTION: test via
+  Dashboard → Authentication → Users → Invite, or configure SMTP under
+  Authentication → Settings → SMTP. No code change needed once email works.
+- **Fixture-pattern gotchas (permanent list):**
+  (a) `handle_new_user` trigger auto-creates profiles from
+  raw_user_meta_data — NEVER insert public.profiles manually for a fixture
+  auth user (pk collision); pass role/full_name via raw_user_meta_data
+  instead.
+  (b) Manual auth.users inserts must ALSO set email_change = '' (not just
+  the token columns) or GoTrue password-grant login 500s with "Database
+  error querying schema".
