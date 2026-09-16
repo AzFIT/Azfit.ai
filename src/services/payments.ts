@@ -58,6 +58,60 @@ export interface ClientBilling {
   payments: Payment[];
 }
 
+export interface Expense {
+  id: string;
+  trainer_id: string;
+  label: string;
+  amount_cents: number;
+  expense_date: string;
+  recurring: boolean;
+  created_at: string | null;
+}
+
+/** All payments visible to this trainer (RLS scopes to their clients) —
+ *  the source for the 96b Overview math. Names resolve via the roster. */
+export async function loadTrainerPayments(): Promise<Payment[]> {
+  const { data } = await supabase
+    .from("payments")
+    .select("id, client_id, package_id, amount_cents, kind, note, paid_at, logged_by, created_at");
+  return (data as Payment[] | null) ?? [];
+}
+
+/** Expenses are trainer-owned (trainer_id = auth.uid(), owner-only RLS) —
+ *  plain supabase insert matches the Phase 96 payments mutation pattern. */
+export async function loadExpenses(): Promise<Expense[]> {
+  const { data } = await supabase
+    .from("expenses")
+    .select("*")
+    .order("expense_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(100);
+  return (data as Expense[] | null) ?? [];
+}
+
+export async function addExpense(input: {
+  label: string;
+  amountCents: number;
+  expenseDate: string;
+  recurring: boolean;
+}): Promise<{ ok: boolean; error?: string }> {
+  const uid = await myUid();
+  if (!uid) return { ok: false, error: "Not signed in" };
+  const { error } = await supabase.from("expenses").insert({
+    trainer_id: uid,
+    label: input.label.trim(),
+    amount_cents: input.amountCents,
+    expense_date: input.expenseDate,
+    recurring: input.recurring,
+  });
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+export async function deleteExpense(id: string): Promise<{ ok: boolean; error?: string }> {
+  const { error } = await supabase.from("expenses").delete().eq("id", id);
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
 async function myUid(): Promise<string | null> {
   const { data } = await supabase.auth.getUser();
   return data.user?.id ?? null;

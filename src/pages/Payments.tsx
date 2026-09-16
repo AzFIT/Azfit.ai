@@ -16,10 +16,34 @@ import {
   CircleDollarSign,
   CalendarCheck,
   Ticket,
+  Receipt,
+  Trash2,
+  TrendingUp,
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { useAuth } from "@/hooks/useAuth";
 import LogoHomeButton from "@/components/LogoHomeButton";
 import { formatCents, parseMoneyInput, sumCents } from "@/lib/money";
+import {
+  monthKeyLocal,
+  monthlyRevenue,
+  kpiSums,
+  byKindBreakdown,
+  topClientsByRevenue,
+  monthExpenses,
+  netProfit,
+  type PaymentLike,
+  type ExpenseLike,
+} from "@/lib/moneyDashboard";
+import { formatDateKeyLocal } from "@/lib/utils";
 import { showExpiryWarning, remainingSessions } from "@/lib/sessionBilling";
 import type { BookingClient } from "@/lib/bookingRoster";
 import {
@@ -29,7 +53,13 @@ import {
   createPackage,
   setPackageActive,
   logPayment,
+  loadTrainerPayments,
+  loadExpenses,
+  addExpense,
+  deleteExpense,
   type ClientBilling,
+  type Payment,
+  type Expense,
 } from "@/services/payments";
 import { supabase } from "@/lib/supabase";
 
@@ -96,6 +126,21 @@ export default function Payments() {
   const [payPackageId, setPayPackageId] = useState("");
   const [savingPay, setSavingPay] = useState(false);
 
+  // ── Phase 96b: trainer-wide overview data ──
+  const [trainerPayments, setTrainerPayments] = useState<Payment[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expLabel, setExpLabel] = useState("");
+  const [expAmount, setExpAmount] = useState("");
+  const [expDate, setExpDate] = useState(() => formatDateKeyLocal(new Date()));
+  const [expRecurring, setExpRecurring] = useState(true);
+  const [savingExp, setSavingExp] = useState(false);
+
+  const reloadOverview = async () => {
+    const [p, e] = await Promise.all([loadTrainerPayments(), loadExpenses()]);
+    setTrainerPayments(p);
+    setExpenses(e);
+  };
+
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
@@ -106,6 +151,7 @@ export default function Payments() {
         setRosterLoaded(true);
       }
     })();
+    void reloadOverview();
     return () => {
       cancelled = true;
     };
@@ -225,6 +271,40 @@ export default function Payments() {
     setPayNote("");
     setPayPackageId("");
     await refresh(selected.recordId);
+    void reloadOverview();
+  };
+
+  const handleAddExpense = async () => {
+    const cents = parseMoneyInput(expAmount);
+    if (!expLabel.trim()) return toast.error("Enter an expense label");
+    if (cents === null) return toast.error("Enter a valid amount");
+    if (!expDate) return toast.error("Pick an expense date");
+    setSavingExp(true);
+    const res = await addExpense({
+      label: expLabel,
+      amountCents: cents,
+      expenseDate: expDate,
+      recurring: expRecurring,
+    });
+    setSavingExp(false);
+    if (!res.ok) {
+      toast.error(`Could not add expense: ${res.error}`);
+      return;
+    }
+    toast.success("Expense added");
+    setExpLabel("");
+    setExpAmount("");
+    void reloadOverview();
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+    const res = await deleteExpense(id);
+    if (!res.ok) {
+      toast.error("Could not delete expense");
+      return;
+    }
+    toast.success("Expense deleted");
+    void reloadOverview();
   };
 
   return (
@@ -236,6 +316,115 @@ export default function Payments() {
         <LogoHomeButton />
         <span className="w-11" aria-hidden />
       </header>
+
+      {/* Phase 96b — Overview: real sums only, honest empty when no payments */}
+      <Overview
+        payments={trainerPayments}
+        expenses={expenses}
+        nameOf={(id) => roster.find((c) => c.recordId === id)?.name ?? "(archived client)"}
+      />
+
+      {/* Phase 96b — Expenses (trainer-owned, 96b RLS owner-only) */}
+      <section
+        className="mb-4 rounded-2xl border p-4"
+        style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}
+      >
+        <h3
+          className="mb-3 flex items-center gap-2 text-sm font-semibold"
+          style={{ color: "var(--page-text)" }}
+        >
+          <Receipt className="h-4 w-4" style={{ color: "var(--azfit-accent)" }} />
+          Expenses
+        </h3>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <input
+            value={expLabel}
+            onChange={(e) => setExpLabel(e.target.value)}
+            placeholder="Label (e.g. Gym rent)"
+            aria-label="Expense label"
+            className={inputCls}
+            style={inputStyle}
+          />
+          <input
+            value={expAmount}
+            onChange={(e) => setExpAmount(e.target.value)}
+            inputMode="decimal"
+            placeholder="Amount (e.g. 150.00)"
+            aria-label="Expense amount"
+            className={inputCls}
+            style={inputStyle}
+          />
+          <input
+            type="date"
+            value={expDate}
+            onChange={(e) => setExpDate(e.target.value)}
+            aria-label="Expense date"
+            className={inputCls}
+            style={inputStyle}
+          />
+          <label
+            className="flex min-h-[44px] items-center gap-2 rounded-lg border px-3 py-2 text-sm"
+            style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)", color: "var(--page-text)" }}
+          >
+            <input
+              type="checkbox"
+              checked={expRecurring}
+              onChange={(e) => setExpRecurring(e.target.checked)}
+              aria-label="Recurring monthly expense"
+              className="h-4 w-4"
+            />
+            Recurring
+          </label>
+        </div>
+        <button
+          type="button"
+          onClick={() => void handleAddExpense()}
+          disabled={savingExp}
+          className="mt-2 h-11 rounded-lg px-4 text-sm font-semibold text-white"
+          style={{ backgroundColor: "var(--azfit-accent)" }}
+        >
+          {savingExp ? "Adding…" : "Add expense"}
+        </button>
+        {expenses.length === 0 ? (
+          <p className="mt-3 text-sm" style={{ color: "var(--light-text-muted)" }}>
+            No expenses yet.
+          </p>
+        ) : (
+          <ul className="mt-3 divide-y" style={{ borderColor: "var(--card-border)" }}>
+            {expenses.map((e) => (
+              <li key={e.id} className="flex items-center justify-between gap-2 py-2">
+                <span className="min-w-0">
+                  <span className="block text-sm" style={{ color: "var(--page-text)" }}>
+                    {e.label}
+                    {e.recurring && (
+                      <span className="ml-2 text-xs" style={{ color: "var(--light-text-muted)" }}>
+                        recurring
+                      </span>
+                    )}
+                  </span>
+                  <span className="block text-xs" style={{ color: "var(--light-text-muted)" }}>
+                    {e.expense_date}
+                  </span>
+                </span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <span className="text-sm font-semibold" style={{ color: "var(--page-text)" }}>
+                    {formatCents(e.amount_cents)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void handleDeleteExpense(e.id)}
+                    aria-label={`Delete expense ${e.label}`}
+                    className="flex h-11 w-11 items-center justify-center rounded-lg"
+                    style={{ color: "var(--danger)" }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {/* Client picker (Phase 90h roster pattern — includes account-less clients) */}
       <div className="mb-4">
@@ -608,4 +797,191 @@ function kindLabel(kind: string): string {
     default:
       return "Other";
   }
+}
+
+/** Chart tooltip — token-styled, money via formatCents (strict-TS friendly:
+ *  recharts' own formatter types fight `noImplicitAny`, a custom content
+ *  component keeps the payload untangled). */
+function RevenueTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: ReadonlyArray<{ value?: number | string }>;
+  label?: string | number;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const cents = Number(payload[0]?.value ?? 0);
+  return (
+    <div
+      className="rounded-lg border px-3 py-2 text-xs"
+      style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}
+    >
+      <span style={{ color: "var(--light-text-muted)" }}>{label}</span>{" "}
+      <strong style={{ color: "var(--page-text)" }}>{formatCents(cents)}</strong>
+    </div>
+  );
+}
+
+/** Phase 96b Overview — everything below is REAL sums of the payments the
+ *  trainer can see (RLS-scoped); no number is derived or fabricated.
+ *  HONEST DATA: zero payments → single empty state, chart/by-kind/top-5
+ *  hidden rather than zeroed. */
+function Overview({
+  payments,
+  expenses,
+  nameOf,
+}: {
+  payments: PaymentLike[];
+  expenses: ExpenseLike[];
+  nameOf: (clientId: string) => string;
+}) {
+  const now = new Date();
+  const kpi = kpiSums(payments, now);
+  const thisKey = monthKeyLocal(now);
+  const net = netProfit(kpi.thisMonth, monthExpenses(expenses, thisKey));
+  const months = monthlyRevenue(payments, now, 6);
+  const kinds = byKindBreakdown(payments);
+  const top = topClientsByRevenue(payments, nameOf, 5);
+
+  const kpiCard = (label: string, value: string, tone?: "danger" | "success") => (
+    <div
+      className="rounded-xl border p-3"
+      style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}
+    >
+      <p className="text-xs" style={{ color: "var(--light-text-muted)" }}>
+        {label}
+      </p>
+      <p
+        className="mt-1 text-lg font-bold"
+        style={{
+          color:
+            tone === "danger" ? "var(--danger)" : tone === "success" ? "var(--success)" : "var(--page-text)",
+        }}
+      >
+        {value}
+      </p>
+    </div>
+  );
+
+  return (
+    <section className="mb-4" aria-label="Revenue overview">
+      <h2
+        className="mb-2 flex items-center gap-2 text-sm font-semibold"
+        style={{ color: "var(--page-text)" }}
+      >
+        <TrendingUp className="h-4 w-4" style={{ color: "var(--azfit-primary)" }} />
+        Overview
+      </h2>
+
+      {payments.length === 0 ? (
+        <div
+          className="rounded-2xl border p-4 text-sm"
+          style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)", color: "var(--light-text-muted)" }}
+        >
+          No payments yet — log a payment below to see your revenue overview.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            {kpiCard("This month", formatCents(kpi.thisMonth))}
+            {kpiCard("Last month", formatCents(kpi.lastMonth))}
+            {kpiCard("All-time total", formatCents(kpi.allTime))}
+            {kpiCard("Sessions logged", String(kpi.count))}
+            {kpiCard(
+              "Net profit (this month)",
+              formatCents(net),
+              net < 0 ? "danger" : "success",
+            )}
+          </div>
+
+          {/* 6-month revenue, LOCAL month buckets (90g convention) */}
+          <div
+            className="rounded-2xl border p-4"
+            style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}
+          >
+            <p className="mb-2 text-xs font-medium" style={{ color: "var(--light-text-muted)" }}>
+              Revenue — last 6 months
+            </p>
+            <div style={{ width: "100%", height: 220 }}>
+              <ResponsiveContainer>
+                <BarChart data={months} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--light-border)" opacity={0.4} vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fill: "var(--light-text-muted)", fontSize: 11 }}
+                    axisLine={{ stroke: "var(--light-border)" }}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fill: "var(--light-text-muted)", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={52}
+                    tickFormatter={(v: number) => `$${Math.round(v / 100)}`}
+                  />
+                  <Tooltip content={<RevenueTooltip />} cursor={{ fill: "var(--light-elevated)", opacity: 0.4 }} />
+                  <Bar dataKey="cents" fill="var(--azfit-primary)" radius={[4, 4, 0, 0]} animationDuration={600} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* By-kind breakdown — shares reconcile to exactly 100% */}
+          <div
+            className="rounded-2xl border p-4"
+            style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}
+          >
+            <p className="mb-2 text-xs font-medium" style={{ color: "var(--light-text-muted)" }}>
+              By kind
+            </p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {kinds.map((k) => (
+                <div key={k.kind} className="rounded-xl border p-3" style={{ borderColor: "var(--card-border)" }}>
+                  <p className="text-xs" style={{ color: "var(--light-text-muted)" }}>
+                    {kindLabel(k.kind)}
+                  </p>
+                  <p className="mt-1 text-sm font-bold" style={{ color: "var(--page-text)" }}>
+                    {formatCents(k.cents)}
+                  </p>
+                  <p className="text-xs" style={{ color: "var(--light-text-muted)" }}>
+                    {k.sharePct}%
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Top-5 clients by lifetime revenue (account-less included) */}
+          <div
+            className="rounded-2xl border p-4"
+            style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}
+          >
+            <p className="mb-2 text-xs font-medium" style={{ color: "var(--light-text-muted)" }}>
+              Top clients by lifetime revenue
+            </p>
+            <ol className="divide-y" style={{ borderColor: "var(--card-border)" }}>
+              {top.map((t, i) => (
+                <li key={t.clientId} className="flex items-center justify-between gap-2 py-2">
+                  <span className="flex min-w-0 items-center gap-2 text-sm" style={{ color: "var(--page-text)" }}>
+                    <span
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
+                      style={{ backgroundColor: "var(--light-elevated)", color: "var(--light-text-muted)" }}
+                    >
+                      {i + 1}
+                    </span>
+                    <span className="truncate">{t.name}</span>
+                  </span>
+                  <span className="shrink-0 text-sm font-semibold" style={{ color: "var(--page-text)" }}>
+                    {formatCents(t.cents)}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+      )}
+    </section>
+  );
 }

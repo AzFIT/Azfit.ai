@@ -2088,6 +2088,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      expenses: {
+        Row: {
+          id: string;
+          trainer_id: string;
+          label: string;
+          amount_cents: number;
+          expense_date: string;
+          recurring: boolean;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          trainer_id: string;
+          label: string;
+          amount_cents: number;
+          expense_date: string;
+          recurring?: boolean;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          trainer_id?: string;
+          label?: string;
+          amount_cents?: number;
+          expense_date?: string;
+          recurring?: boolean;
+          created_at?: string | null;
+        };
+        Relationships: [];
+      };
       client_goals: {
         Row: {
           id: string;

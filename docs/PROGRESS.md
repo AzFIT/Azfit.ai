@@ -1842,3 +1842,70 @@ lowercases emails while clients rows may hold original casing**. Two layers:
   (b) Manual auth.users inserts must ALSO set email_change = '' (not just
   the token columns) or GoTrue password-grant login 500s with "Database
   error querying schema".
+
+## PHASE 96b — MONEY DASHBOARD: **BRANCH SHIPPED — awaiting merge**
+
+Branch `feat/money-96b` off `ed91924` (main incl. 99a). Push-only autonomy:
+STOP after push, no merge.
+
+### What shipped
+
+**Schema (additive, applied live + mirrored):** `public.expenses`
+(id, trainer_id FK auth.users CASCADE, label, amount_cents INT ≥ 0,
+expense_date DATE, recurring bool DEFAULT true, created_at). Owner-only RLS
+(ALL policy `trainer_id = auth.uid()`) — client role has NO policies (default
+deny: clients never see trainer business costs). Migration:
+`supabase/expenses-96b.sql`; mirrored in `supabase/schema.sql` (96b section
+after the payments policies); typed in `src/types/supabase.ts`.
+
+**Pure math — `src/lib/moneyDashboard.ts` (+10 unit tests):** local-month
+bucketing (90g convention — `monthKeyLocal` via getFullYear/getMonth, never
+`iso.split("T")[0]`), `monthlyRevenue` (last-6-month buckets, paid_at NULL
+skipped), `kpiSums` (this/last/all-time + row count), `byKindBreakdown`
+(share % via largest-remainder — ALWAYS sums to exactly 100),
+`topClientsByRevenue` (ties alphabetical, deterministic), `monthExpenses` +
+`netProfit`. Wall-clock always injected (Fix Pack 2 lesson).
+**Net-profit month rule (documented):** ANY expense counts only in the month
+of its expense_date — recurring vs one-off does NOT change month attribution;
+future-dated expenses never count toward an earlier month.
+
+**UI (`src/pages/Payments.tsx`, above the 96 forms — forms untouched):**
+- Overview section: 5 KPI cards (This month / Last month / All-time /
+  Sessions logged = payments-row count / Net profit this month, red when
+  negative), 6-month recharts BarChart (same dep as Analytics, no new dep),
+  by-kind row (4 kinds, amounts + share %), top-5 lifetime clients
+  (account-less included, name via roster, archived fallback "(archived
+  client)"). HONEST DATA: zero payments → single "No payments yet" empty
+  state, chart/by-kind/top-5 hidden not zeroed.
+- Expenses card: add form (label/amount/date/recurring) + list with delete.
+  Mutations in `src/services/payments.ts` (`addExpense`/`deleteExpense`/
+  `loadTrainerPayments`) — plain supabase calls matching the Phase 96
+  payments pattern (allowed by the phase spec; not a profiles write).
+
+### Verification
+- Gates on branch: tsc · lint · **1058/1058** (+10) · build + 404 copy ·
+  e2e 4/4 — all green.
+- Smoke 26/26 (`.temp/audit/shots/96b/`): every KPI equals the SQL sum to
+  the cent ($371/$200/$811/11 rows/net $236); chart 6 bars with current-month
+  tooltip $371.00; by-kind $471/$200/$120/$20 at 58/25/15/2 (=100 exactly);
+  top-5 order Alpha→Echo→Gamma→Beta(account-less)→Delta, 6th excluded;
+  add $50 → net $186, delete → back to $236, SQL-verified 4 expense rows;
+  cross-trainer REST insert claiming another trainer → **403**, B reads 0
+  rows, A untouched; empty trainer B sees honest "No payments yet" /
+  "No expenses yet" with NO zeroed KPI cards; scrollWidth 390 both themes;
+  zero console errors.
+- Fixture `smoke96b-delete` cleaned, SQL-verified 0 rows everywhere incl.
+  auth.users. Temp scripts deleted.
+
+### Gotchas documented
+- Fixture month pinning: pay_at seeded at month-start + 4 days 12 hours —
+  inside the same LOCAL month for any TZ within ±12h (DB now() vs browser
+  local month can differ near month boundaries).
+- node-pg renders DATE columns as TZ-shifted Date JSON in the pooler tooling
+  — cosmetic to verification only; PostgREST (the app's path) returns plain
+  'YYYY-MM-DD' strings.
+- recharts bars are `path.recharts-rectangle` inside `g.recharts-bar` —
+  `> *` direct-child locators only see the layer groups.
+- Fixture-auth pattern per the 99a gotchas: profiles auto-created by
+  handle_new_user from raw_user_meta_data (role/full_name), never inserted
+  manually; email_change = ''.
