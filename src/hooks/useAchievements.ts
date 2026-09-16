@@ -20,6 +20,7 @@ import { useConsistencyMap } from "@/hooks/useConsistencyMap";
 import { findNumericHabit, weekValues, type NumericLogLike } from "@/lib/numericHabits";
 import { computeAchievements, type Achievement } from "@/lib/achievements";
 import { newUnlocks, notifyNewAchievements } from "@/lib/achievementNotify";
+import { clientScopeOr } from "@/lib/clientScope";
 
 export function useAchievements() {
   const { user } = useAuth();
@@ -54,16 +55,20 @@ export function useAchievements() {
         // half only — never the signed-in trainer's profile id.
         const profileId =
           eff.isOverride && !eff.profileId ? null : (eff.profileId ?? user.id);
-        const sessionsOr = profileId
-          ? `client_id.eq.${profileId},client_record_id.eq.${cid}`
-          : `client_record_id.eq.${cid}`;
+        // Fix Pack 2: defensive scope — a null cid used to interpolate
+        // `client_record_id.eq.null` (400/22P02). Null scope = zero sessions.
+        const sessionsOr = clientScopeOr(profileId, cid);
+        const sessionsCount =
+          sessionsOr === null
+            ? Promise.resolve({ count: 0, data: null, error: null })
+            : supabase
+                .from("sessions")
+                .select("id", { count: "exact", head: true })
+                .or(sessionsOr)
+                .eq("status", "completed");
 
         const [countRes, habitsRes, logsRes] = await Promise.all([
-          supabase
-            .from("sessions")
-            .select("id", { count: "exact", head: true })
-            .or(sessionsOr)
-            .eq("status", "completed"),
+          sessionsCount,
           cid
             ? supabase.from("habits").select("id, name, active, target_value, unit").eq("client_id", cid).eq("active", true)
             : Promise.resolve({ data: [] }),

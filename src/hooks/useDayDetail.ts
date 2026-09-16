@@ -24,6 +24,7 @@ import { supabase } from "@/lib/supabase";
 import { useEffectiveClientIdentity } from "@/hooks/useViewAs";
 import { TARGET_HABIT_KEYWORDS } from "@/lib/dailyPlan";
 import { formatHabitValue } from "@/lib/dayDetail";
+import { clientScopeOr } from "@/lib/clientScope";
 
 export interface DayDetailRow {
   /** logged rows exist for this category on this day */
@@ -117,19 +118,15 @@ export function useDayDetail(opts: { clientId?: string; clientEmail?: string }) 
       const startIso = isoDayStart(dateKey);
       const endIso = isoDayEnd(dateKey);
 
-      const sessionsQuery = profileId
-        ? supabase
-            .from("sessions")
-            .select("status")
-            .or(`client_id.eq.${profileId},client_record_id.eq.${cid}`)
-            .gte("starts_at", startIso)
-            .lt("starts_at", endIso)
-        : cid
-          ? // Account-less target: clients.id half of the ownership only
-            supabase
+      // Fix Pack 2: defensive scope — null cid used to interpolate
+      // `client_record_id.eq.null` (400/22P02).
+      const scope = clientScopeOr(profileId, cid);
+      const sessionsQuery =
+        scope !== null
+          ? supabase
               .from("sessions")
               .select("status")
-              .or(`client_record_id.eq.${cid}`)
+              .or(scope)
               .gte("starts_at", startIso)
               .lt("starts_at", endIso)
           : Promise.resolve({ data: [] });

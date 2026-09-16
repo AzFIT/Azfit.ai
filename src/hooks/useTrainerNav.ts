@@ -15,12 +15,18 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { keepaliveProfilePatch } from "@/lib/keepaliveSave";
 import { normalizeNavPreferences, toNavPreferences } from "@/lib/trainerNav";
 
 const cache = new Map<string, string[]>();
+/** Fix Pack 2 — hides queued before the profiles row has been read; flushed
+ * by the fetch effect. Only additions are possible pre-read (fallback shows
+ * everything), so the merge is a union with the server doc. */
+const pendingNavSaves = new Map<string, string[]>();
 
 export function clearTrainerNavCacheForTests() {
   cache.clear();
+  pendingNavSaves.clear();
 }
 
 export function useTrainerNav(userId: string | undefined) {
@@ -44,9 +50,24 @@ export function useTrainerNav(userId: string | undefined) {
       const ids = normalizeNavPreferences(
         (data as { nav_preferences?: unknown } | null)?.nav_preferences,
       );
-      cache.set(userId, ids);
-      setHiddenIds(ids);
+      // Flush any hide queued before the read resolved (union — pre-read
+      // the fallback shows everything, so queued ids are pure additions).
+      const queued = pendingNavSaves.get(userId);
+      const initial =
+        queued && queued.length > 0
+          ? normalizeNavPreferences([...new Set([...ids, ...queued])])
+          : ids;
+      pendingNavSaves.delete(userId);
+      cache.set(userId, initial);
+      setHiddenIds(initial);
       setLoaded(true);
+      if (queued && queued.length > 0) {
+        keepaliveProfilePatch(userId, {
+          nav_preferences: toNavPreferences(initial),
+        }).then((res) => {
+          if (!res.ok) console.error('queued nav prefs flush failed:', res.error);
+        });
+      }
     })();
     return () => {
       cancelled = true;
@@ -58,14 +79,20 @@ export function useTrainerNav(userId: string | undefined) {
       if (!userId) return false;
       const prev = cache.get(userId) ?? [];
       const clean = normalizeNavPreferences(next);
+      if (!cache.has(userId)) {
+        // Row not read yet — QUEUE (Fix Pack 2), never drop silently.
+        pendingNavSaves.set(userId, clean);
+        setHiddenIds(clean);
+        return true;
+      }
       cache.set(userId, clean);
       setHiddenIds(clean);
-      const { error } = await supabase
-        .from("profiles")
-        .update({ nav_preferences: toNavPreferences(clean) })
-        .eq("id", userId);
-      if (error) {
+      const res = await keepaliveProfilePatch(userId, {
+        nav_preferences: toNavPreferences(clean),
+      });
+      if (!res.ok) {
         // Write failed — revert so the nav keeps the previous state.
+        console.error('nav prefs save failed — reverting:', res.error);
         cache.set(userId, prev);
         setHiddenIds(prev);
         return false;

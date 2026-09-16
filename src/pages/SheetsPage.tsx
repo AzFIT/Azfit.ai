@@ -182,7 +182,7 @@ export default function SheetsPage() {
         <p className="text-sm text-[var(--text-muted)] mt-2">Start a workout from your dashboard or program page.</p>
         <button
           onClick={() => navigate('/dashboard')}
-          className="mt-4 px-4 py-2 rounded-xl bg-[#00AEEF] text-[#0B1120] font-bold text-sm hover:bg-[#0098D1] transition-colors"
+          className="mt-4 min-h-[44px] px-4 py-2 rounded-xl bg-[#00AEEF] text-[#0B1120] font-bold text-sm hover:bg-[#0098D1] transition-colors"
         >
           Back to Dashboard
         </button>
@@ -205,7 +205,7 @@ export default function SheetsPage() {
         <h1 className="text-xl font-bold text-[var(--text-primary)]">Workout not found</h1>
         <button
           onClick={() => navigate('/dashboard')}
-          className="mt-4 px-4 py-2 rounded-xl bg-[#00AEEF] text-[#0B1120] font-bold text-sm hover:bg-[#0098D1] transition-colors"
+          className="mt-4 min-h-[44px] px-4 py-2 rounded-xl bg-[#00AEEF] text-[#0B1120] font-bold text-sm hover:bg-[#0098D1] transition-colors"
         >
           Back to Dashboard
         </button>

@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useReducer, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { keepaliveProfilePatch } from "@/lib/keepaliveSave";
 import type { Json } from "@/types/supabase";
 import {
   normalizeDashboardPreferences,
@@ -24,6 +25,36 @@ import {
 
 const cache = new Map<string, DashboardPreferences>();
 const listeners = new Set<(userId: string) => void>();
+/** Fix Pack 2 — saves made before the profiles row has been read (92c-fix
+ * lesson: never drop a legitimate save silently). Flushed by the fetch
+ * effect once the server doc lands. */
+const pendingSaves = new Map<string, DashboardPreferences>();
+const PREFS_DEFAULT = normalizeDashboardPreferences(
+  null,
+  DASHBOARD_CARD_IDS,
+  PROFILE_SECTION_IDS,
+  BENTO_GROUP
+);
+
+/**
+ * Apply a queued (pre-read) save over the freshly-read server doc: keys the
+ * queued doc still holds at DEFAULT value were untouched by the user this
+ * session, so the server's customized value wins there; keys that differ
+ * from default carry the user's actual change and win. Prevents the queued
+ * fallback-based doc from wiping server-side privacy/order customizations.
+ */
+function mergeOverServer(
+  queued: DashboardPreferences,
+  server: DashboardPreferences
+): DashboardPreferences {
+  const out = { ...server };
+  (Object.keys(queued) as (keyof DashboardPreferences)[]).forEach((k) => {
+    if (JSON.stringify(queued[k]) !== JSON.stringify(PREFS_DEFAULT[k])) {
+      (out as Record<string, unknown>)[k] = queued[k];
+    }
+  });
+  return out;
+}
 
 function publish(userId: string): void {
   listeners.forEach((l) => l(userId));
@@ -31,6 +62,7 @@ function publish(userId: string): void {
 
 export function clearDashboardPrefsCacheForTests(): void {
   cache.clear();
+  pendingSaves.clear();
 }
 
 export interface DashboardPrefsState {
@@ -94,16 +126,28 @@ export function useDashboardPrefs(userId: string | undefined): DashboardPrefsSta
         setLoaded(true);
         return;
       }
-      const normalized = normalizeDashboardPreferences(
+      const serverNorm = normalizeDashboardPreferences(
         data?.dashboard_preferences ?? null,
         DASHBOARD_CARD_IDS,
         PROFILE_SECTION_IDS,
         BENTO_GROUP
       );
-      cache.set(userId, normalized);
+      // Flush any save queued before the read resolved (merged over the
+      // server doc so untouched customized fields survive).
+      const queued = pendingSaves.get(userId);
+      const initial = queued ? mergeOverServer(queued, serverNorm) : serverNorm;
+      pendingSaves.delete(userId);
+      cache.set(userId, initial);
       publish(userId);
-      setFetched(normalized);
+      setFetched(initial);
       setLoaded(true);
+      if (queued) {
+        keepaliveProfilePatch(userId, {
+          dashboard_preferences: initial as unknown as Json,
+        }).then((res) => {
+          if (!res.ok) console.error("queued dashboard prefs flush failed:", res.error);
+        });
+      }
     })();
     return () => {
       cancelled = true;
@@ -113,12 +157,6 @@ export function useDashboardPrefs(userId: string | undefined): DashboardPrefsSta
   const save = useCallback(
     async (next: DashboardPreferences): Promise<boolean> => {
       if (!userId) return false;
-      // Never persist a doc built on unsaved defaults: if the server row
-      // hasn't been read at least once, `next` may have been composed from
-      // the fallback prefs (e.g. the panel toggle racing the initial fetch)
-      // and would write default privacy/order state over real preferences.
-      // The 92c smoke caught exactly this wiping server-side privacy.
-      if (!cache.has(userId)) return false;
       const prev = cache.get(userId) ?? null;
       const normalized = normalizeDashboardPreferences(
         next,
@@ -126,15 +164,23 @@ export function useDashboardPrefs(userId: string | undefined): DashboardPrefsSta
         PROFILE_SECTION_IDS,
         BENTO_GROUP
       );
+      if (!cache.has(userId)) {
+        // Row not read yet — QUEUE the save (Fix Pack 2). The 92c guard
+        // dropped these silently; now the fetch effect flushes it merged
+        // over the server doc (see mergeOverServer).
+        pendingSaves.set(userId, normalized);
+        return true;
+      }
       cache.set(userId, normalized);
       publish(userId);
-      const { error } = await supabase
-        .from("profiles")
-        .update({ dashboard_preferences: normalized as unknown as Json })
-        .eq("id", userId);
-      if (error) {
+      // Fix Pack 2: keepalive PATCH — survives the Phase 33A SW-reload race
+      // that killed supabase-js writes in this window (same RLS, raw REST).
+      const res = await keepaliveProfilePatch(userId, {
+        dashboard_preferences: normalized as unknown as Json,
+      });
+      if (!res.ok) {
         // Revert — the UI keeps working with the previous state (honest rule).
-        console.warn("dashboard prefs save failed — reverting:", error.message);
+        console.error('dashboard prefs save failed — reverting:', res.error);
         if (prev) cache.set(userId, prev);
         else cache.delete(userId);
         publish(userId);

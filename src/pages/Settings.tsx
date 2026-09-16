@@ -6,7 +6,6 @@ import {
   Palette,
   Ruler,
   Bell,
-  Watch,
   Download,
   Lock,
   LogOut,
@@ -19,20 +18,16 @@ import {
   User,
   Edit3,
   CheckCircle2,
-  Circle,
-  Activity,
-  Scale,
   Dumbbell,
   Apple,
   Send,
   Bot,
-  type LucideIcon,
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
-import IconTile, { type IconTileTone } from '@/components/ui/IconTile';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
+import { keepaliveProfilePatch } from '@/lib/keepaliveSave';
 import { hasAiKey, saveAiKey, clearAiKey } from '@/services/aiConfig';
 import { toast } from 'sonner';
 import { GOAL_TYPE_LABELS, goalLabel, type ClientGoalRow, type ClientGoalType } from '@/lib/clientGoals';
@@ -168,68 +163,6 @@ function ToggleRow({
       </div>
       <Switch checked={checked} onCheckedChange={onCheckedChange} disabled={disabled} />
     </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Device Row                                                         */
-/* ------------------------------------------------------------------ */
-
-interface DeviceItem {
-  name: string;
-  type: string;
-  connected: boolean;
-  lastSync: string;
-  icon: LucideIcon;
-  tone: IconTileTone;
-}
-
-function DeviceRow({ device }: { device: DeviceItem }) {
-  return (
-    <motion.div
-      variants={childFade}
-      className="flex items-center justify-between py-3"
-      style={{
-        borderBottom: '1px solid var(--light-border)',
-        opacity: device.connected ? 1 : 0.7,
-      }}
-    >
-      <div className="flex items-center gap-3">
-        <IconTile icon={device.icon} size="md" tone={device.tone} />
-        <div>
-          <p className="text-sm font-semibold" style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}>
-            {device.name}
-          </p>
-          <div className="mt-0.5 flex items-center gap-2">
-            <span className="text-xs" style={{ color: 'var(--light-text-muted)' }}>{device.type}</span>
-            <span className="text-xs" style={{ color: 'var(--light-text-muted)' }}>--</span>
-            <span className="text-xs font-mono" style={{ color: 'var(--light-text-muted)' }}>{device.lastSync}</span>
-          </div>
-        </div>
-      </div>
-      <div className="flex items-center gap-2">
-        {device.connected ? (
-          <>
-            <span className="relative flex h-2.5 w-2.5">
-              <span
-                className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
-                style={{ backgroundColor: 'var(--success)' }}
-              />
-              <span
-                className="relative inline-flex h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: 'var(--success)' }}
-              />
-            </span>
-            <span className="text-xs font-medium" style={{ color: 'var(--success)' }}>Connected</span>
-          </>
-        ) : (
-          <>
-            <Circle size={10} style={{ color: 'var(--light-text-muted)' }} />
-            <span className="text-xs font-medium" style={{ color: 'var(--light-text-muted)' }}>Disconnected</span>
-          </>
-        )}
-      </div>
-    </motion.div>
   );
 }
 
@@ -541,11 +474,12 @@ export default function Settings() {
       if (!user?.id || next === notifPrefs) return;
       const prev = notifPrefs;
       setNotifPrefs(next); // optimistic; reverted on failure (never half-saved)
-      const { error } = await supabase
-        .from('profiles')
-        .update({ notifications: next as unknown as Json })
-        .eq('id', user.id);
-      if (error) {
+      // Fix Pack 2: keepalive write — survives the Phase 33A SW-reload race.
+      const res = await keepaliveProfilePatch(user?.id, {
+        notifications: next as unknown as Json,
+      });
+      if (!res.ok) {
+        console.error('notification prefs save failed — reverting:', res.error);
         setNotifPrefs(prev);
         toast.error('Could not save notification preferences');
       }
@@ -553,45 +487,12 @@ export default function Settings() {
     [user?.id, notifPrefs],
   );
 
-  /* ---- connected devices ---- */
-  const devices: DeviceItem[] = [
-    {
-      name: 'Apple Watch Series 9',
-      type: 'Smartwatch',
-      connected: true,
-      lastSync: '2 min ago',
-      icon: Watch,
-      tone: 'brand',
-    },
-    {
-      name: 'Withings Scale',
-      type: 'Smart Scale',
-      connected: true,
-      lastSync: '1 hr ago',
-      icon: Scale,
-      tone: 'brand',
-    },
-    {
-      name: 'MyFitnessPal',
-      type: 'Fitness App',
-      connected: false,
-      lastSync: '3 days ago',
-      icon: Activity,
-      tone: 'accent',
-    },
-  ];
-
   /* ---- export handlers ---- */
-  const handleExport = useCallback((type: string) => {
-    const csv = `${type} data export...`;
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `azfit-${type.toLowerCase().replace(/\s+/g, '-')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, []);
+  /* Fix Pack 2: the legacy "Connected Devices" section (fabricated Apple
+   * Watch / Withings / MyFitnessPal rows) and the "Data Export" section
+   * (downloaded a fake `${type} data export...` CSV — no real data behind
+   * it) were deleted as demo/mock UI that must not ship to real clients.
+   * A real export can be rebuilt later against the actual tables. */
 
   return (
     <div className="min-h-[100dvh] pb-20" style={{ backgroundColor: 'var(--page-bg)' }}>
@@ -673,15 +574,22 @@ export default function Settings() {
                 </div>
               </div>
               <button
-                className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 shadow-md transition-transform duration-100 active:scale-90"
-                style={{
-                  backgroundColor: 'var(--card-bg)',
-                  borderColor: 'var(--card-border)',
-                  color: 'var(--azfit-primary)',
-                }}
+                // Fix Pack 2 Item 4 (Phase 77 deferred): 28px icon button —
+                // the 44px button is the real hit area; the 28px circle lives
+                // on the inner span so the visual footprint is unchanged.
+                className="absolute -bottom-2.5 -right-2.5 flex h-11 w-11 items-center justify-center rounded-full transition-transform duration-100 active:scale-90"
                 type="button"
               >
-                <Edit3 size={12} />
+                <span
+                  className="flex h-7 w-7 items-center justify-center rounded-full border-2 shadow-md"
+                  style={{
+                    backgroundColor: 'var(--card-bg)',
+                    borderColor: 'var(--card-border)',
+                    color: 'var(--azfit-primary)',
+                  }}
+                >
+                  <Edit3 size={12} />
+                </span>
               </button>
             </motion.div>
 
@@ -702,7 +610,8 @@ export default function Settings() {
                   </p>
                 </div>
                 <button
-                  className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-mono text-xs font-semibold transition-all duration-200 hover:bg-[var(--azfit-primary)] hover:text-white active:scale-[0.97]"
+                  // Fix Pack 2 Item 4 (Phase 77 deferred): 30px → 44px hit target.
+                  className="flex min-h-[44px] items-center gap-1.5 rounded-md border px-3 py-1.5 font-mono text-xs font-semibold transition-all duration-200 hover:bg-[var(--azfit-primary)] hover:text-white active:scale-[0.97]"
                   style={{
                     borderColor: 'var(--azfit-primary)',
                     color: 'var(--azfit-primary)',
@@ -766,7 +675,8 @@ export default function Settings() {
               )}
               <div className="relative">
                 <button
-                  className="flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors duration-150 hover:bg-[var(--light-elevated)]"
+                  // Fix Pack 2 Item 4 (Phase 77 deferred): 24px → 44px hit target.
+                  className="flex min-h-[44px] items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors duration-150 hover:bg-[var(--light-elevated)]"
                   style={{ color: 'var(--light-text-muted)' }}
                   type="button"
                   onClick={() => setGoalPickerOpen((s) => !s)}
@@ -783,7 +693,7 @@ export default function Settings() {
                         key={gt}
                         type="button"
                         onClick={() => addGoal(gt)}
-                        className="w-full px-3 py-1.5 text-left text-xs transition-colors hover:bg-[var(--light-elevated)]"
+                        className="min-h-[44px] w-full px-3 py-1.5 text-left text-xs transition-colors hover:bg-[var(--light-elevated)]"
                         style={{ color: 'var(--page-text)' }}
                       >
                         {GOAL_TYPE_LABELS[gt]}
@@ -865,7 +775,7 @@ export default function Settings() {
                   type="button"
                   aria-pressed={cardVariant === v}
                   onClick={() => handleCardVariantChange(v)}
-                  className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors"
+                  className="min-h-[44px] rounded-md px-3 py-1.5 text-xs font-semibold transition-colors"
                   style={{
                     backgroundColor: cardVariant === v ? 'var(--azfit-primary)' : 'transparent',
                     color: cardVariant === v ? '#FFFFFF' : 'var(--page-text)',
@@ -1299,106 +1209,6 @@ export default function Settings() {
               />
             </motion.div>
           </motion.div>
-        </motion.div>
-
-        {/* ====== Connected Devices Section ====== */}
-        <motion.div
-          {...fadeUp}
-          transition={{ ...fadeUp.transition, delay: 0.25 }}
-          className="mt-4 rounded-2xl border p-5"
-          style={{
-            backgroundColor: 'var(--card-bg)',
-            borderColor: 'var(--card-border)',
-          }}
-        >
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <Watch size={20} style={{ color: 'var(--azfit-primary)' }} />
-              <h3 className="text-lg font-bold" style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}>
-                Connected Devices
-              </h3>
-            </div>
-            <button
-              className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-mono text-xs font-semibold transition-all duration-200 hover:bg-[var(--azfit-primary)] hover:text-white active:scale-[0.97]"
-              style={{
-                borderColor: 'var(--azfit-primary)',
-                color: 'var(--azfit-primary)',
-                textShadow: 'var(--text-shadow-dark)',
-              }}
-              type="button"
-              onClick={() => toast.info('Device connection coming soon')}
-            >
-              + Connect Device
-            </button>
-          </div>
-
-          <motion.div
-            variants={stagger}
-            initial="initial"
-            animate="animate"
-          >
-            {devices.map((device) => (
-              <DeviceRow key={device.name} device={device} />
-            ))}
-          </motion.div>
-        </motion.div>
-
-        {/* ====== Data Export Section ====== */}
-        <motion.div
-          {...fadeUp}
-          transition={{ ...fadeUp.transition, delay: 0.3 }}
-          className="mt-4 rounded-2xl border p-5"
-          style={{
-            backgroundColor: 'var(--card-bg)',
-            borderColor: 'var(--card-border)',
-          }}
-        >
-          <div className="mb-4 flex items-center gap-2.5">
-            <Download size={20} style={{ color: 'var(--azfit-secondary)' }} />
-            <h3 className="text-lg font-bold" style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}>
-              Data Export
-            </h3>
-          </div>
-
-          <div className="space-y-3">
-            <button
-              onClick={() => handleExport('all-data')}
-              className="flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 font-mono text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 active:scale-[0.97]"
-              style={{ backgroundColor: 'var(--azfit-primary)', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
-              type="button"
-            >
-              <Download size={16} />
-              Export All Data
-            </button>
-            <div className="flex gap-3">
-              <button
-                onClick={() => handleExport('workouts')}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg border px-4 py-2.5 font-mono text-xs font-semibold transition-all duration-200 hover:bg-[var(--azfit-primary)] hover:text-white active:scale-[0.97]"
-                style={{
-                  borderColor: 'var(--azfit-primary)',
-                  color: 'var(--azfit-primary)',
-                  textShadow: 'var(--text-shadow-dark)',
-                }}
-                type="button"
-              >
-                <Dumbbell size={14} />
-                Export Workouts (CSV)
-              </button>
-              <button
-                onClick={() => handleExport('nutrition')}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg border px-4 py-2.5 font-mono text-xs font-semibold transition-all duration-200 hover:bg-[var(--azfit-primary)] hover:text-white active:scale-[0.97]"
-                style={{
-                  borderColor: 'var(--azfit-primary)',
-                  color: 'var(--azfit-primary)',
-                  textShadow: 'var(--text-shadow-dark)',
-                }}
-                type="button"
-              >
-                <Apple size={14} />
-                Export Nutrition (CSV)
-              </button>
-            </div>
-          </div>
         </motion.div>
 
         {/* ====== Account Actions Section ====== */}

@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { keepaliveRpc } from '@/lib/keepaliveSave';
 
 /**
  * Phase 97a — AI key management + ai-chat edge proxy.
@@ -14,17 +15,25 @@ import { supabase } from '@/lib/supabase';
  */
 
 export async function saveAiKey(apiKey: string, baseUrl: string, model: string): Promise<void> {
-  const { error } = await supabase.rpc('save_ai_config', {
+  // Fix Pack 2: keepalive write — a save racing the Phase 33A SW-reload was
+  // aborted mid-flight ("TypeError: Failed to fetch") and lost silently.
+  const res = await keepaliveRpc('save_ai_config', {
     p_api_key: apiKey,
     p_base_url: baseUrl,
     p_model: model,
   });
-  if (error) throw new Error(error.message);
+  if (!res.ok) {
+    console.error('saveAiKey failed:', res.error);
+    throw new Error(res.error ?? 'Could not save AI key');
+  }
 }
 
 export async function clearAiKey(): Promise<void> {
-  const { error } = await supabase.rpc('clear_ai_config');
-  if (error) throw new Error(error.message);
+  const res = await keepaliveRpc('clear_ai_config', {});
+  if (!res.ok) {
+    console.error('clearAiKey failed:', res.error);
+    throw new Error(res.error ?? 'Could not clear AI key');
+  }
 }
 
 /** Presence-only — never the key itself. */

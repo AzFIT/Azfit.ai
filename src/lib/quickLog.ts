@@ -160,7 +160,7 @@ export function parseTraining(text: string): TrainingData | null {
 const CAL_RE = /(\d+(?:[.,]\d+)?)\s*(?:kcal|cal(?:ories)?|cals)\b/i;
 
 /** Macro extraction: "40g protein", "protein 40", "40p 50c 20f". */
-export function parseMeal(text: string): MealData | null {
+export function parseMeal(text: string, now: Date = new Date()): MealData | null {
   const caloriesM = text.match(CAL_RE);
   const calories = caloriesM ? toNum(caloriesM[1]) : null;
   let protein: number | null = null;
@@ -193,7 +193,7 @@ export function parseMeal(text: string): MealData | null {
   name = words.join(" ").replace(/\s{2,}/g, " ").trim();
   if (!name) name = "Meal";
 
-  const meal_type = inferMealType(text, new Date());
+  const meal_type = inferMealType(text, now);
   return {
     name: name.charAt(0).toUpperCase() + name.slice(1),
     ...(calories !== null ? { calories } : {}),
@@ -224,7 +224,7 @@ export function inferMealType(text: string, now: Date): MealType {
  * `hint` (a tapped chip) forces the intent; without it the parser
  * detects from content, defaulting to meal.
  */
-export function parseQuickLog(raw: string, hint: QuickIntent | null): QuickLogResult {
+export function parseQuickLog(raw: string, hint: QuickIntent | null, now: Date = new Date()): QuickLogResult {
   const text = raw.trim();
   if (!text) return { status: "clarify", question: "What would you like to log?" };
 
@@ -265,7 +265,7 @@ export function parseQuickLog(raw: string, hint: QuickIntent | null): QuickLogRe
       return { status: "ok", intent, data: t };
     }
     case "meal": {
-      const m = parseMeal(text);
+      const m = parseMeal(text, now);
       if (!m) {
         return {
           status: "clarify",

@@ -26,6 +26,7 @@ import {
   consistencyRange,
   type ConsistencyGrid,
 } from "@/lib/consistencyMap";
+import { clientScopeOr } from "@/lib/clientScope";
 
 interface UseConsistencyMapOptions {
   /** trainer view: the clients-row id of the client being viewed */
@@ -89,21 +90,16 @@ export function useConsistencyMap(opts: UseConsistencyMapOptions = {}) {
         const tomorrow = new Date(new Date(`${todayKey}T00:00:00`).getTime() + 86400000);
 
         // sessions: profile-id OR clients-row id (same orFilter pattern
-        // as useInsights/useMetricTiles), completed only, 12-week window
-        const sessionsQuery = profileId
-          ? supabase
-              .from("sessions")
-              .select("starts_at")
-              .or(`client_id.eq.${profileId},client_record_id.eq.${cid}`)
-              .eq("status", "completed")
-              .gte("starts_at", iso(startKey))
-              .lt("starts_at", tomorrow.toISOString())
-          : cid
-            ? // Account-less target (no profiles row): clients.id half only
-              supabase
+        // as useInsights/useMetricTiles), completed only, 12-week window.
+        // Fix Pack 2: defensive scope — null cid used to interpolate
+        // `client_record_id.eq.null` (400/22P02).
+        const scope = clientScopeOr(profileId, cid);
+        const sessionsQuery =
+          scope !== null
+            ? supabase
                 .from("sessions")
                 .select("starts_at")
-                .or(`client_record_id.eq.${cid}`)
+                .or(scope)
                 .eq("status", "completed")
                 .gte("starts_at", iso(startKey))
                 .lt("starts_at", tomorrow.toISOString())

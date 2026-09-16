@@ -45,6 +45,7 @@ import AchievementsGrid from "./AchievementsGrid";
 import SessionsRemainingCard from "./SessionsRemainingCard";
 import PaidPackageCard from "./PaidPackageCard";
 import MyProgressSection from "./MyProgressSection";
+import { clientScopeOr } from "@/lib/clientScope";
 import MyTargetsCard from "./MyTargetsCard";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -217,11 +218,15 @@ export default function ClientDashboard() {
     if (!eff.resolved) return;
     let cancelled = false;
     (async () => {
-      const { data: clientRow } = await supabase
-        .from("clients")
-        .select("id, trainer_id")
-        .eq("id", eff.clientId ?? "")
-        .maybeSingle();
+      // Fix Pack 2: no clients row → skip the query (an `id=eq.` empty filter
+      // 400'd for accounts without a clients record).
+      const { data: clientRow } = eff.clientId
+        ? await supabase
+            .from("clients")
+            .select("id, trainer_id")
+            .eq("id", eff.clientId)
+            .maybeSingle()
+        : { data: null };
 
       // Unread notifications (real count — own account only)
       const { count: unread } = viewAs
@@ -337,17 +342,21 @@ export default function ClientDashboard() {
         .select("starts_at, status")
         .gte("starts_at", dayKey(monday) + "T00:00:00")
         .lt("starts_at", dayKey(weekEnd) + "T00:00:00");
+      const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
       if (viewAs) {
-        query.or(
-          eff.profileId
-            ? `client_id.eq.${eff.profileId},client_record_id.eq.${eff.clientId}`
-            : `client_record_id.eq.${eff.clientId}`,
-        );
+        // Fix Pack 2: build the scope defensively — a null clientId used to
+        // interpolate `client_record_id.eq.null` (400/22P02). Null scope =
+        // no filter at all, which would fetch EVERY session — treat as zero.
+        const scope = clientScopeOr(eff.profileId, eff.clientId);
+        if (scope) query.or(scope);
+        else {
+          if (!cancelled) setComplianceData(days.map((day) => ({ day, value: 0 })));
+          return;
+        }
       } else {
         query.eq("client_id", ownProfileId!);
       }
       const { data } = await query;
-      const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
       const out = days.map((day, i) => {
         const d = new Date(monday);
         d.setDate(monday.getDate() + i);
@@ -434,7 +443,8 @@ export default function ClientDashboard() {
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={() => navigate("/notifications")}
-              className="relative flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-all"
+              // Fix Pack 2 Item 4 (Phase 77 deferred): 42×34 → 44px hit target.
+              className="relative flex min-h-[44px] min-w-[44px] items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-all"
               style={{
                 backgroundColor: "var(--card-bg)",
                 borderColor: "var(--card-border)",

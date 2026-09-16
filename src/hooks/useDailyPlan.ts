@@ -77,11 +77,15 @@ export function useDailyPlan({ habits, habitLogs, checkinDue }: UseDailyPlanArgs
       setLoading(true);
       // Same clients row the inline email copy resolved; keyed by the
       // resolver's clients.id now.
-      const { data: clientRow } = await supabase
-        .from("clients")
-        .select("id, lifestyle_targets")
-        .eq("id", eff.clientId ?? "")
-        .maybeSingle();
+      // Fix Pack 2: no clients row → skip the query (`id=eq.` 400'd for
+      // accounts without a clients record).
+      const { data: clientRow } = eff.clientId
+        ? await supabase
+            .from("clients")
+            .select("id, lifestyle_targets")
+            .eq("id", eff.clientId)
+            .maybeSingle()
+        : { data: null };
       if (cancelled) return;
       const row = clientRow as { id: string; lifestyle_targets: { steps?: number | null; sleep_hours?: number | null; water_ml?: number | null } | null } | null;
       const cid = row?.id ?? null;
