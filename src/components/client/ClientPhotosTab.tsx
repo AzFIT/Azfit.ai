@@ -42,7 +42,7 @@ export default function ClientPhotosTab({ clientEmail }: ClientPhotosTabProps) {
       const { data: prof } = await supabase
         .from("profiles")
         .select("id")
-        .eq("email", clientEmail)
+        .ilike("email", clientEmail)
         .maybeSingle();
       if (cancelled || !prof) {
         if (!cancelled) setLoading(false);

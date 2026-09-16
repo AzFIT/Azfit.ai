@@ -106,7 +106,7 @@ export default function BioPrintPage() {
       const { data } = await supabase
         .from("clients")
         .select("intake_profile, gender, height_cm, date_of_birth, weight_kg")
-        .eq("email", user.email)
+        .ilike("email", user.email)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();

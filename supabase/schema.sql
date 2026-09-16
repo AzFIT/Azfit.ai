@@ -45,6 +45,8 @@ CREATE TABLE IF NOT EXISTS clients (
   experience_level TEXT CHECK (experience_level IN ('beginner', 'intermediate', 'advanced')),
   status TEXT NOT NULL CHECK (status IN ('active', 'inactive', 'on_hold', 'archived')) DEFAULT 'active',
   notes TEXT,
+  -- Phase 99a: client invitation stamp (NULL = never invited)
+  invited_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -446,6 +448,24 @@ CREATE TRIGGER update_profiles_updated_at
 CREATE TRIGGER update_clients_updated_at
   BEFORE UPDATE ON clients
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Phase 99a: enforce the linkage invariant "clients.email is always
+-- lowercase" (auth lowercases profiles.email; the 35 case-sensitive
+-- clients.email = profiles.email RLS policies are correct only when both
+-- sides share casing). See client-email-lowercase-99a.sql.
+CREATE OR REPLACE FUNCTION clients_email_lowercase()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.email IS NOT NULL THEN
+    NEW.email := lower(NEW.email);
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER clients_email_lowercase
+  BEFORE INSERT OR UPDATE OF email ON clients
+  FOR EACH ROW EXECUTE FUNCTION clients_email_lowercase();
 
 CREATE TRIGGER update_programs_updated_at
   BEFORE UPDATE ON programs

@@ -44,7 +44,7 @@ export async function linkInvitedClient(
     const { data: existing } = await supabase
       .from("clients")
       .select("id, trainer_id")
-      .eq("email", user.email)
+      .ilike("email", user.email)
       .limit(1)
       .maybeSingle();
 

@@ -93,6 +93,7 @@ function mapDbClientToClient(row: Database["public"]["Tables"]["clients"]["Row"]
     progress: undefined,
     streak: undefined,
     lastActive: null,
+    invitedAt: row.invited_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -370,6 +371,7 @@ export default function ClientProfile() {
           onBuildProgram={handleBuildProgram}
           onEdit={() => setEditOpen(true)}
           onExportPlanPack={() => navigate(`/print/plan-pack/${client.id}`)}
+          onInvited={() => void loadClient()}
         />
 
         {/* Tabs */}

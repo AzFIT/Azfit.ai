@@ -18,6 +18,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useViewAs } from "@/hooks/useViewAs";
 import { Button } from "@/components/ui/button";
 import LogoHomeButton from "@/components/LogoHomeButton";
+import InviteControl from "@/components/client/InviteControl";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,6 +31,8 @@ interface ClientProfileHeaderProps {
   onBuildProgram?: () => void;
   onEdit?: () => void;
   onExportPlanPack?: () => void;
+  /** Phase 99a: server-stamped invited_at after a successful invite */
+  onInvited?: (invitedAt: string) => void;
 }
 
 export default function ClientProfileHeader({
@@ -37,6 +40,7 @@ export default function ClientProfileHeader({
   onBuildProgram,
   onEdit,
   onExportPlanPack,
+  onInvited,
 }: ClientProfileHeaderProps) {
   const navigate = useNavigate();
   const { isTrainer } = useAuth();
@@ -287,6 +291,17 @@ export default function ClientProfileHeader({
             <Edit3 size={13} />
             Edit
           </Button>
+          {/* Phase 99a: invite the client to the app (real states only —
+              hidden when they already have an account or the row has no
+              email). Icon-only below sm to keep the row uncrowded. */}
+          {isTrainer && (
+            <InviteControl
+              clientId={client.id}
+              email={client.email}
+              invitedAt={client.invitedAt}
+              onInvited={onInvited}
+            />
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button

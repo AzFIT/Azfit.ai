@@ -50,6 +50,20 @@ vi.mock("@/lib/supabase", () => ({
   supabase: {
     from: (table: string) => ({
       select: () => ({
+        // Phase 99a: the email linkage is case-insensitive `.ilike` —
+        // the mock mirrors the query-builder, so both names resolve.
+        ilike: () => ({
+          order: () => ({
+            limit: () => ({
+              maybeSingle: async () => ({
+                data: table === "clients" ? mockState.clientsRow : null,
+              }),
+            }),
+          }),
+          maybeSingle: async () => ({
+            data: table === "profiles" ? mockState.profilesRow : null,
+          }),
+        }),
         eq: () => ({
           order: () => ({
             limit: () => ({

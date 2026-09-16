@@ -41,7 +41,7 @@ export function SessionLauncher({
       const { data: client, error: clientError } = await supabase
         .from('clients')
         .select('id')
-        .eq('email', user.email)
+        .ilike('email', user.email)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();

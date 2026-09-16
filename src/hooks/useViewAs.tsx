@@ -11,7 +11,8 @@
 
    useEffectiveClientIdentity() is THE shared identity resolver the
    client-data hooks use (it replaces the ~10 inline
-   `clients.eq("email", user.email)` copies):
+   `clients.eq("email", user.email)` copies — ALL of which became
+   case-insensitive `.ilike` in Phase 99a, the invited-client fix):
      · override active  → the TARGET's clients.id + email, and their
        profiles.id resolved async (null until resolved; also null
        permanently when the target has no account — account-less
@@ -194,7 +195,7 @@ export function useEffectiveClientIdentity(): EffectiveClientIdentity {
         const { data } = await supabase
           .from("clients")
           .select("id")
-          .eq("email", ownEmail)
+          .ilike("email", ownEmail)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -224,7 +225,7 @@ export function useEffectiveClientIdentity(): EffectiveClientIdentity {
         const { data } = await supabase
           .from("profiles")
           .select("id")
-          .eq("email", overrideEmail)
+          .ilike("email", overrideEmail)
           .maybeSingle();
         if (cancelled) return;
         id = (data as { id: string } | null)?.id ?? null;

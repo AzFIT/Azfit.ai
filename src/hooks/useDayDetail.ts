@@ -107,7 +107,7 @@ export function useDayDetail(opts: { clientId?: string; clientEmail?: string }) 
         const { data: prof } = await supabase
           .from("profiles")
           .select("id")
-          .eq("email", opts.clientEmail!)
+          .ilike("email", opts.clientEmail!)
           .maybeSingle();
         profileId = (prof as { id: string } | null)?.id ?? null;
         cid = opts.clientId ?? null;

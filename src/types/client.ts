@@ -37,6 +37,8 @@ export interface Client {
   progress?: number;
   streak?: number;
   lastActive?: string | null;
+  /** Phase 99a: when the trainer sent the app invite (null = never) */
+  invitedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

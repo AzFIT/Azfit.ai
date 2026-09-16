@@ -317,7 +317,7 @@ export default function ClientIntakeWizard({ open, onClose, onSuccess }: ClientI
         const { data: prof } = await supabase
           .from("profiles")
           .select("id")
-          .eq("email", data.email.trim())
+          .ilike("email", data.email.trim())
           .maybeSingle();
         if (prof) {
           await saveNutritionTargets(computedTargets, prof.id).catch(() => {});

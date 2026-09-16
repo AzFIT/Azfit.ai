@@ -580,7 +580,7 @@ export default function SchedulePage() {
       const { data: crow } = await supabase
         .from('clients')
         .select('id')
-        .eq('email', event.clientEmail)
+        .ilike('email', event.clientEmail)
         .eq('trainer_id', user?.id || '')
         .maybeSingle();
       clientRecordId = (crow as { id: string } | null)?.id ?? null;
@@ -742,7 +742,7 @@ export default function SchedulePage() {
         const { data: crow } = await supabase
           .from('clients')
           .select('id')
-          .eq('email', email)
+          .ilike('email', email)
           .eq('trainer_id', user?.id || '')
           .maybeSingle();
         sessionUpdates.clientRecordId = (crow as { id: string } | null)?.id ?? null;

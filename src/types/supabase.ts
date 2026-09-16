@@ -101,6 +101,7 @@ export type Database = {
           intake_profile: Json | null;
           equipment_access: string[] | null;
           lifestyle_targets: Json | null;
+          invited_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -122,6 +123,7 @@ export type Database = {
           intake_profile?: Json | null;
           equipment_access?: string[] | null;
           lifestyle_targets?: Json | null;
+          invited_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -143,6 +145,7 @@ export type Database = {
           intake_profile?: Json | null;
           equipment_access?: string[] | null;
           lifestyle_targets?: Json | null;
+          invited_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };

@@ -47,7 +47,7 @@ export function useClientScore() {
         const { data: clientRow } = await supabase
           .from("clients")
           .select("id, lifestyle_targets")
-          .eq("email", eff.clientEmail ?? user.email)
+          .ilike("email", eff.clientEmail ?? user.email)
           .maybeSingle();
         if (cancelled) return;
         const cid = (clientRow as { id: string; lifestyle_targets: LifestyleTargets | null } | null)?.id ?? null;

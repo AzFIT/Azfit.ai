@@ -740,7 +740,7 @@ function NutritionCard({ clientEmail, onClick }: { clientEmail: string; onClick?
       const { data: prof } = await supabase
         .from("profiles")
         .select("id")
-        .eq("email", clientEmail)
+        .ilike("email", clientEmail)
         .maybeSingle();
       if (cancelled) return;
       if (!prof) {

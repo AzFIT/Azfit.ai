@@ -11,7 +11,7 @@ export async function resolveClientId(_userId: string, email: string): Promise<s
   const { data, error } = await supabase
     .from("clients")
     .select("id")
-    .eq("email", email)
+    .ilike("email", email)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle(); // Phase 43: no clients row → null, not a 406

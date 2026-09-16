@@ -140,7 +140,7 @@ export default function ScheduleTab({ clientEmail, clientsId }: ScheduleTabProps
       // Resolve both id spaces: profiles.id (via email) and the clients row
       const [profRes, clientRes] = await Promise.all([
         clientEmail
-          ? supabase.from("profiles").select("id, full_name").eq("email", clientEmail).maybeSingle()
+          ? supabase.from("profiles").select("id, full_name").ilike("email", clientEmail).maybeSingle()
           : Promise.resolve({ data: null, error: null }),
         clientsId
           ? supabase.from("clients").select("full_name").eq("id", clientsId).maybeSingle()

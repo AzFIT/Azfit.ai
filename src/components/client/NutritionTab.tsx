@@ -124,7 +124,7 @@ export default function NutritionTab({ clientId, clientEmail }: NutritionTabProp
       const { data: prof } = await supabase
         .from("profiles")
         .select("id")
-        .eq("email", clientEmail)
+        .ilike("email", clientEmail)
         .maybeSingle();
       if (cancelled) return;
 

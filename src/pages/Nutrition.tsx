@@ -236,7 +236,7 @@ export default function NutritionPage() {
         const { data } = await supabase
           .from("clients")
           .select("id, intake_profile")
-          .eq("email", email)
+          .ilike("email", email)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();

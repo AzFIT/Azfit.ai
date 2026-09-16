@@ -795,7 +795,7 @@ function ClientCheckIns() {
       const { data: clientRow, error: clientError } = await supabase
         .from("clients")
         .select("id")
-        .eq("email", user.email)
+        .ilike("email", user.email)
         .maybeSingle(); // Phase 43: no clients row → null, not a 406
 
       if (clientError || !clientRow) {

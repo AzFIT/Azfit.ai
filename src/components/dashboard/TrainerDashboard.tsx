@@ -472,7 +472,7 @@ export default function TrainerDashboard() {
         const { data: prof } = await supabase
           .from("profiles")
           .select("id")
-          .eq("email", c.email)
+          .ilike("email", c.email)
           .maybeSingle();
         // Phase 35: match holiday sessions by profiles.id OR clients.id
         const latestEnd = allSessions

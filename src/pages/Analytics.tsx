@@ -245,7 +245,7 @@ export default function Analytics() {
         ? await supabase
             .from('clients')
             .select('id, trainer_id')
-            .eq('email', user.email)
+            .ilike('email', user.email)
             .maybeSingle()
         : { data: null, error: null };
 

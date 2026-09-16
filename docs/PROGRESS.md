@@ -1739,3 +1739,86 @@ From `neon-tokens.css` `.neon-card` / `.neon-metal`: (1) per-card full metal fac
 - **Item 4 — Phase 77 deferred tap targets.** Fixed: dashboard bell button (42×34 → 44×44 via min-h/min-w), workouts 'Back to Dashboard' ×2 (36px → 44px), Settings 'Edit' (30px), '+ Add Goal' (24px), goal-picker menu items, Card-style segmented buttons, and the avatar edit icon button (28px visual kept on an inner span; the 44px button is the hit area — the first attempt, an invisible `::before` inset pseudo, was NOT hit-testable in practice (probe proved only ~28px effective despite a rendered 40px pseudo; an ancestor transform on the profile card further shrinks the used box) — documented dead end, real-box approach chosen). **N/A: 'Skip to content' a11y link** — visually-hidden-until-focus keyboard pattern; a 44px forced target would alter the a11y design (the audit itself deferred it as a design-pass item).
 - **Pre-existing flake fixed en route:** `quickLog.test.ts` "meal chip with macros" asserted `meal_type: "lunch"` while `parseQuickLog`/`parseMeal` read the wall clock (`new Date()`), so it failed 14:00–16:59 local (that's also the mystery single-test flake seen on the main baseline). Root-fix: `parseMeal(text, now = new Date())` and `parseQuickLog(raw, hint, now = new Date())` thread the test's pinned NOON through (the test had been passing an ignored third arg).
 - Verified: gates green (tsc / lint / **1040 tests = 1035 + 5 clientScope** / build + 404 copy / e2e 4/4), re-run on merged main. Smoke (Playwright + pooler, **22/22 × two consecutive passes**): (a) AI key save via real Settings UI within seconds of load → pooler-proven `ai_config` row + key material never in DOM + presence survives hard reload; Pulse Metal toggled via real UI → pooler `ui_variant='metal'` + `data-ui-variant` applied + survives hard reload → both restored NULL; (b) zero "Connected Devices"/"Data Export" references; (c) account-less client login → **zero 400s** + scrollWidth 390; (d) computed bounding boxes ≥44px on every fixed target (bell 44×44, Edit 73×44 / 70×44, Add Goal 88×44, segmented 91×44, avatar 44×44, Back-to-Dashboard 161×44); (e) fixtures SQL-verified 0 rows everywhere incl. `auth.users`/`auth.identities`. Zero console errors. Known Playwright-timing flake (first synthesized click of a fresh context intermittently misses React's delegated handler) absorbed with retry-until-state, same pattern as 92. Screenshots: .temp/audit/shots/fixpack2/ (settings-{dark,light}-1280, client-dash-dark-390). Temp scripts deleted.
+
+## PHASE 99a — CLIENT INVITATION SYSTEM: **BRANCH SHIPPED — awaiting merge + verifier deploy**
+
+Branch `feat/invite-99a` off `a272210`. Push-only autonomy: STOP after push, no merge.
+The `invite-client` edge function is repo+README only — the verifier deploys it
+via Supabase MCP after gates pass (no Supabase CLI on this machine; verified).
+
+### What shipped
+
+**Pre-step (commit `a272210` on main):** ai-chat edge function temperature param
+removed (Moonshot kimi-k3/k2.6 reject temperature≠1; deploy was already live as
+ai-chat v2 — this commit makes git match the deploy) + `.gitignore` rule for
+AZFITAIKIMI.txt. The three owner logo PNGs moved from `public/` to
+`.temp/Build/logos-ref/` (not app assets; only 96a's `azfit-logo-header.png`
+belongs in `public/`).
+
+**Schema (additive, applied live + mirrored):**
+- `clients.invited_at TIMESTAMPTZ NULL` — invitation stamp. Migration:
+  `supabase/client-invited-at-99a.sql`; mirrored in `supabase/schema.sql`
+  clients CREATE; added to clients Row/Insert/Update in `src/types/supabase.ts`.
+- `supabase/client-email-lowercase-99a.sql` — see the Item 3 linkage fix below.
+
+**Invite edge function** `supabase/functions/invite-client/` (+ README with
+exact deploy command): POST `{ client_id }`, authenticated trainer only
+(profiles.role check), ownership validation (`clients.trainer_id = caller.id`),
+400 no-email, profiles-`ilike` pre-check → 200 `already_has_account` (never
+duplicate auth users), 409 within the 24h re-invite window (`retry_after_s`),
+else `inviteUserByEmail` via service role + stamps `clients.invited_at`
+server-side. Sanitized errors only; CORS includes `x-app-name` (the ai-chat
+lesson). **Verifier: `supabase functions deploy invite-client --project-ref
+gcurvjprfwecbchreieu`** — smoke (a) invite-ok + stamp, (b) 409 duplicate, (c)
+cross-trainer 403 are contract-read from code and deferred to post-deploy.
+
+**Trainer UI:** `src/components/client/InviteControl.tsx` mounted in
+`ClientProfileHeader` (trainer-only). Pure state machine in
+`src/lib/inviteStatus.ts` (`deriveInviteStatus` → has-account | invited-recent |
+resend | invite; 24h window const; 8 unit tests). Real data only: account
+exists → button hidden; invited <24h → "Invited ✓ · resend tomorrow" (disabled,
+honest); >24h → "Resend invite"; never → "Invite". Account-existence probe
+(`profiles.ilike`) gates the enabled state — no fabricated status. Icon-only
+below sm, `min-h-[44px] min-w-[44px]` (min-w added after smoke caught 39×44),
+`data-invite-status` attr, optimistic pending → toast on success / toast +
+revert on failure. No client write path — the edge function stamps invited_at.
+
+**Item 3 — the invited-client linkage (permanent knowledge, READ THIS):**
+The account→clients-row linkage is **email, both sides, and Supabase auth
+lowercases emails while clients rows may hold original casing**. Two layers:
+1. Client side: ALL 27 `.eq("email", …)` supabase call sites across `src/`
+   swept to `.ilike` (grep-clean; useViewAs doc comment updated).
+2. Database side (found by smoke, the real bug): **35 client-visible RLS
+   policies across 26 tables join `clients.email = profiles.email`
+   CASE-SENSITIVELY.** A mixed-case clients row silently fails every one — the
+   invited client logs in to an empty shell. Minimal fix enforcing the
+   invariant at one place: `client-email-lowercase-99a.sql` normalizes the 1
+   mixed-case live row and adds trigger `clients_email_lowercase` (BEFORE
+   INSERT OR UPDATE OF email → `lower(NEW.email)`), mirrored in schema.sql.
+   The 35 policies become correct by construction; the .ilike sweep stays as
+   defense-in-depth. Email local-parts are treated as case-insensitive
+   app-wide (auth already lowercases).
+
+### Verification
+- Gates on branch: tsc · lint · **1048/1048 (97 files)** · build + 404 copy ·
+  e2e 4/4 — all green.
+- Smoke 13/13 (`.temp/audit/shots/99a/`): all three invite states render from
+  real data; pre-deploy click → honest "Could not send the invitation" toast
+  with no fake state change; 44×44 at 390; scrollWidth=390; admin-API
+  invite-analog creates the lowercase auth user (200); invited client logs in,
+  lands on the real dashboard, THEIR habit row visible (RLS linkage proven);
+  account-exists then hides the button; zero console errors.
+- Smoke item (d) no-email client: **N/A by schema** — `clients.email` is NOT
+  NULL live. UI guard retained in code.
+- Fixture SMOKE99A-DELETE cleaned, SQL-verified 0 rows everywhere incl.
+  auth.users. Temp scripts deleted.
+
+### Gotchas documented
+- The smoke cleans public fixture rows itself at the end but NOT auth.users —
+  re-runs must delete fixture auth users first or the account-exists state
+  hides the Invite button.
+- Fixture seeding of dependent rows must use ILIKE for the mixed-case email —
+  the 99a trigger now lowercases it at insert, so `email = 'Mixed…Case'`
+  matches nothing.
+- Playwright fresh-context first-click flake absorbed via retry-until-state
+  (standing heisenbug, still under watch).

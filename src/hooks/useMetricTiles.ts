@@ -66,7 +66,7 @@ export function useMetricTiles() {
       const { data: clientRow } = await supabase
         .from("clients")
         .select("id, lifestyle_targets")
-        .eq("email", eff.clientEmail ?? user.email)
+        .ilike("email", eff.clientEmail ?? user.email)
         .maybeSingle();
 
       const monday = weekStartMonday();

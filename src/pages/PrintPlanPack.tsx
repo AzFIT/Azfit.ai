@@ -124,7 +124,7 @@ export default function PrintPlanPackPage() {
           .limit(1)
           .maybeSingle(),
         supabase.from("habits").select("name, target_frequency, active").eq("client_id", c.id),
-        supabase.from("profiles").select("id").eq("email", c.email).maybeSingle(),
+        supabase.from("profiles").select("id").ilike("email", c.email).maybeSingle(),
       ]);
       if (cancelled) return;
 

@@ -246,7 +246,7 @@ export default function Settings() {
       const { data: row } = await supabase
         .from('clients')
         .select('id, created_at, phone, date_of_birth, height_cm, gender')
-        .eq('email', user.email)
+        .ilike('email', user.email)
         .maybeSingle();
       if (cancelled) return;
       setClientRow(row ?? null);

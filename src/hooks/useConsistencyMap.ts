@@ -78,7 +78,7 @@ export function useConsistencyMap(opts: UseConsistencyMapOptions = {}) {
           const { data: prof } = await supabase
             .from("profiles")
             .select("id")
-            .eq("email", opts.clientEmail!)
+            .ilike("email", opts.clientEmail!)
             .maybeSingle();
           if (cancelled) return;
           profileId = (prof as { id: string } | null)?.id ?? null;

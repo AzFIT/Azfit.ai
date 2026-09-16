@@ -37,7 +37,7 @@ export default function ClientFormChecksTab({ clientEmail }: ClientFormChecksTab
       const { data: prof } = await supabase
         .from("profiles")
         .select("id, full_name")
-        .eq("email", clientEmail)
+        .ilike("email", clientEmail)
         .maybeSingle();
       if (cancelled || !prof) {
         if (!cancelled) setLoading(false);
