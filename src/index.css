@@ -627,22 +627,30 @@
     linear-gradient(180deg, #EDF1F6 0%, #E4EAF1 42%, #D8E0E9 100%);
   --metal-brush:
     repeating-linear-gradient(90deg,
-      rgba(15, 23, 42, 0.020) 0px, rgba(15, 23, 42, 0.020) 1px,
+      rgba(15, 23, 42, 0.012) 0px, rgba(15, 23, 42, 0.012) 1px,
       transparent 1px, transparent 4px),
     repeating-linear-gradient(0deg,
-      rgba(255, 255, 255, 0.35) 0px, rgba(255, 255, 255, 0.35) 1px,
+      rgba(255, 255, 255, 0.22) 0px, rgba(255, 255, 255, 0.22) 1px,
       transparent 1px, transparent 3px);
   --metal-sheen:
     linear-gradient(115deg,
-      transparent 32%,
-      rgba(255, 255, 255, 0.16) 46%,
-      rgba(255, 255, 255, 0.06) 54%,
-      transparent 68%);
+      transparent 30%,
+      rgba(255, 255, 255, 0.28) 45%,
+      rgba(255, 255, 255, 0.10) 55%,
+      transparent 70%);
   --metal-tint:
-    radial-gradient(120% 90% at 50% 0%, rgba(0, 174, 239, 0.06), transparent 55%);
-  --metal-border: rgba(15, 23, 42, 0.12);
-  --metal-edge-highlight: rgba(255, 255, 255, 0.85);
-  --metal-card: rgba(255, 255, 255, 0.78);
+    radial-gradient(120% 90% at 50% 0%, rgba(0, 174, 239, 0.07), transparent 55%);
+  --metal-border: rgba(15, 23, 42, 0.17);
+  --metal-edge-highlight: rgba(255, 255, 255, 0.95);
+  --metal-card: rgba(255, 255, 255, 0.66);
+
+  /* Phase 92d — per-card metallic face (etched light steel): a touch
+     DARKER than the page base so the rim reads as a raised edge. */
+  --metal-card-face:
+    linear-gradient(180deg, #E9EEF5 0%, #DCE4ED 45%, #CBD7E3 100%);
+  --metal-glow: rgba(0, 174, 239, 0.12);
+  --metal-glow-ring: rgba(0, 174, 239, 0.10);
+  --metal-rim: rgba(0, 174, 239, 0.45);
 
   /* Card surfaces become translucent steel over the page metal layer */
   --page-bg: transparent;
@@ -656,22 +664,31 @@
     linear-gradient(180deg, #1E2736 0%, #161E2C 42%, #10151F 100%);
   --metal-brush:
     repeating-linear-gradient(90deg,
-      rgba(255, 255, 255, 0.014) 0px, rgba(255, 255, 255, 0.014) 1px,
+      rgba(255, 255, 255, 0.022) 0px, rgba(255, 255, 255, 0.022) 1px,
       transparent 1px, transparent 4px),
     repeating-linear-gradient(0deg,
-      rgba(0, 0, 0, 0.05) 0px, rgba(0, 0, 0, 0.05) 1px,
+      rgba(0, 0, 0, 0.06) 0px, rgba(0, 0, 0, 0.06) 1px,
       transparent 1px, transparent 3px);
   --metal-sheen:
     linear-gradient(115deg,
       transparent 32%,
-      rgba(255, 255, 255, 0.050) 46%,
-      rgba(255, 255, 255, 0.018) 54%,
+      rgba(255, 255, 255, 0.070) 46%,
+      rgba(255, 255, 255, 0.025) 54%,
       transparent 68%);
   --metal-tint:
-    radial-gradient(120% 90% at 50% 0%, rgba(0, 174, 239, 0.05), transparent 55%);
-  --metal-border: rgba(196, 222, 255, 0.12);
-  --metal-edge-highlight: rgba(255, 255, 255, 0.09);
-  --metal-card: rgba(21, 29, 42, 0.82);
+    radial-gradient(120% 90% at 50% 0%, rgba(0, 174, 239, 0.07), transparent 55%);
+  --metal-border: rgba(196, 222, 255, 0.14);
+  --metal-edge-highlight: rgba(255, 255, 255, 0.12);
+  --metal-card: rgba(21, 29, 42, 0.72);
+
+  /* Phase 92d — per-card metallic face (dark steel, per the package):
+     brighter head fading to a dark foot, so the bevel + rim read at a
+     glance. Text contrast vs --page-text stays ~13:1 (AA). */
+  --metal-card-face:
+    linear-gradient(180deg, #2A3648 0%, #1D2736 45%, #141B28 100%);
+  --metal-glow: rgba(0, 174, 239, 0.12);
+  --metal-glow-ring: rgba(0, 174, 239, 0.07);
+  --metal-rim: rgba(0, 174, 239, 0.55);
 
   --page-bg: transparent;
   --card-bg: var(--metal-card);
@@ -716,9 +733,67 @@
   }
 }
 
-/* ── Performance guardrail: no backdrop-filter on small screens ── */
+/* ── Phase 92d: per-card metallic face ──────────────────────────────
+   Package craft (neon-tokens.css .neon-card) mapped to our tokens: full
+   metal face per card (sheen + brush + tint + steel base), beveled rim
+   (inset top highlight + inset bottom shade), restrained cyan ambient
+   glow + hairline rim along the top edge. `!important` is required
+   because GlassCard sets backgroundColor inline (89 call sites) — the
+   override exists ONLY under [data-ui-variant='metal'], so default
+   rendering stays byte-identical. Cyan = brand #00AEEF at
+   package-appropriate intensities (the guide's neon palette stays out
+   of scope — palette swap is a separate owner decision). */
+:root[data-ui-variant='metal'] .glass-card {
+  background:
+    var(--metal-sheen),
+    var(--metal-brush),
+    var(--metal-tint),
+    var(--metal-card-face) !important;
+  border: 1px solid var(--metal-border) !important;
+  box-shadow:
+    inset 0 1px 0 var(--metal-edge-highlight),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.30),
+    0 0 0 1px var(--metal-glow-ring),
+    0 0 24px var(--metal-glow),
+    0 10px 28px rgba(0, 0, 0, 0.38);
+}
+/* Luminous top-edge rim line (the reference's signature card edge). */
+:root[data-ui-variant='metal'] .glass-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 8%;
+  right: 8%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--metal-rim), transparent);
+  pointer-events: none;
+}
+
+/* ── Phase 92d, Item 2: accent glow discipline (variant only) ───────
+   Restrained cyan glow on INTERACTIVE accents only — primary buttons
+   (hover/focus) and the active nav rail (aria-current). No glow on
+   static text, no full-card halos. */
+:root[data-ui-variant='metal'] .bg-primary {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 0 16px rgba(0, 174, 239, 0.30);
+}
+:root[data-ui-variant='metal'] .bg-primary:hover,
+:root[data-ui-variant='metal'] .bg-primary:focus-visible {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    0 0 24px rgba(0, 174, 239, 0.45);
+}
+:root[data-ui-variant='metal'] [aria-current='page'] {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    inset 3px 0 0 rgba(0, 174, 239, 0.65),
+    0 0 16px rgba(0, 174, 239, 0.28);
+}
+
+/* ── Performance guardrail: no backdrop-filter on cards <640px ── */
 @media (max-width: 639px) {
-  :root[data-ui-variant='metal'] .glass {
+  :root[data-ui-variant='metal'] .glass-card {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }

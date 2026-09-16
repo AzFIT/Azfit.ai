@@ -84,7 +84,7 @@ export function GlassCard({
       data-testid={dataTestId}
       className={cn(
         // Base shape
-        "rounded-xl overflow-hidden relative",
+        "glass-card rounded-xl overflow-hidden relative",
         // Background — theme tokens (Phase 57: the old dark: classes never
         // fired — the app themes via data-theme, not the .dark class — so
         // dark mode showed light cards with unreadable muted text)

@@ -1702,3 +1702,31 @@ No new UI. AI-logged entries land in the real tables → the trainer sees them t
 - Local rule parser is a co-equal producer of the same contract (permanent rule: AI features are rule-based unless the owner approves a real LLM) — this is what makes quick-logging work before any key exists.
 - Meal logging unavailable under View As Client (nutrition_logs RLS is own-row only and the table has no `logged_by` column) — honest chat message instead of a write.
 - Training intent logs a habit flag + chat summary, not a workout_log (documented above).
+
+
+---
+
+## Phase 92d — Pulse Metal Card Redesign (neon-package-informed)
+
+**Branch:** `feat/metal-redesign-92d` · **Gates:** tsc · lint · **1035/1035** · build + 404 · e2e 4/4, re-run on merged main. **Smoke:** 33/33 assertions, two consecutive full passes, zero console errors; fixture `smoke92d-delete@azfit.demo` SQL-verified 0 rows incl. `auth.users`. Screenshots `.temp/audit/shots/92d/` (default-vs-metal pairs, both themes, 390 + 1280).
+
+### What was extracted from the package (visual reference only — nothing pasted)
+From `neon-tokens.css` `.neon-card` / `.neon-metal`: (1) per-card full metal face — sheen + brush + ambient tint + steel base as the card's own background layers; (2) beveled rim — `inset 0 1px 0` pale edge highlight + `inset 0 -1px 0` dark foot shade; (3) restrained cyan ambient ring + drop shadow (`0 0 0 1px` hairline + `0 0 24px` glow + `0 10px 28px` elevation); (4) the signature luminous top-edge rim line (`::before` 1px gradient, transparent → cyan → transparent, 8% inset). Interactive glow discipline from the package's buttons: glossy bevel (`inset 0 1px 0 rgba(255,255,255,.28)`) + cyan glow on primary buttons, intensified on hover/focus.
+
+### What was deliberately left out
+- The package's **neon palette** (#35E0FF etc.) — OUT OF SCOPE per the phase lock; its "neon cyan" glow roles are mapped onto **brand cyan #00AEEF** at package-appropriate intensities. Palette swap remains a separate future owner decision.
+- No `.neon-*` class names, no whole-file replacements, no pasted CSS.
+
+### Implementation (extends the 92c mechanism, `data-ui-variant="metal"` on `<html>`)
+- **Per-card metallic face (the fix for the owner's "nothing really changes"):** 92c made `--card-bg` translucent steel over a body pseudo-layer — cards stayed flat panes. 92d adds a real face to every GlassCard via a new stable `glass-card` class (added to the component's `cn` — a bare class name, zero style by itself). Under the variant only: `background: sheen, brush, tint, --metal-card-face !important` (the `!important` is required because GlassCard sets `backgroundColor` inline at ~89 call sites; the rule cannot match without it and is inert without the attribute, so default rendering stays byte-identical — smoke (a) proves flat `--card-bg` + no shadow on main), steel border, bevel + cyan ambient shadow stack, and the `::before` top rim (GlassCard is already `relative overflow-hidden`, so the rim needs no component change).
+- **New tokens** (both themes): `--metal-card-face` (dark `#2A3648→#1D2736→#141B28` steel gradient, brighter head/dark foot so the bevel reads; light etched `#E9EEF5→#DCE4ED→#CBD7E3`, deliberately a touch DARKER than the page base so the rim reads as a raised edge), `--metal-glow`, `--metal-glow-ring`, `--metal-rim` (cyan rgba). Light theme brush softened (0.020→0.012 / 0.35→0.22) to kill a corduroy moiré at 390.
+- **Accent glow (Item 2), variant-only:** `.bg-primary` buttons (glossy bevel + cyan glow, stronger on hover/focus-visible) and `[aria-current='page']` nav items (inset cyan edge + glow). No glow on static text, no full-card halos. Inline-styled chips (AI Log, Schedule) are out of reach without component forks — documented, not built.
+- **Performance (Item 3):** sheen sweep stays transform-only + reduced-motion-off (92c); the 92c `<640px` no-backdrop-filter rule retargeted from the DEAD `.glass` selector (no component ever used it) to `.glass-card` — smoke (e) proves computed `backdrop-filter: none` at 390.
+- **Readability:** computed contrast of the metal face vs `--page-text` — dark 11.25:1, light 15.31:1 (both AA).
+
+### Integration proven under the strengthened variant
+92 CollapsiblePanel registry renders (9 glass-cards), 91 privacy blur still applies (`blur(8px)` computed on sensitive panel content — the blur lives on `[data-privacy-blur]`'s inner div, not the panel wrapper), Settings toggle persists server-side. 90e banner / 90d palette are token-styled surfaces unaffected by the variant (CSS-only paths).
+
+### Gotchas
+- Fresh Playwright contexts default to LIGHT `prefers-color-scheme` — the app's "dark default" is media-query-based, so theme must be emulated explicitly (`colorScheme: 'dark'`) or both smokes and screenshots silently test light only.
+- The 92c `.glass` <640px rule never matched anything (GlassCard never carried a `glass` class) — corrected to `.glass-card`.
