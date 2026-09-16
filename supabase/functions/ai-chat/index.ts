@@ -136,10 +136,13 @@ serve(async (req) => {
     const config = cfg as { api_key: string; base_url: string; model: string };
 
     // ── Provider call ──────────────────────────────────────────
+    // NOTE: Moonshot kimi-k3 / kimi-k2.6 (api.moonshot.ai) reject any
+    // temperature other than 1 ("invalid temperature: only 1 is allowed
+    // for this model"), so we omit temperature entirely and use the
+    // provider default. Verified live 2026-09-16.
     const body: Record<string, unknown> = {
       model: config.model,
       messages: payload.messages,
-      temperature: 0.2,
     };
     if (payload.json) {
       body.response_format = { type: "json_object" };

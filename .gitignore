@@ -49,3 +49,6 @@ scripts/data/
 *KIMI*KEY*.txt
 *MOONSHOT*KEY*.txt
 KIMI AI NOOMSHOT CN.txt
+
+# Kimi/Moonshot API keys (local only, never commit)
+AZFITAIKIMI.txt
