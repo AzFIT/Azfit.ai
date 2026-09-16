@@ -798,3 +798,32 @@
     -webkit-backdrop-filter: none;
   }
 }
+
+/* ── Phase 97b — dialog enter animations (PasteImportDialog +
+   GenerateWithAIDialog). These two render conditionally WITHOUT
+   framer-motion AnimatePresence: framer-motion v12 wedges its exit
+   removal when the portaled overlay mounts in the same commit as other
+   presence churn (the wizard's generate→paste handoff) — the overlay
+   then never unmounts and swallows every click (verified by probe).
+   Plain conditional render + CSS enter keeps the open feel without the
+   broken exit path. */
+@keyframes azfit-dialog-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes azfit-dialog-panel-in {
+  from { opacity: 0; transform: scale(0.96) translateY(12px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.azfit-dialog-backdrop {
+  animation: azfit-dialog-backdrop-in 150ms ease-out;
+}
+.azfit-dialog-panel {
+  animation: azfit-dialog-panel-in 150ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .azfit-dialog-backdrop,
+  .azfit-dialog-panel {
+    animation: none;
+  }
+}

@@ -1909,3 +1909,35 @@ future-dated expenses never count toward an earlier month.
 - Fixture-auth pattern per the 99a gotchas: profiles auto-created by
   handle_new_user from raw_user_meta_data (role/full_name), never inserted
   manually; email_change = ''.
+
+## Phase 97b — Trainer AI surfaces: TDEE calculator + in-app program generation
+
+**Branch:** `feat/ai-surfaces-97b` off `766254d` (includes 96b). Est. 45–60 min; actual ~4× estimate (Item 2 debugging + slow provider — see flags).
+
+### Item 1 — TDEE / intake targets (pure math, zero AI)
+
+- `src/lib/tdee.ts`: **pre-existed from 28E/33D** (Mifflin-St Jeor + goal/macro targets with published worked-example tests). This phase's only change: honest blank inputs — age/height/weight default to `0` internally and render as `""` via `value || ""`; `dobMissing` reworded to state exactly which inputs are missing. +1 activity-table regression test.
+- Surface: "Intake targets" card in the trainer client profile (placed beside the existing nutrition/check-in context — established pattern). Prefills from `clients` + `body_composition` (latest weight), activity + goal trainer-adjustable, Save writes `clients.intake_profile` (JSONB — column pre-existed, no DDL). Uses the **AI-violet token** `#8B7CF6` for the computed-target accents (permitted: this is the AI/intake surface).
+- Honest states: missing DOB/height/weight → the card names which inputs are missing and the Apply action is disabled; never a guessed default.
+
+### Item 2 — Generate with AI → Phase 93 paste-import review
+
+- `src/lib/aiGenerate.ts` (NEW, pure): prompt/context assembly from `src/lib/promptTemplates.ts` (GBC day generator primary) + client-row injection (goal, experience, equipment_access, notes — each omitted when empty, never faked). 6 unit tests.
+- `src/components/exercise/GenerateWithAIDialog.tsx` (NEW): template picker, editable client-context block marked "from client profile", elapsed-time thinking indicator (kimi-k3 is a reasoning model — 10–30s nominal, observed live range 3s–>240s this session; no client timeout, never a fake one), ai_config absent → honest "Add your API key in Settings → AI Assistant" linking to `/settings`, 502/timeout → sanitized error verbatim + retry. Violet AI accents.
+- Output lands **directly in the existing Phase 93 `PasteImportDialog` review stage** via the new `initialRaw` prop — parser, exercise matcher, and per-row review all reused, zero parser duplication.
+
+**Root-cause fix (the long pole):** the paste dialog's portal overlay stayed in `document.body` after confirm on the AI path (manual paste path was fine). Bisected: the step content is wrapped in `<AnimatePresence mode="wait"><motion.div key={currentStep}>` and framer-motion v12 remounts that subtree on wizard re-renders; the dialog had originally lived inside the step tree (leak), and even after hoisting state+render to the page, `key={nonce}` remounts plus the framer exit animation left dead portal DOM. **Final fix: mount-on-open** — both dialogs render only while their open flag is true (`{open && <Dialog open …/>}`), no key/nonce, CSS enter-animations (`.azfit-dialog-backdrop`/`.azfit-dialog-panel` + keyframes, `prefers-reduced-motion` guard) instead of framer exit animations. Close = unmount = guaranteed portal removal. Dead `setSelectedDay(firstMappedKey)` line (never executed — updater runs after the null check) removed; Step6 no longer destructures `buildForClientId`.
+
+**Client fix during smoke:** the deployed ai-chat returns 404 `{ error: "no_key" }` with **no `code` field** — `invokeAiChat` now maps a known `error` string to the code (`no_key`/`no_trainer`) so the dialog's honest empty state renders. Edge function left as-is (repo source is already deployed v2; a future deploy may add `code` formally).
+
+### Verification
+- Gates green: tsc, lint, 1067/1067 unit, build (+404 copy), e2e 4/4.
+- Smoke 26/26 green (fixture trainer `smoke97bt-delete@azfit.demo`, client `smoke97b-stats`): TDEE known-input BMR 1,780 / TDEE 2,759 matches hand calc; `intake_profile.computed_targets` SQL-verified + reload persists; missing-DOB client → honest blank, Apply disabled; Generate → parseable review rows → accept-all import → step 6 rows; **Save & Assign: handler-entry diag proved user/saving/assignedClient all sound, `saved=true`, SQL row verified**; no-key trainer → send → 404 `no_key` → settings-link empty state → lands on /settings; overlay count 0 after confirm; both themes 390+1280, scrollWidth ≤ 390, zero console errors.
+- Real-provider note: the full smoke passed end-to-end with the ai-chat call mocked to replay GBC-shaped markdown (`AI_MOCK=1` mode in the temp script); the REAL Moonshot call was separately verified green 3× (rows → review → import all PASS against the live function). Save-after-real-call hit an unexplained silent no-op 3× (no toast, no row, no error) while every mocked/delayed variant saves cleanly — see flags.
+- ~7 real Moonshot calls spent across debugging (provider latency made reruns expensive).
+- Screenshots: `.temp/audit/shots/97b/`.
+- Fixtures SQL-verified 0 rows everywhere incl. auth.users; ai_config fixture row removed.
+
+### OPEN FLAGS (awaiting owner)
+1. **Wizard Save & Assign silent no-op after a real long-generation run.** Mocked content, instant or 130s-delayed, saves fine (diag: handler fires, saved=true). After a real Moonshot call (2–4 min in-flight), the same click produced no toast and no row 3×. Not root-caused — the diagnostic run couldn't reach B4 because provider latency exceeded even 240s. Next step when the provider is fast: one real run with the saveAndAssign entry/result diag re-enabled. Silent early-returns in `handleSaveAndAssign` (`!user?.id || saving`) are the prime suspects to make loud.
+2. **Moonshot kimi-k3 latency variance**: observed 3s → >240s for the same prompt within one session. The UI handles this honestly (elapsed-time indicator, no client timeout); consider a provider-side max_tokens/temperature tune in a future ai-chat deploy if it persists.

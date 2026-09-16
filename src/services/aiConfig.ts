@@ -98,10 +98,13 @@ export async function invokeAiChat(
   }
 
   if (!res.ok) {
+    // 97b: the deployed ai-chat returns { error: "no_key" } with NO code
+    // field — treat the error string itself as the code for known codes.
+    const known = body.error === 'no_key' || body.error === 'no_trainer' ? body.error : undefined;
     throw new AiChatError(
       res.status,
       body.error ?? `ai-chat failed (${res.status})`,
-      body.code,
+      body.code ?? known,
     );
   }
   return { content: body.content ?? '' };

@@ -20,7 +20,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
   Check,
@@ -62,6 +61,12 @@ interface PasteImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onImport: (result: ParseResult, resolutions: ImportResolutions) => void;
+  /** Phase 97b — prefilled content (in-app AI generation lands its
+   *  markdown here). When non-empty the dialog opens DIRECTLY at the
+   *  review stage; the paste stage stays reachable via the back arrow.
+   *  Parents must key-remount when the prefill changes (repo lint rule
+   *  bans setState-in-effect for dialog prefill). */
+  initialRaw?: string;
 }
 
 type Stage = "paste" | "review";
@@ -76,9 +81,10 @@ export default function PasteImportDialog({
   open,
   onOpenChange,
   onImport,
+  initialRaw,
 }: PasteImportDialogProps) {
-  const [stage, setStage] = useState<Stage>("paste");
-  const [raw, setRaw] = useState("");
+  const [stage, setStage] = useState<Stage>(initialRaw?.trim() ? "review" : "paste");
+  const [raw, setRaw] = useState(() => initialRaw ?? "");
   const [library, setLibrary] = useState<LibraryExercise[]>([]);
   const [libraryError, setLibraryError] = useState<string | null>(null);
   const [resolutions, setResolutions] = useState<ImportResolutions>(new Map());
@@ -278,25 +284,19 @@ export default function PasteImportDialog({
   const shell =
     "w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] shadow-2xl overflow-hidden";
 
+  // Phase 97b: plain conditional render (no AnimatePresence — see index.css
+  // note). A CSS keyframe provides the enter animation; close is immediate.
   return createPortal(
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={close}
-          data-testid="paste-import-dialog"
+    open ? (
+      <div
+        className="azfit-dialog-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+        onClick={close}
+        data-testid="paste-import-dialog"
+      >
+        <div
+          className={`${shell} azfit-dialog-panel`}
+          onClick={(e) => e.stopPropagation()}
         >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 12 }}
-            transition={{ duration: 0.15 }}
-            className={shell}
-            onClick={(e) => e.stopPropagation()}
-          >
             {/* ── Header ─────────────────────────────────────── */}
             <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--card-border)] shrink-0">
               {stage === "review" && (
@@ -680,10 +680,9 @@ export default function PasteImportDialog({
                 </>
               )}
             </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>,
+        </div>
+      </div>
+    ) : null,
     document.body,
   );
 }

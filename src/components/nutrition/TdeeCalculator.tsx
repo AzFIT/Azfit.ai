@@ -66,9 +66,12 @@ export default function TdeeCalculator({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [weight, setWeight] = useState(80);
-  const [height, setHeight] = useState(175);
-  const [age, setAge] = useState(30);
+  // Phase 97b: no guessed defaults — blank until the clients row /
+  // body composition supplies a value (HONEST DATA: a fabricated 80 kg
+  // or 175 cm would silently skew every BMR the trainer reads).
+  const [weight, setWeight] = useState(0);
+  const [height, setHeight] = useState(0);
+  const [age, setAge] = useState(0);
   const [dobMissing, setDobMissing] = useState(false);
   const [gender, setGender] = useState<"male" | "female">("male");
   const [activity, setActivity] = useState<ActivityLevelKey>("moderate");
@@ -192,7 +195,7 @@ export default function TdeeCalculator({
               </label>
               <input
                 type="number"
-                value={weight}
+                value={weight || ""}
                 onChange={(e) => setWeight(Number(e.target.value) || 0)}
                 className={inputCls}
                 style={selectStyle}
@@ -204,7 +207,7 @@ export default function TdeeCalculator({
               </label>
               <input
                 type="number"
-                value={height}
+                value={height || ""}
                 onChange={(e) => setHeight(Number(e.target.value) || 0)}
                 className={inputCls}
                 style={selectStyle}
@@ -216,7 +219,7 @@ export default function TdeeCalculator({
               </label>
               <input
                 type="number"
-                value={age}
+                value={age || ""}
                 onChange={(e) => setAge(Number(e.target.value) || 0)}
                 className={inputCls}
                 style={selectStyle}
@@ -243,7 +246,7 @@ export default function TdeeCalculator({
               className="rounded-lg border px-3 py-2 text-[11px] font-medium"
               style={{ borderColor: "rgba(245, 158, 11, 0.4)", backgroundColor: "rgba(245, 158, 11, 0.12)", color: "#F59E0B" }}
             >
-              No date of birth on file — age is estimated. Set date of birth for accurate targets.
+              No date of birth on file — enter the client's age to compute targets.
             </p>
           )}
 

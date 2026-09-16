@@ -81,6 +81,8 @@ import { nextSeriesLetter } from '@/lib/exerciseLabels';
 import { pairingStyleForMethod, assignPairGroups } from '@/lib/supersets';
 import ExercisePickerDialog, { type LibraryExercise } from '@/components/exercise/ExercisePickerDialog';
 import PasteImportDialog, { type ImportResolutions } from '@/components/exercise/PasteImportDialog';
+import GenerateWithAIDialog from '@/components/exercise/GenerateWithAIDialog';
+import type { GenerateContext } from '@/lib/aiGenerate';
 import { formatRest, formatTempo } from '@/lib/programImport';
 import type { ParseResult, ParsedRow } from '@/lib/programImport';
 import {
@@ -122,7 +124,7 @@ export interface ProgramExercise { code: string; name: string; sets: number; rep
 // Phase 56: goal → goals (multi-select; goals[0] is the primary for generation mapping)
 export interface ProgramData { id?: string; goals: string[]; method: string; clientContext: ClientContext; phases: ProgramPhase[]; split: ProgramSplit[]; exercises: ProgramExercise[]; workoutExercises?: Record<number, ProgramExercise[]>; progressionRules: ProgressionRule[]; programName: string; description: string; tags: string[]; isPublic: boolean; assignedClient: string; }
 export interface SavedProgram { id: string; createdAt: string; updatedAt: string; data: ProgramData; }
-interface StepProps { data: ProgramData; updateData: (partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => void; onSave?: () => void; onSaveAndAssign?: () => void; program?: GeneratedProgram | null; clientName?: string; clients?: ClientRow[]; saving?: boolean; limitations?: string[]; dbMethods?: DbMethod[]; methodCategories?: DbMethodCategory[]; goalScores?: { method_id: string; score: number }[]; methodsLoading?: boolean; methodsError?: string | null; customGoals?: DbGoal[]; onAddGoal?: (name: string) => Promise<void>; onArchiveGoal?: (id: string) => Promise<void>; buildForClientId?: string; onBuildForClientChange?: (id: string) => void; }
+interface StepProps { data: ProgramData; updateData: (partial: Partial<ProgramData> | ((prev: ProgramData) => Partial<ProgramData>)) => void; onSave?: () => void; onSaveAndAssign?: () => void; program?: GeneratedProgram | null; clientName?: string; clients?: ClientRow[]; saving?: boolean; limitations?: string[]; dbMethods?: DbMethod[]; methodCategories?: DbMethodCategory[]; goalScores?: { method_id: string; score: number }[]; methodsLoading?: boolean; methodsError?: string | null; customGoals?: DbGoal[]; onAddGoal?: (name: string) => Promise<void>; onArchiveGoal?: (id: string) => Promise<void>; buildForClientId?: string; onBuildForClientChange?: (id: string) => void; onOpenGenerate?: () => void; onOpenPasteImport?: () => void; }
 
 type ClientRow = Database['public']['Tables']['clients']['Row'];
 type ProgramRow = Database['public']['Tables']['programs']['Row'];
@@ -1496,7 +1498,7 @@ function Step5Split({ data, updateData }: StepProps) {
   );
 }
 
-function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepProps) {
+function Step6Exercises({ data, updateData, limitations, dbMethods = [], onOpenGenerate, onOpenPasteImport }: StepProps) {
   const [openRows, setOpenRows] = useState<Record<number, boolean>>({});
   const perDay = data.workoutExercises != null;
   const activeDays = data.split.filter((d) => d.active);
@@ -1590,92 +1592,6 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
   );
   const openAddPicker = () => { setSwapIdx(null); setPickerOpen(true); };
   const openSwapPicker = (idx: number) => { setSwapIdx(idx); setPickerOpen(true); };
-
-  // Phase 93 — Paste Import: populate per-day exercise lists from a pasted
-  // program (Sheets/AI chat). Day mapping: paste day N → Nth ACTIVE split day
-  // (Mon→Sun order); if there aren't enough active days, trailing inactive
-  // days are activated. Replaces the mapped days' lists wholesale.
-  const [pasteOpen, setPasteOpen] = useState(false);
-  const handlePasteImport = useCallback(
-    (result: ParseResult, resolutions: ImportResolutions) => {
-      const pasteDays = [...new Set(result.rows.map((r) => r.day))].sort((a, b) => a - b);
-      let firstMappedKey: number | null = null;
-      updateData((prev) => {
-        let split = prev.split;
-        const activeCount = split.filter((d) => d.active).length;
-        if (activeCount < pasteDays.length) {
-          // Activate trailing inactive days (Mon→Sun order) so every pasted
-          // day has a slot; 'Rest Day' labels become an honest 'Workout'.
-          const toActivate = split
-            .filter((d) => !d.active)
-            .sort((a, b) => (SPLIT_DAY_INDEX[a.day] ?? 0) - (SPLIT_DAY_INDEX[b.day] ?? 0))
-            .slice(0, pasteDays.length - activeCount);
-          const days = new Set(toActivate.map((d) => d.day));
-          split = split.map((d) =>
-            days.has(d.day)
-              ? { ...d, active: true, workout: d.workout === 'Rest Day' ? 'Workout' : d.workout }
-              : d,
-          );
-        }
-        const orderedActive = split
-          .filter((d) => d.active)
-          .sort((a, b) => (SPLIT_DAY_INDEX[a.day] ?? 0) - (SPLIT_DAY_INDEX[b.day] ?? 0));
-        const dayKeyByPasteDay = new Map<number, number>();
-        pasteDays.forEach((pd, i) => {
-          const d = orderedActive[i];
-          if (d) dayKeyByPasteDay.set(pd, SPLIT_DAY_INDEX[d.day] ?? 0);
-        });
-        const rowsByPasteDay = new Map<number, ParsedRow[]>();
-        for (const r of result.rows) {
-          const l = rowsByPasteDay.get(r.day) ?? [];
-          l.push(r);
-          rowsByPasteDay.set(r.day, l);
-        }
-        const workoutExercises = { ...(prev.workoutExercises ?? {}) };
-        for (const [pd, rows] of rowsByPasteDay) {
-          const key = dayKeyByPasteDay.get(pd);
-          if (!key) continue;
-          if (firstMappedKey == null) firstMappedKey = key;
-          workoutExercises[key] = rows.map((r) => {
-            const lib = resolutions.get(r.line);
-            const noteBits = [
-              r.notes ? `Note: ${r.notes}` : null,
-              r.alternate ? `Alternate: ${r.alternate}` : null,
-            ].filter(Boolean).join(' · ');
-            return {
-              code: r.order,
-              name: lib?.name ?? r.exercise,
-              sets: r.sets,
-              reps: r.reps,
-              pct1RM: 'N/A',
-              tempo: formatTempo(r.tempo),
-              rest: formatRest(r.restSec),
-              dbId: lib?.id,
-              importNote: noteBits || undefined,
-            };
-          });
-        }
-        const partial: Partial<ProgramData> = { split, workoutExercises };
-        if (result.meta.name) partial.programName = result.meta.name;
-        if (result.meta.description) partial.description = result.meta.description;
-        if (result.meta.weeks != null && prev.phases.length > 0) {
-          partial.phases = prev.phases.map((p, i) => (i === 0 ? { ...p, weeks: result.meta.weeks! } : p));
-        }
-        // Method: only when the pasted method name matches a real db method
-        // (honest — never fabricate a method mapping).
-        if (result.meta.method) {
-          const m = dbMethods.find(
-            (dm) => dm.name.trim().toLowerCase() === result.meta.method!.trim().toLowerCase(),
-          );
-          if (m) partial.method = m.slug;
-        }
-        return partial;
-      });
-      if (firstMappedKey != null) setSelectedDay(firstMappedKey);
-      toast.success(`Imported ${result.rows.length} exercises across ${pasteDays.length} day${pasteDays.length === 1 ? '' : 's'}`);
-    },
-    [updateData, dbMethods],
-  );
 
   // Phase 65A — Change-exercise dialog (Similar / Swap-from-day / Custom) +
   // taxonomy-driven pattern chips. The taxonomy query is shared app-wide via
@@ -1826,7 +1742,8 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={handleAutoFill} className="border-[var(--ai-violet)] text-[var(--ai-violet)] hover:bg-[var(--ai-violet)]/10 text-xs"><Sparkles className="w-3.5 h-3.5 mr-1" />AI Auto-Fill</Button>
         <Button variant="outline" size="sm" onClick={openAddPicker} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs"><Plus className="w-3.5 h-3.5 mr-1" />Add Exercise</Button>
-        <Button variant="outline" size="sm" onClick={() => setPasteOpen(true)} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs"><ClipboardPaste className="w-3.5 h-3.5 mr-1" />Paste Import</Button>
+        <Button variant="outline" size="sm" onClick={() => onOpenGenerate?.()} className="border-[var(--ai-violet)] text-[var(--ai-violet)] hover:bg-[var(--ai-violet)]/10 text-xs" data-testid="generate-with-ai-open"><Sparkles className="w-3.5 h-3.5 mr-1" />Generate with AI</Button>
+        <Button variant="outline" size="sm" onClick={() => onOpenPasteImport?.()} className="border-[var(--card-border)] text-[var(--page-text)] hover:bg-[var(--page-bg)] text-xs"><ClipboardPaste className="w-3.5 h-3.5 mr-1" />Paste Import</Button>
         <div className="ml-auto"><ViewModeSwitch mode={mode} onChange={setMode} /></div>
       </div>
 
@@ -2132,12 +2049,6 @@ function Step6Exercises({ data, updateData, limitations, dbMethods = [] }: StepP
         onOpenChange={setPickerOpen}
         onSelect={handlePicked}
         limitations={limitations ?? []}
-      />
-      {/* Phase 93 — paste import (Sheets / AI chat → per-day lists). */}
-      <PasteImportDialog
-        open={pasteOpen}
-        onOpenChange={setPasteOpen}
-        onImport={handlePasteImport}
       />
       {/* Phase 65A — key-remount resets the tab state per row (repo lint rule
           bans setState-in-effect for dialog prefill). */}
@@ -3138,6 +3049,140 @@ export default function AIProgramBuilderPage() {
   const isFinalStep = currentStep === STEPS.length - 1;
   const generateHint = buildForClientRow ? `Tailored to ${buildForClientRow.full_name}'s intake profile` : 'Generic template';
 
+  // Phase 93/97b — paste import + AI generation dialogs. STATE AND PORTALS
+  // LIVE HERE, NOT IN Step6Exercises: the step content is wrapped in
+  // <AnimatePresence mode="wait"><motion.div key={currentStep}> and
+  // framer-motion v12 remounts that subtree on wizard re-renders — a
+  // remounted dialog loses its state AND leaks its createPortal overlay in
+  // document.body (probe-verified: dead instance's overlay swallows all
+  // clicks forever). The page never remounts, so the portals stay sound.
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [genOpen, setGenOpen] = useState(false);
+  const [genCtx, setGenCtx] = useState<GenerateContext>({});
+  const [genClientName, setGenClientName] = useState<string | undefined>(undefined);
+  const [aiMarkdown, setAiMarkdown] = useState<string | null>(null);
+
+  const openGenerate = useCallback(async () => {
+    const targetId = buildForClient || data.assignedClient || '';
+    if (targetId) {
+      const { data: row } = await supabase
+        .from('clients')
+        .select('full_name, fitness_goal, experience_level, equipment_access, notes')
+        .eq('id', targetId)
+        .maybeSingle();
+      const r = row as {
+        full_name?: string | null;
+        fitness_goal?: string | null;
+        experience_level?: string | null;
+        equipment_access?: string[] | null;
+        notes?: string | null;
+      } | null;
+      setGenClientName(r?.full_name ?? undefined);
+      setGenCtx({
+        goal: r?.fitness_goal ?? '',
+        experience: r?.experience_level ?? '',
+        equipment: r?.equipment_access ?? [],
+        notes: r?.notes ?? '',
+      });
+    } else {
+      setGenClientName(undefined);
+      setGenCtx({});
+    }
+    setGenOpen(true);
+  }, [buildForClient, data.assignedClient]);
+
+  const openPasteImport = useCallback(() => {
+    setAiMarkdown(null); // a manual paste must never inherit AI output
+    setPasteOpen(true);
+  }, []);
+
+  const handleGenerated = useCallback((markdown: string) => {
+    setAiMarkdown(markdown);
+    setPasteOpen(true);
+    toast.success('Program generated — review the rows');
+  }, []);
+
+  const handlePasteImport = useCallback(
+    (result: ParseResult, resolutions: ImportResolutions) => {
+      const pasteDays = [...new Set(result.rows.map((r) => r.day))].sort((a, b) => a - b);
+      updateData((prev) => {
+        let split = prev.split;
+        const activeCount = split.filter((d) => d.active).length;
+        if (activeCount < pasteDays.length) {
+          // Activate trailing inactive days (Mon→Sun order) so every pasted
+          // day has a slot; 'Rest Day' labels become an honest 'Workout'.
+          const toActivate = split
+            .filter((d) => !d.active)
+            .sort((a, b) => (SPLIT_DAY_INDEX[a.day] ?? 0) - (SPLIT_DAY_INDEX[b.day] ?? 0))
+            .slice(0, pasteDays.length - activeCount);
+          const days = new Set(toActivate.map((d) => d.day));
+          split = split.map((d) =>
+            days.has(d.day)
+              ? { ...d, active: true, workout: d.workout === 'Rest Day' ? 'Workout' : d.workout }
+              : d,
+          );
+        }
+        const orderedActive = split
+          .filter((d) => d.active)
+          .sort((a, b) => (SPLIT_DAY_INDEX[a.day] ?? 0) - (SPLIT_DAY_INDEX[b.day] ?? 0));
+        const dayKeyByPasteDay = new Map<number, number>();
+        pasteDays.forEach((pd, i) => {
+          const d = orderedActive[i];
+          if (d) dayKeyByPasteDay.set(pd, SPLIT_DAY_INDEX[d.day] ?? 0);
+        });
+        const rowsByPasteDay = new Map<number, ParsedRow[]>();
+        for (const r of result.rows) {
+          const l = rowsByPasteDay.get(r.day) ?? [];
+          l.push(r);
+          rowsByPasteDay.set(r.day, l);
+        }
+        const workoutExercises = { ...(prev.workoutExercises ?? {}) };
+        for (const [pd, rows] of rowsByPasteDay) {
+          const key = dayKeyByPasteDay.get(pd);
+          if (!key) continue;
+          workoutExercises[key] = rows.map((r) => {
+            const lib = resolutions.get(r.line);
+            const noteBits = [
+              r.notes ? `Note: ${r.notes}` : null,
+              r.alternate ? `Alternate: ${r.alternate}` : null,
+            ].filter(Boolean).join(' · ');
+            return {
+              code: r.order,
+              name: lib?.name ?? r.exercise,
+              sets: r.sets,
+              reps: r.reps,
+              pct1RM: 'N/A',
+              tempo: formatTempo(r.tempo),
+              rest: formatRest(r.restSec),
+              dbId: lib?.id,
+              importNote: noteBits || undefined,
+            };
+          });
+        }
+        const partial: Partial<ProgramData> = { split, workoutExercises };
+        if (result.meta.name) partial.programName = result.meta.name;
+        if (result.meta.description) partial.description = result.meta.description;
+        if (result.meta.weeks != null && prev.phases.length > 0) {
+          partial.phases = prev.phases.map((p, i) => (i === 0 ? { ...p, weeks: result.meta.weeks! } : p));
+        }
+        // Method: only when the pasted method name matches a real db method
+        // (honest — never fabricate a method mapping).
+        if (result.meta.method) {
+          const m = dbMethods.find(
+            (dm) => dm.name.trim().toLowerCase() === result.meta.method!.trim().toLowerCase(),
+          );
+          if (m) partial.method = m.slug;
+        }
+        return partial;
+      });
+      // 97b: the Phase 93 setSelectedDay(firstMappedKey) call that lived here
+      // was dead code — the updater runs after this check, so it never
+      // fired. Removed in the page-level lift; day selection is unchanged.
+      toast.success(`Imported ${result.rows.length} exercises across ${pasteDays.length} day${pasteDays.length === 1 ? '' : 's'}`);
+    },
+    [updateData, dbMethods],
+  );
+
   // Phase 66 Item 2g: blocked Next/Save jumps to the first missing field —
   // scroll the step region into view, ring it, and name what's missing.
   // Both nav bars share this via WizardNavBar (buttons stay clickable).
@@ -3309,7 +3354,7 @@ export default function AIProgramBuilderPage() {
           )}
           <AnimatePresence mode="wait">
             <motion.div key={currentStep} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.2 }}>
-              <CurrentComponent data={data} updateData={updateData} program={program} onSave={handleSave} onSaveAndAssign={handleSaveAndAssign} clientName={selectedClientName} clients={clients} saving={saving} limitations={wizardLimitations} dbMethods={dbMethods} methodCategories={methodCategories} goalScores={goalScores} methodsLoading={methodsLoading} methodsError={methodsError} customGoals={dbGoals} onAddGoal={handleAddGoal} onArchiveGoal={handleArchiveGoal} buildForClientId={buildForClient || undefined} onBuildForClientChange={setBuildForClient} />
+              <CurrentComponent data={data} updateData={updateData} program={program} onSave={handleSave} onSaveAndAssign={handleSaveAndAssign} clientName={selectedClientName} clients={clients} saving={saving} limitations={wizardLimitations} dbMethods={dbMethods} methodCategories={methodCategories} goalScores={goalScores} methodsLoading={methodsLoading} methodsError={methodsError} customGoals={dbGoals} onAddGoal={handleAddGoal} onArchiveGoal={handleArchiveGoal} buildForClientId={buildForClient || undefined} onBuildForClientChange={setBuildForClient} onOpenGenerate={() => void openGenerate()} onOpenPasteImport={openPasteImport} />
             </motion.div>
           </AnimatePresence>
         </div>
@@ -3317,6 +3362,33 @@ export default function AIProgramBuilderPage() {
         {/* Back / Next */}
         <WizardNavBar currentStep={currentStep} saving={saving} isFinalStep={isFinalStep} canProceed={!!stepComplete[currentStep]} onBack={goBack} onNext={goNext} className="mt-6" />
       </div>
+
+      {/* Phase 93/97b — paste import + AI generation, rendered at PAGE level
+          (never inside the AnimatePresence-keyed step tree — see the state
+          declaration above for why). MOUNT-ON-OPEN: each dialog renders only
+          while its open flag is true, so closing = unmount = guaranteed
+          portal-DOM removal — no key/nonce remounts, no leaked overlays. */}
+      {pasteOpen && (
+        <PasteImportDialog
+          open
+          onOpenChange={(o) => {
+            if (!o) setPasteOpen(false);
+          }}
+          onImport={handlePasteImport}
+          initialRaw={aiMarkdown ?? undefined}
+        />
+      )}
+      {genOpen && (
+        <GenerateWithAIDialog
+          open
+          onOpenChange={(o) => {
+            if (!o) setGenOpen(false);
+          }}
+          initialContext={genCtx}
+          clientName={genClientName}
+          onGenerated={handleGenerated}
+        />
+      )}
 
       {/* Phase 65B Item 4: floating scroll arrows (appear after scrolling;
           bottom offset keeps them clear of the Back/Next bar + mobile nav) */}

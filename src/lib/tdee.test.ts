@@ -9,6 +9,7 @@ import {
   GOAL_ADJUSTMENTS_PCT,
   MAX_KCAL_DELTA,
   DIET_PRESETS,
+  ACTIVITY_LEVELS,
 } from "@/lib/tdee";
 
 describe("tdee", () => {
@@ -29,6 +30,25 @@ describe("tdee", () => {
     const tdee = calculateTDEE(bmr, "moderate");
     expect(tdee).toBe(2759);
     expect(Math.abs(tdee - 1780 * 1.55) / (1780 * 1.55)).toBeLessThan(0.01);
+  });
+
+  // Phase 97b — full published activity table for the worked example
+  // (BMR 1780): every multiplier 1.2 → 1.9, hand-comparable to ±1 kcal.
+  it("matches the published activity multiplier table (1.2–1.9)", () => {
+    const bmr = calculateBMR(80, 180, 30, "male");
+    expect(bmr).toBe(1780);
+    const table: Array<[keyof typeof ACTIVITY_LEVELS, number]> = [
+      ["sedentary", 2136], // 1780 × 1.2
+      ["light", 2448], // 1780 × 1.375 = 2447.5 → 2448
+      ["moderate", 2759], // 1780 × 1.55
+      ["very", 3071], // 1780 × 1.725 = 3070.5 → 3071
+      ["extreme", 3382], // 1780 × 1.9
+    ];
+    for (const [level, expected] of table) {
+      expect(calculateTDEE(bmr, level)).toBe(expected);
+      expect(ACTIVITY_LEVELS[level]).toBeGreaterThanOrEqual(1.2);
+      expect(ACTIVITY_LEVELS[level]).toBeLessThanOrEqual(1.9);
+    }
   });
 
   it("has the four spec diet presets", () => {
