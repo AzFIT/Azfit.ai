@@ -1668,3 +1668,37 @@ SELECT-only on their own (profiles-email join). `/payments` added to
 ### Deferred (Phase 96b, documented)
 Gym rent + trainer revenue dashboard, per-client profitability, payment
 history charts.
+
+
+---
+
+## Phase 97a — AI Chat Backend + Client Quick-Log
+
+**Branch:** `feat/ai-quicklog-97a` · **Gates:** tsc · lint · **1035/1035** (+44) · build + 404 · e2e 4/4, re-run on merged main. **Smoke:** 16/16 assertions, two consecutive full passes, zero console errors; fixtures `smoke97at-delete@azfit.demo` / `smoke97ac-delete@azfit.demo` SQL-verified 0 rows everywhere incl. `auth.users`. Screenshots `.temp/audit/shots/97a/`.
+
+### Item 1 — AI key management (security model)
+
+`ai_config` — one row per trainer (`trainer_id PK → profiles(id)`, `api_key`, `base_url` default `https://api.openai.com/v1`, `model` default `gpt-4o-mini`, `updated_at`). **RLS enabled with ZERO policies**: authenticated roles (trainer OR client, owner or not) cannot SELECT/INSERT/UPDATE/DELETE it at all — only the service role reads it. Writes go through shape-validated SECURITY DEFINER RPCs scoped to `auth.uid()` (`save_ai_config` validates key ≥8 chars / https base_url / non-empty model; `clear_ai_config`; `has_ai_config` presence-only boolean). All three `REVOKE ... FROM PUBLIC` + `GRANT EXECUTE TO authenticated`. DDL in `supabase/ai-config-97a.sql` (applied live, mirrored in `schema.sql` + `src/types/supabase.ts` table + Functions entries). Settings → new trainer-only "AI Assistant" section: password input, optional base_url/model, Save/Clear, presence chip "Key saved ········" / "No key set" — the key is never rendered back into the DOM (smoke-asserted).
+
+### Item 2 — ai-chat edge function (REPO ONLY — master deploys)
+
+`supabase/functions/ai-chat/index.ts` (+ README): OPTIONS CORS (allow-headers includes `x-app-name` — the app's global supabase-js header) → caller JWT via anon client (`verify_jwt=true`) → 401 unauthenticated → role-aware config resolution (trainer → own row; client → their `clients.trainer_id` row, ilike email — the client spends the TRAINER's key by design, documented) → 404 `{code:'no_key'}` when absent → OpenAI-compatible `POST {base_url}/chat/completions` with `response_format: {type:'json_object'}` when `json: true` → 200 `{content}` / 502 `{code:'provider', error}` sanitized (never leaks key material). Client invocation is plain fetch (NOT `supabase.functions.invoke` — the `x-app-name` CORS gotcha documented at `src/lib/push.ts:164`), wrapped in `src/services/aiConfig.ts` (`invokeAiChat` throws typed `AiChatError` with status + code). **No Supabase CLI / MCP on this machine → NOT deployed; master deploys then smoke (b)'s live invoke + 401 path become runnable.** Quota layer: future.
+
+### Item 3 — Client quick-log chat
+
+`/ai-log` (`requireClient` — trainers reach it only via the 90e View As Client override, which stamps `logged_by` where the table has it; not in `VIEW_AS_BLOCKED_PREFIXES`). Client nav: desktop sidebar + mobile More sheet. Strict JSON contract per intent in `src/lib/quickLog.ts` (no zod — not installed, no-new-deps): `weight {kg}` · `water {liters}` · `sleep {hours}` · `training {summary, duration_min?}` · `meal {name, calories?, protein_g?, carbs_g?, fats_g?, meal_type}`. `validateQuickLogJson` strictly validates AI output — anything invalid/missing → ONE clarifying question, never a guessed write. **Two producers, same contract**: ai-chat (json mode) when available; on-device rule parser (`parseQuickLog`, 44 unit tests) as the permanent fallback — no key / undeployed function / provider error all fall back with an honest "AI provider unavailable — parsed on-device" note (no note for the quiet `no_key` path). **Writers (`src/services/quickLogWrite.ts`) hit the EXISTING real tables**: weight → `body_composition`; meal → `foods_cache` (source `custom`, 0-default macros = the table's own partial-data convention) + `nutrition_logs`; water → `habit_logs` ADDITIVE (read today → sum → upsert), liters converted to the habit's own unit (ml/l/glasses/cups); sleep → `habit_logs` REPLACE; training → flag habit (`target_value NULL, done:true`) — `workout_logs` is unreachable here (`workout_id NOT NULL`, no program context in chat), documented deviation; missing habit → honest "your coach hasn't set up a X habit" message, nothing written. Chat history is in-memory only (no persistence requirement this phase — documented).
+
+### Item 4 — Trainer view
+No new UI. AI-logged entries land in the real tables → the trainer sees them through the existing dashboard/check-in views (existing sync, no parallel store).
+
+### Smoke gotchas (permanent)
+- **Manual `auth.users` inserts must set the token columns to `''`** (`confirmation_token`, `recovery_token`, `email_change_token_current/new`, `reauthentication_token`, `phone_change_token`, `email_change`, `phone_change`) — NULLs pass inserts but GoTrue's scan fails on password grant with the opaque **"Database error querying schema" (500)**. Cost one strike to diagnose; now baked into the fixture pattern.
+- `auth.identities.provider_id` = user UUID (not email) for the email provider; `identity_data` carries `sub`/`email`/`email_verified`.
+- Smoke waits must target the toast ("AI key saved"), not the presence chip — the chip pre-exists on re-run and races the save.
+- Client quick-log data is additive (water) → smoke wipes the fixture client's log rows before the assert pass for determinism.
+
+### Deviations (transparent)
+- Edge function built but not deployed from this machine (spec explicitly allows; master deploys + re-runs smoke b/401).
+- Local rule parser is a co-equal producer of the same contract (permanent rule: AI features are rule-based unless the owner approves a real LLM) — this is what makes quick-logging work before any key exists.
+- Meal logging unavailable under View As Client (nutrition_logs RLS is own-row only and the table has no `logged_by` column) — honest chat message instead of a write.
+- Training intent logs a habit flag + chat summary, not a workout_log (documented above).

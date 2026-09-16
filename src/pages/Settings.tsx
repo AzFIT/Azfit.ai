@@ -25,6 +25,7 @@ import {
   Dumbbell,
   Apple,
   Send,
+  Bot,
   type LucideIcon,
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
@@ -32,6 +33,7 @@ import IconTile, { type IconTileTone } from '@/components/ui/IconTile';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
+import { hasAiKey, saveAiKey, clearAiKey } from '@/services/aiConfig';
 import { toast } from 'sonner';
 import { GOAL_TYPE_LABELS, goalLabel, type ClientGoalRow, type ClientGoalType } from '@/lib/clientGoals';
 import { formatDate } from '@/lib/utils';
@@ -240,6 +242,57 @@ export default function Settings() {
   const { logout, user, isTrainer } = useAuth();
   const navigate = useNavigate();
   const isDark = theme === 'dark';
+
+  /* ---- Phase 97a: AI Assistant key (trainer-owned, presence-only) ---- */
+  const [aiKey, setAiKey] = useState('');
+  const [aiBaseUrl, setAiBaseUrl] = useState('');
+  const [aiModel, setAiModel] = useState('');
+  const [aiHasKey, setAiHasKey] = useState<boolean | null>(null);
+  const [aiSaving, setAiSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isTrainer) return;
+    let cancelled = false;
+    void hasAiKey().then((has) => {
+      if (!cancelled) setAiHasKey(has);
+    });
+    return () => { cancelled = true; };
+  }, [isTrainer]);
+
+  const handleAiSave = useCallback(async () => {
+    if (!aiKey.trim()) {
+      toast.error('Paste your API key first');
+      return;
+    }
+    setAiSaving(true);
+    try {
+      await saveAiKey(
+        aiKey.trim(),
+        aiBaseUrl.trim() || 'https://api.openai.com/v1',
+        aiModel.trim() || 'gpt-4o-mini',
+      );
+      setAiKey(''); // never keep key material in state longer than needed
+      setAiHasKey(true);
+      toast.success('AI key saved');
+    } catch (err) {
+      toast.error('Could not save key: ' + (err instanceof Error ? err.message : 'unknown error'));
+    } finally {
+      setAiSaving(false);
+    }
+  }, [aiKey, aiBaseUrl, aiModel]);
+
+  const handleAiClear = useCallback(async () => {
+    setAiSaving(true);
+    try {
+      await clearAiKey();
+      setAiHasKey(false);
+      toast.success('AI key removed');
+    } catch (err) {
+      toast.error('Could not remove key: ' + (err instanceof Error ? err.message : 'unknown error'));
+    } finally {
+      setAiSaving(false);
+    }
+  }, []);
 
   /* ---- Phase 33B: real profile identity + goals ---- */
   const [clientRow, setClientRow] = useState<{
@@ -906,6 +959,116 @@ export default function Settings() {
             </div>
           </div>
         </motion.div>
+
+        {/* ====== AI Assistant Section (Phase 97a, trainer only) ====== */}
+        {isTrainer && (
+        <motion.div
+          {...fadeUp}
+          transition={{ ...fadeUp.transition, delay: 0.17 }}
+          className="mt-4 rounded-2xl border p-5"
+          style={{
+            backgroundColor: 'var(--card-bg)',
+            borderColor: 'var(--card-border)',
+          }}
+        >
+          <div className="mb-4 flex items-center gap-2.5">
+            <Bot size={20} style={{ color: 'var(--azfit-primary)' }} />
+            <h3 className="text-lg font-bold" style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}>
+              AI Assistant
+            </h3>
+          </div>
+
+          <p className="mb-4 text-xs" style={{ color: 'var(--light-text-muted)' }}>
+            Connect your own OpenAI-compatible API key (OpenAI or Moonshot/Kimi) to power the
+            client quick-log chat. Your key is stored encrypted-in-isolation server-side and is
+            never shown back — only its presence.
+          </p>
+
+          {/* Presence + key input */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-medium" style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}>
+                API key
+              </span>
+              <span
+                className="rounded-full px-3 py-1 text-xs font-semibold"
+                style={{
+                  backgroundColor: aiHasKey ? 'color-mix(in srgb, var(--azfit-primary) 15%, transparent)' : 'var(--light-border)',
+                  color: aiHasKey ? 'var(--azfit-primary)' : 'var(--light-text-muted)',
+                }}
+              >
+                {aiHasKey === null ? '…' : aiHasKey ? 'Key saved ········' : 'No key set'}
+              </span>
+            </div>
+            <input
+              type="password"
+              value={aiKey}
+              onChange={(e) => setAiKey(e.target.value)}
+              placeholder={aiHasKey ? 'Paste a new key to replace' : 'Paste your API key (sk-…)'}
+              autoComplete="off"
+              className="min-h-[44px] w-full rounded-lg border px-3 py-2 text-sm outline-none"
+              style={{
+                backgroundColor: 'var(--card-bg)',
+                borderColor: 'var(--light-border)',
+                color: 'var(--page-text)',
+              }}
+              aria-label="AI API key"
+            />
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <input
+                type="url"
+                value={aiBaseUrl}
+                onChange={(e) => setAiBaseUrl(e.target.value)}
+                placeholder="Base URL (default https://api.openai.com/v1)"
+                autoComplete="off"
+                className="min-h-[44px] flex-1 rounded-lg border px-3 py-2 text-sm outline-none"
+                style={{
+                  backgroundColor: 'var(--card-bg)',
+                  borderColor: 'var(--light-border)',
+                  color: 'var(--page-text)',
+                }}
+                aria-label="AI base URL"
+              />
+              <input
+                type="text"
+                value={aiModel}
+                onChange={(e) => setAiModel(e.target.value)}
+                placeholder="Model (default gpt-4o-mini)"
+                autoComplete="off"
+                className="min-h-[44px] flex-1 rounded-lg border px-3 py-2 text-sm outline-none"
+                style={{
+                  backgroundColor: 'var(--card-bg)',
+                  borderColor: 'var(--light-border)',
+                  color: 'var(--page-text)',
+                }}
+                aria-label="AI model"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void handleAiSave()}
+                disabled={aiSaving || !aiKey.trim()}
+                className="flex min-h-[44px] items-center justify-center rounded-lg px-4 text-sm font-semibold disabled:opacity-50"
+                style={{ backgroundColor: 'var(--azfit-primary)', color: '#FFFFFF' }}
+              >
+                {aiSaving ? 'Saving…' : 'Save key'}
+              </button>
+              {aiHasKey && (
+                <button
+                  type="button"
+                  onClick={() => void handleAiClear()}
+                  disabled={aiSaving}
+                  className="flex min-h-[44px] items-center justify-center rounded-lg border px-4 text-sm font-semibold disabled:opacity-50"
+                  style={{ borderColor: 'var(--light-border)', color: 'var(--page-text)' }}
+                >
+                  Clear key
+                </button>
+              )}
+            </div>
+          </div>
+        </motion.div>
+        )}
 
         {/* ====== Notifications Section ====== */}
         <motion.div

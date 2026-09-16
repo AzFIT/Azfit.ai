@@ -153,6 +153,8 @@ export default function Layout({
       : []),
     { icon: Dumbbell, label: "Workouts", path: "/workouts" },
     { icon: Apple, label: "Nutrition", path: "/nutrition" },
+    // Phase 97a: client quick-log chat (client role only — requireClient route)
+    ...(!isTrainer ? [{ icon: MessageSquare, label: "AI Log", path: "/ai-log" }] : []),
     { icon: BarChart3, label: "Analytics", path: "/analytics" },
   ];
 
@@ -178,6 +180,7 @@ export default function Layout({
         { icon: Apple, label: "Nutrition", path: "/nutrition" },
       ];
   const moreTabItems = [
+    ...(isTrainer ? [] : [{ icon: MessageSquare, label: "AI Log", path: "/ai-log" }]),
     { icon: Video, label: "Form Checks", path: "/form-checks" },
     { icon: MessageSquare, label: "Messages", path: "/messages" },
     { icon: Settings, label: "Settings", path: "/settings" },

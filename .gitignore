@@ -44,3 +44,8 @@ playwright/.cache
 
 # Owner-supplied Excel import source (Phase 52A) — durable artifacts are scripts/ + supabase/seed
 scripts/data/
+
+# Owner-supplied AI provider keys (Phase 97a) — key material lives in Supabase/Settings, never in the repo
+*KIMI*KEY*.txt
+*MOONSHOT*KEY*.txt
+KIMI AI NOOMSHOT CN.txt

@@ -58,6 +58,30 @@ export type Database = {
         };
         Relationships: [];
       };
+      ai_config: {
+        Row: {
+          trainer_id: string;
+          api_key: string;
+          base_url: string;
+          model: string;
+          updated_at: string | null;
+        };
+        Insert: {
+          trainer_id: string;
+          api_key: string;
+          base_url?: string;
+          model?: string;
+          updated_at?: string | null;
+        };
+        Update: {
+          trainer_id?: string;
+          api_key?: string;
+          base_url?: string;
+          model?: string;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
       clients: {
         Row: {
           id: string;
@@ -2358,6 +2382,18 @@ export type Database = {
       };
     };
     Functions: {
+      save_ai_config: {
+        Args: { p_api_key: string; p_base_url: string; p_model: string };
+        Returns: boolean;
+      };
+      clear_ai_config: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      has_ai_config: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
       compute_jaccard: {
         Args: { tags_a: string[]; tags_b: string[] };
         Returns: number;

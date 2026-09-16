@@ -76,7 +76,9 @@ const PrintPlanSummaryPage = lazy(() => import("@/pages/PrintPlanSummary"));
 const PlanSummaryIndexPage = lazy(() => import("@/pages/PlanSummaryIndex"));
 // Phase 96: payments, packages & attendance (trainer money page).
 const PaymentsPage = lazy(() => import("@/pages/Payments"));
-// Phase 90b: trainer public identity — /trainer-profile (view + edit form).
+// Phase 97a: client AI quick-log chat (requireClient — trainer reaches it
+// only via the 90e View As Client override, which stamps logged_by).
+const AILogPage = lazy(() => import("@/pages/AILog"));// Phase 90b: trainer public identity — /trainer-profile (view + edit form).
 const TrainerProfilePage = lazy(() => import("@/pages/TrainerProfile"));
 
 // Loading fallback
@@ -381,6 +383,14 @@ export default function App() {
                     element={
                       <ProtectedRoute>
                         <CheckInsPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/ai-log"
+                    element={
+                      <ProtectedRoute requireClient>
+                        <AILogPage />
                       </ProtectedRoute>
                     }
                   />
