@@ -2882,7 +2882,14 @@ export default function AIProgramBuilderPage() {
 
   const handleReset = useCallback(() => { setData(defaultData); setProgram(null); setCurrentStep(0); setMaxStep(0); clearDraft(BUILDER_DRAFT_KEY); }, []);
   const handleSave = useCallback(async () => {
-    if (!user?.id || saving) return;
+    if (saving) return; // button is disabled while saving — belt-and-braces
+    if (!user?.id) {
+      // Silent no-op root-caused post-97b: after a long AI generation the
+      // auth session can hiccup (user momentarily null) and the old combined
+      // guard returned silently — the trainer clicked and nothing happened.
+      toast.error('Session hiccup — your login dropped during the AI call. Please log in again.');
+      return;
+    }
     const assignedClientId = data.assignedClient || null;
     setSaving(true);
     setSaveError(null);
@@ -2908,7 +2915,12 @@ export default function AIProgramBuilderPage() {
     }
   }, [data, user, saving]);
   const handleSaveAndAssign = useCallback(async () => {
-    if (!user?.id || saving) return;
+    if (saving) return; // button is disabled while saving — belt-and-braces
+    if (!user?.id) {
+      // Same loud-guard fix as handleSave (silent no-op root-caused post-97b).
+      toast.error('Session hiccup — your login dropped during the AI call. Please log in again.');
+      return;
+    }
     const assignedClientId = data.assignedClient || null;
     if (!assignedClientId) {
       toast.error('Please select a client before assigning');
