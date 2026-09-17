@@ -22,6 +22,7 @@ import {
   Apple,
   Send,
   Bot,
+  Table2,
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useTheme } from '@/hooks/useTheme';
@@ -29,6 +30,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { keepaliveProfilePatch } from '@/lib/keepaliveSave';
 import { hasAiKey, saveAiKey, clearAiKey } from '@/services/aiConfig';
+import { invokeSheetsExport, SheetsExportError, type SheetsExportResult } from '@/services/sheetsExport';
 import { toast } from 'sonner';
 import { GOAL_TYPE_LABELS, goalLabel, type ClientGoalRow, type ClientGoalType } from '@/lib/clientGoals';
 import { formatDate } from '@/lib/utils';
@@ -192,6 +194,69 @@ export default function Settings() {
     return () => { cancelled = true; };
   }, [isTrainer]);
 
+  /* ---- Phase 98a: Google Sheets export (trainer-only, function-owned config) ---- */
+  interface SheetsConfigDoc {
+    spreadsheet_id?: string | null;
+    url?: string | null;
+    last_export_at?: string | null;
+    row_counts?: SheetsExportResult['row_counts'] | null;
+  }
+  const [sheetsCfg, setSheetsCfg] = useState<SheetsConfigDoc | null>(null);
+  const [sheetsExporting, setSheetsExporting] = useState(false);
+  const [sheetsNotConfigured, setSheetsNotConfigured] = useState(false);
+  const [sheetsError, setSheetsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isTrainer || !user?.id) return;
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('sheets_config')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (!cancelled) setSheetsCfg((data?.sheets_config as SheetsConfigDoc | null) ?? null);
+    })();
+    return () => { cancelled = true; };
+  }, [isTrainer, user?.id]);
+
+  const handleSheetsExport = useCallback(async () => {
+    setSheetsExporting(true);
+    setSheetsError(null);
+    setSheetsNotConfigured(false);
+    try {
+      const result = await invokeSheetsExport();
+      setSheetsCfg({
+        spreadsheet_id: result.spreadsheet_id,
+        url: result.url,
+        last_export_at: new Date().toISOString(),
+        row_counts: result.row_counts,
+      });
+      const total =
+        result.row_counts.clients +
+        result.row_counts.sessions +
+        result.row_counts.payments +
+        result.row_counts.packages;
+      toast.success(`Exported ${total} rows to Google Sheets`);
+    } catch (err) {
+      // 503 = secret missing; 404 = function not deployed yet — both are
+      // the same honest "not configured" state pre-setup.
+      if (
+        err instanceof SheetsExportError &&
+        (err.status === 503 || err.status === 404 || err.code === 'not_configured')
+      ) {
+        setSheetsNotConfigured(true);
+      } else {
+        const msg = err instanceof Error ? err.message : 'Export failed';
+        setSheetsError(msg);
+        toast.error(msg);
+      }
+    } finally {
+      setSheetsExporting(false);
+    }
+  }, []);
+
+
   const handleAiSave = useCallback(async () => {
     if (!aiKey.trim()) {
       toast.error('Paste your API key first');
@@ -213,6 +278,7 @@ export default function Settings() {
       setAiSaving(false);
     }
   }, [aiKey, aiBaseUrl, aiModel]);
+
 
   const handleAiClear = useCallback(async () => {
     setAiSaving(true);
@@ -977,6 +1043,100 @@ export default function Settings() {
               )}
             </div>
           </div>
+        </motion.div>
+        )}
+
+        {/* ====== Google Sheets Export (Phase 98a, trainer only) ====== */}
+        {isTrainer && (
+        <motion.div
+          {...fadeUp}
+          transition={{ ...fadeUp.transition, delay: 0.185 }}
+          className="mt-4 rounded-2xl border p-5"
+          style={{
+            backgroundColor: 'var(--card-bg)',
+            borderColor: 'var(--card-border)',
+          }}
+        >
+          <div className="mb-4 flex items-center gap-2.5">
+            <Table2 size={20} style={{ color: 'var(--azfit-primary)' }} />
+            <h3 className="text-lg font-bold" style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}>
+              Google Sheets export
+            </h3>
+          </div>
+
+          <p className="mb-4 text-xs" style={{ color: 'var(--light-text-muted)' }}>
+            Exports your clients, sessions (last 90 days), payments, and packages to a
+            Google Spreadsheet owned by the export service account.
+          </p>
+
+          {/* Last export — from profiles.sheets_config, real data only */}
+          {sheetsCfg?.last_export_at ? (
+            <div className="mb-4 space-y-2">
+              <p className="text-sm" style={{ color: 'var(--page-text)', textShadow: 'var(--text-shadow-dark)' }}>
+                Last export: {formatDate(new Date(sheetsCfg.last_export_at))}
+              </p>
+              {sheetsCfg.row_counts && (
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      ['Clients', sheetsCfg.row_counts.clients],
+                      ['Sessions', sheetsCfg.row_counts.sessions],
+                      ['Payments', sheetsCfg.row_counts.payments],
+                      ['Packages', sheetsCfg.row_counts.packages],
+                    ] as const
+                  ).map(([label, count]) => (
+                    <span
+                      key={label}
+                      className="rounded-full px-3 py-1 text-xs font-semibold"
+                      style={{
+                        backgroundColor: 'color-mix(in srgb, var(--azfit-primary) 15%, transparent)',
+                        color: 'var(--azfit-primary)',
+                      }}
+                    >
+                      {label}: {count}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {sheetsCfg.url && (
+                <a
+                  href={sheetsCfg.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border px-4 text-sm font-semibold"
+                  style={{ borderColor: 'var(--light-border)', color: 'var(--page-text)' }}
+                >
+                  Open spreadsheet
+                </a>
+              )}
+            </div>
+          ) : (
+            <p className="mb-4 text-sm" style={{ color: 'var(--light-text-muted)' }}>
+              Never exported
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={() => void handleSheetsExport()}
+            disabled={sheetsExporting}
+            className="flex min-h-[44px] items-center justify-center rounded-lg px-4 text-sm font-semibold disabled:opacity-50"
+            style={{ backgroundColor: 'var(--azfit-primary)', color: '#FFFFFF' }}
+          >
+            {sheetsExporting ? 'Exporting…' : 'Export now'}
+          </button>
+
+          {sheetsNotConfigured && (
+            <p className="mt-3 text-xs" style={{ color: 'var(--warning)' }} role="status">
+              Not configured — the service account secret needs to be added before exports
+              can run.
+            </p>
+          )}
+          {sheetsError && (
+            <p className="mt-3 text-xs" style={{ color: 'hsl(var(--destructive))' }} role="alert">
+              {sheetsError}
+            </p>
+          )}
         </motion.div>
         )}
 

@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   notifications JSONB DEFAULT NULL -- Phase 94: notification prefs { types: {session_reminder, checkin_due, missed_workout, streak_at_risk, achievement_unlocked}, quietHours: {from,to}|null }; NULL = defaults; master switch = push_subscriptions row (applied live 2026-09-15, supabase/notifications-prefs-94.sql)
 , -- (comma on its own line keeps phase-comment lines append-only)
   ui_variant TEXT DEFAULT NULL -- Phase 92c: opt-in card style ('metal' = Pulse Metal; NULL/'default' = classic). RLS: own-row via existing auth.uid() policy (applied live 2026-09-15, supabase/profiles-ui-variant-92c.sql)
+, -- (comma on its own line keeps phase-comment lines append-only)
+  sheets_config JSONB DEFAULT NULL -- Phase 98a: Google Sheets export identity/bookkeeping {spreadsheet_id, url, created_at, last_export_at, row_counts}; written ONLY by the sheets-export edge function; NULL = never exported (applied live 2026-09-16, supabase/profiles-sheets-config-98a.sql)
 );
 
 -- ============================================================

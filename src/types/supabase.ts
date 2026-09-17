@@ -22,6 +22,7 @@ export type Database = {
           dashboard_preferences: Json | null;
           notifications: Json | null;
           ui_variant: string | null;
+          sheets_config: Json | null;
           role: "admin" | "trainer" | "client";
           created_at: string;
           updated_at: string;
@@ -37,6 +38,7 @@ export type Database = {
           dashboard_preferences?: Json | null;
           notifications?: Json | null;
           ui_variant?: string | null;
+          sheets_config?: Json | null;
           role?: "trainer" | "client";
           created_at?: string;
           updated_at?: string;
@@ -52,6 +54,7 @@ export type Database = {
           dashboard_preferences?: Json | null;
           notifications?: Json | null;
           ui_variant?: string | null;
+          sheets_config?: Json | null;
           role?: "trainer" | "client";
           created_at?: string;
           updated_at?: string;

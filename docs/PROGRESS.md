@@ -1941,3 +1941,32 @@ future-dated expenses never count toward an earlier month.
 ### OPEN FLAGS (awaiting owner)
 1. **Wizard Save & Assign silent no-op after a real long-generation run.** Mocked content, instant or 130s-delayed, saves fine (diag: handler fires, saved=true). After a real Moonshot call (2–4 min in-flight), the same click produced no toast and no row 3×. Not root-caused — the diagnostic run couldn't reach B4 because provider latency exceeded even 240s. Next step when the provider is fast: one real run with the saveAndAssign entry/result diag re-enabled. Silent early-returns in `handleSaveAndAssign` (`!user?.id || saving`) are the prime suspects to make loud.
 2. **Moonshot kimi-k3 latency variance**: observed 3s → >240s for the same prompt within one session. The UI handles this honestly (elapsed-time indicator, no client timeout); consider a provider-side max_tokens/temperature tune in a future ai-chat deploy if it persists.
+
+## Phase 98a — Google Sheets export: sheets-export edge function + Settings card
+
+**Branch:** `feat/sheets-export-98a` off `4d8b7df` (includes the verifier's loud-guard patch; save handlers untouched). Est. 60–75 min; actual ~65 min.
+
+### Item 1 — sheets-export edge function (`supabase/functions/sheets-export/`, repo + README; verifier deploys via MCP)
+
+- **Auth:** `verify_jwt=true` at the gateway + `auth.getUser()` re-check; caller's `profiles.role` must be `trainer` → 403 otherwise. Export scope = caller's own data only, filtered by **explicit `trainer_id`** via the service-role client (there is no payload at all — nothing to trust).
+- **Google auth:** service-account JWT flow (jose `SignJWT`/`importPKCS8`, RS256) → oauth2 token endpoint, scopes `spreadsheets` + `drive.file`. `SHEETS_SA_JSON` secret parsed + shape-validated (`client_email` + `BEGIN PRIVATE KEY`); missing/malformed → honest **503 `{error, code:"not_configured"}`**. The SA is never logged or returned; Google errors are sanitized to a safe label.
+- **First run:** creates "AzFIT Export — YYYY-MM" via Drive API, stores `{spreadsheet_id, url, created_at, last_export_at, row_counts}` in **`profiles.sheets_config`** (NEW additive JSONB column — `ALTER TABLE … ADD COLUMN IF NOT EXISTS`, applied live, mirrored in `schema.sql` + `src/types/supabase.ts`). Later runs reuse the stored spreadsheet and **clear-and-rewrite** the four worksheets.
+- **Worksheets:** Clients / Sessions (last 90 days, LOCAL dates) / Payments (money as **decimal strings** — `"250.00"` — Sheets locales mangle float cells) / Packages (`used/total`, honest empty expiry). Row mapping lives in the PURE helper `src/lib/sheetsExportRows.ts`, imported by the function via relative path; 11 unit tests (exact worksheet arrays, 90-day window with injected clock, config merge preserving unknown keys).
+- **Response:** `{url, spreadsheet_id, row_counts}` — real counts only (header excluded; an empty sheet honestly reports 0).
+- **README:** deploy command (`supabase functions deploy sheets-export --project-ref gcurvjprfwecbchreieu`), owner one-time setup (enable Sheets + Drive APIs; Dashboard → Edge Functions → Secrets → `SHEETS_SA_JSON` = full SA JSON).
+
+### Item 2 — Settings → "Google Sheets export" card (trainer-only, below AI Assistant)
+
+- Reads `profiles.sheets_config`: last export time + per-sheet row count chips + "Open spreadsheet" external link, else honest **"Never exported"**.
+- "Export now" → `src/services/sheetsExport.ts` (plain fetch with the trainer's JWT; network/CORS failure mapped to an honest `SheetsExportError(0, "Export service unreachable — it may not be deployed yet")`). Success → toast with real total + local config state update. **503/404/`not_configured` → "Not configured — the service account secret needs to be added"** (404 included = function not yet deployed, same honest state). Other errors → sanitized verbatim + retry. The function owns the config write — **no client-side save at all** (no keepalive concerns).
+- Token-only styling; 44px targets; theme tokens verified in both themes.
+
+### Verification
+- Gates green: tsc · lint · **1079/1079** · build + 404 copy · e2e 4/4.
+- Smoke 20/20 (fixture `smoke98a-delete`×2 accounts): pure row-mapping vs SQL ground truth (clients 2 / sessions-in-90d 2 with the 120-day session excluded / payments `"250.00"`+`"55.00"` / package `3/10` + real expiry / account-only session → `"(account client)"`); no-JWT invoke rejected; client-role JWT rejected; card both themes at 390 + 1280 (scrollWidth 390), 44px button, honest state after invoke. Pre-deploy the invoke surfaces the gateway 404/CORS block — the exact state the card's not-configured mapping covers; post-deploy the same path returns the function's real CORS + 503/200 (verifier's live write test: fixture rows appear in the auto-created spreadsheet, counts match SQL, config JSONB verified).
+- Fixture cleanup SQL-verified 0 rows everywhere incl. auth.users + profiles.
+- Screenshots: `.temp/audit/shots/98a/` (card dark + light).
+
+### Notes / flags
+- Fixture gotcha confirmed live: `handle_new_user` DOES auto-create profiles from `raw_user_meta_data` — manual profiles inserts collide (pk). Pass `role`/`full_name` via `raw_user_meta_data`; still set `email_change = ''` (99a lesson).
+- The Sheets API `values.clear` is a POST (not DELETE) — encoded in the function.
