@@ -26,7 +26,7 @@ import {
   type GoalKeyPct,
   type DietKey,
 } from "@/lib/tdee";
-import { calculateBodyFat, PROTOCOL_SITES, type SkinfoldSite } from "@/lib/bodyfat";
+import { calculateBodyFat, getProtocolSites, type SkinfoldSite } from "@/lib/bodyfat";
 import { saveNutritionTargets } from "@/lib/foodApi";
 import { WIZARD_GOALS, wizardGoalToClientGoal, intakeTargetsEligible, EQUIPMENT_OPTIONS } from "@/lib/trialIntake";
 
@@ -158,7 +158,7 @@ export default function ClientIntakeWizard({ open, onClose, onSuccess }: ClientI
   const bmr = weightNum && heightNum && age ? calculateBMR(weightNum, heightNum, age, data.gender === "female" ? "female" : "male") : 0;
   const tdee = bmr ? calculateTDEE(bmr, data.activity) : 0;
 
-  const jp7Sites = PROTOCOL_SITES.jp7;
+  const jp7Sites = getProtocolSites("jp7", data.gender === "female" ? "female" : "male");
   const enteredSkinfolds = jp7Sites.filter((s) => (parseFloat(data.skinfolds[s] || "") || 0) > 0);
   const sum7 = jp7Sites.reduce((sum, s) => sum + (parseFloat(data.skinfolds[s] || "") || 0), 0);
   const bfResult =

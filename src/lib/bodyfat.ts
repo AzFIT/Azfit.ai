@@ -18,16 +18,35 @@ export const SKINFOLD_SITES = [
 
 export type SkinfoldSite = (typeof SKINFOLD_SITES)[number];
 
-export const PROTOCOL_SITES: Record<SkinfoldProtocol, SkinfoldSite[]> = {
-  jp7: ["pec", "mid_axillary", "triceps", "subscapular", "umbilical", "supra_iliac", "mid_thigh"],
-  jp3: ["pec", "umbilical", "mid_thigh"],
-  poliquin12: [...SKINFOLD_SITES],
+/** Site sets per protocol. jp7/poliquin12 are the same for both sexes;
+ *  jp3 is gender-specific in the literature (males: chest/abdomen/thigh;
+ *  females: triceps/supra-iliac/thigh) — see getProtocolSites. */
+const PROTOCOL_SITE_SETS: Record<SkinfoldProtocol, Record<Gender, SkinfoldSite[]>> = {
+  jp7: {
+    male: ["pec", "mid_axillary", "triceps", "subscapular", "umbilical", "supra_iliac", "mid_thigh"],
+    female: ["pec", "mid_axillary", "triceps", "subscapular", "umbilical", "supra_iliac", "mid_thigh"],
+  },
+  jp3: {
+    male: ["pec", "umbilical", "mid_thigh"],
+    female: ["triceps", "supra_iliac", "mid_thigh"],
+  },
+  poliquin12: {
+    male: [...SKINFOLD_SITES],
+    female: [...SKINFOLD_SITES],
+  },
 };
 
+/** The sites a protocol measures for a given sex. The single source of
+ *  truth — every consumer (wizard inputs, sumSites, exports) must route
+ *  through here so a female jp3 is never summed from male sites. */
+export function getProtocolSites(protocol: SkinfoldProtocol, gender: Gender): SkinfoldSite[] {
+  return PROTOCOL_SITE_SETS[protocol][gender];
+}
+
 export const PROTOCOL_DESCRIPTIONS: Record<SkinfoldProtocol, string> = {
-  jp3: "Jackson-Pollock 3-site — quickest estimate",
+  jp3: "Jackson-Pollock 3-site — quickest estimate (sites differ by sex: males chest/abdomen/thigh, females triceps/supra-iliac/thigh)",
   jp7: "Jackson-Pollock 7-site — more accurate",
-  poliquin12: "Poliquin 12-site — comprehensive caliper map",
+  poliquin12: "Poliquin 12-site — comprehensive caliper map (sum only — no body-fat formula)",
 };
 
 export const SITE_HINTS: Record<SkinfoldSite, string> = {
@@ -109,9 +128,15 @@ export function fmt(n: number | null, digits = 2): string {
   return n.toFixed(digits);
 }
 
-/** Compute the sum of a partial sites record, filling missing sites with 0. */
-export function sumSites(sites: Partial<Record<SkinfoldSite, number>>, protocol: SkinfoldProtocol): number {
-  const required = PROTOCOL_SITES[protocol];
+/** Compute the sum of a protocol's sites for a given sex, filling
+ *  missing sites with 0. Gender matters: jp3 sums sex-specific sites
+ *  (a female jp3 from male sites was the 98b bug). */
+export function sumSites(
+  sites: Partial<Record<SkinfoldSite, number>>,
+  protocol: SkinfoldProtocol,
+  gender: Gender,
+): number {
+  const required = getProtocolSites(protocol, gender);
   return required.reduce((sum, site) => sum + (sites[site] ?? 0), 0);
 }
 

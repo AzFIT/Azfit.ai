@@ -6,10 +6,14 @@ import {
   getPhotos,
   deletePhoto,
   updateTrainerNotes,
+  updateTransform,
   setMilestone,
   type ProgressPhoto,
 } from "@/lib/photoMetadata";
 import PhotoGallery from "@/components/photos/PhotoGallery";
+import PhotoCompare from "@/components/photos/PhotoCompare";
+
+type PhotosMode = "gallery" | "compare";
 
 interface ClientPhotosTabProps {
   clientEmail: string;
@@ -20,6 +24,8 @@ export default function ClientPhotosTab({ clientEmail }: ClientPhotosTabProps) {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [photos, setPhotos] = useState<ProgressPhoto[]>([]);
   const [loading, setLoading] = useState(true);
+  // Phase 98b: Gallery | Compare segmented toggle
+  const [mode, setMode] = useState<PhotosMode>("gallery");
 
   const refetch = useCallback(
     async (pid: string) => {
@@ -82,22 +88,51 @@ export default function ClientPhotosTab({ clientEmail }: ClientPhotosTabProps) {
   }
 
   return (
-    <PhotoGallery
-      photos={photos}
-      loading={loading}
-      isTrainer
-      onDelete={async (p) => {
-        await deletePhoto(p);
-        if (profileId) await refetch(profileId);
-      }}
-      onUpdateTrainerNotes={async (id, notes) => {
-        await updateTrainerNotes(id, notes);
-        if (profileId) await refetch(profileId);
-      }}
-      onSetMilestone={async (id, value) => {
-        await setMilestone(id, value);
-        if (profileId) await refetch(profileId);
-      }}
-    />
+    <div>
+      {/* Phase 98b: Gallery | Compare toggle */}
+      <div className="mb-4 inline-flex rounded-xl border p-1" role="group" aria-label="Photos view" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}>
+        {(["gallery", "compare"] as PhotosMode[]).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setMode(m)}
+            aria-pressed={mode === m}
+            className={`h-11 rounded-lg px-4 text-xs font-semibold capitalize transition ${
+              mode === m ? "bg-[#00AEEF] text-[#0B1120]" : "text-slate-300 hover:bg-slate-800"
+            }`}
+          >
+            {m === "gallery" ? "Gallery" : "Compare"}
+          </button>
+        ))}
+      </div>
+
+      {mode === "gallery" ? (
+        <PhotoGallery
+          photos={photos}
+          loading={loading}
+          isTrainer
+          onDelete={async (p) => {
+            await deletePhoto(p);
+            if (profileId) await refetch(profileId);
+          }}
+          onUpdateTrainerNotes={async (id, notes) => {
+            await updateTrainerNotes(id, notes);
+            if (profileId) await refetch(profileId);
+          }}
+          onSetMilestone={async (id, value) => {
+            await setMilestone(id, value);
+            if (profileId) await refetch(profileId);
+          }}
+        />
+      ) : (
+        <PhotoCompare
+          photos={photos}
+          onTransformSaved={async (id, t) => {
+            await updateTransform(id, t);
+            setPhotos((prev) => prev.map((p) => (p.id === id ? { ...p, transform: t } : p)));
+          }}
+        />
+      )}
+    </div>
   );
 }

@@ -5,10 +5,26 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { supabase } from "@/lib/supabase";
-import type { Database } from "@/types/supabase";
+import type { Database, Json } from "@/types/supabase";
 
 export type PhotoCategory = "Front" | "Back" | "Side" | "Other";
 export const PHOTO_CATEGORIES: PhotoCategory[] = ["Front", "Back", "Side", "Other"];
+
+/** Phase 98b: per-photo compare/align transform (persists on the photo row). */
+export interface PhotoTransform {
+  x: number;
+  y: number;
+  scale: number;
+}
+export const IDENTITY_TRANSFORM: PhotoTransform = { x: 0, y: 0, scale: 1 };
+
+function toTransform(value: unknown): PhotoTransform | null {
+  if (!value || typeof value !== "object") return null;
+  const t = value as Record<string, unknown>;
+  if (typeof t.x !== "number" || typeof t.y !== "number" || typeof t.scale !== "number") return null;
+  if (!Number.isFinite(t.x) || !Number.isFinite(t.y) || !Number.isFinite(t.scale)) return null;
+  return { x: t.x, y: t.y, scale: t.scale };
+}
 
 const BUCKET = "progress-photos";
 const SIGNED_URL_TTL = 3600;
@@ -28,6 +44,7 @@ export interface ProgressPhoto {
   notes: string | null;
   trainerNotes?: string | null; // only present for trainers
   isMilestone: boolean;
+  transform: PhotoTransform | null; // Phase 98b compare/align
   createdAt: string;
 }
 
@@ -55,6 +72,7 @@ function rowToPhoto(
     notes: row.notes,
     trainerNotes: trainerNotes ?? undefined,
     isMilestone: row.is_milestone ?? false,
+    transform: toTransform(row.transform),
     createdAt: row.created_at,
   };
 }
@@ -151,6 +169,15 @@ export async function deletePhoto(photo: ProgressPhoto): Promise<void> {
 /** Owner updates their own note. */
 export async function updateNote(id: string, notes: string): Promise<void> {
   const { error } = await supabase.from("photo_metadata").update({ notes }).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+/** Phase 98b: persist a compare/align transform for one photo (null = reset to identity). */
+export async function updateTransform(id: string, transform: PhotoTransform | null): Promise<void> {
+  const { error } = await supabase
+    .from("photo_metadata")
+    .update({ transform: (transform ?? null) as Json })
+    .eq("id", id);
   if (error) throw new Error(error.message);
 }
 

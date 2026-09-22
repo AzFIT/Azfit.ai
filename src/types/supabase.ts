@@ -1773,6 +1773,7 @@ export type Database = {
           body_fat_pct: number | null;
           notes: string | null;
           is_milestone: boolean | null;
+          transform: Json | null;
           created_at: string;
         };
         Insert: {
@@ -1785,6 +1786,7 @@ export type Database = {
           body_fat_pct?: number | null;
           notes?: string | null;
           is_milestone?: boolean | null;
+          transform?: Json | null;
           created_at?: string;
         };
         Update: {
@@ -1797,6 +1799,7 @@ export type Database = {
           body_fat_pct?: number | null;
           notes?: string | null;
           is_milestone?: boolean | null;
+          transform?: Json | null;
           created_at?: string;
         };
         Relationships: [
@@ -2385,6 +2388,7 @@ export type Database = {
           body_fat_pct: number | null;
           notes: string | null;
           is_milestone: boolean | null;
+          transform: Json | null;
           created_at: string;
         };
         Relationships: [];

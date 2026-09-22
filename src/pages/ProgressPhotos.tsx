@@ -10,11 +10,15 @@ import {
   getPhotos,
   deletePhoto,
   updateNote,
+  updateTransform,
   PHOTO_CATEGORIES,
   type ProgressPhoto,
   type PhotoCategory,
 } from '@/lib/photoMetadata';
 import PhotoGallery from '@/components/photos/PhotoGallery';
+import PhotoCompare from '@/components/photos/PhotoCompare';
+
+type PhotosMode = 'gallery' | 'compare';
 
 export default function ProgressPhotosPage() {
   const navigate = useNavigate();
@@ -25,6 +29,8 @@ export default function ProgressPhotosPage() {
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [uploading, setUploading] = useState(false);
+  // Phase 98b: Gallery | Compare segmented toggle
+  const [mode, setMode] = useState<PhotosMode>('gallery');
 
   // Upload form state
   const [file, setFile] = useState<File | null>(null);
@@ -203,12 +209,39 @@ export default function ProgressPhotosPage() {
           </div>
         )}
 
-        <PhotoGallery
-          photos={photos}
-          loading={loading}
-          onDelete={handleDelete}
-          onUpdateNote={async (id, n) => { await updateNote(id, n); await refetch(); }}
-        />
+        {/* Phase 98b: Gallery | Compare toggle */}
+        <div className="mb-4 inline-flex rounded-xl border border-slate-800 bg-slate-900/50 p-1" role="group" aria-label="Photos view">
+          {(['gallery', 'compare'] as PhotosMode[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              aria-pressed={mode === m}
+              className={`h-11 rounded-lg px-4 text-xs font-semibold capitalize transition ${
+                mode === m ? 'bg-[#00AEEF] text-[#0B1120]' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              {m === 'gallery' ? 'Gallery' : 'Compare'}
+            </button>
+          ))}
+        </div>
+
+        {mode === 'gallery' ? (
+          <PhotoGallery
+            photos={photos}
+            loading={loading}
+            onDelete={handleDelete}
+            onUpdateNote={async (id, n) => { await updateNote(id, n); await refetch(); }}
+          />
+        ) : (
+          <PhotoCompare
+            photos={photos}
+            onTransformSaved={async (id, t) => {
+              await updateTransform(id, t);
+              setPhotos((prev) => prev.map((p) => (p.id === id ? { ...p, transform: t } : p)));
+            }}
+          />
+        )}
       </div>
     </div>
   );

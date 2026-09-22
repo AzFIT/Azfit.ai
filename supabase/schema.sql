@@ -1118,6 +1118,8 @@ CREATE TABLE IF NOT EXISTS public.photo_metadata (
   notes TEXT,
   trainer_notes TEXT,
   is_milestone BOOLEAN DEFAULT FALSE,
+  -- Phase 98b: per-photo compare/align transform {x, y, scale}; NULL = unmodified
+  transform JSONB DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -1151,7 +1153,7 @@ CREATE POLICY "Trainers can update client photo_metadata"
 CREATE OR REPLACE VIEW public.photo_metadata_owner
 WITH (security_invoker = true) AS
 SELECT id, storage_path, owner_id, category, taken_on, weight_kg,
-       body_fat_pct, notes, is_milestone, created_at
+       body_fat_pct, notes, is_milestone, created_at, transform
 FROM public.photo_metadata;
 
 CREATE POLICY "Trainers can read client progress photos"

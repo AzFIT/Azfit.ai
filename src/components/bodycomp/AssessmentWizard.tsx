@@ -19,7 +19,7 @@ import {
   type SkinfoldProtocol,
   type SkinfoldSite,
   type Gender,
-  PROTOCOL_SITES,
+  getProtocolSites,
   PROTOCOL_DESCRIPTIONS,
   SITE_HINTS,
   calculateBodyFat,
@@ -185,10 +185,12 @@ export function AssessmentWizard({ clientId: propClientId, isOpen, onClose, onSa
   }, [clientProfile, age, gender, weightKg]);
 
   const requiredSites = useMemo<SkinfoldSite[]>(() => {
-    if (protocol === "jp3" && gender) {
-      return gender === "male" ? ["pec", "umbilical", "mid_thigh"] : ["triceps", "supra_iliac", "mid_thigh"];
-    }
-    return PROTOCOL_SITES[protocol];
+    // 98b: the single source of truth for sex-specific site sets —
+    // jp3 renders female (triceps/supra-iliac/thigh) vs male
+    // (chest/abdomen/thigh) inputs. Gender comes from the client
+    // record/onboarding defaults, never a UI toggle here.
+    if (!gender) return getProtocolSites(protocol, "male");
+    return getProtocolSites(protocol, gender);
   }, [protocol, gender]);
 
   const canProceedToStep2 = protocol && (protocol !== "jp3" || !!gender);
@@ -201,7 +203,7 @@ export function AssessmentWizard({ clientId: propClientId, isOpen, onClose, onSa
 
   const result = useMemo(() => {
     if (!canProceedToStep3) return null;
-    const sum = sumSites(sites, protocol);
+    const sum = sumSites(sites, protocol, gender as Gender);
     return calculateBodyFat(protocol, sum, Number(age), gender as Gender);
   }, [canProceedToStep3, sites, protocol, age, gender]);
 

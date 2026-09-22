@@ -1976,3 +1976,74 @@ future-dated expenses never count toward an earlier month.
 - sheets-export edge function DEPLOYED v4 by the verifier via MCP (flat 3-file bundle: index.ts + sheetsExportRows.ts + bundle-utils.ts — repo imports rewritten to sibling paths; re-deploys must reproduce this layout, MCP cannot resolve ../../src/lib). verify_jwt=true.
 - Live contract verified: 401 unauthenticated, 503 not_configured pre-secret; client-role 403 enforced post-secret.
 - App deploy: main 9f1df65 pushed epoch 1790049996; GitHub Pages Last-Modified epoch 1790050068 (probe 4 of 6).
+
+
+## Phase 98b — Photo Compare & Align + Body-fat JP3 Gender-site Fix (branch feat/photos-compare-98b)
+
+### Item 1 — bodyfat.ts JP3 site-set bug (verified correct formulas, one real bug)
+- REAL BUG: `calculateJP3` switches Jackson-Pollock constants by gender, but the old exported
+  `PROTOCOL_SITES.jp3` was the MALE site set (pec / umbilical / mid_thigh) for everyone — every
+  female 3-site result was summed from male sites. JP7/Poliquin constants were already correct
+  (verified against literature, unchanged).
+- Fix: `PROTOCOL_SITES` replaced by `getProtocolSites(protocol, gender)` — jp3 male =
+  [pec, umbilical, mid_thigh], jp3 female = [triceps, supra_iliac, mid_thigh]; jp7/poliquin12
+  identical across sexes. `sumSites(sites, protocol, gender)` now requires gender.
+  `PROTOCOL_DESCRIPTIONS.jp3` notes the sex-specific sites; poliquin12 notes "sum only".
+- Consumers: `AssessmentWizard` (gender from the client record, never a UI toggle; site inputs
+  rendered from the gender-correct set) + `ClientIntakeWizard` (jp7 only).
+- LIMITATION (documented, history never rewritten): female jp3 rows stored BEFORE this fix keep
+  their stored snapshot values — re-run the assessment to get corrected numbers.
+- Poliquin 12-site stays honest: bodyFatPct remains null ("sum only"), by design.
+- Missing gender/DOB → wizard shows an honest empty state; never assumes, never scores 0.
+- Tests: `src/lib/bodyfat.test.ts` — 10 known-answer locks (jp3 male S=51 age25 → BD 1.0649 / BF
+  14.8%; jp3 female S=50 age30 → 1.0514 / 20.8%; jp7 male S=120 age35 → 1.0576 / 18.0%;
+  Siri(1.0649)≈14.8; Katch-McArdle(15%, 80 kg)=1838.8; female pec=99 ignored by the female site set).
+
+### Item 2 — Progress Photos: Compare mode (new) + per-photo Align
+- DDL (applied live via pooler + mirrored schema.sql + types): `photo_metadata.transform JSONB
+  DEFAULT NULL` (`supabase/photo-metadata-transform-98b.sql`). The owner-facing
+  `photo_metadata_owner` VIEW now also selects `transform` (additive column at end — the only
+  position CREATE OR REPLACE allows); the owner getPhotos path reads the view, so this was required.
+- `src/lib/photoMetadata.ts`: `PhotoTransform {x,y,scale}`, `IDENTITY_TRANSFORM`, transform
+  mapped in `rowToPhoto` (validated, non-finite rejected), `updateTransform(id, t|null)`.
+  RLS re-check: trainers can UPDATE client photo_metadata (existing 27B-era policy) — trainer-side
+  align persists without new policies.
+- `src/components/photos/PhotoCompare.tsx` (new, photos-in props — reused by owner page AND
+  trainer ClientPhotosTab, no fork): Before/After dropdowns ("Category · date", time-disambiguated
+  on same-day duplicates, newest first), category filter chips (All/Front/Back/Side/Other), default
+  = oldest vs newest Front; Side-by-side | Slider views (fixed aspect-[3/4] frames — no layout
+  shift); slider = After fills the frame, Before clipped at divider (inline clip width), divider
+  handle 44px with role=slider / aria-valuenow / arrow-key ±2; per-photo pan (pointer drag),
+  zoom 50–200%, Reset; transforms debounce-persist 500ms (identity → NULL), flush-on-unmount.
+- Wiring: Gallery | Compare segmented toggle on `ProgressPhotos.tsx` + `ClientPhotosTab.tsx`
+  (trainer AND owner). Slate/#00AEEF styling matches the existing dark-only photos surface
+  (ProgressPhotos + PhotoGallery are hardcoded dark like Schedule.tsx — by design; verified the
+  computed surface background is identical under theme toggle).
+- SMOKE-CAUGHT APP BUG: the frame-width ResizeObserver effect was keyed [view] only — on first
+  render Before/After ids are null so the slider frame doesn't exist yet; when the ids landed the
+  effect didn't re-run, leaving the Before layer unsized (frameW=0). Fixed: deps [view, beforeId,
+  afterId]. `before layer frame-sized (330px)` now asserted in smoke.
+
+### Gallery overlap flag (owner decision)
+PhotoGallery already ships a Phase 27F "Compare" (pick-2 + side-by-side modal). Per spec the
+gallery stayed untouched; the page-level Compare toggle coexists with it. If the owner wants, a
+future phase can retire the 27F modal in favour of the new Compare mode.
+
+### Verification
+- Gates green: tsc · lint · **1089/1089** · build + 404 copy · e2e 4/4.
+- Smoke 23/23 (fixture `smoke98b-delete`, real UI): both themes checked; default Before/After
+  selection; slider keyboard ±2 + handle drag → clip 75% + aria-valuenow; Before layer frame-sized
+  (330px at 390); side-by-side honest chips (null-weight photo → NO kg chip; 80 kg chip on the
+  real one); zoom 150% + pan → JSONB {"x":40,"y":25,"scale":1.5} pooler-verified; hard reload →
+  restored; Reset → NULL; scrollWidth 390; zero console errors; fixture cleaned 0 rows everywhere
+  incl. auth.users + storage.objects (storage rows are delete-protected at SQL level
+  (storage.protect_delete) — bucket files removed via the Storage API with the service role).
+- Smoke-harness lessons (permanent): (a) block service workers in Playwright contexts — the app's
+  controllerchange reload (Fix Pack 2 pattern) resets UI state mid-test when dist changes; the
+  resulting "[PWA] Service Worker registration failed" console error is a harness artifact, not an
+  app bug. (b) sonner toasts: wait for the toast to DETACH before the next action that waits for
+  the same text, or you race ahead while the previous op is still in flight (this silently cost us
+  a metadata row — "Photo uploaded" matched the still-visible previous toast and the browser was
+  closed mid-upload). (c) React range inputs: drive with real keyboard Arrow keys, not synthetic
+  value+input events.
+- Screenshots: `.temp/audit/shots/98b/` (slider + side-by-side, 390 + 1280, align controls).
