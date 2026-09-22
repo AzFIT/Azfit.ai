@@ -1970,3 +1970,9 @@ future-dated expenses never count toward an earlier month.
 ### Notes / flags
 - Fixture gotcha confirmed live: `handle_new_user` DOES auto-create profiles from `raw_user_meta_data` — manual profiles inserts collide (pk). Pass `role`/`full_name` via `raw_user_meta_data`; still set `email_change = ''` (99a lesson).
 - The Sheets API `values.clear` is a POST (not DELETE) — encoded in the function.
+
+### Phase 98a post-merge deploy facts (verifier)
+
+- sheets-export edge function DEPLOYED v4 by the verifier via MCP (flat 3-file bundle: index.ts + sheetsExportRows.ts + bundle-utils.ts — repo imports rewritten to sibling paths; re-deploys must reproduce this layout, MCP cannot resolve ../../src/lib). verify_jwt=true.
+- Live contract verified: 401 unauthenticated, 503 not_configured pre-secret; client-role 403 enforced post-secret.
+- App deploy: main 9f1df65 pushed epoch 1790049996; GitHub Pages Last-Modified epoch 1790050068 (probe 4 of 6).
