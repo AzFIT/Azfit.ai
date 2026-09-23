@@ -15,6 +15,10 @@ export interface TaxonomyExercise {
   secondary_muscle: string | null;
   equipment: string | null;
   exercise_type: string | null;
+  /** Phase 99c: difficulty ("Beginner" | "Intermediate" | "Advanced") —
+   *  used by the plan-summary variety engine for solo-session safety
+   *  gating. Optional so existing test fixtures keep compiling. */
+  difficulty?: string | null;
 }
 
 export type MusclePattern = 'push' | 'pull' | 'legs' | 'core' | 'any';

@@ -202,3 +202,53 @@ describe("buildFaq + computeBlueprint integration", () => {
     expect(isFatLossGoal("increase_strength")).toBe(false);
   });
 });
+
+/* ── Phase 99c Item 6: withCalorieTarget (saved-targets consistency) ── */
+describe("withCalorieTarget", () => {
+  const wctInputs: BlueprintInputs = {
+    ...FIXTURE,
+    trainerSessionsPerWeek: 2,
+    soloSessionsPerWeek: 1,
+    stepTarget: 9000,
+    goalType: "reduce_body_fat",
+    programWeeks: 16,
+    dietBreak: true,
+    trainerName: "Coach Demo",
+  };
+  it("re-derives every calorie-dependent section from the saved target", async () => {
+    const { withCalorieTarget } = await import("./planBlueprint");
+    const base = computeBlueprint(wctInputs, "2026-08-10T00:00:00.000Z");
+    const saved = { calories: 1700, protein: 160, carbs: 140, fats: 55 };
+    const r = withCalorieTarget(base, saved);
+    expect(r.targetsSource).toBe("saved");
+    expect(r.calories.target).toBe(1700);
+    expect(r.calories.deficitPerDay).toBe(r.calories.maintenance - 1700);
+    // macro table + sample day + roadmap rebuilt at the saved target
+    const rec = r.macroStyles.find((s) => s.key === r.recommended.key)!;
+    // macro table stays style-derived at the saved kcal; saved grams drive the sample day
+    expect(rec.atTarget.proteinG).toBeGreaterThan(0);
+    const totalG = r.sampleDay.totals.p + r.sampleDay.totals.c + r.sampleDay.totals.f;
+    expect(totalG).toBeGreaterThan(0);
+    expect(r.sampleDay.totals.kcal).toBeGreaterThan(0);
+    expect(r.goal.statement).toContain("weeks");
+    // outcomes re-derived from the saved deficit
+    expect(r.outcomes).not.toBeNull();
+    expect(r.outcomes!.weeklyLossKg).toBeGreaterThan(base.outcomes!.weeklyLossKg); // 1700 kcal = deeper deficit than 1760
+  });
+
+  it("marks clampedByFloor when the saved target sits at/below the floor", async () => {
+    const { withCalorieTarget } = await import("./planBlueprint");
+    const base = computeBlueprint(wctInputs, "2026-08-10T00:00:00.000Z");
+    const r = withCalorieTarget(base, { calories: 1100 });
+    expect(r.targetsSource).toBe("saved");
+    expect(r.calories.clampedByFloor).toBe(true);
+  });
+
+  it("falls back to the recommended style grams when saved grams are missing", async () => {
+    const { withCalorieTarget } = await import("./planBlueprint");
+    const base = computeBlueprint(wctInputs, "2026-08-10T00:00:00.000Z");
+    const r = withCalorieTarget(base, { calories: 1800 });
+    const rec = r.macroStyles.find((s) => s.key === r.recommended.key)!;
+    expect(rec.atTarget.proteinG).toBeGreaterThan(0);
+  });
+});

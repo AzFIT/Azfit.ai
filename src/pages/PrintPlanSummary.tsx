@@ -81,9 +81,14 @@ export default function PrintPlanSummaryPage() {
   const m = report;
   const a = m.assessment;
   const n = (k: number) => k + (m.femaleReassurance ? 1 : 0);
+  // Phase 99c: dynamic section-number shifts for the new cards
+  const shWT = m.weeklyTargets ? 1 : 0;
+  const shCardio = m.cardio ? 1 : 0;
+  const shGuide = m.nutritionGuide ? 1 : 0;
   // Phase 80: dynamic section-number shifts for blueprint extras
-  const shiftWarmup = m.extras?.warmup ? 1 : 0;
-  const shiftDiet = shiftWarmup + (m.extras?.sampleDiet ? 1 : 0);
+  const shiftWarmup = shWT + (m.extras?.warmup ? 1 : 0);
+  const postTrain = shCardio + shGuide;
+  const shiftDiet = shiftWarmup + postTrain + (m.extras?.sampleDiet ? 1 : 0);
   const shiftSupplements = shiftDiet + (m.extras?.supplements ? 1 : 0);
   const genDate = new Date(m.header.generatedIso).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 
@@ -128,6 +133,15 @@ export default function PrintPlanSummaryPage() {
             <p className="text-right text-xs text-gray-500">{genDate}</p>
           </div>
         </header>
+
+        {/* Phase 99c: welcoming cover with the real logo */}
+        {m.welcome && (
+          <section className={`${sec} rounded-lg border border-gray-200 px-4 py-4 text-center`}>
+            <img src={`${import.meta.env.BASE_URL}azfit-logo-header.png`} alt="AzFIT" className="mx-auto mb-2 h-12 object-contain" />
+            <h2 className="text-base font-bold">{m.welcome.title}</h2>
+            <p className="mx-auto mt-1.5 max-w-md text-[11px] leading-relaxed text-gray-600">{m.welcome.message}</p>
+          </section>
+        )}
 
         {/* 1. Starting Assessment */}
         <section className={sec}>
@@ -236,11 +250,71 @@ export default function PrintPlanSummaryPage() {
           </p>
         </section>
 
+        {/* Phase 99c: Weekly Targets & Expectations */}
+        {m.weeklyTargets && (
+          <section className={sec}>
+            <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(4)} · Your Weekly Targets & Expectations</h2>
+            <div className="mt-2 grid grid-cols-2 gap-3 text-center">
+              <div className="rounded border border-gray-200 px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Starting point</p>
+                <p className="text-lg font-bold">{m.weeklyTargets.baseline.weightKg != null ? `${m.weeklyTargets.baseline.weightKg} kg` : "Not recorded yet"}</p>
+                <p className="text-[10px] text-gray-500">
+                  {m.weeklyTargets.baseline.bodyFatPct != null ? `${m.weeklyTargets.baseline.bodyFatPct}% body fat · ` : ""}
+                  {m.weeklyTargets.baseline.recordedAt
+                    ? `first logged ${new Date(m.weeklyTargets.baseline.recordedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`
+                    : "log your first weigh-in"}
+                </p>
+              </div>
+              <div className="rounded border-2 border-gray-900 px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-900">The goal</p>
+                <p className="text-lg font-bold">{m.weeklyTargets.goal.targetWeightKg != null ? `${m.weeklyTargets.goal.targetWeightKg} kg` : m.weeklyTargets.goal.label}</p>
+                <p className="text-[10px] text-gray-600">
+                  {[
+                    m.weeklyTargets.goal.targetBodyFatPct != null ? `${m.weeklyTargets.goal.targetBodyFatPct}% BF` : null,
+                    m.weeklyTargets.goal.targetDate
+                      ? `by ${new Date(m.weeklyTargets.goal.targetDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || m.weeklyTargets.goal.label}
+                </p>
+              </div>
+            </div>
+            {m.weeklyTargets.weeklyRate && (
+              <p className="mt-2 rounded bg-gray-100 px-3 py-2 text-[11px] font-medium">
+                Realistic pace: <strong>{m.weeklyTargets.weeklyRate.label}</strong> — week to week, never day to day.
+              </p>
+            )}
+            {m.weeklyTargets.goalDateHonestNote && (
+              <p className="mt-2 rounded border border-gray-400 px-3 py-2 text-[10px] italic text-gray-700">{m.weeklyTargets.goalDateHonestNote}</p>
+            )}
+            <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">What to expect</p>
+            {m.weeklyTargets.expectations.map((e) => (
+              <div key={e.weeks} className="mt-1 flex gap-3">
+                <span className="w-20 shrink-0 rounded bg-gray-900 px-1.5 py-0.5 text-center text-[9px] font-bold text-white">{e.weeks}</span>
+                <div>
+                  <p className="text-[11px] font-semibold">{e.focus}</p>
+                  <p className="text-[10px] text-gray-600">{e.expectation}</p>
+                </div>
+              </div>
+            ))}
+            <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">Wins that aren't the scale</p>
+            <ul className="list-inside list-disc text-[10px] text-gray-600">
+              {m.weeklyTargets.nonScaleVictories.map((v) => (
+                <li key={v}>{v}</li>
+              ))}
+            </ul>
+            {m.weeklyTargets.notes.map((nt) => (
+              <p key={nt} className="mt-1.5 text-[10px] italic text-gray-500">{nt}</p>
+            ))}
+          </section>
+        )}
+
         {/* Phase 80: Dynamic Warm-Up (only when the summary carries
             blueprint extras) */}
         {m.extras?.warmup && (
           <section className={sec}>
-            <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(4)} · Dynamic Warm-Up & Mobility</h2>
+            <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(4 + shWT)} · Dynamic Warm-Up & Mobility</h2>
             <ol className="mt-1.5 list-inside list-decimal text-[11px]">
               {m.extras.warmup.steps.map((s) => (
                 <li key={s.name}>
@@ -284,11 +358,82 @@ export default function PrintPlanSummaryPage() {
               <li key={r}>{r}</li>
             ))}
           </ul>
+          {m.trainingMeta && (
+            <ul className="mt-1.5 list-inside list-disc border-t border-gray-200 pt-1.5 text-[10px] italic text-gray-500">
+              {m.trainingMeta.notes.map((nt) => (
+                <li key={nt}>{nt}</li>
+              ))}
+            </ul>
+          )}
         </section>
+
+        {/* Phase 99c: Cardio — machines, intensity & progression */}
+        {m.cardio && (
+          <section className={sec}>
+            <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(5 + shiftWarmup)} · Cardio — Machines, Intensity & Progression</h2>
+            {m.cardio.rows.map((r) => (
+              <div key={r.machine + r.protocol} className="mt-2 rounded border border-gray-200 p-2.5">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="text-[11px] font-bold">{r.machine}</p>
+                  <span className="rounded-full bg-gray-900 px-2 py-0.5 text-[8px] font-bold uppercase text-white">{r.difficulty}</span>
+                </div>
+                <p className="text-[10px] font-semibold text-gray-700">{r.protocol} · {r.basis}</p>
+                <p className="text-[10px] text-gray-600">{r.intensity}</p>
+                <p className="text-[10px] text-gray-600">{r.schedule}</p>
+                <table className="mt-1 w-full text-[9px]">
+                  <tbody>
+                    {r.progression.map((pg) => (
+                      <tr key={pg.label} className="border-b border-gray-100">
+                        <td className="px-1 py-0.5 font-semibold text-gray-700">{pg.label}</td>
+                        <td className="px-1 py-0.5 text-right text-gray-600">{pg.prescription}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+            <p className="mt-2 rounded bg-gray-100 px-3 py-2 text-[11px] font-medium">
+              ≈ {m.cardio.weeklyMinutes} cardio minutes/week · {m.cardio.stepNote}
+            </p>
+            {m.cardio.notes.map((nt) => (
+              <p key={nt} className="mt-1 text-[10px] italic text-gray-500">{nt}</p>
+            ))}
+          </section>
+        )}
+
+        {/* Phase 99c: goal-adaptive eating guide */}
+        {m.nutritionGuide && (
+          <section className={sec}>
+            <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(5 + shiftWarmup + shCardio)} · {m.nutritionGuide.title}</h2>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-gray-700">{m.nutritionGuide.intro}</p>
+            {m.nutritionGuide.safetyCallout && (
+              <p className="mt-2 rounded border border-gray-900 px-3 py-2 text-[11px] font-bold">{m.nutritionGuide.safetyCallout}</p>
+            )}
+            {m.nutritionGuide.blocks.map((b) => (
+              <div key={b.heading} className="mt-2">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-gray-900">{b.heading}</p>
+                <ul className="list-inside list-disc text-[10px] text-gray-700">
+                  {b.points.map((pt) => (
+                    <li key={pt}>{pt}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+            <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-gray-900">Who should NOT be in a deficit</p>
+            <ul className="list-inside list-disc text-[10px] text-gray-600">
+              {m.nutritionGuide.whoShouldNotCut.map((w) => (
+                <li key={w}>{w}</li>
+              ))}
+            </ul>
+            {m.nutritionGuide.notes.map((nt) => (
+              <p key={nt} className="mt-1.5 text-[10px] italic text-gray-500">{nt}</p>
+            ))}
+          </section>
+        )}
 
         {/* 6. Sample Day */}
         <section className={sec}>
-          <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(5 + shiftWarmup)} · Sample Day of Eating ({m.recommended.name})</h2>
+          <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(5 + shiftWarmup + postTrain)} · Sample Day of Eating ({m.recommended.name})</h2>
           <table className="mt-1 w-full text-[10px]">
             <tbody>
               {m.sampleDay.meals.map((meal) => (
@@ -321,7 +466,7 @@ export default function PrintPlanSummaryPage() {
         {/* Phase 80: Sample Diet Day (blueprint foods) */}
         {m.extras?.sampleDiet && (
           <section className={sec}>
-            <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(6 + shiftWarmup)} · Sample Diet Day — Your Foods</h2>
+            <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{n(6 + shiftWarmup + postTrain)} · Sample Diet Day — Your Foods</h2>
             <table className="mt-1 w-full text-[10px]">
               <tbody>
                 {m.extras.sampleDiet.meals.map((meal) => (

@@ -2047,3 +2047,45 @@ future phase can retire the 27F modal in favour of the new Compare mode.
   closed mid-upload). (c) React range inputs: drive with real keyboard Arrow keys, not synthetic
   value+input events.
 - Screenshots: `.temp/audit/shots/98b/` (slider + side-by-side, 390 + 1280, align controls).
+## Phase 99c — Plan Summary engine overhaul: variety + new cards + TDEE consistency
+
+**Branch:** `feat/blueprint-99c` off `42133ac` (post-98a main). Est. 90 min (of the owner's 99c–99e package). Part 1 of 3 — 99d adds per-card editing + include ticks + print polish; 99e adds .docx export.
+
+### Context (owner request)
+Professional, client-ready Plan Summary: real exercise variety (no repeats), safe basic solo exercises, cardio machines with difficulty/time/intensity, every card editable (99d), exportable (99e), AzFIT-branded welcome cover, weekly targets from first-recorded data, low-calorie eating guidance, and — critically — numbers consistent "from generating to plan summary".
+
+### Item 1 — Training variety engine (`src/lib/blueprintTraining.ts`, pure, 11 tests)
+- Replaces the hardcoded GBC templates (`buildGbcPlan`) whenever the 52B taxonomy is available; **null → caller keeps the legacy plan, marked `trainingMeta.varied: false`** with an honest note (never a silent fallback).
+- Own muscle-family classifier (live `primary_muscle` has compound labels — "Quads/Glutes", "Chest/Triceps" — split on "/" and mapped; NOT the 65A `MusclePattern` map, which collapses these to "any").
+- Trainer sessions rotate Full Body / Lower / Upper templates: 2 antagonist compound pairs (3×10–12, GBC tempo/rest) + an isolation pair (2×12–15). **Global used-set dedupe across ALL sessions**; deterministic widening: unused same-slot → unused other exercise (noted) → reuse (noted). Seeded mulberry32 (default seed 42 — own copy, trainingEditor's stays private).
+- Solo sessions: 5-slot circuit (legs/push/pull/hinge/core), **Beginner-only + no-barbell + no Olympic/Plyo**; if the Beginner pool is too small, Intermediate non-barbell with an explicit "review before the client trains alone" note. An empty slot renders "— coach to select —" (never a fabricated exercise name).
+- Injury gate reuses Phase 80 `parseInjuries` + `EQUIPMENT_TIERS` (now exported); every filter/fallback lands in `trainingMeta.notes` rendered under the training card.
+- Finishers: fat-loss biases the incline walk; sled requires full_gym; farmer carry needs a load-bearing tier.
+
+### Item 2 — Cardio plan (`src/lib/blueprintCardio.ts`, pure, 6 tests)
+Rule-based prescription per goal: fat loss = 2 LISS + 1 intervals; fitness = intervals + tempo distance; strength = low-intensity only (honest "protects recovery" note). Machines gated by equipment access (dumbbells_only gets bike/outdoor only — treadmill needs a gym). Every row: machine, protocol, difficulty (Beginner durations scaled to 75%), intensity (RPE + talk test), time/distance basis, schedule, 4-week progression. Weekly-minutes total + step note.
+
+### Item 3 — Weekly targets (`src/lib/blueprintWeeklyTargets.ts`, pure, 7 tests)
+Baseline = **FIRST recorded** body_composition (not latest — honest starting point). Safe rate 0.5–1% BW/week; goal-date math flags "faster than the safe maximum" honestly and gives a real week estimate; phase expectations bounded by program length; non-scale victories; female cycle-weight note. Clock injectable (`nowIso`).
+
+### Item 4 — Nutrition guide (`src/lib/blueprintNutritionGuide.ts`, pure, 6 tests)
+Goal-adaptive: fat-loss gets the low-calorie toolkit (protein anchor with the report's real grams, volume eating, hunger hacks tiered by deficit %, diet breaks, "what the deficit is NOT") + a **loud safety callout when the calorie floor clamped the target** + who-should-not-cut list. Non-fat-loss gets a "you are NOT dieting" variant.
+
+### Items 5+6 — Welcome cover + TDEE consistency
+- `welcome` card: real logo (`azfit-logo-header.png`, BASE_URL-relative), first name from `clients.full_name`, trainer sign-off.
+- **Consistency:** if `clients.intake_profile.computed_targets` exists (97b TDEE calculator), `withCalorieTarget()` (exported from planBlueprint, 3 tests) re-derives EVERY calorie-dependent section (calories, macro table, sample day, outcomes, goal statement, roadmap) from the saved target → `targetsSource: "saved"`. Reverse path: "Save these targets to the client's Nutrition tab" button (engine-computed reports only) writes the same shape NutritionTab uses — **one voice from calculator → summary → nutrition tab**. `goal.dietBreak` now stored in the result so the roadmap can be rebuilt consistently.
+- **Adaptive TDEE from the Azfit.fit Python tool was evaluated and REJECTED** (owner asked us to review it): it back-solves calories from intake logs + a hardcoded 3.2 kcal/lb coefficient — with this app's real data (no reliable intake logs) it would fabricate numbers. Only the consistency idea was adopted.
+
+### Wiring
+- `PlanSummaryTab.generate()`: one extra parallel fetch round (client row + latest client_goal + first/latest body_composition) + `computeExtrasForClient` now returns `{extras, bp, library}` (library select adds `difficulty` — the only taxonomy source, no second fetch).
+- `BlueprintReportView` + `PrintPlanSummary`: welcome (unnumbered) → assessment → calories (+ provenance note / write-back) → macros → **weekly targets (n4)** → warmup → training (+ meta notes) → **cardio** → **nutrition guide** → sample day → … → FAQ. Section numbering reworked as shift constants (`shWT/shCardio/shGuide/postTrain`) so old stored summaries (missing the new cards) renumber correctly.
+- **No DDL anywhere** — new cards live inside `plan_summaries.result` jsonb; old summaries render unchanged.
+
+### Verification
+- Gates green: tsc · lint · **1112/1112** (+33 new: 11+6+7+6+3) · build + 404 copy · e2e 4/4.
+- Smoke (fixture `smoke99c-delete` + trainer `smoke99ct-delete@azfit.demo`): saved 1,700 kcal drove the whole report (SQL-verified `targetsSource:"saved"`, target=1700); welcome/weekly-targets/cardio/guide cards render; baseline = first-recorded 95 kg; unrealistic goal date flagged; dumbbells_only cardio pool excludes treadmill/stair/sled; knee keyword excluded leg/hinge patterns — solo legs+hinge slots honestly render "— coach to select —" (conservative unsupervised gate) and the one forced repeat carries an explicit builder note (44/44 assertions); write-back path (drop saved targets → regenerate → button appears → click → `computed_targets` SQL-verified, calories == regenerated report target); print page renders the welcome cover; 390px scrollWidth ≤ 390; dark + light themes; fixture cleanup SQL-verified 0 rows everywhere incl auth.users.
+- Screenshots: `.temp/audit/shots/99c/`.
+
+### Flags
+- **Fixture gotchas confirmed live (add to permanent list):** (a) `auth.identities.provider_id` must be the **user id** (not the email) and `instance_id` + `raw_app_meta_data {"provider":"email","providers":["email"]` are required on the users insert, or GoTrue password grant fails with invalid_credentials; (b) `auth.identities.email` is now a **generated column** — never insert it; (c) `raw_user_meta_data.sub` must be set to the user id (jsonb_set after insert, per the demo-seed pattern).
+- Cardio "experience" dial is derived from trainer sessions/week (≤1 = beginner) — the blueprint row has no experience field; documented, coarse, only scales durations.

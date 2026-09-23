@@ -30,6 +30,7 @@ import { saveDraft, loadDraft, clearDraft } from "@/lib/draftStore";
 import DraftBanner from "@/components/DraftBanner";
 import {
   computeBlueprint,
+  withCalorieTarget,
   ACTIVITY_PRESETS,
   DEFAULT_INPUTS,
   type BlueprintInputs,
@@ -39,6 +40,10 @@ import {
   type StyledMacros,
   type GbcSession,
 } from "@/lib/planBlueprint";
+import { buildVariedSessions, type TaxonomyExerciseLike } from "@/lib/blueprintTraining";
+import { buildCardioPlan } from "@/lib/blueprintCardio";
+import { buildWeeklyTargets } from "@/lib/blueprintWeeklyTargets";
+import { buildNutritionGuide } from "@/lib/blueprintNutritionGuide";
 import {
   buildWarmupProtocol,
   buildSampleDiet,
@@ -46,10 +51,9 @@ import {
   SUPPLEMENT_BLOCK,
   SUPPLEMENT_DISCLAIMER,
   MEDICAL_DISCLAIMER,
-  type LibraryExercise,
   type StapleFoodMacros,
 } from "@/lib/planSummaryExtras";
-import { blueprintFromRow, type BlueprintRow } from "@/lib/planBlueprintInput";
+import { blueprintFromRow, type BlueprintRow, type PlanBlueprintInput } from "@/lib/planBlueprintInput";
 import { validateSession } from "@/lib/trainingEditor";
 import { useExerciseTaxonomy } from "@/hooks/useExerciseTaxonomy";
 import TrainingPlanEditor from "./TrainingPlanEditor";
@@ -91,31 +95,33 @@ function normalizeGoalForSelect(g: string | null | undefined): string {
    client's client_plan_blueprints row (null when no row exists →
    sections omitted entirely, never empty shells). The 61 engine
    stays pure — this merges at generation time with the report's
-   REAL macro targets. */
+   REAL macro targets. Phase 99c: also returns the parsed blueprint
+   input + library (with difficulty) so the variety engine and the
+   cardio plan build from the same single fetch. */
 async function computeExtrasForClient(
   clientId: string,
   weightKg: number,
   macroTargets: { kcal: number; proteinG: number; carbsG: number; fatsG: number },
-): Promise<BlueprintExtras | null> {
+): Promise<{ extras: BlueprintExtras | null; bp: PlanBlueprintInput | null; library: TaxonomyExerciseLike[] }> {
   const { data: row } = await supabase
     .from("client_plan_blueprints")
     .select("*")
     .eq("client_id", clientId)
     .maybeSingle();
-  if (!row) return null;
-  const bp = blueprintFromRow(row as unknown as BlueprintRow);
-
   const [libRes, foodsRes] = await Promise.all([
     supabase
       .from("exercise_library")
-      .select("id, name, primary_muscle, secondary_muscle, equipment, exercise_type")
+      .select("id, name, primary_muscle, secondary_muscle, equipment, exercise_type, difficulty")
       .eq("is_active", true),
     supabase
       .from("foods_cache")
       .select("name, category, calories, protein, carbs, fats")
       .eq("source", "seed-staples"),
   ]);
-  const library = (libRes.data as LibraryExercise[] | null) ?? [];
+  const library = (libRes.data as TaxonomyExerciseLike[] | null) ?? [];
+  if (!row) return { extras: null, bp: null, library };
+
+  const bp = blueprintFromRow(row as unknown as BlueprintRow);
   const foods = (foodsRes.data as StapleFoodMacros[] | null) ?? [];
 
   const warmup = buildWarmupProtocol(bp.equipmentAccess, bp.injuriesNotes, library);
@@ -136,7 +142,16 @@ async function computeExtrasForClient(
       disclaimer: SUPPLEMENT_DISCLAIMER,
     },
   };
-  return extras;
+  return { extras, bp, library };
+}
+
+/* Phase 99c Item 5: welcoming cover message — warm, specific, and
+   honest (no promised results, no fabricated numbers). */
+function buildWelcome(firstName: string, trainerName: string, programWeeks: number, goalLabel: string): { title: string; message: string } {
+  return {
+    title: `Welcome aboard, ${firstName}!`,
+    message: `This is your personal plan for the next ${programWeeks} weeks — built around your ${goalLabel} goal, your schedule, and the equipment you actually have. Everything in here is a starting point: we review it together, adjust as your body responds, and celebrate the wins along the way. Show up, log honestly, and ask me anything. — ${trainerName}`,
+  };
 }
 
 export default function PlanSummaryTab({ clientId }: { clientId: string }) {
@@ -208,18 +223,136 @@ export default function PlanSummaryTab({ clientId }: { clientId: string }) {
     if (!user) return;
     setSaving(true);
     try {
-      const result = computeBlueprint(inputs);
-      // Phase 80: merge blueprint-driven extras when the client has a
+      let result = computeBlueprint(inputs);
+      // Phase 99c Item 6: TDEE consistency — when the client has saved
+      // intake targets (97b calculator), they drive EVERY number here.
+      const [{ data: clientRow }, { data: goalRow }, { data: firstBc }, { data: latestBc }] = await Promise.all([
+        supabase.from("clients").select("full_name, gender, intake_profile").eq("id", clientId).maybeSingle(),
+        supabase
+          .from("client_goals")
+          .select("goal_type, custom_label, target_weight_kg, target_body_fat_pct, target_date, notes")
+          .eq("client_id", clientId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("body_composition")
+          .select("weight_kg, body_fat_percentage, recorded_at")
+          .eq("client_id", clientId)
+          .order("recorded_at", { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("body_composition")
+          .select("weight_kg, body_fat_percentage, recorded_at")
+          .eq("client_id", clientId)
+          .order("recorded_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      const savedT = (clientRow?.intake_profile as { computed_targets?: { calories?: number; protein?: number; carbs?: number; fats?: number } } | null)?.computed_targets;
+      const savedKcal = savedT?.calories;
+      if (typeof savedKcal === "number" && savedKcal > 0) {
+        result = withCalorieTarget(result, {
+          calories: savedKcal,
+          protein: typeof savedT?.protein === "number" ? savedT.protein : null,
+          carbs: typeof savedT?.carbs === "number" ? savedT.carbs : null,
+          fats: typeof savedT?.fats === "number" ? savedT.fats : null,
+        });
+      }
+
+      // Phase 80 + 99c: merge blueprint-driven extras when the client has a
       // client_plan_blueprints row (Phase 79). Older summaries without
       // extras render unchanged — the sections are simply omitted.
       const recStyle = result.macroStyles.find((s) => s.key === result.recommended.key) ?? result.macroStyles[0];
-      const extras = await computeExtrasForClient(clientId, inputs.weightKg, {
+      const ctx = await computeExtrasForClient(clientId, inputs.weightKg, {
         kcal: result.calories.target,
         proteinG: recStyle.atTarget.proteinG,
         carbsG: recStyle.atTarget.carbsG,
         fatsG: recStyle.atTarget.fatsG,
       });
-      const finalResult = extras ? { ...result, extras } : result;
+      if (ctx.extras) result = { ...result, extras: ctx.extras };
+
+      // Phase 99c Item 1: taxonomy-driven training variety — replaces the
+      // hardcoded GBC templates whenever the library is available; falls
+      // back to them (varied:false, honest note) otherwise.
+      const varied = buildVariedSessions(
+        {
+          trainerSessionsPerWeek: inputs.trainerSessionsPerWeek,
+          soloSessionsPerWeek: inputs.soloSessionsPerWeek,
+          equipmentAccess: ctx.bp?.equipmentAccess ?? null,
+          injuriesNotes: ctx.bp?.injuriesNotes ?? "",
+          isFatLoss: result.goal.isFatLoss,
+        },
+        ctx.library,
+      );
+      result = varied
+        ? {
+            ...result,
+            training: { ...result.training, sessions: varied.sessions },
+            trainingMeta: { varied: true, notes: varied.notes },
+          }
+        : {
+            ...result,
+            trainingMeta: { varied: false, notes: ["Exercise library unavailable at generation time — showing the standard GBC template. Regenerate to build varied sessions from your library."] },
+          };
+
+      // Phase 99c Item 2: cardio plan (machines gated by equipment access;
+      // difficulty dial derived from weekly session count — coarse, documented).
+      result = {
+        ...result,
+        cardio: buildCardioPlan({
+          goalType: inputs.goalType,
+          equipmentAccess: ctx.bp?.equipmentAccess ?? null,
+          sessionsPerWeek: inputs.trainerSessionsPerWeek + inputs.soloSessionsPerWeek,
+          stepTarget: inputs.stepTarget,
+          experience: inputs.trainerSessionsPerWeek <= 1 ? "beginner" : "intermediate",
+        }),
+      };
+
+      // Phase 99c Item 3: weekly targets from the FIRST recorded measurements.
+      const firstPoint = firstBc
+        ? { recordedAt: firstBc.recorded_at, weightKg: firstBc.weight_kg, bodyFatPct: firstBc.body_fat_percentage }
+        : null;
+      const latestPoint = latestBc
+        ? { recordedAt: latestBc.recorded_at, weightKg: latestBc.weight_kg, bodyFatPct: latestBc.body_fat_percentage }
+        : null;
+      result = {
+        ...result,
+        weeklyTargets: buildWeeklyTargets({
+          first: firstPoint,
+          latest: latestPoint,
+          goalRow: (goalRow as import("@/lib/blueprintWeeklyTargets").GoalRowLike | null) ?? null,
+          weightKgNow: inputs.weightKg,
+          programWeeks: inputs.programWeeks,
+          isFatLoss: result.goal.isFatLoss,
+          gender: inputs.gender,
+        }),
+      };
+
+      // Phase 99c Item 4: goal-adaptive eating guide (low-calorie toolkit
+      // for fat loss; "fuel the work" variant otherwise).
+      const recG = result.macroStyles.find((s) => s.key === result.recommended.key) ?? result.macroStyles[0];
+      result = {
+        ...result,
+        nutritionGuide: buildNutritionGuide({
+          isFatLoss: result.goal.isFatLoss,
+          targetKcal: result.calories.target,
+          maintenanceKcal: result.calories.maintenance,
+          clampedByFloor: result.calories.clampedByFloor,
+          proteinG: recG.atTarget.proteinG,
+          dietBreak: inputs.dietBreak,
+        }),
+      };
+
+      // Phase 99c Item 5: welcoming cover.
+      const firstName = (clientRow?.full_name ?? "").trim().split(/\s+/)[0] || "there";
+      result = {
+        ...result,
+        welcome: buildWelcome(firstName, inputs.trainerName, inputs.programWeeks, result.weeklyTargets?.goal.label ?? "training"),
+      };
+
+      const finalResult = result;
       const { data, error } = await supabase
         .from("plan_summaries")
         .insert({
@@ -242,6 +375,34 @@ export default function PlanSummaryTab({ clientId }: { clientId: string }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  /* Phase 99c Item 6 write-back: push this report's computed targets
+     into clients.intake_profile.computed_targets (the Nutrition tab's
+     source), so both surfaces stay consistent. */
+  const saveTargetsToIntake = async () => {
+    if (!report) throw new Error("No active summary");
+    const rec = report.macroStyles.find((s) => s.key === report.recommended.key) ?? report.macroStyles[0];
+    const { data: crow, error: readErr } = await supabase.from("clients").select("intake_profile").eq("id", clientId).maybeSingle();
+    if (readErr) throw readErr;
+    const merged = {
+      ...((crow?.intake_profile as Record<string, unknown> | null) ?? {}),
+      computed_targets: {
+        calories: report.calories.target,
+        protein: rec.atTarget.proteinG,
+        carbs: rec.atTarget.carbsG,
+        fats: rec.atTarget.fatsG,
+      },
+    };
+    const { error } = await supabase.from("clients").update({ intake_profile: merged as unknown as Database["public"]["Tables"]["clients"]["Update"]["intake_profile"] }).eq("id", clientId);
+    if (error) throw error;
+    // Reflect the new source of truth on the stored summary too.
+    const next = { ...report, targetsSource: "saved" as const };
+    await supabase
+      .from("plan_summaries")
+      .update({ result: next as unknown as Database["public"]["Tables"]["plan_summaries"]["Update"]["result"] })
+      .eq("id", active!.id);
+    await load();
   };
 
   const remove = async (id: string) => {
@@ -350,6 +511,7 @@ export default function PlanSummaryTab({ clientId }: { clientId: string }) {
           canEdit={canEdit}
           onDelete={() => remove(active.id)}
           onSaveTraining={saveTraining}
+          onSaveTargets={saveTargetsToIntake}
         />
       )}
 
@@ -578,19 +740,25 @@ const rowCls = "flex items-center justify-between border-b py-1.5 text-xs last:b
 const rowLabel = "text-[var(--light-text-muted)]";
 const rowValue = "font-semibold text-[var(--page-text)]";
 
-function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTraining }: { report: BlueprintResult; createdAt: string; canEdit: boolean; onDelete: () => void; onSaveTraining: (sessions: GbcSession[]) => Promise<void> }) {
+function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTraining, onSaveTargets }: { report: BlueprintResult; createdAt: string; canEdit: boolean; onDelete: () => void; onSaveTraining: (sessions: GbcSession[]) => Promise<void>; onSaveTargets: () => Promise<void> }) {
   const [expanded, setExpanded] = useState(true);
   // Phase 81 Item 2: trainer-only training-module edit mode
   const [editMode, setEditMode] = useState(false);
   const [draftSessions, setDraftSessions] = useState<GbcSession[] | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [savingTargets, setSavingTargets] = useState(false);
   const { rows: taxonomyRows } = useExerciseTaxonomy();
   const a = report.assessment;
   const n = (k: number) => k + (report.femaleReassurance ? 1 : 0);
+  // Phase 99c: dynamic section-number shifts for the new cards
+  const shWT = report.weeklyTargets ? 1 : 0;
+  const shCardio = report.cardio ? 1 : 0;
+  const shGuide = report.nutritionGuide ? 1 : 0;
   // Phase 80: dynamic section-number shifts for blueprint extras
-  const shiftWarmup = report.extras?.warmup ? 1 : 0;
-  const shiftDiet = shiftWarmup + (report.extras?.sampleDiet ? 1 : 0);
+  const shiftWarmup = shWT + (report.extras?.warmup ? 1 : 0);
+  const postTrain = shCardio + shGuide;
+  const shiftDiet = shiftWarmup + postTrain + (report.extras?.sampleDiet ? 1 : 0);
   const shiftSupplements = shiftDiet + (report.extras?.supplements ? 1 : 0);
   return (
     <div className="space-y-3">
@@ -617,6 +785,25 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
 
       {expanded && (
         <>
+          {/* Phase 99c Item 5: welcoming cover — first card, unnumbered */}
+          {report.welcome && (
+            <section
+              className="rounded-xl border p-5 text-center"
+              style={{
+                background: "linear-gradient(135deg, rgba(0,174,239,0.10), rgba(139,92,246,0.10))",
+                borderColor: "var(--card-border)",
+              }}
+            >
+              <img src={`${import.meta.env.BASE_URL}azfit-logo-header.png`} alt="AzFIT" className="mx-auto mb-2 h-10 object-contain" />
+              <h4 className="text-base font-bold" style={{ color: "var(--page-text)" }}>
+                {report.welcome.title}
+              </h4>
+              <p className="mx-auto mt-1.5 max-w-lg text-xs leading-relaxed" style={{ color: "var(--light-text-muted)" }}>
+                {report.welcome.message}
+              </p>
+            </section>
+          )}
+
           <Section title={`${n(1)} · Starting Assessment`}>
             <div className={rowCls}><span className={rowLabel}>Weight</span><span className={rowValue}>{a.weightKg} kg</span></div>
             <div className={rowCls}><span className={rowLabel}>Height</span><span className={rowValue}>{a.heightCm} cm</span></div>
@@ -661,6 +848,34 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
                 Note: your target was raised to the safety floor (BMR × 1.05 / 1,200 kcal) — a deeper deficit would cost muscle.
               </p>
             )}
+            {/* Phase 99c Item 6: provenance + write-back for TDEE consistency */}
+            {report.targetsSource === "saved" ? (
+              <p className="mt-2 rounded-lg border px-3 py-2 text-[11px] font-medium" style={{ borderColor: "var(--card-border)", backgroundColor: "var(--light-elevated)", color: "var(--light-text-muted)" }}>
+                Targets synced from the saved intake profile (TDEE calculator) — every number in this report matches the Nutrition tab.
+              </p>
+            ) : (
+              canEdit && (
+                <button
+                  type="button"
+                  disabled={savingTargets}
+                  onClick={async () => {
+                    setSavingTargets(true);
+                    try {
+                      await onSaveTargets();
+                      toast.success("Targets saved to the Nutrition tab");
+                    } catch (err) {
+                      toast.error("Couldn't save targets: " + (err instanceof Error ? err.message : "unknown error"));
+                    } finally {
+                      setSavingTargets(false);
+                    }
+                  }}
+                  className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--card-border)] px-3 py-2 text-[11px] font-semibold text-[var(--page-text)] transition hover:border-[var(--azfit-primary)]/50 disabled:opacity-50"
+                >
+                  {savingTargets ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} style={{ color: "var(--azfit-primary)" }} />}
+                  Save these targets to the client's Nutrition tab
+                </button>
+              )
+            )}
           </Section>
 
           <Section title={`${n(3)} · Macro Targets — All Options`}>
@@ -685,11 +900,82 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
             </p>
           </Section>
 
+          {/* Phase 99c Item 3: weekly targets — baseline vs goal, realistic
+              weekly rate, phase expectations, non-scale victories. Absent in
+              summaries generated before 99c. */}
+          {report.weeklyTargets && (
+            <Section title={`${n(4)} · Your Weekly Targets & Expectations`}>
+              {(() => {
+                const wt = report.weeklyTargets!;
+                return (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-lg border p-3 text-center" style={{ borderColor: "var(--card-border)" }}>
+                        <p className="text-[10px] uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>Starting point</p>
+                        <p className="stat-numeral text-lg" style={{ color: "var(--page-text)" }}>
+                          {wt.baseline.weightKg != null ? `${wt.baseline.weightKg} kg` : "Not recorded yet"}
+                        </p>
+                        <p className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+                          {wt.baseline.bodyFatPct != null ? `${wt.baseline.bodyFatPct}% body fat · ` : ""}
+                          {wt.baseline.recordedAt ? `first logged ${formatDate(wt.baseline.recordedAt)}` : "log your first weigh-in"}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border p-3 text-center" style={{ borderColor: "#8B5CF6" }}>
+                        <p className="text-[10px] uppercase tracking-wide" style={{ color: "#8B5CF6" }}>The goal</p>
+                        <p className="stat-numeral text-lg" style={{ color: "var(--page-text)" }}>
+                          {wt.goal.targetWeightKg != null ? `${wt.goal.targetWeightKg} kg` : wt.goal.label}
+                        </p>
+                        <p className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+                          {[wt.goal.targetBodyFatPct != null ? `${wt.goal.targetBodyFatPct}% BF` : null, wt.goal.targetDate ? `by ${formatDate(wt.goal.targetDate)}` : null].filter(Boolean).join(" · ") || wt.goal.label}
+                        </p>
+                      </div>
+                    </div>
+                    {wt.weeklyRate && (
+                      <p className="mt-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ backgroundColor: "var(--light-elevated)", color: "var(--page-text)" }}>
+                        Realistic pace: <strong style={{ color: "#00AEEF" }}>{wt.weeklyRate.label}</strong> — week to week, never day to day.
+                      </p>
+                    )}
+                    {wt.goalDateHonestNote && (
+                      <p className="mt-2 rounded-lg border px-3 py-2 text-[11px] font-medium" style={{ borderColor: "rgba(245,158,11,0.4)", backgroundColor: "rgba(245,158,11,0.12)", color: "#F59E0B" }}>
+                        {wt.goalDateHonestNote}
+                      </p>
+                    )}
+                    <p className="mb-1 mt-3 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>
+                      What to expect
+                    </p>
+                    {wt.expectations.map((e) => (
+                      <div key={e.weeks} className="mb-1.5 flex gap-3 last:mb-0">
+                        <span className="w-20 shrink-0 rounded-md px-1.5 py-0.5 text-center text-[10px] font-bold" style={{ backgroundColor: "var(--light-elevated)", color: "#00AEEF" }}>
+                          {e.weeks}
+                        </span>
+                        <div>
+                          <p className="text-xs font-semibold" style={{ color: "var(--page-text)" }}>{e.focus}</p>
+                          <p className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>{e.expectation}</p>
+                        </div>
+                      </div>
+                    ))}
+                    <p className="mb-1 mt-3 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>
+                      Wins that aren't the scale
+                    </p>
+                    <ul className="list-inside list-disc space-y-0.5 text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+                      {wt.nonScaleVictories.map((v) => (
+                        <li key={v}>{v}</li>
+                      ))}
+                    </ul>
+                    {wt.notes.map((note) => (
+                      <p key={note} className="mt-2 text-[10px]" style={{ color: "var(--light-text-muted)" }}>{note}</p>
+                    ))}
+                  </>
+                );
+              })()}
+            </Section>
+          )}
+
           {/* Phase 80: blueprint-driven sections — only when the stored
               summary carries extras (blueprint row existed at generate
               time). Section numbers shift dynamically. */}
           {report.extras?.warmup && (
-            <Section title={`${n(4)} · Dynamic Warm-Up & Mobility`}>
+            <Section title={`${n(4 + shWT)} · Dynamic Warm-Up & Mobility`}>
               <ol className="list-inside list-decimal space-y-1 text-xs" style={{ color: "var(--page-text)" }}>
                 {report.extras.warmup.steps.map((s) => (
                   <li key={s.name}>
@@ -788,11 +1074,88 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
                 <li key={r}>{r}</li>
               ))}
             </ul>
+            {report.trainingMeta && (
+              <ul className="mt-2 list-inside list-disc space-y-0.5 border-t pt-2 text-[10px]" style={{ borderColor: "var(--card-border)", color: "var(--light-text-muted)" }}>
+                {report.trainingMeta.notes.map((nt) => (
+                  <li key={nt}>{nt}</li>
+                ))}
+              </ul>
+            )}
               </>
             )}
           </Section>
 
-          <Section title={`${n(5 + shiftWarmup)} · Sample Day of Eating (${report.recommended.name})`}>
+          {/* Phase 99c Item 2: cardio prescription — machines gated by the
+              client's real equipment access, with difficulty, intensity and
+              a 4-week progression. Absent in pre-99c summaries. */}
+          {report.cardio && (
+            <Section title={`${n(5 + shiftWarmup)} · Cardio — Machines, Intensity & Progression`}>
+              {report.cardio.rows.map((r) => (
+                <div key={r.machine + r.protocol} className="mb-3 rounded-lg border p-3 last:mb-0" style={{ borderColor: "var(--card-border)", backgroundColor: "var(--light-elevated)" }}>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="text-xs font-bold" style={{ color: "var(--page-text)" }}>{r.machine}</p>
+                    <span className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "var(--light-elevated)", color: "#00AEEF" }}>
+                      {r.difficulty}
+                    </span>
+                  </div>
+                  <p className="text-[10px] font-medium" style={{ color: "#8B5CF6" }}>{r.protocol} · {r.basis}</p>
+                  <p className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>{r.intensity}</p>
+                  <p className="mt-1 text-[10px]" style={{ color: "var(--light-text-muted)" }}>{r.schedule}</p>
+                  <div className="mt-1.5 space-y-0.5">
+                    {r.progression.map((pg) => (
+                      <p key={pg.label} className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+                        <span className="font-semibold" style={{ color: "var(--page-text)" }}>{pg.label}:</span> {pg.prescription}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <p className="mt-2 rounded-lg px-3 py-2 text-[11px] font-medium" style={{ backgroundColor: "var(--light-elevated)", color: "var(--page-text)" }}>
+                ≈ {report.cardio.weeklyMinutes} cardio minutes/week · {report.cardio.stepNote}
+              </p>
+              {report.cardio.notes.map((nt) => (
+                <p key={nt} className="mt-1.5 text-[10px]" style={{ color: "var(--light-text-muted)" }}>{nt}</p>
+              ))}
+            </Section>
+          )}
+
+          {/* Phase 99c Item 4: goal-adaptive eating guide. Absent in
+              pre-99c summaries. */}
+          {report.nutritionGuide && (
+            <Section title={`${n(5 + shiftWarmup + shCardio)} · ${report.nutritionGuide.title}`}>
+              <p className="text-[11px] leading-relaxed" style={{ color: "var(--page-text)" }}>{report.nutritionGuide.intro}</p>
+              {report.nutritionGuide.safetyCallout && (
+                <p className="mt-2 rounded-lg border px-3 py-2 text-[11px] font-bold" style={{ borderColor: "rgba(245,158,11,0.4)", backgroundColor: "rgba(245,158,11,0.12)", color: "#F59E0B" }}>
+                  {report.nutritionGuide.safetyCallout}
+                </p>
+              )}
+              {report.nutritionGuide.blocks.map((b) => (
+                <div key={b.heading} className="mt-3">
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-wide" style={{ color: "#00AEEF" }}>{b.heading}</p>
+                  <ul className="list-inside list-disc space-y-0.5 text-[11px]" style={{ color: "var(--page-text)" }}>
+                    {b.points.map((pt) => (
+                      <li key={pt}>{pt}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+              <div className="mt-3 border-t pt-2" style={{ borderColor: "var(--card-border)" }}>
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>
+                  Who should NOT be in a deficit
+                </p>
+                <ul className="list-inside list-disc space-y-0.5 text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+                  {report.nutritionGuide.whoShouldNotCut.map((w) => (
+                    <li key={w}>{w}</li>
+                  ))}
+                </ul>
+              </div>
+              {report.nutritionGuide.notes.map((nt) => (
+                <p key={nt} className="mt-2 text-[10px]" style={{ color: "var(--light-text-muted)" }}>{nt}</p>
+              ))}
+            </Section>
+          )}
+
+          <Section title={`${n(5 + shiftWarmup + postTrain)} · Sample Day of Eating (${report.recommended.name})`}>
             {report.sampleDay.meals.map((m) => (
               <div key={m.name} className="mb-2 last:mb-0">
                 <div className="flex items-baseline justify-between gap-2">
@@ -819,7 +1182,7 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
           </Section>
 
           {report.extras?.sampleDiet && (
-            <Section title={`${n(6 + shiftWarmup)} · Sample Diet Day — Your Foods`}>
+            <Section title={`${n(6 + shiftWarmup + postTrain)} · Sample Diet Day — Your Foods`}>
               {report.extras.sampleDiet.meals.map((m) => (
                 <div key={m.name} className="mb-2 last:mb-0">
                   <p className="text-xs font-semibold" style={{ color: "var(--page-text)" }}>{m.name}</p>

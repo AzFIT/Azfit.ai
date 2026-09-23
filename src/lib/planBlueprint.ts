@@ -11,6 +11,9 @@
 
 import { calculateBMR, calculateBMRKatchMcArdle, ACTIVITY_LEVELS, type ActivityLevelKey } from "./tdee";
 import type { WarmupResult, SampleDietResult, SUPPLEMENT_BLOCK } from "./planSummaryExtras";
+import type { CardioPlan } from "./blueprintCardio";
+import type { WeeklyTargetsResult } from "./blueprintWeeklyTargets";
+import type { NutritionGuideResult } from "./blueprintNutritionGuide";
 
 /** Phase 80: blueprint-driven report sections (computed at generate
  *  time in PlanSummaryTab, stored inside plan_summaries.result). */
@@ -564,6 +567,9 @@ export interface BlueprintResult {
     pace: BlueprintInputs["pace"];
     programWeeks: number;
     statement: string;
+    /** Phase 99c: kept so withCalorieTarget can rebuild the roadmap
+     *  consistently from a saved target. */
+    dietBreak: boolean;
   };
   calories: CalorieTargets;
   proteinFloor: ProteinFloor;
@@ -584,6 +590,24 @@ export interface BlueprintResult {
   /** Phase 80: blueprint-driven sections (optional — absent in
    *  summaries generated before the blueprint panel existed). */
   extras?: BlueprintExtras;
+  /** Phase 99c: welcoming cover message (first card of the report). */
+  welcome?: { title: string; message: string };
+  /** Phase 99c: rule-based cardio prescription (machines, difficulty,
+   *  intensity, time/distance, progression). Absent in older summaries. */
+  cardio?: CardioPlan;
+  /** Phase 99c: weekly targets — baseline (first recorded) vs goal,
+   *  realistic weekly rate, phase expectations, non-scale victories. */
+  weeklyTargets?: WeeklyTargetsResult;
+  /** Phase 99c: goal-adaptive "eating on low calories" guide with the
+   *  safety callout when the calorie floor clamped the target. */
+  nutritionGuide?: NutritionGuideResult;
+  /** Phase 99c: where the calorie target came from — "saved" means the
+   *  client's stored intake_profile.computed_targets drove every number
+   *  in this report (TDEE consistency, 97b ↔ 99c). */
+  targetsSource?: "computed" | "saved";
+  /** Phase 99c: training provenance — varied library-built sessions vs
+   *  the legacy hardcoded GBC templates, plus builder notes. */
+  trainingMeta?: { varied: boolean; notes: string[] };
 }
 
 export function computeBlueprint(input: BlueprintInputs, generatedIso = new Date().toISOString()): BlueprintResult {
@@ -621,6 +645,7 @@ export function computeBlueprint(input: BlueprintInputs, generatedIso = new Date
       pace: input.pace,
       programWeeks: input.programWeeks,
       statement: goalStatement,
+      dietBreak: input.dietBreak,
     },
     calories: cal,
     proteinFloor: floor,
@@ -638,5 +663,58 @@ export function computeBlueprint(input: BlueprintInputs, generatedIso = new Date
     roadmap: buildRoadmap(input.programWeeks, input.dietBreak, cal.target, cal.maintenance),
     faq: buildFaq(input.gender === "female" && isFatLoss),
     femaleReassurance: input.gender === "female" && isFatLoss,
+  };
+}
+
+/* ── Phase 99c Item 6: TDEE consistency ────────────────────────
+   When the client has saved intake targets (97b TDEE calculator →
+   clients.intake_profile.computed_targets), the report must speak
+   with ONE voice: every calorie-dependent section (macro table,
+   sample day, outcomes, roadmap, goal statement) is re-derived from
+   the saved target, not from the engine's default pace. Pure — the
+   caller persists nothing; this returns a consistent copy. */
+export interface SavedTargets {
+  calories: number;
+  protein?: number | null;
+  carbs?: number | null;
+  fats?: number | null;
+}
+
+export function withCalorieTarget(result: BlueprintResult, saved: SavedTargets): BlueprintResult {
+  const target = Math.round(saved.calories);
+  const maintenance = result.calories.maintenance;
+  const deficitPerDay = Math.max(0, maintenance - target);
+  const floorLine = Math.max(result.calories.bmr * 1.05, 1200);
+  const clampedByFloor = target <= floorLine || result.calories.clampedByFloor;
+  const calories: CalorieTargets = {
+    ...result.calories,
+    target,
+    deficitPerDay,
+    deficitPct: maintenance > 0 ? deficitPerDay / maintenance : 0,
+    clampedByFloor,
+  };
+  const macroStyles = buildMacroTable(target, maintenance, result.proteinFloor.grams);
+  const recStyle = macroStyles.find((s) => s.key === result.recommended.key) ?? macroStyles[0];
+  // Saved grams win for the sample day; fall back to the recommended style.
+  const recG = recStyle.atTarget;
+  const p = saved.protein != null && saved.protein > 0 ? saved.protein : recG.proteinG;
+  const c = saved.carbs != null && saved.carbs > 0 ? saved.carbs : recG.carbsG;
+  const f = saved.fats != null && saved.fats > 0 ? saved.fats : recG.fatsG;
+  const outcomes = result.goal.isFatLoss
+    ? computeExpectedOutcomes(deficitPerDay, result.goal.programWeeks, result.assessment.weightKg, result.assessment.bodyFatPct)
+    : null;
+  const goalStatement = result.goal.isFatLoss
+    ? `${result.goal.type === "reduce_body_fat" ? "Reduce body fat" : "Lose weight"}${result.assessment.bodyFatPct != null && outcomes ? ` from ${result.assessment.bodyFatPct}% → ${outcomes.endBodyFatPct}%` : ""} in ${result.goal.programWeeks} weeks — ~${outcomes?.projectedFatLossKg} kg fat at ${outcomes?.weeklyLossRange[0]}–${outcomes?.weeklyLossRange[1]} kg/week.`
+    : `Build on your current base over ${result.goal.programWeeks} weeks — targets aligned with your saved intake profile.`;
+
+  return {
+    ...result,
+    calories,
+    macroStyles,
+    outcomes,
+    goal: { ...result.goal, statement: goalStatement },
+    sampleDay: buildSampleDay(target, p, c, f),
+    roadmap: buildRoadmap(result.goal.programWeeks, result.goal.dietBreak, target, maintenance),
+    targetsSource: "saved",
   };
 }

@@ -81,8 +81,9 @@ export function parseInjuries(notes: string): InjuryParse {
 }
 
 /** Equipment gate: which library `equipment` values an access level
- *  can use. Bodyweight-only is always safe; each tier adds tools. */
-const EQUIPMENT_TIERS: Record<EquipmentAccess, (eq: string | null) => boolean> = {
+ *  can use. Bodyweight-only is always safe; each tier adds tools.
+ *  (Exported in Phase 99c — the plan-summary variety engine reuses it.) */
+export const EQUIPMENT_TIERS: Record<EquipmentAccess, (eq: string | null) => boolean> = {
   bodyweight_only: (eq) => !eq || /bodyweight|none/i.test(eq),
   dumbbells_only: (eq) => !eq || /bodyweight|none|dumbbell/i.test(eq),
   home_gym_bb_db: (eq) => !eq || !/cable|machine/i.test(eq),

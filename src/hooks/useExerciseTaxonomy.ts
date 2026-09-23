@@ -22,7 +22,7 @@ let inflight: Promise<TaxonomyExercise[]> | null = null;
 async function fetchTaxonomy(): Promise<TaxonomyExercise[]> {
   const { data, error } = await supabase
     .from("exercise_library")
-    .select("id, name, primary_muscle, secondary_muscle, equipment, exercise_type")
+    .select("id, name, primary_muscle, secondary_muscle, equipment, exercise_type, difficulty")
     .eq("is_active", true)
     .order("name");
   if (error) {
