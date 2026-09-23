@@ -20,6 +20,7 @@ import {
   Save,
   LoaderCircle,
   CircleAlert,
+  RotateCcw,
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -57,6 +58,43 @@ import { blueprintFromRow, type BlueprintRow, type PlanBlueprintInput } from "@/
 import { validateSession } from "@/lib/trainingEditor";
 import { useExerciseTaxonomy } from "@/hooks/useExerciseTaxonomy";
 import TrainingPlanEditor from "./TrainingPlanEditor";
+import {
+  isIncluded,
+  includedCount,
+  sectionNumber,
+  effectiveWelcome,
+  effectiveWeeklyTargets,
+  effectiveCardio,
+  effectiveNutritionGuide,
+  effectiveSampleDay,
+  effectiveTracking,
+  effectiveFaq,
+  effectiveRoadmap,
+  type SectionKey,
+} from "@/lib/planSummaryOverrides";
+import {
+  buildDraft,
+  overrideFromDraft,
+  type CardDraft,
+  type WeeklyTargetsDraft,
+  type CardioDraft,
+  type NutritionGuideDraft,
+  type SampleDayDraft,
+  type TrackingDraft,
+  type FaqDraft,
+  type RoadmapDraft,
+  type WelcomeDraft,
+} from "@/lib/planSummaryCardDrafts";
+import {
+  WelcomeEditor,
+  WeeklyTargetsEditor,
+  CardioEditor,
+  NutritionGuideEditor,
+  SampleDayEditor,
+  TrackingEditor,
+  FaqEditor,
+  RoadmapEditor,
+} from "./PlanSummaryCardEditors";
 import type { Database } from "@/types/supabase";
 
 type SummaryRow = Database["public"]["Tables"]["plan_summaries"]["Row"];
@@ -432,6 +470,28 @@ export default function PlanSummaryTab({ clientId }: { clientId: string }) {
     [active, report, load],
   );
 
+  /* Phase 99d Items 1+2: persist a modified result JSONB (per-card
+     overrides or include ticks) back to the SAME plan_summaries row —
+     same pattern as saveTraining above. */
+  const persistResult = useCallback(
+    async (next: BlueprintResult, message: string) => {
+      if (!active) throw new Error("No active summary");
+      const { error } = await supabase
+        .from("plan_summaries")
+        .update({ result: next as unknown as Database["public"]["Tables"]["plan_summaries"]["Update"]["result"] })
+        .eq("id", active.id);
+      if (error) throw new Error(error.message);
+      toast.success(message);
+      await load();
+    },
+    [active, load],
+  );
+
+  /* Phase 99d Item 1: Regenerate REPLACES the stored result with a fresh
+     generation — all manual overrides are cleared (nothing carries over).
+     The confirm dialog says exactly that. */
+  const [confirmRegen, setConfirmRegen] = useState(false);
+
   if (loading) {
     return (
       <div className="flex justify-center py-10">
@@ -454,12 +514,12 @@ export default function PlanSummaryTab({ clientId }: { clientId: string }) {
               className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition hover:opacity-80"
               style={{ borderColor: "var(--card-border)", color: "var(--page-text)" }}
             >
-              <Printer size={13} /> Print / PDF
+              <Printer size={13} /> Print / PDF · {includedCount(report)} sections
             </button>
           )}
           {canEdit && (
             <button
-              onClick={() => setFormOpen(true)}
+              onClick={() => (report ? setConfirmRegen(true) : setFormOpen(true))}
               className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90"
               style={{ background: "linear-gradient(135deg, #00AEEF, #8B5CF6)" }}
             >
@@ -512,6 +572,8 @@ export default function PlanSummaryTab({ clientId }: { clientId: string }) {
           onDelete={() => remove(active.id)}
           onSaveTraining={saveTraining}
           onSaveTargets={saveTargetsToIntake}
+          onPersistResult={persistResult}
+          onReload={load}
         />
       )}
 
@@ -521,6 +583,41 @@ export default function PlanSummaryTab({ clientId }: { clientId: string }) {
           <BlueprintForm draftKey={`plan-summary-${clientId}`} initial={report && active ? (active.inputs as unknown as BlueprintInputs) : prefill} saving={saving} onCancel={() => setFormOpen(false)} onGenerate={generate} />
         )}
       </AnimatePresence>
+
+      {/* Phase 99d Item 1: regenerate clears ALL manual overrides —
+          confirm says exactly that before proceeding. */}
+      {confirmRegen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5 shadow-2xl">
+            <p className="text-sm font-semibold" style={{ color: "var(--page-text)" }}>
+              Regenerate the Plan Summary?
+            </p>
+            <p className="mt-1.5 text-xs" style={{ color: "var(--light-text-muted)" }}>
+              Regenerate replaces generated content — your manual edits will be cleared.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmRegen(false)}
+                className="min-h-[44px] flex-1 rounded-lg border border-[var(--card-border)] text-xs font-semibold text-[var(--page-text)] transition hover:opacity-70"
+              >
+                Keep edits
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmRegen(false);
+                  setFormOpen(true);
+                }}
+                className="min-h-[44px] flex-1 rounded-lg text-xs font-semibold text-white transition hover:opacity-90"
+                style={{ background: "linear-gradient(135deg, #00AEEF, #8B5CF6)" }}
+              >
+                Regenerate anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -718,7 +815,7 @@ function BlueprintForm({
 
 /* ── Report renderer (app-themed) ────────────────────────────── */
 
-function Section({ title, children, highlighted }: { title: string; children: React.ReactNode; highlighted?: boolean }) {
+function Section({ title, children, highlighted, actions }: { title: string; children: React.ReactNode; highlighted?: boolean; actions?: React.ReactNode }) {
   return (
     <section
       className="rounded-xl border p-4"
@@ -728,9 +825,12 @@ function Section({ title, children, highlighted }: { title: string; children: Re
         borderLeft: highlighted ? "3px solid #00AEEF" : undefined,
       }}
     >
-      <h4 className="mb-2 text-xs font-bold uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>
-        {title}
-      </h4>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h4 className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>
+          {title}
+        </h4>
+        {actions}
+      </div>
       {children}
     </section>
   );
@@ -740,7 +840,7 @@ const rowCls = "flex items-center justify-between border-b py-1.5 text-xs last:b
 const rowLabel = "text-[var(--light-text-muted)]";
 const rowValue = "font-semibold text-[var(--page-text)]";
 
-function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTraining, onSaveTargets }: { report: BlueprintResult; createdAt: string; canEdit: boolean; onDelete: () => void; onSaveTraining: (sessions: GbcSession[]) => Promise<void>; onSaveTargets: () => Promise<void> }) {
+function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTraining, onSaveTargets, onPersistResult, onReload }: { report: BlueprintResult; createdAt: string; canEdit: boolean; onDelete: () => void; onSaveTraining: (sessions: GbcSession[]) => Promise<void>; onSaveTargets: () => Promise<void>; onPersistResult: (next: BlueprintResult, message: string) => Promise<void>; onReload: () => Promise<void> }) {
   const [expanded, setExpanded] = useState(true);
   // Phase 81 Item 2: trainer-only training-module edit mode
   const [editMode, setEditMode] = useState(false);
@@ -748,18 +848,167 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
   const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savingTargets, setSavingTargets] = useState(false);
+  // Phase 99d Item 1: per-card inline editing via result.overrides
+  const [editing, setEditing] = useState<SectionKey | null>(null);
+  const [draft, setDraft] = useState<CardDraft | null>(null);
+  const [editingSaving, setEditingSaving] = useState(false);
   const { rows: taxonomyRows } = useExerciseTaxonomy();
   const a = report.assessment;
-  const n = (k: number) => k + (report.femaleReassurance ? 1 : 0);
-  // Phase 99c: dynamic section-number shifts for the new cards
-  const shWT = report.weeklyTargets ? 1 : 0;
-  const shCardio = report.cardio ? 1 : 0;
-  const shGuide = report.nutritionGuide ? 1 : 0;
-  // Phase 80: dynamic section-number shifts for blueprint extras
-  const shiftWarmup = shWT + (report.extras?.warmup ? 1 : 0);
-  const postTrain = shCardio + shGuide;
-  const shiftDiet = shiftWarmup + postTrain + (report.extras?.sampleDiet ? 1 : 0);
-  const shiftSupplements = shiftDiet + (report.extras?.supplements ? 1 : 0);
+  // Phase 99d: dynamic section numbers derived from presence + include
+  // ticks (replaces the 99c shift-constant system, which broke when
+  // cards became excludable). num() === 0 → section is not rendered.
+  const num = (k: SectionKey | "femaleNote") => sectionNumber(report, k);
+  const secTitle = (k: SectionKey | "femaleNote", t: string) => {
+    const n = num(k);
+    return n > 0 ? `${n} · ${t}` : t;
+  };
+  // Phase 99d: renderers read cards ONLY through the effective* helpers
+  // so overrides + include ticks apply everywhere by construction.
+  const welcome = effectiveWelcome(report);
+  const weeklyTargets = effectiveWeeklyTargets(report);
+  const cardio = effectiveCardio(report);
+  const nutritionGuide = effectiveNutritionGuide(report);
+  const sampleDay = effectiveSampleDay(report);
+  const tracking = effectiveTracking(report);
+  const roadmap = effectiveRoadmap(report);
+  const faq = effectiveFaq(report);
+
+  /* Phase 99d Item 2: optimistic include-tick state. Without this, the
+     controlled checkbox snaps back to its old `checked` prop the moment
+     load()'s setLoading(true) re-renders mid-save — the toggle looks
+     dead to the trainer (and to Playwright). pendingInclude holds the
+     intended value until the refreshed report lands. */
+  const [pendingInclude, setPendingInclude] = useState<Partial<Record<SectionKey, boolean>>>({});
+  const isInc = (key: SectionKey) => pendingInclude[key] ?? isIncluded(report.included, key);
+
+  const toggleIncluded = async (key: SectionKey) => {
+    const currently = isIncluded(report.included, key);
+    if (currently && includedCount(report) <= 1) {
+      toast.error("At least one section must stay included");
+      return;
+    }
+    setPendingInclude((p) => ({ ...p, [key]: !currently }));
+    try {
+      await onPersistResult({ ...report, included: { ...report.included, [key]: !currently } }, currently ? "Section excluded from the summary" : "Section included in the summary");
+    } catch (err) {
+      toast.error("Couldn't update the include tick: " + (err instanceof Error ? err.message : "unknown error"));
+      await onReload();
+    } finally {
+      setPendingInclude((p) => {
+        const next = { ...p };
+        delete next[key];
+        return next;
+      });
+    }
+  };
+
+  const resetCard = async (key: SectionKey, cardTitle: string) => {
+    const overrides: Record<string, unknown> = { ...(report.overrides as Record<string, unknown> | undefined) };
+    delete overrides[key];
+    try {
+      await onPersistResult({ ...report, overrides: overrides as BlueprintResult["overrides"] }, `${cardTitle} reset to the generated version`);
+    } catch (err) {
+      toast.error("Couldn't reset the card: " + (err instanceof Error ? err.message : "unknown error"));
+      await onReload();
+    }
+  };
+
+  const saveCard = async (key: SectionKey) => {
+    if (!draft) return;
+    const override = overrideFromDraft(key, draft);
+    if (override === undefined) return;
+    setEditingSaving(true);
+    try {
+      await onPersistResult({ ...report, overrides: { ...report.overrides, [key]: override } }, "Card saved");
+      setEditing(null);
+      setDraft(null);
+    } catch (err) {
+      toast.error("Couldn't save the edit: " + (err instanceof Error ? err.message : "unknown error"));
+      await onReload();
+    } finally {
+      setEditingSaving(false);
+    }
+  };
+
+  /* Phase 99d Item 2: per-card header actions (trainer-only) — Edited
+     marker + reset, pencil for editable cards, include tick. */
+  const cardActions = (key: SectionKey, cardTitle: string, opts?: { editable?: boolean }) =>
+    canEdit ? (
+      <div className="flex items-center gap-1.5">
+        {!!(report.overrides as Record<string, unknown> | undefined)?.[key] && (
+          <>
+            <span className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "rgba(0,174,239,0.12)", color: "#00AEEF" }}>
+              Edited
+            </span>
+            <button
+              type="button"
+              aria-label={`Reset ${cardTitle} to generated`}
+              onClick={() => void resetCard(key, cardTitle)}
+              className="flex min-h-[44px] items-center gap-1 rounded-lg border border-[var(--card-border)] px-2.5 text-[10px] font-semibold text-[var(--page-text)] transition hover:opacity-70"
+            >
+              <RotateCcw size={11} style={{ color: "var(--azfit-primary)" }} />
+              Reset
+            </button>
+          </>
+        )}
+        {opts?.editable && editing !== key && (
+          <button
+            type="button"
+            aria-label={`Edit ${cardTitle}`}
+            onClick={() => {
+              const d = buildDraft(key, report);
+              if (d) {
+                setDraft(d);
+                setEditing(key);
+              }
+            }}
+            className="flex min-h-[44px] items-center gap-1 rounded-lg border border-[var(--card-border)] px-2.5 text-[10px] font-semibold text-[var(--page-text)] transition hover:border-[var(--azfit-primary)]/50"
+          >
+            <Pencil size={11} style={{ color: "var(--azfit-primary)" }} />
+            Edit
+          </button>
+        )}
+        <label className="flex min-h-[44px] cursor-pointer items-center gap-1.5 text-[10px] font-semibold text-[var(--light-text-muted)]" aria-label={`Include ${cardTitle} in summary`}>
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-[#00AEEF]"
+            checked={isInc(key)}
+            onChange={() => void toggleIncluded(key)}
+          />
+          Include
+        </label>
+      </div>
+    ) : undefined;
+
+  /* Phase 99d Item 1: Save / Discard shell around an open card editor. */
+  const editorShell = (key: SectionKey, children: React.ReactNode) => (
+    <>
+      {children}
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          disabled={editingSaving}
+          onClick={() => void saveCard(key)}
+          className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
+          style={{ background: "linear-gradient(135deg, var(--azfit-primary), var(--azfit-accent))" }}
+        >
+          {editingSaving && <Loader2 size={12} className="animate-spin" />}
+          Save changes
+        </button>
+        <button
+          type="button"
+          disabled={editingSaving}
+          onClick={() => {
+            setEditing(null);
+            setDraft(null);
+          }}
+          className="min-h-[44px] rounded-lg border border-[var(--card-border)] px-4 text-xs font-semibold text-[var(--page-text)] disabled:opacity-40"
+        >
+          Discard
+        </button>
+      </div>
+    </>
+  );
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between rounded-xl border px-4 py-3" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}>
@@ -785,8 +1034,9 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
 
       {expanded && (
         <>
-          {/* Phase 99c Item 5: welcoming cover — first card, unnumbered */}
-          {report.welcome && (
+          {/* Phase 99c Item 5: welcoming cover — first card, unnumbered.
+              Phase 99d: editable via overrides + include tick. */}
+          {welcome && isIncluded(report.included, "welcome") && (
             <section
               className="rounded-xl border p-5 text-center"
               style={{
@@ -794,17 +1044,65 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
                 borderColor: "var(--card-border)",
               }}
             >
-              <img src={`${import.meta.env.BASE_URL}azfit-logo-header.png`} alt="AzFIT" className="mx-auto mb-2 h-10 object-contain" />
-              <h4 className="text-base font-bold" style={{ color: "var(--page-text)" }}>
-                {report.welcome.title}
-              </h4>
-              <p className="mx-auto mt-1.5 max-w-lg text-xs leading-relaxed" style={{ color: "var(--light-text-muted)" }}>
-                {report.welcome.message}
-              </p>
+              {canEdit && (
+                <div className="mb-1 flex items-center justify-end gap-1.5">
+                  {report.overrides?.welcome && (
+                    <>
+                      <span className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "rgba(0,174,239,0.12)", color: "#00AEEF" }}>
+                        Edited
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="Reset Welcome to generated"
+                        onClick={() => void resetCard("welcome", "Welcome")}
+                        className="flex min-h-[44px] items-center gap-1 rounded-lg border border-[var(--card-border)] px-2.5 text-[10px] font-semibold text-[var(--page-text)] transition hover:opacity-70"
+                      >
+                        <RotateCcw size={11} style={{ color: "var(--azfit-primary)" }} />
+                        Reset
+                      </button>
+                    </>
+                  )}
+                  {editing !== "welcome" && (
+                    <button
+                      type="button"
+                      aria-label="Edit Welcome"
+                      onClick={() => {
+                        const d = buildDraft("welcome", report);
+                        if (d) {
+                          setDraft(d);
+                          setEditing("welcome");
+                        }
+                      }}
+                      className="flex min-h-[44px] items-center gap-1 rounded-lg border border-[var(--card-border)] px-2.5 text-[10px] font-semibold text-[var(--page-text)] transition hover:border-[var(--azfit-primary)]/50"
+                    >
+                      <Pencil size={11} style={{ color: "var(--azfit-primary)" }} />
+                      Edit
+                    </button>
+                  )}
+                  <label className="flex min-h-[44px] cursor-pointer items-center gap-1.5 text-[10px] font-semibold text-[var(--light-text-muted)]" aria-label="Include Welcome in summary">
+                    <input type="checkbox" className="h-4 w-4 accent-[#00AEEF]" checked={isInc("welcome")} onChange={() => void toggleIncluded("welcome")} />
+                    Include
+                  </label>
+                </div>
+              )}
+              {editing === "welcome" && draft ? (
+                editorShell("welcome", <WelcomeEditor value={draft as WelcomeDraft} onChange={setDraft} />)
+              ) : (
+                <>
+                  <img src={`${import.meta.env.BASE_URL}azfit-logo-header.png`} alt="AzFIT" className="mx-auto mb-2 h-10 object-contain" />
+                  <h4 className="text-base font-bold" style={{ color: "var(--page-text)" }}>
+                    {welcome.title}
+                  </h4>
+                  <p className="mx-auto mt-1.5 max-w-lg text-xs leading-relaxed" style={{ color: "var(--light-text-muted)" }}>
+                    {welcome.message}
+                  </p>
+                </>
+              )}
             </section>
           )}
 
-          <Section title={`${n(1)} · Starting Assessment`}>
+          {isIncluded(report.included, "assessment") && (
+          <Section title={`${num("assessment")} · Starting Assessment`} actions={cardActions("assessment", "Starting Assessment")}>
             <div className={rowCls}><span className={rowLabel}>Weight</span><span className={rowValue}>{a.weightKg} kg</span></div>
             <div className={rowCls}><span className={rowLabel}>Height</span><span className={rowValue}>{a.heightCm} cm</span></div>
             <div className={rowCls}><span className={rowLabel}>BMI</span><span className={rowValue}>{a.bmi}</span></div>
@@ -817,16 +1115,18 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
               Goal: {report.goal.statement}
             </p>
           </Section>
+          )}
 
           {report.femaleReassurance && (
-            <Section title="2 · A note before we start">
+            <Section title={secTitle("femaleNote", "A note before we start")}>
               <p className="text-xs leading-relaxed" style={{ color: "var(--page-text)" }}>
                 You will NOT bulk up. Women carry roughly 1/10 to 1/20 of the testosterone men do, and in a calorie deficit there is simply no surplus to build size from. Lifting weights in a deficit makes you smaller and firmer — "toned" is just muscle plus less fat. The strength work in this plan is what keeps your shape while the fat comes off.
               </p>
             </Section>
           )}
 
-          <Section title={`${n(2)} · Calorie Targets`}>
+          {isIncluded(report.included, "calories") && (
+          <Section title={secTitle("calories", "Calorie Targets")} actions={cardActions("calories", "Calorie Targets")}>
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-lg border p-3 text-center" style={{ borderColor: "var(--card-border)" }}>
                 <p className="text-[10px] uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>Maintenance</p>
@@ -877,8 +1177,10 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
               )
             )}
           </Section>
+          )}
 
-          <Section title={`${n(3)} · Macro Targets — All Options`}>
+          {isIncluded(report.included, "macros") && (
+          <Section title={secTitle("macros", "Macro Targets — All Options")} actions={cardActions("macros", "Macro Targets")}>
             <MacroTable
               title={`At your target (${report.calories.target.toLocaleString()} kcal)`}
               styles={report.macroStyles}
@@ -899,14 +1201,19 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
               <strong style={{ color: "#00AEEF" }}>{report.recommended.name}</strong> — {report.recommended.reason}.
             </p>
           </Section>
+          )}
 
           {/* Phase 99c Item 3: weekly targets — baseline vs goal, realistic
               weekly rate, phase expectations, non-scale victories. Absent in
-              summaries generated before 99c. */}
-          {report.weeklyTargets && (
-            <Section title={`${n(4)} · Your Weekly Targets & Expectations`}>
-              {(() => {
-                const wt = report.weeklyTargets!;
+              summaries generated before 99c. Phase 99d: editable +
+              include-tickable via the overrides system. */}
+          {weeklyTargets && isIncluded(report.included, "weeklyTargets") && (
+            <Section title={secTitle("weeklyTargets", "Your Weekly Targets & Expectations")} actions={cardActions("weeklyTargets", "Weekly Targets", { editable: true })}>
+              {editing === "weeklyTargets" && draft ? (
+                editorShell("weeklyTargets", <WeeklyTargetsEditor value={draft as WeeklyTargetsDraft} onChange={setDraft} />)
+              ) : (
+                (() => {
+                const wt = weeklyTargets;
                 return (
                   <>
                     <div className="grid grid-cols-2 gap-3">
@@ -967,15 +1274,16 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
                     ))}
                   </>
                 );
-              })()}
+                })()
+              )}
             </Section>
           )}
 
           {/* Phase 80: blueprint-driven sections — only when the stored
               summary carries extras (blueprint row existed at generate
               time). Section numbers shift dynamically. */}
-          {report.extras?.warmup && (
-            <Section title={`${n(4 + shWT)} · Dynamic Warm-Up & Mobility`}>
+          {report.extras?.warmup && isIncluded(report.included, "warmup") && (
+            <Section title={secTitle("warmup", "Dynamic Warm-Up & Mobility")} actions={cardActions("warmup", "Warm-Up")}>
               <ol className="list-inside list-decimal space-y-1 text-xs" style={{ color: "var(--page-text)" }}>
                 {report.extras.warmup.steps.map((s) => (
                   <li key={s.name}>
@@ -990,7 +1298,8 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
             </Section>
           )}
 
-          <Section title={`${n(4 + shiftWarmup)} · Training Plan (GBC) · ${report.training.sessions.length} sessions + ${report.training.stepTarget.toLocaleString()} steps/day`}>
+          {isIncluded(report.included, "training") && (
+          <Section title={secTitle("training", `Training Plan (GBC) · ${report.training.sessions.length} sessions + ${report.training.stepTarget.toLocaleString()} steps/day`)} actions={cardActions("training", "Training Plan")}>
             {/* Phase 81 Item 2: trainer-only edit toggle */}
             {canEdit && !editMode && (
               <button
@@ -1084,13 +1393,19 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
               </>
             )}
           </Section>
+          )}
 
           {/* Phase 99c Item 2: cardio prescription — machines gated by the
               client's real equipment access, with difficulty, intensity and
-              a 4-week progression. Absent in pre-99c summaries. */}
-          {report.cardio && (
-            <Section title={`${n(5 + shiftWarmup)} · Cardio — Machines, Intensity & Progression`}>
-              {report.cardio.rows.map((r) => (
+              a 4-week progression. Absent in pre-99c summaries. Phase 99d:
+              editable + include-tickable via the overrides system. */}
+          {cardio && isIncluded(report.included, "cardio") && (
+            <Section title={secTitle("cardio", "Cardio — Machines, Intensity & Progression")} actions={cardActions("cardio", "Cardio", { editable: true })}>
+              {editing === "cardio" && draft ? (
+                editorShell("cardio", <CardioEditor value={draft as CardioDraft} onChange={setDraft} />)
+              ) : (
+                <>
+              {cardio.rows.map((r) => (
                 <div key={r.machine + r.protocol} className="mb-3 rounded-lg border p-3 last:mb-0" style={{ borderColor: "var(--card-border)", backgroundColor: "var(--light-elevated)" }}>
                   <div className="flex items-baseline justify-between gap-2">
                     <p className="text-xs font-bold" style={{ color: "var(--page-text)" }}>{r.machine}</p>
@@ -1111,25 +1426,31 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
                 </div>
               ))}
               <p className="mt-2 rounded-lg px-3 py-2 text-[11px] font-medium" style={{ backgroundColor: "var(--light-elevated)", color: "var(--page-text)" }}>
-                ≈ {report.cardio.weeklyMinutes} cardio minutes/week · {report.cardio.stepNote}
+                ≈ {cardio.weeklyMinutes} cardio minutes/week · {cardio.stepNote}
               </p>
-              {report.cardio.notes.map((nt) => (
+              {cardio.notes.map((nt) => (
                 <p key={nt} className="mt-1.5 text-[10px]" style={{ color: "var(--light-text-muted)" }}>{nt}</p>
               ))}
+                </>
+              )}
             </Section>
           )}
 
           {/* Phase 99c Item 4: goal-adaptive eating guide. Absent in
               pre-99c summaries. */}
-          {report.nutritionGuide && (
-            <Section title={`${n(5 + shiftWarmup + shCardio)} · ${report.nutritionGuide.title}`}>
-              <p className="text-[11px] leading-relaxed" style={{ color: "var(--page-text)" }}>{report.nutritionGuide.intro}</p>
-              {report.nutritionGuide.safetyCallout && (
+          {nutritionGuide && isIncluded(report.included, "nutritionGuide") && (
+            <Section title={secTitle("nutritionGuide", nutritionGuide.title)} actions={cardActions("nutritionGuide", "Nutrition Guide", { editable: true })}>
+              {editing === "nutritionGuide" && draft ? (
+                editorShell("nutritionGuide", <NutritionGuideEditor value={draft as NutritionGuideDraft} onChange={setDraft} />)
+              ) : (
+                <>
+              <p className="text-[11px] leading-relaxed" style={{ color: "var(--page-text)" }}>{nutritionGuide.intro}</p>
+              {nutritionGuide.safetyCallout && (
                 <p className="mt-2 rounded-lg border px-3 py-2 text-[11px] font-bold" style={{ borderColor: "rgba(245,158,11,0.4)", backgroundColor: "rgba(245,158,11,0.12)", color: "#F59E0B" }}>
-                  {report.nutritionGuide.safetyCallout}
+                  {nutritionGuide.safetyCallout}
                 </p>
               )}
-              {report.nutritionGuide.blocks.map((b) => (
+              {nutritionGuide.blocks.map((b) => (
                 <div key={b.heading} className="mt-3">
                   <p className="mb-1 text-[10px] font-bold uppercase tracking-wide" style={{ color: "#00AEEF" }}>{b.heading}</p>
                   <ul className="list-inside list-disc space-y-0.5 text-[11px]" style={{ color: "var(--page-text)" }}>
@@ -1144,19 +1465,26 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
                   Who should NOT be in a deficit
                 </p>
                 <ul className="list-inside list-disc space-y-0.5 text-[10px]" style={{ color: "var(--light-text-muted)" }}>
-                  {report.nutritionGuide.whoShouldNotCut.map((w) => (
+                  {nutritionGuide.whoShouldNotCut.map((w) => (
                     <li key={w}>{w}</li>
                   ))}
                 </ul>
               </div>
-              {report.nutritionGuide.notes.map((nt) => (
+              {nutritionGuide.notes.map((nt) => (
                 <p key={nt} className="mt-2 text-[10px]" style={{ color: "var(--light-text-muted)" }}>{nt}</p>
               ))}
+                </>
+              )}
             </Section>
           )}
 
-          <Section title={`${n(5 + shiftWarmup + postTrain)} · Sample Day of Eating (${report.recommended.name})`}>
-            {report.sampleDay.meals.map((m) => (
+          {isIncluded(report.included, "sampleDay") && (
+          <Section title={secTitle("sampleDay", `Sample Day of Eating (${report.recommended.name})`)} actions={cardActions("sampleDay", "Sample Day of Eating", { editable: true })}>
+            {editing === "sampleDay" && draft ? (
+              editorShell("sampleDay", <SampleDayEditor value={draft as SampleDayDraft} onChange={setDraft} />)
+            ) : (
+              <>
+            {sampleDay.meals.map((m) => (
               <div key={m.name} className="mb-2 last:mb-0">
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="text-xs font-semibold" style={{ color: "var(--page-text)" }}>{m.name}</p>
@@ -1170,8 +1498,8 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
             <div className="mt-2 flex items-center justify-between rounded-lg px-3 py-2 text-xs font-bold" style={{ backgroundColor: "var(--light-elevated)", color: "var(--page-text)" }}>
               <span>Day total</span>
               <span className="tabular-nums">
-                {report.sampleDay.totals.kcal} kcal · P{report.sampleDay.totals.p} C{report.sampleDay.totals.c} F{report.sampleDay.totals.f}
-                {report.sampleDay.withinTolerance && <span style={{ color: "#22C55E" }}> · on target ±5%</span>}
+                {sampleDay.totals.kcal} kcal · P{sampleDay.totals.p} C{sampleDay.totals.c} F{sampleDay.totals.f}
+                {sampleDay.withinTolerance && <span style={{ color: "#22C55E" }}> · on target ±5%</span>}
               </span>
             </div>
             <ul className="mt-2 list-inside list-disc space-y-0.5 text-[10px]" style={{ color: "var(--light-text-muted)" }}>
@@ -1179,10 +1507,13 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
                 <li key={r}>{r}</li>
               ))}
             </ul>
+              </>
+            )}
           </Section>
+          )}
 
-          {report.extras?.sampleDiet && (
-            <Section title={`${n(6 + shiftWarmup + postTrain)} · Sample Diet Day — Your Foods`}>
+          {report.extras?.sampleDiet && isIncluded(report.included, "sampleDiet") && (
+            <Section title={secTitle("sampleDiet", "Sample Diet Day — Your Foods")} actions={cardActions("sampleDiet", "Sample Diet Day")}>
               {report.extras.sampleDiet.meals.map((m) => (
                 <div key={m.name} className="mb-2 last:mb-0">
                   <p className="text-xs font-semibold" style={{ color: "var(--page-text)" }}>{m.name}</p>
@@ -1204,8 +1535,8 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
             </Section>
           )}
 
-          {report.extras?.supplements && (
-            <Section title={`${n(6 + shiftDiet)} · Supplementation & Hydration`}>
+          {report.extras?.supplements && isIncluded(report.included, "supplements") && (
+            <Section title={secTitle("supplements", "Supplementation & Hydration")} actions={cardActions("supplements", "Supplements")}>
               {report.extras.supplements.items.map((s) => (
                 <div key={s.name} className={rowCls}>
                   <span className={rowLabel}>{s.name}</span>
@@ -1228,8 +1559,13 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
             </Section>
           )}
 
-          <Section title={`${n(6 + shiftSupplements)} · Tracking & Accountability`}>
-            {report.tracking.map((t) => (
+          {isIncluded(report.included, "tracking") && (
+          <Section title={secTitle("tracking", "Tracking & Accountability")} actions={cardActions("tracking", "Tracking & Accountability", { editable: true })}>
+            {editing === "tracking" && draft ? (
+              editorShell("tracking", <TrackingEditor value={draft as TrackingDraft} onChange={setDraft} />)
+            ) : (
+              <>
+            {tracking.map((t) => (
               <div key={t.what} className={rowCls}>
                 <span className={rowLabel}>{t.what}</span>
                 <span className="text-right text-xs">
@@ -1238,10 +1574,18 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
                 </span>
               </div>
             ))}
+              </>
+            )}
           </Section>
+          )}
 
-          <Section title={`${n(7 + shiftSupplements)} · Program Roadmap (${report.goal.programWeeks} weeks)`}>
-            {report.roadmap.map((p) => (
+          {isIncluded(report.included, "roadmap") && (
+          <Section title={secTitle("roadmap", `Program Roadmap (${report.goal.programWeeks} weeks)`)} actions={cardActions("roadmap", "Program Roadmap", { editable: true })}>
+            {editing === "roadmap" && draft ? (
+              editorShell("roadmap", <RoadmapEditor value={draft as RoadmapDraft} onChange={setDraft} />)
+            ) : (
+              <>
+            {roadmap.map((p) => (
               <div key={p.weeks} className="mb-2 flex gap-3 last:mb-0">
                 <span className="w-12 shrink-0 rounded-md px-1.5 py-0.5 text-center text-[10px] font-bold" style={{ backgroundColor: "var(--light-elevated)", color: "#00AEEF" }}>
                   Wk {p.weeks}
@@ -1257,16 +1601,27 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
                 Realistic outcome: {report.outcomes.projectedFatLossKg} kg fat down ({report.outcomes.weeklyLossRange[0]}–{report.outcomes.weeklyLossRange[1]} kg/week) → ~{report.outcomes.endWeightKg} kg{report.outcomes.endBodyFatPct != null ? `, ~${report.outcomes.endBodyFatPct}% BF` : ""} at week {report.goal.programWeeks}.
               </p>
             )}
+              </>
+            )}
           </Section>
+          )}
 
-          <Section title={`${n(8 + shiftSupplements)} · FAQ`}>
-            {report.faq.map((f) => (
+          {isIncluded(report.included, "faq") && (
+          <Section title={secTitle("faq", "FAQ")} actions={cardActions("faq", "FAQ", { editable: true })}>
+            {editing === "faq" && draft ? (
+              editorShell("faq", <FaqEditor value={draft as FaqDraft} onChange={setDraft} />)
+            ) : (
+              <>
+            {faq.map((f) => (
               <div key={f.q} className="mb-2 last:mb-0">
                 <p className="text-xs font-semibold" style={{ color: "#00AEEF" }}>{f.q}</p>
                 <p className="text-[11px] leading-relaxed" style={{ color: "var(--page-text)" }}>{f.a}</p>
               </div>
             ))}
+              </>
+            )}
           </Section>
+          )}
 
           {/* Phase 80 Item 2: medical disclaimer — footer of the
               on-screen report (the print page carries it too) */}

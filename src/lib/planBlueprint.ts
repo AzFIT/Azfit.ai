@@ -608,6 +608,13 @@ export interface BlueprintResult {
   /** Phase 99c: training provenance — varied library-built sessions vs
    *  the legacy hardcoded GBC templates, plus builder notes. */
   trainingMeta?: { varied: boolean; notes: string[] };
+  /** Phase 99d Item 1: trainer edits per card. Base engine values are
+   *  never mutated — overrides win at render via the effective*
+   *  helpers in planSummaryOverrides.ts. */
+  overrides?: import("./planSummaryOverrides").PlanOverrides;
+  /** Phase 99d Item 2: include/exclude ticks per section (absent =
+   *  included). Respected by the app report, print view and export. */
+  included?: Partial<Record<import("./planSummaryOverrides").SectionKey, boolean>>;
 }
 
 export function computeBlueprint(input: BlueprintInputs, generatedIso = new Date().toISOString()): BlueprintResult {
