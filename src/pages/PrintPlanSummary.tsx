@@ -13,18 +13,11 @@ import { formatNumber } from "@/lib/utils";
 import type { BlueprintResult } from "@/lib/planBlueprint";
 import { MEDICAL_DISCLAIMER } from "@/lib/planSummaryExtras";
 import {
-  isIncluded,
-  sectionNumber,
-  effectiveWelcome,
-  effectiveWeeklyTargets,
-  effectiveCardio,
-  effectiveNutritionGuide,
-  effectiveSampleDay,
-  effectiveTracking,
-  effectiveFaq,
-  effectiveRoadmap,
-  type SectionKey,
-} from "@/lib/planSummaryOverrides";
+  resolvePlanSummary,
+  displayTitle,
+  type ResolvedSectionKey,
+  type ResolvedSectionOf,
+} from "@/lib/planSummaryRender";
 import type { Database } from "@/types/supabase";
 
 type SummaryRow = Database["public"]["Tables"]["plan_summaries"]["Row"];
@@ -93,21 +86,33 @@ export default function PrintPlanSummaryPage() {
 
   const m = report;
   const a = m.assessment;
-  // Phase 99d: dynamic section numbers + effective cards — the print view
-  // respects the same overrides and include ticks as the app report.
-  const num = (k: SectionKey | "femaleNote") => sectionNumber(m, k);
-  const secTitle = (k: SectionKey | "femaleNote", t: string) => {
-    const n = num(k);
-    return n > 0 ? `${n} · ${t}` : t;
+  // Phase 99d: overrides + include ticks. Phase 99e: ALL section
+  // resolution (presence, include, order, numbering, titles, effective
+  // data) comes from the SHARED resolver — the app report, this print
+  // view and the plan-export edge function consume the same output.
+  const byKey = new Map(
+    resolvePlanSummary(m).map((s) => [s.key, s] as const),
+  );
+  function sectionOf<K extends ResolvedSectionKey>(k: K): ResolvedSectionOf<K> | undefined {
+    return byKey.get(k) as ResolvedSectionOf<K> | undefined;
+  }
+  const num = (k: ResolvedSectionKey) => byKey.get(k)?.number ?? 0;
+  const secTitle = (k: ResolvedSectionKey, t: string) => {
+    const s = byKey.get(k);
+    return s && s.number > 0 ? displayTitle(s) : t;
   };
-  const welcome = effectiveWelcome(m);
-  const weeklyTargets = effectiveWeeklyTargets(m);
-  const cardio = effectiveCardio(m);
-  const nutritionGuide = effectiveNutritionGuide(m);
-  const sampleDay = effectiveSampleDay(m);
-  const tracking = effectiveTracking(m);
-  const roadmap = effectiveRoadmap(m);
-  const faq = effectiveFaq(m);
+  const welcome = sectionOf("welcome")?.data;
+  const weeklyTargets = sectionOf("weeklyTargets")?.data;
+  const cardio = sectionOf("cardio")?.data;
+  const nutritionGuide = sectionOf("nutritionGuide")?.data;
+  const sampleDay = sectionOf("sampleDay")?.data;
+  const tracking = sectionOf("tracking")?.data.rows;
+  const roadmap = sectionOf("roadmap")?.data.phases;
+  const faq = sectionOf("faq")?.data.items;
+  const femaleNote = sectionOf("femaleNote")?.data.text;
+  const warmup = sectionOf("warmup")?.data;
+  const sampleDiet = sectionOf("sampleDiet")?.data;
+  const supplements = sectionOf("supplements")?.data;
   const genDate = new Date(m.header.generatedIso).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 
   return (
@@ -163,7 +168,7 @@ export default function PrintPlanSummaryPage() {
 
         {/* Phase 99c: welcoming cover with the real logo. Phase 99d:
             effective (override-merged) values + include tick. */}
-        {welcome && isIncluded(m.included, "welcome") && (
+        {welcome && (
           <section className={`${sec} rounded-lg border border-gray-200 px-4 py-4 text-center`}>
             <img src={`${import.meta.env.BASE_URL}azfit-logo-header.png`} alt="AzFIT" className="mx-auto mb-2 h-12 object-contain" />
             <h2 className="text-base font-bold">{welcome.title}</h2>
@@ -172,7 +177,7 @@ export default function PrintPlanSummaryPage() {
         )}
 
         {/* 1. Starting Assessment */}
-        {isIncluded(m.included, "assessment") && (
+        {byKey.has("assessment") && (
         <section className={sec}>
           <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{num("assessment")} · Starting Assessment</h2>
           <table className="mt-1 w-full text-[11px]">
@@ -199,17 +204,15 @@ export default function PrintPlanSummaryPage() {
         )}
 
         {/* 2. Female reassurance */}
-        {m.femaleReassurance && (
+        {femaleNote && (
           <section className={sec}>
             <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{secTitle("femaleNote", "A note before we start")}</h2>
-            <p className="mt-1.5 text-[11px] leading-relaxed text-gray-700">
-              You will NOT bulk up. Women carry roughly 1/10 to 1/20 of the testosterone men do, and in a calorie deficit there is simply no surplus to build size from. Lifting weights in a deficit makes you smaller and firmer — "toned" is just muscle plus less fat. The strength work in this plan is what keeps your shape while the fat comes off.
-            </p>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-gray-700">{femaleNote}</p>
           </section>
         )}
 
         {/* 3. Calorie Targets */}
-        {isIncluded(m.included, "calories") && (
+        {byKey.has("calories") && (
         <section className={sec}>
           <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{secTitle("calories", "Calorie Targets")}</h2>
           <div className="mt-2 grid grid-cols-2 gap-3 text-center">
@@ -235,7 +238,7 @@ export default function PrintPlanSummaryPage() {
         )}
 
         {/* 4. Macro tables */}
-        {isIncluded(m.included, "macros") && (
+        {byKey.has("macros") && (
         <section className={sec}>
           <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{secTitle("macros", "Macro Targets — All Options")}</h2>
           {[
@@ -286,7 +289,7 @@ export default function PrintPlanSummaryPage() {
 
         {/* Phase 99c: Weekly Targets & Expectations — 99d: effective +
             include-tickable */}
-        {weeklyTargets && isIncluded(m.included, "weeklyTargets") && (
+        {weeklyTargets && (
           <section className={sec}>
             <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{secTitle("weeklyTargets", "Your Weekly Targets & Expectations")}</h2>
             <div className="mt-2 grid grid-cols-2 gap-3 text-center">
@@ -347,23 +350,23 @@ export default function PrintPlanSummaryPage() {
 
         {/* Phase 80: Dynamic Warm-Up (only when the summary carries
             blueprint extras) */}
-        {m.extras?.warmup && isIncluded(m.included, "warmup") && (
+        {warmup && (
           <section className={sec}>
             <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{secTitle("warmup", "Dynamic Warm-Up & Mobility")}</h2>
             <ol className="mt-1.5 list-inside list-decimal text-[11px]">
-              {m.extras.warmup.steps.map((s) => (
+              {warmup.steps.map((s) => (
                 <li key={s.name}>
                   <span className="font-semibold">{s.name}</span>
                   <span className="text-gray-500"> — {s.muscle}</span>
                 </li>
               ))}
             </ol>
-            {m.extras.warmup.note && <p className="mt-1.5 text-[10px] text-gray-500">{m.extras.warmup.note}</p>}
+            {warmup.note && <p className="mt-1.5 text-[10px] text-gray-500">{warmup.note}</p>}
           </section>
         )}
 
         {/* 5. Training Plan */}
-        {isIncluded(m.included, "training") && (
+        {byKey.has("training") && (
         <section className={sec}>
           <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">
             {secTitle("training", `Training Plan (GBC) · ${m.training.sessions.length} sessions + ${formatNumber(m.training.stepTarget)} steps/day`)}
@@ -406,7 +409,7 @@ export default function PrintPlanSummaryPage() {
 
         {/* Phase 99c: Cardio — machines, intensity & progression. 99d:
             effective values + include tick. */}
-        {cardio && isIncluded(m.included, "cardio") && (
+        {cardio && (
           <section className={sec}>
             <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{secTitle("cardio", "Cardio — Machines, Intensity & Progression")}</h2>
             {cardio.rows.map((r) => (
@@ -441,7 +444,7 @@ export default function PrintPlanSummaryPage() {
 
         {/* Phase 99c: goal-adaptive eating guide — 99d: effective +
             include tick. */}
-        {nutritionGuide && isIncluded(m.included, "nutritionGuide") && (
+        {nutritionGuide && (
           <section className={sec}>
             <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{secTitle("nutritionGuide", nutritionGuide.title)}</h2>
             <p className="mt-1.5 text-[11px] leading-relaxed text-gray-700">{nutritionGuide.intro}</p>
@@ -471,7 +474,7 @@ export default function PrintPlanSummaryPage() {
         )}
 
         {/* 6. Sample Day — 99d: effective (override-merged) + tick. */}
-        {isIncluded(m.included, "sampleDay") && (
+        {sampleDay && (
         <section className={sec}>
           <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{secTitle("sampleDay", `Sample Day of Eating (${m.recommended.name})`)}</h2>
           <table className="mt-1 w-full text-[10px]">
@@ -505,12 +508,12 @@ export default function PrintPlanSummaryPage() {
         )}
 
         {/* Phase 80: Sample Diet Day (blueprint foods) */}
-        {m.extras?.sampleDiet && isIncluded(m.included, "sampleDiet") && (
+        {sampleDiet && (
           <section className={sec}>
             <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{secTitle("sampleDiet", "Sample Diet Day — Your Foods")}</h2>
             <table className="mt-1 w-full text-[10px]">
               <tbody>
-                {m.extras.sampleDiet.meals.map((meal) => (
+                {sampleDiet.meals.map((meal) => (
                   <tr key={meal.name} className="border-b border-gray-100 align-top">
                     <td className={`${td} w-1/2`}>
                       <p className="font-semibold">{meal.name}</p>
@@ -522,23 +525,23 @@ export default function PrintPlanSummaryPage() {
                 <tr className="bg-gray-100 font-bold">
                   <td className={td}>Day total</td>
                   <td className={`${td} text-right`}>
-                    {m.extras.sampleDiet.totals.kcal} kcal · P{m.extras.sampleDiet.totals.proteinG} C{m.extras.sampleDiet.totals.carbsG} F{m.extras.sampleDiet.totals.fatsG}
-                    {m.extras.sampleDiet.withinTolerance ? " (within ±10% of target)" : ""}
+                    {sampleDiet.totals.kcal} kcal · P{sampleDiet.totals.proteinG} C{sampleDiet.totals.carbsG} F{sampleDiet.totals.fatsG}
+                    {sampleDiet.withinTolerance ? " (within ±10% of target)" : ""}
                   </td>
                 </tr>
               </tbody>
             </table>
-            {m.extras.sampleDiet.note && <p className="mt-1.5 text-[10px] text-gray-500">{m.extras.sampleDiet.note}</p>}
+            {sampleDiet.note && <p className="mt-1.5 text-[10px] text-gray-500">{sampleDiet.note}</p>}
           </section>
         )}
 
         {/* Phase 80: Supplementation & Hydration */}
-        {m.extras?.supplements && isIncluded(m.included, "supplements") && (
+        {supplements && (
           <section className={sec}>
             <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{secTitle("supplements", "Supplementation & Hydration")}</h2>
             <table className="mt-1 w-full text-[10px]">
               <tbody>
-                {m.extras.supplements.items.map((s) => (
+                {supplements.items.map((s) => (
                   <tr key={s.name} className="border-b border-gray-100">
                     <td className={`${td} font-medium`}>{s.name}</td>
                     <td className={`${td} text-right font-semibold`}>{s.dose}</td>
@@ -548,18 +551,18 @@ export default function PrintPlanSummaryPage() {
                 <tr className="border-b border-gray-100">
                   <td className={`${td} font-medium`}>Water</td>
                   <td className={`${td} text-right font-semibold`}>
-                    {(m.extras.supplements.hydration.min / 1000).toFixed(1)}–{(m.extras.supplements.hydration.max / 1000).toFixed(1)} L/day
+                    {(supplements.hydration.min / 1000).toFixed(1)}–{(supplements.hydration.max / 1000).toFixed(1)} L/day
                   </td>
                   <td className={`${td} text-right text-gray-500`}>30–35 ml per kg bodyweight</td>
                 </tr>
               </tbody>
             </table>
-            <p className="mt-1.5 text-[10px] italic text-gray-500">{m.extras.supplements.disclaimer}</p>
+            <p className="mt-1.5 text-[10px] italic text-gray-500">{supplements.disclaimer}</p>
           </section>
         )}
 
         {/* 7. Tracking — 99d: effective + tick. */}
-        {isIncluded(m.included, "tracking") && (
+        {tracking && (
         <section className={sec}>
           <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{secTitle("tracking", "Tracking & Accountability")}</h2>
           <table className="mt-1 w-full text-[10px]">
@@ -577,7 +580,7 @@ export default function PrintPlanSummaryPage() {
         )}
 
         {/* 8. Roadmap — 99d: effective + tick. */}
-        {isIncluded(m.included, "roadmap") && (
+        {roadmap && (
         <section className={sec}>
           <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{secTitle("roadmap", `Program Roadmap (${m.goal.programWeeks} weeks)`)}</h2>
           {roadmap.map((p) => (
@@ -598,7 +601,7 @@ export default function PrintPlanSummaryPage() {
         )}
 
         {/* 9. FAQ — 99d: effective + tick. */}
-        {isIncluded(m.included, "faq") && (
+        {faq && (
         <section className={sec}>
           <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{secTitle("faq", "FAQ")}</h2>
           {faq.map((f) => (

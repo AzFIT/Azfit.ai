@@ -21,9 +21,11 @@ import {
   LoaderCircle,
   CircleAlert,
   RotateCcw,
+  FileDown,
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
+import { invokePlanExport, PlanExportError } from "@/services/planExport";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDate } from "@/lib/utils";
@@ -61,17 +63,14 @@ import TrainingPlanEditor from "./TrainingPlanEditor";
 import {
   isIncluded,
   includedCount,
-  sectionNumber,
-  effectiveWelcome,
-  effectiveWeeklyTargets,
-  effectiveCardio,
-  effectiveNutritionGuide,
-  effectiveSampleDay,
-  effectiveTracking,
-  effectiveFaq,
-  effectiveRoadmap,
   type SectionKey,
 } from "@/lib/planSummaryOverrides";
+import {
+  resolvePlanSummary,
+  displayTitle,
+  type ResolvedSectionKey,
+  type ResolvedSectionOf,
+} from "@/lib/planSummaryRender";
 import {
   buildDraft,
   overrideFromDraft,
@@ -492,6 +491,38 @@ export default function PlanSummaryTab({ clientId }: { clientId: string }) {
      The confirm dialog says exactly that. */
   const [confirmRegen, setConfirmRegen] = useState(false);
 
+  /* Phase 99e Item 3: Export to Google Doc via the plan-export edge
+     function. Progress state, honest not-configured 503 handling, and
+     the KC-audit popup lesson: when window.open is blocked the URL is
+     kept in an inline copyable banner instead of being lost. */
+  const [exporting, setExporting] = useState(false);
+  const [exportUrl, setExportUrl] = useState<string | null>(null);
+
+  const exportToDoc = async () => {
+    if (!active || exporting) return;
+    setExporting(true);
+    setExportUrl(null);
+    try {
+      const { url } = await invokePlanExport(active.id);
+      toast.success("Exported to Google Drive");
+      const win = window.open(url, "_blank", "noopener");
+      if (!win) {
+        setExportUrl(url);
+        toast.info("Popup blocked — open the document with the link below");
+      }
+    } catch (err) {
+      if (err instanceof PlanExportError && (err.status === 503 || err.code === "not_configured")) {
+        toast.error("Export needs the Google service account secret — ask your admin");
+      } else if (err instanceof PlanExportError && err.status === 404) {
+        toast.error("Couldn't export this summary — refresh and try again");
+      } else {
+        toast.error(err instanceof Error ? err.message : "Export failed — please try again");
+      }
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-10">
@@ -517,6 +548,19 @@ export default function PlanSummaryTab({ clientId }: { clientId: string }) {
               <Printer size={13} /> Print / PDF · {includedCount(report)} sections
             </button>
           )}
+          {report && canEdit && (
+            <button
+              type="button"
+              onClick={() => void exportToDoc()}
+              disabled={exporting}
+              aria-label="Export to Google Doc"
+              className="flex min-h-[44px] items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition hover:opacity-80 disabled:opacity-60"
+              style={{ borderColor: "var(--card-border)", color: "var(--page-text)" }}
+            >
+              {exporting ? <LoaderCircle size={13} className="animate-spin" /> : <FileDown size={13} />}
+              {exporting ? "Exporting…" : "Export to Doc"}
+            </button>
+          )}
           {canEdit && (
             <button
               onClick={() => (report ? setConfirmRegen(true) : setFormOpen(true))}
@@ -529,6 +573,39 @@ export default function PlanSummaryTab({ clientId }: { clientId: string }) {
           )}
         </div>
       </div>
+
+      {/* Phase 99e: popup-blocked fallback — the doc URL stays copyable. */}
+      {exportUrl && (
+        <div
+          className="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs"
+          style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)", color: "var(--page-text)" }}
+        >
+          <span>Your Google Doc is ready:</span>
+          <a href={exportUrl} target="_blank" rel="noreferrer" className="font-semibold underline" style={{ color: "var(--azfit-primary)" }}>
+            Open document
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard?.writeText(exportUrl);
+              toast.success("Link copied");
+            }}
+            className="rounded-md border px-2 py-1 text-[10px] font-semibold"
+            style={{ borderColor: "var(--card-border)" }}
+          >
+            Copy link
+          </button>
+          <button
+            type="button"
+            aria-label="Dismiss export link"
+            onClick={() => setExportUrl(null)}
+            className="ml-auto flex min-h-[44px] min-w-[44px] items-center justify-center"
+            style={{ color: "var(--light-text-muted)" }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Empty state */}
       {!report && !formOpen && (
@@ -854,24 +931,33 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
   const [editingSaving, setEditingSaving] = useState(false);
   const { rows: taxonomyRows } = useExerciseTaxonomy();
   const a = report.assessment;
-  // Phase 99d: dynamic section numbers derived from presence + include
-  // ticks (replaces the 99c shift-constant system, which broke when
-  // cards became excludable). num() === 0 → section is not rendered.
-  const num = (k: SectionKey | "femaleNote") => sectionNumber(report, k);
-  const secTitle = (k: SectionKey | "femaleNote", t: string) => {
-    const n = num(k);
-    return n > 0 ? `${n} · ${t}` : t;
+  // Phase 99e: ALL section resolution (presence, include ticks, order,
+  // numbering, titles, effective override-merged data) comes from the
+  // SHARED resolver — the same output the print view and the plan-export
+  // edge function consume. num() === 0 → section is not rendered.
+  const byKey = new Map(
+    resolvePlanSummary(report).map((s) => [s.key, s] as const),
+  );
+  function sectionOf<K extends ResolvedSectionKey>(k: K): ResolvedSectionOf<K> | undefined {
+    return byKey.get(k) as ResolvedSectionOf<K> | undefined;
+  }
+  const num = (k: ResolvedSectionKey) => byKey.get(k)?.number ?? 0;
+  const secTitle = (k: ResolvedSectionKey, t: string) => {
+    const s = byKey.get(k);
+    return s && s.number > 0 ? displayTitle(s) : t;
   };
-  // Phase 99d: renderers read cards ONLY through the effective* helpers
-  // so overrides + include ticks apply everywhere by construction.
-  const welcome = effectiveWelcome(report);
-  const weeklyTargets = effectiveWeeklyTargets(report);
-  const cardio = effectiveCardio(report);
-  const nutritionGuide = effectiveNutritionGuide(report);
-  const sampleDay = effectiveSampleDay(report);
-  const tracking = effectiveTracking(report);
-  const roadmap = effectiveRoadmap(report);
-  const faq = effectiveFaq(report);
+  const welcome = sectionOf("welcome")?.data;
+  const weeklyTargets = sectionOf("weeklyTargets")?.data;
+  const cardio = sectionOf("cardio")?.data;
+  const nutritionGuide = sectionOf("nutritionGuide")?.data;
+  const sampleDay = sectionOf("sampleDay")?.data;
+  const warmup = sectionOf("warmup")?.data;
+  const sampleDiet = sectionOf("sampleDiet")?.data;
+  const supplements = sectionOf("supplements")?.data;
+  const tracking = sectionOf("tracking")?.data.rows;
+  const roadmap = sectionOf("roadmap")?.data.phases;
+  const faq = sectionOf("faq")?.data.items;
+  const femaleNoteText = sectionOf("femaleNote")?.data.text;
 
   /* Phase 99d Item 2: optimistic include-tick state. Without this, the
      controlled checkbox snaps back to its old `checked` prop the moment
@@ -1117,11 +1203,9 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
           </Section>
           )}
 
-          {report.femaleReassurance && (
+          {femaleNoteText && (
             <Section title={secTitle("femaleNote", "A note before we start")}>
-              <p className="text-xs leading-relaxed" style={{ color: "var(--page-text)" }}>
-                You will NOT bulk up. Women carry roughly 1/10 to 1/20 of the testosterone men do, and in a calorie deficit there is simply no surplus to build size from. Lifting weights in a deficit makes you smaller and firmer — "toned" is just muscle plus less fat. The strength work in this plan is what keeps your shape while the fat comes off.
-              </p>
+              <p className="text-xs leading-relaxed" style={{ color: "var(--page-text)" }}>{femaleNoteText}</p>
             </Section>
           )}
 
@@ -1282,18 +1366,18 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
           {/* Phase 80: blueprint-driven sections — only when the stored
               summary carries extras (blueprint row existed at generate
               time). Section numbers shift dynamically. */}
-          {report.extras?.warmup && isIncluded(report.included, "warmup") && (
+          {warmup && (
             <Section title={secTitle("warmup", "Dynamic Warm-Up & Mobility")} actions={cardActions("warmup", "Warm-Up")}>
               <ol className="list-inside list-decimal space-y-1 text-xs" style={{ color: "var(--page-text)" }}>
-                {report.extras.warmup.steps.map((s) => (
+                {warmup.steps.map((s) => (
                   <li key={s.name}>
                     <span className="font-semibold">{s.name}</span>
                     <span className="text-[10px]" style={{ color: "var(--light-text-muted)" }}> — {s.muscle}</span>
                   </li>
                 ))}
               </ol>
-              {report.extras.warmup.note && (
-                <p className="mt-2 text-[10px]" style={{ color: "var(--light-text-muted)" }}>{report.extras.warmup.note}</p>
+              {warmup.note && (
+                <p className="mt-2 text-[10px]" style={{ color: "var(--light-text-muted)" }}>{warmup.note}</p>
               )}
             </Section>
           )}
@@ -1478,7 +1562,7 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
             </Section>
           )}
 
-          {isIncluded(report.included, "sampleDay") && (
+          {sampleDay && (
           <Section title={secTitle("sampleDay", `Sample Day of Eating (${report.recommended.name})`)} actions={cardActions("sampleDay", "Sample Day of Eating", { editable: true })}>
             {editing === "sampleDay" && draft ? (
               editorShell("sampleDay", <SampleDayEditor value={draft as SampleDayDraft} onChange={setDraft} />)
@@ -1512,9 +1596,9 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
           </Section>
           )}
 
-          {report.extras?.sampleDiet && isIncluded(report.included, "sampleDiet") && (
+          {sampleDiet && (
             <Section title={secTitle("sampleDiet", "Sample Diet Day — Your Foods")} actions={cardActions("sampleDiet", "Sample Diet Day")}>
-              {report.extras.sampleDiet.meals.map((m) => (
+              {sampleDiet.meals.map((m) => (
                 <div key={m.name} className="mb-2 last:mb-0">
                   <p className="text-xs font-semibold" style={{ color: "var(--page-text)" }}>{m.name}</p>
                   <p className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
@@ -1525,19 +1609,19 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
               <div className="mt-2 flex items-center justify-between rounded-lg px-3 py-2 text-xs font-bold" style={{ backgroundColor: "var(--light-elevated)", color: "var(--page-text)" }}>
                 <span>Day total</span>
                 <span className="tabular-nums">
-                  {report.extras.sampleDiet.totals.kcal} kcal · P{report.extras.sampleDiet.totals.proteinG} C{report.extras.sampleDiet.totals.carbsG} F{report.extras.sampleDiet.totals.fatsG}
-                  {report.extras.sampleDiet.withinTolerance && <span style={{ color: "#22C55E" }}> · within ±10% of target</span>}
+                  {sampleDiet.totals.kcal} kcal · P{sampleDiet.totals.proteinG} C{sampleDiet.totals.carbsG} F{sampleDiet.totals.fatsG}
+                  {sampleDiet.withinTolerance && <span style={{ color: "#22C55E" }}> · within ±10% of target</span>}
                 </span>
               </div>
-              {report.extras.sampleDiet.note && (
-                <p className="mt-2 text-[10px]" style={{ color: "var(--light-text-muted)" }}>{report.extras.sampleDiet.note}</p>
+              {sampleDiet.note && (
+                <p className="mt-2 text-[10px]" style={{ color: "var(--light-text-muted)" }}>{sampleDiet.note}</p>
               )}
             </Section>
           )}
 
-          {report.extras?.supplements && isIncluded(report.included, "supplements") && (
+          {supplements && (
             <Section title={secTitle("supplements", "Supplementation & Hydration")} actions={cardActions("supplements", "Supplements")}>
-              {report.extras.supplements.items.map((s) => (
+              {supplements.items.map((s) => (
                 <div key={s.name} className={rowCls}>
                   <span className={rowLabel}>{s.name}</span>
                   <span className="text-right text-xs">
@@ -1550,16 +1634,16 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
                 <span className={rowLabel}>Water</span>
                 <span className="text-right text-xs">
                   <span className="font-semibold" style={{ color: "var(--page-text)" }}>
-                    {(report.extras.supplements.hydration.min / 1000).toFixed(1)}–{(report.extras.supplements.hydration.max / 1000).toFixed(1)} L/day
+                    {(supplements.hydration.min / 1000).toFixed(1)}–{(supplements.hydration.max / 1000).toFixed(1)} L/day
                   </span>
                   <span className="block text-[10px]" style={{ color: "var(--light-text-muted)" }}>30–35 ml per kg of your bodyweight</span>
                 </span>
               </div>
-              <p className="mt-2 text-[10px]" style={{ color: "var(--light-text-muted)" }}>{report.extras.supplements.disclaimer}</p>
+              <p className="mt-2 text-[10px]" style={{ color: "var(--light-text-muted)" }}>{supplements.disclaimer}</p>
             </Section>
           )}
 
-          {isIncluded(report.included, "tracking") && (
+          {tracking && (
           <Section title={secTitle("tracking", "Tracking & Accountability")} actions={cardActions("tracking", "Tracking & Accountability", { editable: true })}>
             {editing === "tracking" && draft ? (
               editorShell("tracking", <TrackingEditor value={draft as TrackingDraft} onChange={setDraft} />)
@@ -1579,7 +1663,7 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
           </Section>
           )}
 
-          {isIncluded(report.included, "roadmap") && (
+          {roadmap && (
           <Section title={secTitle("roadmap", `Program Roadmap (${report.goal.programWeeks} weeks)`)} actions={cardActions("roadmap", "Program Roadmap", { editable: true })}>
             {editing === "roadmap" && draft ? (
               editorShell("roadmap", <RoadmapEditor value={draft as RoadmapDraft} onChange={setDraft} />)
@@ -1606,7 +1690,7 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
           </Section>
           )}
 
-          {isIncluded(report.included, "faq") && (
+          {faq && (
           <Section title={secTitle("faq", "FAQ")} actions={cardActions("faq", "FAQ", { editable: true })}>
             {editing === "faq" && draft ? (
               editorShell("faq", <FaqEditor value={draft as FaqDraft} onChange={setDraft} />)
