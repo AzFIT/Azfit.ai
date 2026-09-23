@@ -3,6 +3,8 @@
 // CSV, PDF report, and social share image generation
 // ═══════════════════════════════════════════════════════════════
 
+import { toast } from "sonner";
+
 /* ── CSV Export ─────────────────────────────────────────── */
 
 export function exportWorkoutsToCSV(workouts: {
@@ -46,10 +48,15 @@ export function exportNutritionToCSV(entries: {
 }
 
 function escapeCSV(value: string): string {
-  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-    return `"${value.replace(/"/g, '""')}"`;
+  // FIX-1 Item 2: spreadsheet formula injection — a cell beginning with
+  // =, +, - or @ would execute as a formula when the CSV opens in
+  // Excel/Sheets. Prefix a single quote so it stays data.
+  let safe = value;
+  if (/^[=+\-@]/.test(safe)) safe = `'${safe}`;
+  if (safe.includes(',') || safe.includes('"') || safe.includes('\n')) {
+    return `"${safe.replace(/"/g, '""')}"`;
   }
-  return value;
+  return safe;
 }
 
 export function downloadCSV(content: string, filename: string) {
@@ -166,7 +173,12 @@ export function generatePDFReportHTML(data: ReportData): string {
 
 export function downloadPDFReport(html: string, _filename: string) {
   const printWindow = window.open('', '_blank');
-  if (!printWindow) return;
+  if (!printWindow) {
+    // FIX-1 Item 1: a popup blocker used to make this a dead click —
+    // say exactly what happened and what to do.
+    toast.error('Your browser blocked the export window — allow popups for this site and try again');
+    return;
+  }
   printWindow.document.write(html);
   printWindow.document.close();
   printWindow.focus();
@@ -178,6 +190,22 @@ export function downloadPDFReport(html: string, _filename: string) {
 
 /* ── Social Share Image ────────────────────────────────── */
 
+// FIX-1 Item 3: real logo asset, loaded once and cached module-level so
+// repeat shares never refetch. A failed load resolves null and the
+// canvas keeps the text fallback (honest degradation, no blank canvas).
+let shareLogoPromise: Promise<HTMLImageElement | null> | null = null;
+function loadShareLogo(): Promise<HTMLImageElement | null> {
+  if (!shareLogoPromise) {
+    shareLogoPromise = new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = `${import.meta.env.BASE_URL}azfit-logo-header.png`;
+    });
+  }
+  return shareLogoPromise;
+}
+
 export interface ShareImageData {
   clientName: string;
   workoutsThisWeek: number;
@@ -186,7 +214,8 @@ export interface ShareImageData {
   quote: string;
 }
 
-export function generateShareCanvas(data: ShareImageData): Promise<string> {
+export async function generateShareCanvas(data: ShareImageData): Promise<string> {
+  const logo = await loadShareLogo();
   return new Promise((resolve) => {
     const canvas = document.createElement('canvas');
     canvas.width = 1080;
@@ -206,11 +235,17 @@ export function generateShareCanvas(data: ShareImageData): Promise<string> {
     ctx.lineWidth = 8;
     ctx.strokeRect(20, 20, 1040, 1040);
 
-    // Logo area
-    ctx.fillStyle = '#00AEEF';
-    ctx.font = 'bold 48px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('AzFIT.ai', 540, 120);
+    // Logo area — real asset when it loads, text fallback otherwise.
+    if (logo) {
+      const logoH = 72;
+      const logoW = logoH * (logo.width / logo.height);
+      ctx.drawImage(logo, (1080 - logoW) / 2, 60, logoW, logoH);
+    } else {
+      ctx.fillStyle = '#00AEEF';
+      ctx.font = 'bold 48px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('AzFIT.ai', 540, 120);
+    }
 
     // Name
     ctx.fillStyle = '#F0F0F0';
