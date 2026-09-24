@@ -12,6 +12,8 @@ import {
   Moon,
 } from "lucide-react";
 import Footer from "@/components/Footer";
+import TrustedStrip from "@/components/landing/TrustedStrip";
+import TestimonialMarquee from "@/components/landing/TestimonialMarquee";
 import { useTheme } from "@/hooks/useTheme";
 import { supabase } from "@/lib/supabase";
 import AIShowcase from "@/components/AIShowcase";
@@ -337,7 +339,7 @@ function HeroSection({ onNavigate }: { onNavigate: (path: string) => void }) {
 function StatsSection() {
   return (
     <section
-      id="features"
+      id="stats"
       className="flex h-auto items-center py-10 lg:h-[140px] lg:py-0"
       style={{ backgroundColor: "var(--landing-navy-to)" }}
     >
@@ -1015,9 +1017,11 @@ export default function Home() {
 
       {/* Sections */}
       <HeroSection onNavigate={handleNavigate} />
+      <TrustedStrip />
       <StatsSection />
       <FeaturesSection />
       <HowItWorksSection />
+      <TestimonialMarquee />
       <PricingSection onNavigate={handleNavigate} />
       <DownloadCTA onNavigate={handleNavigate} />
 
