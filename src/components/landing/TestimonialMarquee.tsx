@@ -20,7 +20,7 @@ export default function TestimonialMarquee() {
       <div className="relative z-10 mx-auto max-w-6xl">
         <div className="flex items-center gap-4">
           <p className="section-label text-xs font-semibold">
-            05 — Client Stories
+            03 — Client Stories
           </p>
           <div className="section-divider flex-1" />
         </div>
