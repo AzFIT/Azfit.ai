@@ -2223,3 +2223,13 @@ Extends the 99d per-card override system to the remaining core content cards and
 - Push: `723f882..a726e16` at epoch 1790269765.
 - Deploy verified: https://azfit.fit/ Last-Modified `Thu, 24 Sep 2026 17:10:44 GMT` (epoch 1790269844) ≥ push epoch, probe 5 of 6.
 - Edge function NOT re-deployed by KC — POV redeploys plan-export via MCP flat-bundle (see verifier note above).
+
+## LANDING-A1 — TestimonialMarquee + TrustedStrip (U-2 design-locked) — 2026-09-25
+Branch `feat/landing-a1` off main (`af29985`). Hand-ported Aceternity "Infinite Moving Cards" (no registry, no next/*): `marquee` keyframes in tailwind.config.js + shared `LandingMarquee` engine (2× duplicated halves, `--marquee-duration` var, `animation-direction` for direction, `animation-play-state` for hover pause, framer-motion `useReducedMotion` → static wrapped layout).
+- `src/data/testimonials.ts`: `SHOW_TESTIMONIALS = false` (consent-required comment), empty `TESTIMONIALS` — zero fabricated quotes in repo. False → one honest panel ("Real client stories land here soon…") + `#waitlist` link.
+- `TestimonialMarquee.tsx`: new "05 — Client Stories" section between HowItWorks and Pricing; `.landing-surface rounded-2xl` cards, cyan accent line, `.text-chrome` names, navy-from background.
+- `TrustedStrip.tsx`: directly under Hero; 5 verified claims only (270+ movements / 3 tiers / 116+ clients / 5/5 coaches / Hong Kong); cyan `Triangle` separators; 45s loop, no hover pause.
+- Free fix: duplicate `id="features"` (StatsSection vs FeaturesSection) — Stats now `id="stats"`; Footer Features link now lands correctly.
+- Gates: tsc · lint · 1199/1199 · build + 404 copy · e2e 4/4. scrollWidth == viewport at 1280 AND 390, zero console errors.
+- Screenshots: `.temp/audit/shots/uix/` (trusted-strip 1280/390, panel-gate-off 1280/390, marquee-gate-on 1280/390 — gate-on used a local-only temp seed, reverted before commit; nothing fabricated shipped).
+- Decision-log entry C appended in 07-UIUX-STUDIO. Flag to UX: section number "05" sits between "02" and "03" (design-locked value; renumber if undesired).

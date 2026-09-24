@@ -96,6 +96,12 @@ module.exports = {
           "0%": { transform: "scale(1)" },
           "100%": { transform: "scale(1.05)" },
         },
+        /* LANDING-A1: infinite marquee track — content is duplicated 2×
+           inside the track, so one -50% sweep loops seamlessly. */
+        marquee: {
+          from: { transform: "translateX(0)" },
+          to: { transform: "translateX(-50%)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -103,6 +109,7 @@ module.exports = {
         "caret-blink": "caret-blink 1.25s ease-out infinite",
         "bounce-slow": "bounce-slow 2s ease-in-out infinite",
         "ken-burns": "ken-burns 20s linear infinite alternate",
+        marquee: "marquee var(--marquee-duration, 60s) linear infinite",
       },
     },
   },
