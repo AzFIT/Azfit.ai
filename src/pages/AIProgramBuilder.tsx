@@ -3203,6 +3203,10 @@ export default function AIProgramBuilderPage() {
   const flashInvalid = useCallback((issue: WizardIssue) => {
     setInvalidField(issue.field);
     setInvalidMessage(issue.message);
+    // Phase FIX-3 Item 3: LOUD toast on every blocked Next/Save — the inline
+    // message only renders when the blocking field belongs to the current
+    // step, so cross-step blocks were silent (reason only in a hover title).
+    toast.error(issue.message);
     requestAnimationFrame(() => {
       document.querySelector(`[data-field="${issue.field}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });

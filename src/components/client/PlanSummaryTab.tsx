@@ -5,7 +5,7 @@
    All math lives in src/lib/planBlueprint.ts.
    ═══════════════════════════════════════════════════════════════ */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText,
@@ -202,6 +202,31 @@ export default function PlanSummaryTab({ clientId }: { clientId: string }) {
   const [prefill, setPrefill] = useState<BlueprintInputs | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Phase FIX-3 Item 4: when the Blueprint Inputs form opens (Generate /
+  // "Regenerate anyway"), scroll it into view — it renders at the bottom
+  // of a long page and looked like nothing happened.
+  const formRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!formOpen) return;
+    const t = window.setTimeout(() => {
+      const el = formRef.current;
+      if (!el) return;
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        el.scrollIntoView({ behavior: "auto", block: "start" });
+        return;
+      }
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      // Browsers with OS-level animations disabled silently NO-OP smooth
+      // scrolling (verified live in the owner's browser) — detect no
+      // movement and fall back to an instant jump so the form is never
+      // left 3000px below the fold.
+      const before = window.scrollY;
+      window.setTimeout(() => {
+        if (Math.abs(window.scrollY - before) < 2) el.scrollIntoView({ behavior: "auto", block: "start" });
+      }, 150);
+    }, 60);
+    return () => window.clearTimeout(t);
+  }, [formOpen]);
 
   const active = useMemo(() => summaries.find((s) => s.id === activeId) ?? summaries[0] ?? null, [summaries, activeId]);
   const report = useMemo(() => (active ? (active.result as unknown as BlueprintResult) : null), [active]);
@@ -564,7 +589,7 @@ export default function PlanSummaryTab({ clientId }: { clientId: string }) {
           {canEdit && (
             <button
               onClick={() => (report ? setConfirmRegen(true) : setFormOpen(true))}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90"
+              className="flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90"
               style={{ background: "linear-gradient(135deg, #00AEEF, #8B5CF6)" }}
             >
               {report ? <RefreshCw size={13} /> : <Plus size={13} />}
@@ -657,7 +682,9 @@ export default function PlanSummaryTab({ clientId }: { clientId: string }) {
       {/* Generate form */}
       <AnimatePresence>
         {formOpen && prefill && canEdit && (
-          <BlueprintForm draftKey={`plan-summary-${clientId}`} initial={report && active ? (active.inputs as unknown as BlueprintInputs) : prefill} saving={saving} onCancel={() => setFormOpen(false)} onGenerate={generate} />
+          <div ref={formRef}>
+            <BlueprintForm draftKey={`plan-summary-${clientId}`} initial={report && active ? (active.inputs as unknown as BlueprintInputs) : prefill} saving={saving} onCancel={() => setFormOpen(false)} onGenerate={generate} />
+          </div>
         )}
       </AnimatePresence>
 

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { Client } from "@/types/client";
 import { clientStatusMeta } from "@/lib/clientStatus";
+import { displayPhone } from "@/lib/phoneDisplay";
 import { useAuth } from "@/hooks/useAuth";
 import { useViewAs } from "@/hooks/useViewAs";
 import { Button } from "@/components/ui/button";
@@ -202,13 +203,13 @@ export default function ClientProfileHeader({
                 {client.email}
               </span>
             )}
-            {client.phone && (
+            {displayPhone(client.phone) && (
               <span
                 className="flex items-center gap-1 text-[11px]"
                 style={{ color: "var(--light-text-muted)" }}
               >
                 <Phone size={11} />
-                {client.phone}
+                {displayPhone(client.phone)}
               </span>
             )}
             {client.location && (

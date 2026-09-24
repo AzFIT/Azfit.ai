@@ -153,10 +153,9 @@ export default function PrintPlanSummaryPage() {
         <header className="border-b-2 border-gray-900 pb-3">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-lg font-black tracking-tight">
-                Az<span className="text-[#00AEEF]">FIT</span>
-              </p>
-              <h1 className="mt-1 text-2xl font-bold">Your Plan Summary</h1>
+              {/* Phase FIX-3 Item 5: the 99d spec's real logo asset renders
+                  top-middle above (print-only) — no text logo, no hex. */}
+              <h1 className="text-2xl font-bold">Your Plan Summary</h1>
               <p className="mt-1 text-sm text-gray-600">
                 Prepared for <strong className="text-gray-900">{clientName}</strong> by {m.header.trainerName}
                 {m.header.businessName ? ` · ${m.header.businessName}` : ""}

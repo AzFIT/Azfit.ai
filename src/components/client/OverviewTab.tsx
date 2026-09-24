@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { getDayTotals, type MacroTotals } from "@/lib/foodApi";
 import { formatDate, formatDateKeyLocal } from "@/lib/utils";
+import { displayPhone } from "@/lib/phoneDisplay";
 import {
   parseLifestyleTargets,
   lifestyleChips,
@@ -483,8 +484,8 @@ export default function OverviewTab({
         <div className="space-y-2.5">
           <InfoRow icon={User} label="Name" value={client.name} />
           <InfoRow icon={Mail} label="Email" value={client.email} />
-          {client.phone && (
-            <InfoRow icon={Phone} label="Phone" value={client.phone} />
+          {displayPhone(client.phone) && (
+            <InfoRow icon={Phone} label="Phone" value={displayPhone(client.phone) ?? ""} />
           )}
           <InfoRow
             icon={Calendar}

@@ -13,6 +13,7 @@ import { INTENSITY_HEX } from '@/lib/methodDefaults';
 import { highVolumeSets, waveProgress, parseRestSeconds, ghostText } from '@/lib/workoutIntel';
 import { hapticsEnabled, setHapticsEnabled } from '@/lib/haptics';
 import DraftBanner from '@/components/DraftBanner';
+import WorkoutsLanding from '@/components/workouts/WorkoutsLanding';
 import { supabase } from '@/lib/supabase';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -175,19 +176,9 @@ export default function SheetsPage() {
   const currentPhase = workout?.week_number ? getCurrentPhase(phases, workout.week_number) : phases[0];
 
   if (!workoutLogId) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ backgroundColor: 'var(--page-bg)' }}>
-        <Dumbbell className="w-12 h-12 text-[#00AEEF] mb-4" />
-        <h1 className="text-xl font-bold text-[var(--text-primary)]">No workout selected</h1>
-        <p className="text-sm text-[var(--text-muted)] mt-2">Start a workout from your dashboard or program page.</p>
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="mt-4 min-h-[44px] px-4 py-2 rounded-xl bg-[#00AEEF] text-[#0B1120] font-bold text-sm hover:bg-[#0098D1] transition-colors"
-        >
-          Back to Dashboard
-        </button>
-      </div>
-    );
+    // Phase FIX-3 Item 2: no-selection state is a real landing (recent
+    // sessions + honest empties), never a dead end.
+    return <WorkoutsLanding />;
   }
 
   if (loading) {

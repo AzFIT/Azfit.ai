@@ -593,8 +593,8 @@ export default function Settings() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
-            className="text-3xl font-bold text-white"
-            style={{ textShadow: 'var(--text-shadow-hero)' }}
+            className={`text-3xl font-bold ${isDark ? 'text-white' : ''}`}
+            style={{ color: isDark ? undefined : 'var(--page-text)', textShadow: 'var(--text-shadow-hero)' }}
           >
             Settings
           </motion.h1>
@@ -603,7 +603,7 @@ export default function Settings() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.15 }}
             className="mt-1 text-sm"
-            style={{ color: 'rgba(255,255,255,0.8)', textShadow: 'var(--text-shadow-hero)' }}
+            style={{ color: isDark ? 'rgba(255,255,255,0.8)' : 'var(--light-text-muted)', textShadow: 'var(--text-shadow-hero)' }}
           >
             Manage your profile and preferences
           </motion.p>
