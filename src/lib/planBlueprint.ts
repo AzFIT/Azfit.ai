@@ -615,6 +615,13 @@ export interface BlueprintResult {
   /** Phase 99d Item 2: include/exclude ticks per section (absent =
    *  included). Respected by the app report, print view and export. */
   included?: Partial<Record<import("./planSummaryOverrides").SectionKey, boolean>>;
+  /** Phase 99g Item 2: trainer free-text Coach's Notes card
+   *  (markdown-lite — plain paragraphs + line breaks only). Absent
+   *  or blank = no card anywhere (app, print, export). */
+  coachNotes?: string | null;
+  /** Phase 99g Item 3: trainer override for the report header names
+   *  (trainerName / businessName; businessName null hides it). */
+  headerOverride?: import("./planSummaryOverrides").HeaderOverride;
 }
 
 export function computeBlueprint(input: BlueprintInputs, generatedIso = new Date().toISOString()): BlueprintResult {

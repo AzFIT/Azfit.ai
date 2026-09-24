@@ -37,6 +37,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { SignJWT, importPKCS8 } from "npm:jose@5";
 import { resolvePlanSummary } from "../../src/lib/planSummaryRender.ts";
+import { effectiveHeader } from "../../src/lib/planSummaryOverrides.ts";
 import { buildPlanExportHtml } from "../../src/lib/planExportHtml.ts";
 import { MEDICAL_DISCLAIMER } from "../../src/lib/planSummaryExtras.ts";
 
@@ -262,7 +263,10 @@ serve(async (req) => {
       day: "numeric",
       year: "numeric",
     });
-    const header = (result.header ?? {}) as { trainerName?: string; businessName?: string | null };
+    // Phase 99g: the header override (trainer/business names edited on the
+    // welcome card) applies here too — effectiveHeader is the same merge
+    // the app + print views use.
+    const header = effectiveHeader(result);
     const logoDataUrl = await fetchLogoDataUrl();
 
     const html = buildPlanExportHtml({

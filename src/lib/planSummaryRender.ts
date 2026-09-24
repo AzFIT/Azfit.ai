@@ -28,6 +28,12 @@ import {
   effectiveTracking,
   effectiveFaq,
   effectiveRoadmap,
+  effectiveAssessment,
+  effectiveCalories,
+  effectiveMacros,
+  effectiveTraining,
+  effectiveCoachNotes,
+  coachNotesParagraphs,
   type SectionKey,
 } from "./planSummaryOverrides";
 
@@ -60,18 +66,7 @@ export interface ResolvedWelcome extends ResolvedSectionBase {
 }
 export interface ResolvedAssessment extends ResolvedSectionBase {
   key: "assessment";
-  data: {
-    weightKg: number;
-    heightCm: number;
-    bmi: number;
-    bodyFatPct: number | null;
-    fatMassKg: number | null;
-    leanMassKg: number | null;
-    bmr: number;
-    bmrMethod: string;
-    maintenance: number;
-    goalStatement: string;
-  };
+  data: ReturnType<typeof effectiveAssessment>;
 }
 export interface ResolvedFemaleNote extends ResolvedSectionBase {
   key: "femaleNote";
@@ -79,25 +74,16 @@ export interface ResolvedFemaleNote extends ResolvedSectionBase {
 }
 export interface ResolvedCalories extends ResolvedSectionBase {
   key: "calories";
-  data: {
-    maintenance: number;
-    target: number;
+  data: ReturnType<typeof effectiveCalories> & {
     isFatLoss: boolean;
-    deficitPct: number;
+    /** recomputed from the effective deficit when the card is edited
+     *  (never a stale base outcome). */
     weeklyLossKg: number | null;
-    clampedByFloor: boolean;
   };
 }
 export interface ResolvedMacros extends ResolvedSectionBase {
   key: "macros";
-  data: {
-    target: number;
-    maintenance: number;
-    styles: BlueprintResult["macroStyles"];
-    recommended: BlueprintResult["recommended"];
-    proteinFloor: BlueprintResult["proteinFloor"];
-    anyBelowFloor: boolean;
-  };
+  data: ReturnType<typeof effectiveMacros>;
 }
 export interface ResolvedWeeklyTargets extends ResolvedSectionBase {
   key: "weeklyTargets";
@@ -114,12 +100,7 @@ export interface ResolvedWarmup extends ResolvedSectionBase {
 }
 export interface ResolvedTraining extends ResolvedSectionBase {
   key: "training";
-  data: {
-    sessions: BlueprintResult["training"]["sessions"];
-    restRules: string[];
-    stepTarget: number;
-    metaNotes: string[];
-  };
+  data: ReturnType<typeof effectiveTraining>;
 }
 export interface ResolvedCardio extends ResolvedSectionBase {
   key: "cardio";
@@ -153,6 +134,13 @@ export interface ResolvedFaq extends ResolvedSectionBase {
   key: "faq";
   data: { items: NonNullable<ReturnType<typeof effectiveFaq>> };
 }
+export interface ResolvedCoachNotes extends ResolvedSectionBase {
+  key: "coachNotes";
+  /** text = the raw notes; paragraphs = blank-line split, trimmed,
+   *  non-empty (renderers display with preserved line breaks, never
+   *  interpreted as HTML). */
+  data: { text: string; paragraphs: string[] };
+}
 
 export type ResolvedSection =
   | ResolvedWelcome
@@ -170,7 +158,8 @@ export type ResolvedSection =
   | ResolvedSupplements
   | ResolvedTracking
   | ResolvedRoadmap
-  | ResolvedFaq;
+  | ResolvedFaq
+  | ResolvedCoachNotes;
 
 export type ResolvedSectionKey = ResolvedSection["key"];
 
@@ -186,16 +175,19 @@ const FIXED_TITLES = {
   supplements: "Supplementation & Hydration",
   tracking: "Tracking & Accountability",
   faq: "FAQ",
+  coachNotes: "Coach's Notes",
 } as const;
 
 type FixedTitleKey = keyof typeof FIXED_TITLES;
 
 function titleFor(r: BlueprintResult, key: SectionKey): string {
   switch (key) {
-    case "training":
-      return `Training Plan (GBC) · ${r.training.sessions.length} sessions + ${fmt(r.training.stepTarget)} steps/day`;
+    case "training": {
+      const t = effectiveTraining(r);
+      return `Training Plan (GBC) · ${t.sessions.length} sessions + ${fmt(t.stepTarget)} steps/day`;
+    }
     case "sampleDay":
-      return `Sample Day of Eating (${r.recommended.name})`;
+      return `Sample Day of Eating (${effectiveMacros(r).recommended.name})`;
     case "roadmap":
       return `Program Roadmap (${r.goal.programWeeks} weeks)`;
     case "nutritionGuide":
@@ -228,25 +220,14 @@ export function resolvePlanSummary(r: BlueprintResult): ResolvedSection[] {
   }
 
   /* Numbered sections — presence + include via sectionNumber (0 = skip),
-   *  same rules the 99d renderers used, now in one place. */
-  const a = r.assessment;
+   *  same rules the 99d renderers used, now in one place. Phase 99g:
+   *  the core cards read their EFFECTIVE (override-merged) data. */
   if (sectionNumber(r, "assessment") > 0) {
     push({
       key: "assessment",
       number: sectionNumber(r, "assessment"),
       title: titleFor(r, "assessment"),
-      data: {
-        weightKg: a.weightKg,
-        heightCm: a.heightCm,
-        bmi: a.bmi,
-        bodyFatPct: a.bodyFatPct,
-        fatMassKg: a.fatMassKg,
-        leanMassKg: a.leanMassKg,
-        bmr: a.bmr,
-        bmrMethod: a.bmrMethod,
-        maintenance: a.maintenance,
-        goalStatement: r.goal.statement,
-      },
+      data: effectiveAssessment(r),
     });
   }
 
@@ -256,17 +237,17 @@ export function resolvePlanSummary(r: BlueprintResult): ResolvedSection[] {
   }
 
   if (sectionNumber(r, "calories") > 0) {
+    const eff = effectiveCalories(r);
     push({
       key: "calories",
       number: sectionNumber(r, "calories"),
       title: titleFor(r, "calories"),
       data: {
-        maintenance: r.calories.maintenance,
-        target: r.calories.target,
+        ...eff,
         isFatLoss: r.goal.isFatLoss,
-        deficitPct: r.calories.deficitPct,
-        weeklyLossKg: r.outcomes?.weeklyLossKg ?? null,
-        clampedByFloor: r.calories.clampedByFloor,
+        weeklyLossKg: eff.overridden && r.goal.isFatLoss
+          ? Math.round(((eff.maintenance - eff.target) * 7) / 7700 * 100) / 100
+          : (r.outcomes?.weeklyLossKg ?? null),
       },
     });
   }
@@ -276,14 +257,7 @@ export function resolvePlanSummary(r: BlueprintResult): ResolvedSection[] {
       key: "macros",
       number: sectionNumber(r, "macros"),
       title: titleFor(r, "macros"),
-      data: {
-        target: r.calories.target,
-        maintenance: r.calories.maintenance,
-        styles: r.macroStyles,
-        recommended: r.recommended,
-        proteinFloor: r.proteinFloor,
-        anyBelowFloor: r.macroStyles.some((s) => s.atTarget.belowFloor),
-      },
+      data: effectiveMacros(r),
     });
   }
 
@@ -321,12 +295,7 @@ export function resolvePlanSummary(r: BlueprintResult): ResolvedSection[] {
       key: "training",
       number: sectionNumber(r, "training"),
       title: titleFor(r, "training"),
-      data: {
-        sessions: r.training.sessions,
-        restRules: r.training.restRules,
-        stepTarget: r.training.stepTarget,
-        metaNotes: r.trainingMeta?.notes ?? [],
-      },
+      data: effectiveTraining(r),
     });
   }
 
@@ -385,6 +354,18 @@ export function resolvePlanSummary(r: BlueprintResult): ResolvedSection[] {
   const faq = effectiveFaq(r);
   if (faq && sectionNumber(r, "faq") > 0) {
     push({ key: "faq", number: sectionNumber(r, "faq"), title: titleFor(r, "faq"), data: { items: faq } });
+  }
+
+  /* Phase 99g Item 2: Coach's Notes — the LAST card. Present only when
+   *  the trainer wrote something (absent/blank = no card anywhere). */
+  const notes = effectiveCoachNotes(r);
+  if (notes && sectionNumber(r, "coachNotes") > 0) {
+    push({
+      key: "coachNotes",
+      number: sectionNumber(r, "coachNotes"),
+      title: titleFor(r, "coachNotes"),
+      data: { text: notes, paragraphs: coachNotesParagraphs(notes) },
+    });
   }
 
   return out;

@@ -249,6 +249,13 @@ function sectionHtml(s: ResolvedSection): string {
   ${h}
   ${s.data.items.map((f) => `<p><strong>${e(f.q)}</strong><br>${e(f.a)}</p>`).join("\n  ")}
 </section>`;
+    /* Phase 99g Item 2: Coach's Notes — plain paragraphs, line breaks
+       preserved, everything escaped (never interpreted as HTML). */
+    case "coachNotes":
+      return `<section>
+  ${h}
+  ${s.data.paragraphs.map((p) => `<p class="coach-note">${e(p).replace(/\n/g, "<br>")}</p>`).join("\n  ")}
+</section>`;
   }
 }
 
@@ -291,6 +298,7 @@ export function buildPlanExportHtml(input: PlanExportInput): string {
   ul.notes { border-top: 1px solid #D1D5DB; padding-top: 4px; color: #6B7280; font-style: italic; }
   .cover { text-align: center; border: 1px solid #D1D5DB; border-radius: 8px; padding: 12px; }
   .welcome-message { max-width: 480px; margin: 6px auto 0; font-size: 11px; color: #4B5563; }
+  .coach-note { font-size: 11px; margin: 4px 0; }
   .difficulty { font-size: 9px; font-weight: 700; text-transform: uppercase; background: #111827; color: #fff; border-radius: 8px; padding: 1px 6px; }
   footer { border-top: 1px solid #D1D5DB; margin-top: 20px; padding-top: 8px; font-size: 10px; color: #9CA3AF; }
 </style>

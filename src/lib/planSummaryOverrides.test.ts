@@ -10,6 +10,13 @@ import {
   effectiveTracking,
   effectiveFaq,
   effectiveRoadmap,
+  effectiveAssessment,
+  effectiveCalories,
+  effectiveMacros,
+  effectiveTraining,
+  effectiveCoachNotes,
+  coachNotesParagraphs,
+  effectiveHeader,
   isIncluded,
   presentSectionKeys,
   includedCount,
@@ -142,5 +149,194 @@ describe("sectionNumber", () => {
     expect(sectionNumber(r, "assessment")).toBe(1);
     expect(sectionNumber(r, "femaleNote")).toBe(2);
     expect(sectionNumber(r, "calories")).toBe(3);
+  });
+});
+
+/* ── Phase 99g — core-card effective helpers ─────────────────── */
+function coreResult(): BlueprintResult {
+  return {
+    header: { generatedIso: "2026-03-01T10:00:00", trainerName: "Coach", businessName: "AzFIT Studio" },
+    assessment: {
+      weightKg: 90, heightCm: 170, bmi: 31.1, bodyFatPct: 28, fatMassKg: 25.2, leanMassKg: 64.8,
+      bmr: 1650, bmrMethod: "mifflin-st-jeor", maintenance: 2200,
+    },
+    goal: { statement: "Lose 10 kg", isFatLoss: true, programWeeks: 12 },
+    calories: { target: 1700, maintenance: 2200, deficitPct: 0.2273, clampedByFloor: false },
+    macroStyles: [
+      {
+        key: "balanced", name: "Balanced", bestFor: "most people",
+        atTarget: { proteinG: 150, carbsG: 170, fatsG: 60, belowFloor: false },
+        atMaintenance: { proteinG: 150, carbsG: 250, fatsG: 80, belowFloor: false },
+      },
+      {
+        key: "low-carb", name: "Low Carb", bestFor: "satiety",
+        atTarget: { proteinG: 120, carbsG: 100, fatsG: 78, belowFloor: false },
+        atMaintenance: { proteinG: 120, carbsG: 150, fatsG: 90, belowFloor: false },
+      },
+    ],
+    recommended: { key: "balanced", name: "Balanced", reason: "sustainable" },
+    proteinFloor: { grams: 130, basis: "2.0 g/kg target weight" },
+    training: {
+      sessions: [
+        { name: "Day A", kind: "trainer", blocks: [{ label: "A1", exercises: "Goblet Squat", setsReps: "4×10", tempo: "4010", rest: "60s" }], rounds: null, finisher: null },
+      ],
+      restRules: ["rest 60s between supersets"],
+      stepTarget: 8000,
+    },
+    trainingMeta: { notes: ["method: GBC"] },
+  } as unknown as BlueprintResult;
+}
+
+describe("Phase 99g — effectiveAssessment", () => {
+  it("base passes through unchanged", () => {
+    const r = coreResult();
+    expect(effectiveAssessment(r)).toEqual({ ...r.assessment, goalStatement: "Lose 10 kg" });
+  });
+
+  it("edited weight/height recompute BMI + fat/lean mass (never stale derived numbers)", () => {
+    const r = coreResult();
+    r.overrides = { assessment: { weightKg: 100, heightCm: 180, bodyFatPct: 25 } };
+    const a = effectiveAssessment(r);
+    expect(a.bmi).toBeCloseTo(100 / 1.8 ** 2, 1);
+    expect(a.leanMassKg).toBeCloseTo(75, 1);
+    expect(a.fatMassKg).toBeCloseTo(25, 1);
+    // engine numbers stay base — they belong to the calorie engine
+    expect(a.bmr).toBe(1650);
+    expect(a.maintenance).toBe(2200);
+    expect(a.goalStatement).toBe("Lose 10 kg");
+  });
+
+  it("goalStatement override wins; bodyFatPct null clears derived mass", () => {
+    const r = coreResult();
+    r.overrides = { assessment: { goalStatement: "Recomp — keep the number, change the shape" } };
+    expect(effectiveAssessment(r).goalStatement).toBe("Recomp — keep the number, change the shape");
+    r.overrides = { assessment: { bodyFatPct: null } };
+    const a = effectiveAssessment(r);
+    expect(a.bodyFatPct).toBeNull();
+    expect(a.fatMassKg).toBeNull();
+    expect(a.leanMassKg).toBeNull();
+  });
+});
+
+describe("Phase 99g — effectiveCalories", () => {
+  it("target edit recomputes the deficit pair and drops the floor note", () => {
+    const r = coreResult();
+    r.calories.clampedByFloor = true; // engine-raised base
+    r.overrides = { calories: { target: 2000 } };
+    const c = effectiveCalories(r);
+    expect(c.target).toBe(2000);
+    expect(c.deficitPct).toBeCloseTo((2200 - 2000) / 2200, 4);
+    expect(c.deficitPerDay).toBe(200);
+    expect(c.clampedByFloor).toBe(false); // deliberate manual target
+    expect(c.overridden).toBe(true);
+    // base untouched
+    expect(r.calories.target).toBe(1700);
+  });
+
+  it("explicit deficitPct applies directly; no override = base passthrough", () => {
+    const r = coreResult();
+    r.overrides = { calories: { deficitPct: 0.15 } };
+    expect(effectiveCalories(r).deficitPct).toBe(0.15);
+    delete r.overrides;
+    const c = effectiveCalories(r);
+    expect(c.target).toBe(1700);
+    expect(c.overridden).toBe(false);
+  });
+});
+
+describe("Phase 99g — effectiveMacros", () => {
+  it("edited grams merge per style; below-floor flag + note recompute", () => {
+    const r = coreResult();
+    r.overrides = { macros: { styles: { "low-carb": { proteinG: 100, carbsG: 120, fatsG: 80 } } } };
+    const m = effectiveMacros(r);
+    const low = m.styles.find((s) => s.key === "low-carb")!;
+    expect(low.atTarget).toEqual({ proteinG: 100, carbsG: 120, fatsG: 80, belowFloor: true, note: "Below your protein floor — boost protein by trimming carbs" });
+    expect(m.anyBelowFloor).toBe(true);
+    // untouched style keeps its base numbers
+    const bal = m.styles.find((s) => s.key === "balanced")!;
+    expect(bal.atTarget.proteinG).toBe(150);
+    expect(bal.atTarget.belowFloor).toBe(false);
+  });
+
+  it("recommendedKey switch resolves to the style with the coach-pick reason", () => {
+    const r = coreResult();
+    r.overrides = { macros: { recommendedKey: "low-carb" } };
+    const m = effectiveMacros(r);
+    expect(m.recommended).toEqual({ key: "low-carb", name: "Low Carb", reason: "your coach's pick for this plan" });
+    // unknown key falls back to the base pick
+    r.overrides = { macros: { recommendedKey: "nope" } };
+    expect(effectiveMacros(r).recommended.key).toBe("balanced");
+  });
+});
+
+describe("Phase 99g — effectiveTraining", () => {
+  it("restRules / stepTarget / session blocks merge over the base", () => {
+    const r = coreResult();
+    r.overrides = {
+      training: {
+        stepTarget: 10000,
+        restRules: ["rest 90s"],
+        sessions: [{ name: "Day A", kind: "trainer", blocks: [{ label: "A1", exercises: "Trap Bar Deadlift", setsReps: "3×8", tempo: "3010", rest: "90s" }], rounds: null, finisher: null }],
+      },
+    };
+    const t = effectiveTraining(r);
+    expect(t.stepTarget).toBe(10000);
+    expect(t.restRules).toEqual(["rest 90s"]);
+    expect(t.sessions[0].blocks[0].exercises).toBe("Trap Bar Deadlift");
+    expect(t.metaNotes).toEqual(["method: GBC"]);
+    // base untouched
+    expect(r.training.stepTarget).toBe(8000);
+  });
+
+  it("no override = base passthrough", () => {
+    const t = effectiveTraining(coreResult());
+    expect(t.sessions).toHaveLength(1);
+    expect(t.stepTarget).toBe(8000);
+  });
+});
+
+describe("Phase 99g — Coach's Notes + header override", () => {
+  it("effectiveCoachNotes: blank/whitespace → null (no card), text → text", () => {
+    const r = coreResult();
+    expect(effectiveCoachNotes(r)).toBeNull();
+    r.coachNotes = "   ";
+    expect(effectiveCoachNotes(r)).toBeNull();
+    r.coachNotes = "Great first week!";
+    expect(effectiveCoachNotes(r)).toBe("Great first week!");
+  });
+
+  it("coachNotesParagraphs splits on blank lines, trims, drops empties", () => {
+    expect(coachNotesParagraphs("One.\n\nTwo.\n\n\nThree with\na line break.")).toEqual([
+      "One.",
+      "Two.",
+      "Three with\na line break.",
+    ]);
+  });
+
+  it("effectiveHeader: override wins, blank trainer falls back, null business hides", () => {
+    const r = coreResult();
+    expect(effectiveHeader(r)).toEqual({ trainerName: "Coach", businessName: "AzFIT Studio" });
+    r.headerOverride = { trainerName: "Alex", businessName: null };
+    expect(effectiveHeader(r)).toEqual({ trainerName: "Alex", businessName: null });
+    r.headerOverride = { trainerName: "  " };
+    expect(effectiveHeader(r).trainerName).toBe("Coach");
+    r.headerOverride = { businessName: "New Studio" };
+    expect(effectiveHeader(r)).toEqual({ trainerName: "Coach", businessName: "New Studio" });
+  });
+
+  it("sectionNumber: coachNotes takes the last slot only when text exists", () => {
+    const r = coreResult();
+    r.weeklyTargets = undefined as unknown as BlueprintResult["weeklyTargets"];
+    r.cardio = undefined as unknown as BlueprintResult["cardio"];
+    r.nutritionGuide = undefined as unknown as BlueprintResult["nutritionGuide"];
+    expect(sectionNumber(r, "faq")).toBe(8);
+    r.coachNotes = "notes";
+    expect(sectionNumber(r, "coachNotes")).toBe(9);
+    expect(presentSectionKeys(r)).toContain("coachNotes");
+    expect(includedCount(r)).toBe(presentSectionKeys(r).length);
+    // tick-excluded coachNotes → 0
+    r.included = { coachNotes: false };
+    expect(sectionNumber(r, "coachNotes")).toBe(0);
+    expect(isIncluded(r.included, "coachNotes")).toBe(false);
   });
 });

@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { formatNumber } from "@/lib/utils";
 import type { BlueprintResult } from "@/lib/planBlueprint";
 import { MEDICAL_DISCLAIMER } from "@/lib/planSummaryExtras";
+import { effectiveHeader } from "@/lib/planSummaryOverrides";
 import {
   resolvePlanSummary,
   displayTitle,
@@ -85,11 +86,12 @@ export default function PrintPlanSummaryPage() {
   }
 
   const m = report;
-  const a = m.assessment;
   // Phase 99d: overrides + include ticks. Phase 99e: ALL section
   // resolution (presence, include, order, numbering, titles, effective
   // data) comes from the SHARED resolver — the app report, this print
   // view and the plan-export edge function consume the same output.
+  // Phase 99g: the core cards (assessment/calories/macros/training) +
+  // Coach's Notes + the header override render their effective values.
   const byKey = new Map(
     resolvePlanSummary(m).map((s) => [s.key, s] as const),
   );
@@ -113,6 +115,12 @@ export default function PrintPlanSummaryPage() {
   const warmup = sectionOf("warmup")?.data;
   const sampleDiet = sectionOf("sampleDiet")?.data;
   const supplements = sectionOf("supplements")?.data;
+  const assessment = sectionOf("assessment")?.data;
+  const calories = sectionOf("calories")?.data;
+  const macros = sectionOf("macros")?.data;
+  const training = sectionOf("training")?.data;
+  const coachNotes = sectionOf("coachNotes")?.data;
+  const header = effectiveHeader(m);
   const genDate = new Date(m.header.generatedIso).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 
   return (
@@ -157,8 +165,8 @@ export default function PrintPlanSummaryPage() {
                   top-middle above (print-only) — no text logo, no hex. */}
               <h1 className="text-2xl font-bold">Your Plan Summary</h1>
               <p className="mt-1 text-sm text-gray-600">
-                Prepared for <strong className="text-gray-900">{clientName}</strong> by {m.header.trainerName}
-                {m.header.businessName ? ` · ${m.header.businessName}` : ""}
+                Prepared for <strong className="text-gray-900">{clientName}</strong> by {header.trainerName}
+                {header.businessName ? ` · ${header.businessName}` : ""}
               </p>
             </div>
             <p className="text-right text-xs text-gray-500">{genDate}</p>
@@ -175,21 +183,21 @@ export default function PrintPlanSummaryPage() {
           </section>
         )}
 
-        {/* 1. Starting Assessment */}
-        {byKey.has("assessment") && (
+        {/* 1. Starting Assessment — 99g: effective (override-merged) data. */}
+        {assessment && (
         <section className={sec}>
           <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{num("assessment")} · Starting Assessment</h2>
           <table className="mt-1 w-full text-[11px]">
             <tbody>
               {[
-                ["Weight", `${a.weightKg} kg`],
-                ["Height", `${a.heightCm} cm`],
-                ["BMI", String(a.bmi)],
-                ["Body fat", a.bodyFatPct != null ? `${a.bodyFatPct}%` : "—"],
-                ["Fat mass", a.fatMassKg != null ? `${a.fatMassKg} kg` : "—"],
-                ["Lean mass", a.leanMassKg != null ? `${a.leanMassKg} kg` : "—"],
-                [`BMR (${a.bmrMethod === "katch-mcardle" ? "Katch-McArdle" : "Mifflin-St Jeor"})`, `${formatNumber(a.bmr)} kcal`],
-                ["Maintenance calories", `${formatNumber(a.maintenance)} kcal`],
+                ["Weight", `${assessment.weightKg} kg`],
+                ["Height", `${assessment.heightCm} cm`],
+                ["BMI", String(assessment.bmi)],
+                ["Body fat", assessment.bodyFatPct != null ? `${assessment.bodyFatPct}%` : "—"],
+                ["Fat mass", assessment.fatMassKg != null ? `${assessment.fatMassKg} kg` : "—"],
+                ["Lean mass", assessment.leanMassKg != null ? `${assessment.leanMassKg} kg` : "—"],
+                [`BMR (${assessment.bmrMethod === "katch-mcardle" ? "Katch-McArdle" : "Mifflin-St Jeor"})`, `${formatNumber(assessment.bmr)} kcal`],
+                ["Maintenance calories", `${formatNumber(assessment.maintenance)} kcal`],
               ].map(([k, v]) => (
                 <tr key={k} className="border-b border-gray-100">
                   <td className={`${td} font-medium`}>{k}</td>
@@ -198,7 +206,7 @@ export default function PrintPlanSummaryPage() {
               ))}
             </tbody>
           </table>
-          <p className="mt-2 rounded bg-gray-100 px-3 py-2 text-[11px] font-medium">Goal: {m.goal.statement}</p>
+          <p className="mt-2 rounded bg-gray-100 px-3 py-2 text-[11px] font-medium">Goal: {assessment.goalStatement}</p>
         </section>
         )}
 
@@ -210,25 +218,26 @@ export default function PrintPlanSummaryPage() {
           </section>
         )}
 
-        {/* 3. Calorie Targets */}
-        {byKey.has("calories") && (
+        {/* 3. Calorie Targets — 99g: effective data + recomputed weekly
+            loss when the card is edited. */}
+        {calories && (
         <section className={sec}>
           <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{secTitle("calories", "Calorie Targets")}</h2>
           <div className="mt-2 grid grid-cols-2 gap-3 text-center">
             <div className="rounded border border-gray-200 px-3 py-2">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Maintenance</p>
-              <p className="text-xl font-bold">{formatNumber(m.calories.maintenance)}</p>
+              <p className="text-xl font-bold">{formatNumber(calories.maintenance)}</p>
               <p className="text-[10px] text-gray-500">kcal / day</p>
             </div>
             <div className="rounded border-2 border-gray-900 px-3 py-2">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-900">Your target</p>
-              <p className="text-xl font-bold">{formatNumber(m.calories.target)}</p>
+              <p className="text-xl font-bold">{formatNumber(calories.target)}</p>
               <p className="text-[10px] text-gray-600">
-                {m.goal.isFatLoss ? `${Math.round(m.calories.deficitPct * 100)}% deficit · ~${m.outcomes?.weeklyLossKg} kg/week` : "at maintenance"}
+                {m.goal.isFatLoss ? `${Math.round(calories.deficitPct * 100)}% deficit${calories.weeklyLossKg != null ? ` · ~${calories.weeklyLossKg} kg/week` : ""}` : "at maintenance"}
               </p>
             </div>
           </div>
-          {m.calories.clampedByFloor && (
+          {calories.clampedByFloor && (
             <p className="mt-2 text-[10px] italic text-gray-600">
               Note: your target was raised to the safety floor (BMR × 1.05 / 1,200 kcal) — a deeper deficit would cost muscle.
             </p>
@@ -236,13 +245,13 @@ export default function PrintPlanSummaryPage() {
         </section>
         )}
 
-        {/* 4. Macro tables */}
-        {byKey.has("macros") && (
+        {/* 4. Macro tables — 99g: effective grams + recomended pick. */}
+        {macros && (
         <section className={sec}>
           <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{secTitle("macros", "Macro Targets — All Options")}</h2>
           {[
-            { title: `At your target (${formatNumber(m.calories.target)} kcal)`, grams: (s: BlueprintResult["macroStyles"][number]) => s.atTarget, flags: true },
-            { title: `At maintenance (${formatNumber(m.calories.maintenance)} kcal)`, grams: (s: BlueprintResult["macroStyles"][number]) => s.atMaintenance, flags: false },
+            { title: `At your target (${formatNumber(macros.target)} kcal)`, grams: (s: BlueprintResult["macroStyles"][number]) => s.atTarget, flags: true },
+            { title: `At maintenance (${formatNumber(macros.maintenance)} kcal)`, grams: (s: BlueprintResult["macroStyles"][number]) => s.atMaintenance, flags: false },
           ].map((tbl) => (
             <div key={tbl.title} className="mt-2">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">{tbl.title}</p>
@@ -257,9 +266,9 @@ export default function PrintPlanSummaryPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {m.macroStyles.map((s) => {
+                  {macros.styles.map((s) => {
                     const g = tbl.grams(s);
-                    const rec = s.key === m.recommended.key;
+                    const rec = s.key === macros.recommended.key;
                     return (
                       <tr key={s.key} className="border-b border-gray-100" style={rec ? { backgroundColor: "rgba(0,174,239,0.07)" } : undefined}>
                         <td className={`${td} font-semibold`}>
@@ -280,8 +289,8 @@ export default function PrintPlanSummaryPage() {
             </div>
           ))}
           <p className="mt-1.5 text-[10px] text-gray-600">
-            Protein floor: {m.proteinFloor.grams} g ({m.proteinFloor.basis}). Recommended: <strong>{m.recommended.name}</strong> — {m.recommended.reason}.
-            {m.macroStyles.some((s) => s.atTarget.belowFloor) && " ⚠ below the floor — boost protein by trimming carbs."}
+            Protein floor: {macros.proteinFloor.grams} g ({macros.proteinFloor.basis}). Recommended: <strong>{macros.recommended.name}</strong> — {macros.recommended.reason}.
+            {macros.anyBelowFloor && " ⚠ below the floor — boost protein by trimming carbs."}
           </p>
         </section>
         )}
@@ -364,13 +373,14 @@ export default function PrintPlanSummaryPage() {
           </section>
         )}
 
-        {/* 5. Training Plan */}
-        {byKey.has("training") && (
+        {/* 5. Training Plan — 99g: effective (override-merged) sessions +
+            rest rules. */}
+        {training && (
         <section className={sec}>
           <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">
-            {secTitle("training", `Training Plan (GBC) · ${m.training.sessions.length} sessions + ${formatNumber(m.training.stepTarget)} steps/day`)}
+            {secTitle("training", `Training Plan (GBC) · ${training.sessions.length} sessions + ${formatNumber(training.stepTarget)} steps/day`)}
           </h2>
-          {m.training.sessions.map((s, i) => (
+          {training.sessions.map((s, i) => (
             <div key={i} className="mt-2">
               <p className="rounded bg-gray-900 px-2.5 py-1 text-[10px] font-bold uppercase text-white">{s.name}</p>
               <table className="mt-0.5 w-full text-[10px]">
@@ -392,7 +402,7 @@ export default function PrintPlanSummaryPage() {
             </div>
           ))}
           <ul className="mt-2 list-inside list-disc text-[10px] text-gray-600">
-            {m.training.restRules.map((r) => (
+            {training.restRules.map((r) => (
               <li key={r}>{r}</li>
             ))}
           </ul>
@@ -612,10 +622,20 @@ export default function PrintPlanSummaryPage() {
         </section>
         )}
 
+        {/* Phase 99g Item 2: Coach's Notes — last card, plain paragraphs. */}
+        {coachNotes && (
+          <section className={sec}>
+            <h2 className="border-b border-gray-200 pb-1 text-sm font-bold uppercase tracking-wide">{secTitle("coachNotes", "Coach's Notes")}</h2>
+            {coachNotes.paragraphs.map((p, i) => (
+              <p key={`${i}-${p.slice(0, 24)}`} className="mt-1.5 text-[11px] leading-relaxed text-gray-700">{p}</p>
+            ))}
+          </section>
+        )}
+
         <footer className="mt-5 border-t border-gray-200 pt-3 text-[10px] text-gray-400">
           <p className="mb-1.5 text-gray-500">{MEDICAL_DISCLAIMER}</p>
-          Prepared by {m.header.trainerName}
-          {m.header.businessName ? ` · ${m.header.businessName}` : ""} — generated {genDate}. Reviewed together at your next session.
+          Prepared by {header.trainerName}
+          {header.businessName ? ` · ${header.businessName}` : ""} — generated {genDate}. Reviewed together at your next session.
         </footer>
       </div>
     </div>

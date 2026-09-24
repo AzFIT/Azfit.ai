@@ -10,12 +10,17 @@
 
 import type { CardioRow } from "@/lib/blueprintCardio";
 import type {
+  AssessmentDraft,
+  CaloriesDraft,
   CardioDraft,
+  CoachNotesDraft,
   FaqDraft,
+  MacrosDraft,
   NutritionGuideDraft,
   RoadmapDraft,
   SampleDayDraft,
   TrackingDraft,
+  TrainingDraft,
   WeeklyTargetsDraft,
   WelcomeDraft,
 } from "@/lib/planSummaryCardDrafts";
@@ -92,6 +97,148 @@ export function WelcomeEditor({ value, onChange }: { value: WelcomeDraft; onChan
     <div className="space-y-3">
       <TextField label="Title" value={value.title} onChange={(title) => onChange({ ...value, title })} />
       <TextArea label="Welcome message" rows={5} value={value.message} onChange={(message) => onChange({ ...value, message })} />
+      {/* Phase 99g Item 3: report-header override — blank trainer name
+          falls back to the generated one; a blanked business name hides
+          it (the base card's header values are prefilled). */}
+      <div className="grid grid-cols-2 gap-2">
+        <TextField label="Trainer name (report header)" value={value.trainerName} onChange={(trainerName) => onChange({ ...value, trainerName })} />
+        <TextField label="Business name (blank = hide)" value={value.businessName} onChange={(businessName) => onChange({ ...value, businessName })} />
+      </div>
+    </div>
+  );
+}
+
+/* ── Phase 99g: editable core cards ────────────────────────────── */
+
+export function AssessmentEditor({ value, onChange }: { value: AssessmentDraft; onChange: (v: AssessmentDraft) => void }) {
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-2">
+        <NumField label="Weight (kg)" value={value.weightKg} onChange={(weightKg) => onChange({ ...value, weightKg })} />
+        <NumField label="Height (cm)" value={value.heightCm} onChange={(heightCm) => onChange({ ...value, heightCm })} />
+        <NumField label="Body fat (%, blank = not measured)" step={0.1} value={value.bodyFatPct} onChange={(bodyFatPct) => onChange({ ...value, bodyFatPct })} />
+      </div>
+      <TextArea label="Goal statement" rows={3} value={value.goalStatement} onChange={(goalStatement) => onChange({ ...value, goalStatement })} />
+      <p className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+        BMI and fat / lean mass recompute from these numbers automatically. BMR and maintenance stay engine-generated — edit the calorie target on the Calorie Targets card.
+      </p>
+    </div>
+  );
+}
+
+export function CaloriesEditor({ value, onChange }: { value: CaloriesDraft; onChange: (v: CaloriesDraft) => void }) {
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        <NumField label="Daily calorie target (kcal)" value={value.target} onChange={(target) => onChange({ ...value, target })} />
+        <NumField label="Deficit (% of maintenance, 0–50)" value={value.deficitPct} onChange={(deficitPct) => onChange({ ...value, deficitPct })} />
+      </div>
+      <p className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+        The target can't go below 1,200 kcal — the same safety floor the generator uses. The displayed deficit and weekly-loss estimate update from the target and maintenance.
+      </p>
+    </div>
+  );
+}
+
+export function MacrosEditor({ value, onChange }: { value: MacrosDraft; onChange: (v: MacrosDraft) => void }) {
+  const setStyle = (i: number, patch: Partial<MacrosDraft["styles"][number]>) =>
+    onChange({ ...value, styles: value.styles.map((s, j) => (j === i ? { ...s, ...patch } : s)) });
+  return (
+    <div className="space-y-3">
+      <div>
+        <span className={labelCls}>Recommended style</span>
+        <select
+          aria-label="Recommended macro style"
+          className={inputCls}
+          value={value.recommendedKey}
+          onChange={(e) => onChange({ ...value, recommendedKey: e.target.value })}
+        >
+          {value.styles.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className={labelCls}>Grams per style (at the calorie target)</label>
+        {value.styles.map((s, i) => (
+          <div key={s.key} className="mb-2 flex items-center gap-2">
+            <span className="w-28 shrink-0 text-[10px] font-semibold" style={{ color: "var(--page-text)" }}>
+              {s.name}
+            </span>
+            <NumField label="P g" value={s.proteinG} onChange={(proteinG) => setStyle(i, { proteinG: proteinG ?? 0 })} />
+            <NumField label="C g" value={s.carbsG} onChange={(carbsG) => setStyle(i, { carbsG: carbsG ?? 0 })} />
+            <NumField label="F g" value={s.fatsG} onChange={(fatsG) => setStyle(i, { fatsG: fatsG ?? 0 })} />
+          </div>
+        ))}
+      </div>
+      <p className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+        The below-floor protein warnings recompute from your numbers automatically.
+      </p>
+    </div>
+  );
+}
+
+export function TrainingCardEditor({ value, onChange }: { value: TrainingDraft; onChange: (v: TrainingDraft) => void }) {
+  const setBlock = (si: number, bi: number, patch: Partial<TrainingDraft["sessions"][number]["blocks"][number]>) =>
+    onChange({
+      ...value,
+      sessions: value.sessions.map((s, j) =>
+        j === si ? { ...s, blocks: s.blocks.map((b, k) => (k === bi ? { ...b, ...patch } : b)) } : s,
+      ),
+    });
+  return (
+    <div className="space-y-3">
+      <NumField label="Daily step target" value={value.stepTarget} onChange={(stepTarget) => onChange({ ...value, stepTarget })} />
+      <LinesField label="Rest & progression rules" value={value.restRules} onChange={(restRules) => onChange({ ...value, restRules })} />
+      {value.sessions.map((s, si) => (
+        <div key={si} className="rounded-lg border p-3" style={{ borderColor: "var(--card-border)", backgroundColor: "var(--light-elevated)" }}>
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>
+            {s.name}
+          </p>
+          {s.blocks.map((b, bi) => (
+            <div key={b.label} className="mb-2 last:mb-0">
+              <div className="flex items-center gap-2">
+                <span className="w-8 shrink-0 text-center font-mono text-[10px] font-bold" style={{ color: "#00AEEF" }}>
+                  {b.label}
+                </span>
+                <input
+                  className={inputCls}
+                  placeholder="Exercise(s)"
+                  aria-label={`${s.name} block ${b.label} exercise`}
+                  value={b.exercises}
+                  onChange={(e) => setBlock(si, bi, { exercises: e.target.value })}
+                />
+              </div>
+              <div className="mt-1 grid grid-cols-3 gap-2 pl-10">
+                <input className={inputCls} placeholder="Sets × reps" aria-label={`${s.name} block ${b.label} sets reps`} value={b.setsReps} onChange={(e) => setBlock(si, bi, { setsReps: e.target.value })} />
+                <input className={inputCls} placeholder="Tempo" aria-label={`${s.name} block ${b.label} tempo`} value={b.tempo} onChange={(e) => setBlock(si, bi, { tempo: e.target.value })} />
+                <input className={inputCls} placeholder="Rest" aria-label={`${s.name} block ${b.label} rest`} value={b.rest} onChange={(e) => setBlock(si, bi, { rest: e.target.value })} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+      <p className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+        This edits what the summary shows. To rebuild the actual workout program (reps, exercise library, progression), use "Edit training plan" on this card.
+      </p>
+    </div>
+  );
+}
+
+export function CoachNotesEditor({ value, onChange }: { value: CoachNotesDraft; onChange: (v: CoachNotesDraft) => void }) {
+  return (
+    <div>
+      <TextArea
+        label="Coach's notes (plain text — paragraphs separated by a blank line)"
+        rows={8}
+        value={value.text}
+        onChange={(text) => onChange({ ...value, text })}
+      />
+      <p className="mt-1.5 text-[10px]" style={{ color: "var(--light-text-muted)" }}>
+        Rendered as plain paragraphs with line breaks — no formatting, no links. Leave empty to remove the card.
+      </p>
     </div>
   );
 }

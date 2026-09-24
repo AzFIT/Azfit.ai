@@ -74,6 +74,8 @@ import {
 import {
   buildDraft,
   overrideFromDraft,
+  validateCardDraft,
+  headerOverrideFromDraft,
   type CardDraft,
   type WeeklyTargetsDraft,
   type CardioDraft,
@@ -83,6 +85,11 @@ import {
   type FaqDraft,
   type RoadmapDraft,
   type WelcomeDraft,
+  type AssessmentDraft,
+  type CaloriesDraft,
+  type MacrosDraft,
+  type TrainingDraft,
+  type CoachNotesDraft,
 } from "@/lib/planSummaryCardDrafts";
 import {
   WelcomeEditor,
@@ -93,7 +100,13 @@ import {
   TrackingEditor,
   FaqEditor,
   RoadmapEditor,
+  AssessmentEditor,
+  CaloriesEditor,
+  MacrosEditor,
+  TrainingCardEditor,
+  CoachNotesEditor,
 } from "./PlanSummaryCardEditors";
+import { effectiveHeader } from "@/lib/planSummaryOverrides";
 import type { Database } from "@/types/supabase";
 
 type SummaryRow = Database["public"]["Tables"]["plan_summaries"]["Row"];
@@ -957,18 +970,17 @@ export function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSa
   const [draft, setDraft] = useState<CardDraft | null>(null);
   const [editingSaving, setEditingSaving] = useState(false);
   const { rows: taxonomyRows } = useExerciseTaxonomy();
-  const a = report.assessment;
   // Phase 99e: ALL section resolution (presence, include ticks, order,
   // numbering, titles, effective override-merged data) comes from the
   // SHARED resolver — the same output the print view and the plan-export
-  // edge function consume. num() === 0 → section is not rendered.
+  // edge function consume. A section absent from the resolver map is not
+  // rendered (include ticks + presence rules live in the resolver).
   const byKey = new Map(
     resolvePlanSummary(report).map((s) => [s.key, s] as const),
   );
   function sectionOf<K extends ResolvedSectionKey>(k: K): ResolvedSectionOf<K> | undefined {
     return byKey.get(k) as ResolvedSectionOf<K> | undefined;
   }
-  const num = (k: ResolvedSectionKey) => byKey.get(k)?.number ?? 0;
   const secTitle = (k: ResolvedSectionKey, t: string) => {
     const s = byKey.get(k);
     return s && s.number > 0 ? displayTitle(s) : t;
@@ -985,6 +997,14 @@ export function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSa
   const roadmap = sectionOf("roadmap")?.data.phases;
   const faq = sectionOf("faq")?.data.items;
   const femaleNoteText = sectionOf("femaleNote")?.data.text;
+  // Phase 99g: the core cards render their EFFECTIVE (override-merged)
+  // resolved data — the same values print + export consume.
+  const assessment = sectionOf("assessment")?.data;
+  const calories = sectionOf("calories")?.data;
+  const macros = sectionOf("macros")?.data;
+  const training = sectionOf("training")?.data;
+  const coachNotes = sectionOf("coachNotes")?.data;
+  const header = effectiveHeader(report);
 
   /* Phase 99d Item 2: optimistic include-tick state. Without this, the
      controlled checkbox snaps back to its old `checked` prop the moment
@@ -1015,11 +1035,34 @@ export function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSa
     }
   };
 
+  /* Phase 99g: a card "has edits" when its override exists — plus the
+     welcome card (override OR a header-name override) and Coach's
+     Notes (any saved text — it's a top-level field, not an override). */
+  const hasCardEdits = (key: SectionKey) => {
+    if (key === "welcome") {
+      return !!(
+        report.overrides?.welcome ||
+        report.headerOverride?.trainerName !== undefined ||
+        report.headerOverride?.businessName !== undefined
+      );
+    }
+    if (key === "coachNotes") return coachNotes != null;
+    return !!(report.overrides as Record<string, unknown> | undefined)?.[key];
+  };
+
   const resetCard = async (key: SectionKey, cardTitle: string) => {
-    const overrides: Record<string, unknown> = { ...(report.overrides as Record<string, unknown> | undefined) };
-    delete overrides[key];
     try {
-      await onPersistResult({ ...report, overrides: overrides as BlueprintResult["overrides"] }, `${cardTitle} reset to the generated version`);
+      if (key === "coachNotes") {
+        // Coach's Notes is a top-level result field — reset clears it.
+        await onPersistResult({ ...report, coachNotes: null }, `${cardTitle} removed`);
+        return;
+      }
+      const overrides: Record<string, unknown> = { ...(report.overrides as Record<string, unknown> | undefined) };
+      delete overrides[key];
+      const next: BlueprintResult = { ...report, overrides: overrides as BlueprintResult["overrides"] };
+      // Resetting the welcome card also clears the header override.
+      if (key === "welcome") next.headerOverride = undefined;
+      await onPersistResult(next, `${cardTitle} reset to the generated version`);
     } catch (err) {
       toast.error("Couldn't reset the card: " + (err instanceof Error ? err.message : "unknown error"));
       await onReload();
@@ -1034,14 +1077,33 @@ export function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSa
       toast.error("This card isn't open for editing — reopen it and try again");
       return;
     }
-    const override = overrideFromDraft(key, draft);
-    if (override === undefined) {
-      toast.error("This card can't be edited — nothing was saved");
+    // Phase 99g: validated cards reject out-of-range values with an honest
+    // message — never clamp silently.
+    const invalid = validateCardDraft(key, draft);
+    if (invalid) {
+      toast.error(invalid);
       return;
     }
     setEditingSaving(true);
     try {
-      await onPersistResult({ ...report, overrides: { ...report.overrides, [key]: override } }, "Card saved");
+      if (key === "coachNotes") {
+        // Coach's Notes lives at the TOP level of result, not in overrides.
+        const text = (draft as CoachNotesDraft).text.trim();
+        await onPersistResult({ ...report, coachNotes: text ? text : null }, text ? "Coach's Notes saved" : "Coach's Notes removed");
+      } else if (key === "welcome") {
+        const override = overrideFromDraft(key, draft);
+        await onPersistResult(
+          { ...report, overrides: { ...report.overrides, [key]: override }, headerOverride: headerOverrideFromDraft(draft as WelcomeDraft, report) },
+          "Card saved",
+        );
+      } else {
+        const override = overrideFromDraft(key, draft);
+        if (override === undefined) {
+          toast.error("This card can't be edited — nothing was saved");
+          return;
+        }
+        await onPersistResult({ ...report, overrides: { ...report.overrides, [key]: override } }, "Card saved");
+      }
       setEditing(null);
       setDraft(null);
     } catch (err) {
@@ -1057,7 +1119,7 @@ export function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSa
   const cardActions = (key: SectionKey, cardTitle: string, opts?: { editable?: boolean }) =>
     canEdit ? (
       <div className="flex items-center gap-1.5">
-        {!!(report.overrides as Record<string, unknown> | undefined)?.[key] && (
+        {hasCardEdits(key) && (
           <>
             <span className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "rgba(0,174,239,0.12)", color: "#00AEEF" }}>
               Edited
@@ -1136,10 +1198,10 @@ export function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSa
       <div className="flex items-center justify-between rounded-xl border px-4 py-3" style={{ backgroundColor: "var(--card-bg)", borderColor: "var(--card-border)" }}>
         <div>
           <p className="text-sm font-bold" style={{ color: "var(--page-text)" }}>
-            Your Plan Summary{report.header.businessName ? ` — ${report.header.businessName}` : ""}
+            Your Plan Summary{header.businessName ? ` — ${header.businessName}` : ""}
           </p>
           <p className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
-            Prepared by {report.header.trainerName} · generated {formatDate(createdAt)} · reviewed together at your next session
+            Prepared by {header.trainerName} · generated {formatDate(createdAt)} · reviewed together at your next session
           </p>
         </div>
         <div className="flex items-center gap-1">
@@ -1168,7 +1230,7 @@ export function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSa
             >
               {canEdit && (
                 <div className="mb-1 flex items-center justify-end gap-1.5">
-                  {report.overrides?.welcome && (
+                  {hasCardEdits("welcome") && (
                     <>
                       <span className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "rgba(0,174,239,0.12)", color: "#00AEEF" }}>
                         Edited
@@ -1223,19 +1285,25 @@ export function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSa
             </section>
           )}
 
-          {isIncluded(report.included, "assessment") && (
-          <Section title={`${num("assessment")} · Starting Assessment`} actions={cardActions("assessment", "Starting Assessment")}>
-            <div className={rowCls}><span className={rowLabel}>Weight</span><span className={rowValue}>{a.weightKg} kg</span></div>
-            <div className={rowCls}><span className={rowLabel}>Height</span><span className={rowValue}>{a.heightCm} cm</span></div>
-            <div className={rowCls}><span className={rowLabel}>BMI</span><span className={rowValue}>{a.bmi}</span></div>
-            <div className={rowCls}><span className={rowLabel}>Body fat</span><span className={rowValue}>{a.bodyFatPct != null ? `${a.bodyFatPct}%` : "—"}</span></div>
-            <div className={rowCls}><span className={rowLabel}>Fat mass</span><span className={rowValue}>{a.fatMassKg != null ? `${a.fatMassKg} kg` : "—"}</span></div>
-            <div className={rowCls}><span className={rowLabel}>Lean mass</span><span className={rowValue}>{a.leanMassKg != null ? `${a.leanMassKg} kg` : "—"}</span></div>
-            <div className={rowCls}><span className={rowLabel}>BMR ({a.bmrMethod === "katch-mcardle" ? "Katch-McArdle" : "Mifflin-St Jeor"})</span><span className={rowValue}>{a.bmr.toLocaleString()} kcal</span></div>
-            <div className={rowCls}><span className={rowLabel}>Maintenance calories</span><span className={rowValue}>{a.maintenance.toLocaleString()} kcal</span></div>
+          {assessment && (
+          <Section title={secTitle("assessment", "Starting Assessment")} actions={cardActions("assessment", "Starting Assessment", { editable: true })}>
+            {editing === "assessment" && draft ? (
+              editorShell("assessment", <AssessmentEditor value={draft as AssessmentDraft} onChange={setDraft} />)
+            ) : (
+              <>
+            <div className={rowCls}><span className={rowLabel}>Weight</span><span className={rowValue}>{assessment.weightKg} kg</span></div>
+            <div className={rowCls}><span className={rowLabel}>Height</span><span className={rowValue}>{assessment.heightCm} cm</span></div>
+            <div className={rowCls}><span className={rowLabel}>BMI</span><span className={rowValue}>{assessment.bmi}</span></div>
+            <div className={rowCls}><span className={rowLabel}>Body fat</span><span className={rowValue}>{assessment.bodyFatPct != null ? `${assessment.bodyFatPct}%` : "—"}</span></div>
+            <div className={rowCls}><span className={rowLabel}>Fat mass</span><span className={rowValue}>{assessment.fatMassKg != null ? `${assessment.fatMassKg} kg` : "—"}</span></div>
+            <div className={rowCls}><span className={rowLabel}>Lean mass</span><span className={rowValue}>{assessment.leanMassKg != null ? `${assessment.leanMassKg} kg` : "—"}</span></div>
+            <div className={rowCls}><span className={rowLabel}>BMR ({assessment.bmrMethod === "katch-mcardle" ? "Katch-McArdle" : "Mifflin-St Jeor"})</span><span className={rowValue}>{assessment.bmr.toLocaleString()} kcal</span></div>
+            <div className={rowCls}><span className={rowLabel}>Maintenance calories</span><span className={rowValue}>{assessment.maintenance.toLocaleString()} kcal</span></div>
             <p className="mt-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ backgroundColor: "var(--light-elevated)", color: "var(--page-text)" }}>
-              Goal: {report.goal.statement}
+              Goal: {assessment.goalStatement}
             </p>
+              </>
+            )}
           </Section>
           )}
 
@@ -1245,25 +1313,29 @@ export function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSa
             </Section>
           )}
 
-          {isIncluded(report.included, "calories") && (
-          <Section title={secTitle("calories", "Calorie Targets")} actions={cardActions("calories", "Calorie Targets")}>
+          {calories && (
+          <Section title={secTitle("calories", "Calorie Targets")} actions={cardActions("calories", "Calorie Targets", { editable: true })}>
+            {editing === "calories" && draft ? (
+              editorShell("calories", <CaloriesEditor value={draft as CaloriesDraft} onChange={setDraft} />)
+            ) : (
+              <>
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-lg border p-3 text-center" style={{ borderColor: "var(--card-border)" }}>
                 <p className="text-[10px] uppercase tracking-wide" style={{ color: "var(--light-text-muted)" }}>Maintenance</p>
-                <p className="stat-numeral text-xl" style={{ color: "var(--page-text)" }}>{report.calories.maintenance.toLocaleString()}</p>
+                <p className="stat-numeral text-xl" style={{ color: "var(--page-text)" }}>{calories.maintenance.toLocaleString()}</p>
                 <p className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>kcal / day</p>
               </div>
               <div className="rounded-lg border p-3 text-center" style={{ borderColor: "#00AEEF", backgroundColor: "var(--light-elevated)" }}>
                 <p className="text-[10px] uppercase tracking-wide" style={{ color: "#00AEEF" }}>Your target</p>
-                <p className="stat-numeral text-xl" style={{ color: "var(--page-text)" }}>{report.calories.target.toLocaleString()}</p>
+                <p className="stat-numeral text-xl" style={{ color: "var(--page-text)" }}>{calories.target.toLocaleString()}</p>
                 <p className="text-[10px]" style={{ color: "var(--light-text-muted)" }}>
-                  {report.goal.isFatLoss
-                    ? `${Math.round(report.calories.deficitPct * 100)}% deficit · ~${report.outcomes?.weeklyLossKg} kg/week`
+                  {calories.isFatLoss
+                    ? `${Math.round(calories.deficitPct * 100)}% deficit${calories.weeklyLossKg != null ? ` · ~${calories.weeklyLossKg} kg/week` : ""}`
                     : "at maintenance"}
                 </p>
               </div>
             </div>
-            {report.calories.clampedByFloor && (
+            {calories.clampedByFloor && (
               <p className="mt-2 rounded-lg border px-3 py-2 text-[11px] font-medium" style={{ borderColor: "rgba(245,158,11,0.4)", backgroundColor: "rgba(245,158,11,0.12)", color: "#F59E0B" }}>
                 Note: your target was raised to the safety floor (BMR × 1.05 / 1,200 kcal) — a deeper deficit would cost muscle.
               </p>
@@ -1296,30 +1368,38 @@ export function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSa
                 </button>
               )
             )}
+              </>
+            )}
           </Section>
           )}
 
-          {isIncluded(report.included, "macros") && (
-          <Section title={secTitle("macros", "Macro Targets — All Options")} actions={cardActions("macros", "Macro Targets")}>
+          {macros && (
+          <Section title={secTitle("macros", "Macro Targets — All Options")} actions={cardActions("macros", "Macro Targets", { editable: true })}>
+            {editing === "macros" && draft ? (
+              editorShell("macros", <MacrosEditor value={draft as MacrosDraft} onChange={setDraft} />)
+            ) : (
+              <>
             <MacroTable
-              title={`At your target (${report.calories.target.toLocaleString()} kcal)`}
-              styles={report.macroStyles}
+              title={`At your target (${calories ? calories.target.toLocaleString() : report.calories.target.toLocaleString()} kcal)`}
+              styles={macros.styles}
               gramsOf={(s) => s.atTarget}
-              recommendedKey={report.recommended.key}
-              floor={report.proteinFloor.grams}
+              recommendedKey={macros.recommended.key}
+              floor={macros.proteinFloor.grams}
               showFlags
             />
             <MacroTable
-              title={`At maintenance (${report.calories.maintenance.toLocaleString()} kcal)`}
-              styles={report.macroStyles}
+              title={`At maintenance (${macros.maintenance.toLocaleString()} kcal)`}
+              styles={macros.styles}
               gramsOf={(s) => s.atMaintenance}
               recommendedKey={null}
               floor={null}
             />
             <p className="mt-2 text-[11px]" style={{ color: "var(--light-text-muted)" }}>
-              Protein floor: {report.proteinFloor.grams} g ({report.proteinFloor.basis}). Recommended:{" "}
-              <strong style={{ color: "#00AEEF" }}>{report.recommended.name}</strong> — {report.recommended.reason}.
+              Protein floor: {macros.proteinFloor.grams} g ({macros.proteinFloor.basis}). Recommended:{" "}
+              <strong style={{ color: "#00AEEF" }}>{macros.recommended.name}</strong> — {macros.recommended.reason}.
             </p>
+              </>
+            )}
           </Section>
           )}
 
@@ -1418,8 +1498,15 @@ export function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSa
             </Section>
           )}
 
-          {isIncluded(report.included, "training") && (
-          <Section title={secTitle("training", `Training Plan (GBC) · ${report.training.sessions.length} sessions + ${report.training.stepTarget.toLocaleString()} steps/day`)} actions={cardActions("training", "Training Plan")}>
+          {training && isIncluded(report.included, "training") && (
+          <Section title={secTitle("training", `Training Plan (GBC) · ${training.sessions.length} sessions + ${training.stepTarget.toLocaleString()} steps/day`)} actions={cardActions("training", "Training Plan", { editable: true })}>
+            {/* Phase 99g: pencil editing (text-level overrides) takes
+                precedence; the Phase 81 module editor below is for
+                swapping in different exercises from the library. */}
+            {editing === "training" && draft ? (
+              editorShell("training", <TrainingCardEditor value={draft as TrainingDraft} onChange={setDraft} />)
+            ) : (
+            <>
             {/* Phase 81 Item 2: trainer-only edit toggle */}
             {canEdit && !editMode && (
               <button
@@ -1478,7 +1565,7 @@ export function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSa
               </>
             ) : (
               <>
-            {report.training.sessions.map((s, i) => (
+            {training.sessions.map((s, i) => (
               <div key={i} className="mb-3 rounded-lg border p-3 last:mb-0" style={{ borderColor: "var(--card-border)", backgroundColor: "var(--light-elevated)" }}>
                 <p className="mb-1.5 text-xs font-bold" style={{ color: "var(--page-text)" }}>{s.name}</p>
                 {s.blocks.map((b) => (
@@ -1499,7 +1586,7 @@ export function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSa
               </div>
             ))}
             <ul className="mt-2 list-inside list-disc space-y-0.5 text-[10px]" style={{ color: "var(--light-text-muted)" }}>
-              {report.training.restRules.map((r) => (
+              {training.restRules.map((r) => (
                 <li key={r}>{r}</li>
               ))}
             </ul>
@@ -1511,6 +1598,8 @@ export function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSa
               </ul>
             )}
               </>
+            )}
+            </>
             )}
           </Section>
           )}
@@ -1741,6 +1830,34 @@ export function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSa
               </>
             )}
           </Section>
+          )}
+
+          {/* Phase 99g Item 2: Coach's Notes — trainer free-text card.
+              Stored top-level as result.coachNotes (absent = no card).
+              Renders here, in print, and in the plan-export doc. The
+              editor must open even when the card doesn't exist yet —
+              hence the editing-branch in the guard, not just coachNotes. */}
+          {(coachNotes || (editing === "coachNotes" && draft)) && (
+            <Section title={secTitle("coachNotes", "Coach's Notes")} actions={cardActions("coachNotes", "Coach's Notes", { editable: true })}>
+              {editing === "coachNotes" && draft ? (
+                editorShell("coachNotes", <CoachNotesEditor value={draft as CoachNotesDraft} onChange={setDraft} />)
+              ) : (
+                coachNotes?.paragraphs.map((p, i) => (
+                  <p key={`${i}-${p.slice(0, 24)}`} className="mb-1.5 text-[11px] leading-relaxed last:mb-0" style={{ color: "var(--page-text)" }}>{p}</p>
+                ))
+              )}
+            </Section>
+          )}
+          {coachNotes == null && canEdit && isInc("coachNotes") && editing !== "coachNotes" && (
+            <button
+              type="button"
+              aria-label="Add Coach's Notes"
+              onClick={() => { setDraft({ text: "" } satisfies CoachNotesDraft); setEditing("coachNotes"); }}
+              className="flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--card-border)] px-3 py-2 text-[11px] font-semibold text-[var(--light-text-muted)] transition hover:border-[var(--azfit-primary)]/50 hover:text-[var(--page-text)]"
+            >
+              <Plus size={12} />
+              Add Coach's Notes
+            </button>
           )}
 
           {/* Phase 80 Item 2: medical disclaimer — footer of the

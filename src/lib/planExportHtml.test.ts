@@ -135,3 +135,41 @@ describe("buildPlanExportHtml", () => {
     expect(html).toContain("Consult your physician before starting any exercise program.");
   });
 });
+
+describe("Phase 99g — Coach's Notes in the export", () => {
+  it("renders paragraphs with line breaks, escaped (never HTML)", () => {
+    const r = baseResult();
+    r.coachNotes = "Great work this week.\n\nNext week: <script>alert(1)</script>\nkeep it up.";
+    const html = buildHtml(r);
+    expect(html).toContain("Coach&#39;s Notes");
+    expect(html).toContain("Great work this week.");
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    // single newlines inside a paragraph become <br>
+    expect(html).toContain("keep it up.");
+  });
+
+  it("include tick removes the card from the export entirely", () => {
+    const r = baseResult();
+    r.coachNotes = "secret notes";
+    r.included = { coachNotes: false };
+    const html = buildHtml(r);
+    expect(html).not.toContain("Coach's Notes");
+    expect(html).not.toContain("secret notes");
+  });
+
+  it("core-card overrides export the effective values (same resolver)", () => {
+    const r = baseResult();
+    r.overrides = {
+      assessment: { weightKg: 100 },
+      training: { stepTarget: 12000 },
+    };
+    const html = buildHtml(r);
+    expect(html).toContain("100 kg");
+    expect(html).toContain("rest");
+    expect(html).toContain("12,000"); // steps not a table cell — check title separately
+    const sections = resolvePlanSummary(r);
+    const t = sections.find((s) => s.key === "training");
+    expect(t?.title).toContain("12,000 steps/day");
+  });
+});

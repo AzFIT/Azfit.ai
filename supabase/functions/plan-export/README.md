@@ -22,7 +22,12 @@ from there.
 ticks, order, numbering, display formatting) comes from the SAME pure
 resolver the app report and print view consume —
 `src/lib/planSummaryRender.ts`. There is no third renderer divergence by
-construction.
+construction. **Phase 99g:** the resolver also carries the core-card
+effective values (assessment / calories / macros / training overrides),
+the **Coach's Notes** card (`result.coachNotes` — rendered last, plain
+escaped paragraphs) and the **header override**
+(`result.headerOverride`, applied via `effectiveHeader`) — the export
+shows exactly what the app shows.
 
 ## Deploy
 

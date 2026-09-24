@@ -192,3 +192,75 @@ describe("resolveByKey + displayTitle", () => {
     expect(displayTitle(calories)).toBe(`${calories.number} · Calorie Targets`);
   });
 });
+
+describe("Phase 99g — core-card effective data + Coach's Notes", () => {
+  it("coachNotes resolves last, numbered after faq, only when text exists", () => {
+    const r = baseResult();
+    expect(resolvePlanSummary(r).map((s) => s.key)).not.toContain("coachNotes");
+    r.coachNotes = "P1\n\nP2";
+    const sections = resolvePlanSummary(r);
+    const cn = sections[sections.length - 1];
+    expect(cn.key).toBe("coachNotes");
+    if (cn.key === "coachNotes") {
+      expect(cn.data.paragraphs).toEqual(["P1", "P2"]);
+      expect(cn.title).toBe("Coach's Notes");
+    }
+    const faq = sections.find((s) => s.key === "faq")!;
+    expect(cn.number).toBe(faq.number + 1);
+  });
+
+  it("include tick excludes coachNotes everywhere", () => {
+    const r = baseResult();
+    r.coachNotes = "notes";
+    r.included = { coachNotes: false };
+    expect(resolvePlanSummary(r).map((s) => s.key)).not.toContain("coachNotes");
+    expect(resolveByKey(r).has("coachNotes")).toBe(false);
+  });
+
+  it("calories override flows into resolved data with a recomputed weekly loss", () => {
+    const r = baseResult();
+    r.overrides = { calories: { target: 2000 } };
+    const c = resolvePlanSummary(r).find((s) => s.key === "calories");
+    if (c?.key === "calories") {
+      expect(c.data.target).toBe(2000);
+      expect(c.data.overridden).toBe(true);
+      expect(c.data.deficitPct).toBeCloseTo((2200 - 2000) / 2200, 4);
+      // (2200-2000)*7/7700 = 0.18 kg/week
+      expect(c.data.weeklyLossKg).toBeCloseTo(0.18, 2);
+    } else {
+      throw new Error("calories section missing");
+    }
+    // un-edited: base outcome flows through
+    const base = resolvePlanSummary(baseResult()).find((s) => s.key === "calories");
+    if (base?.key === "calories") expect(base.data.weeklyLossKg).toBe(0.7);
+  });
+
+  it("macros + training overrides flow into resolved data and titles", () => {
+    const r = baseResult();
+    r.overrides = {
+      macros: { styles: { balanced: { proteinG: 100, carbsG: 170, fatsG: 60 } } },
+      training: { stepTarget: 12000 },
+    };
+    const m = resolvePlanSummary(r).find((s) => s.key === "macros");
+    if (m?.key === "macros") {
+      expect(m.data.styles[0].atTarget.proteinG).toBe(100);
+      expect(m.data.styles[0].atTarget.belowFloor).toBe(true); // < 130 g floor
+      expect(m.data.anyBelowFloor).toBe(true);
+    } else throw new Error("macros section missing");
+    const t = resolvePlanSummary(r).find((s) => s.key === "training");
+    expect(t?.title).toContain("12,000 steps/day");
+    if (t?.key === "training") expect(t.data.stepTarget).toBe(12000);
+  });
+
+  it("assessment override recomputes derived values in the resolved card", () => {
+    const r = baseResult();
+    r.overrides = { assessment: { weightKg: 100, goalStatement: "Custom goal" } };
+    const a = resolvePlanSummary(r).find((s) => s.key === "assessment");
+    if (a?.key === "assessment") {
+      expect(a.data.weightKg).toBe(100);
+      expect(a.data.bmi).toBeCloseTo(100 / 1.7 ** 2, 1);
+      expect(a.data.goalStatement).toBe("Custom goal");
+      expect(a.data.bmr).toBe(1650);
+    } else throw new Error("assessment section missing");
+  });
+});

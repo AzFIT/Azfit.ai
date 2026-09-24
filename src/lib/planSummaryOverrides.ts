@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════
-   planSummaryOverrides (Phase 99d Item 1+2) — per-card manual edits
-   and include/exclude ticks for the Plan Summary.
+   planSummaryOverrides (Phase 99d Item 1+2, Phase 99g Item 1–3) —
+   per-card manual edits and include/exclude ticks for the Plan
+   Summary.
 
    Model: the engine-generated card values in
    plan_summaries.result are NEVER mutated. Trainers' edits are
@@ -9,13 +10,23 @@
    fields (arrays replace wholesale). result.included maps
    sectionKey → boolean (absent = included).
 
-   Pure + unit-tested. Both renderers (app report + print/export)
-   read cards ONLY through the effective* helpers here, so the
-   include ticks and overrides are respected everywhere by
+   Phase 99g extends editability to the remaining core cards
+   (assessment / calories / macros / training), adds the free-text
+   Coach's Notes card (result.coachNotes — a top-level result field,
+   NOT an override) and the report-header override
+   (result.headerOverride). Derived values are recomputed from the
+   effective inputs where the math is card-local (BMI, fat/lean
+   mass, macro below-floor flags, deficit display) so an edited card
+   never shows a stale derived number.
+
+   Pure + unit-tested. All renderers (app report, print view,
+   export) read cards ONLY through the effective* helpers here, so
+   the include ticks and overrides are respected everywhere by
    construction.
    ═══════════════════════════════════════════════════════════════ */
 
 import type { BlueprintResult } from "./planBlueprint";
+import type { GbcSession } from "./planBlueprint";
 
 export type SectionKey =
   | "welcome"
@@ -32,7 +43,8 @@ export type SectionKey =
   | "supplements"
   | "tracking"
   | "roadmap"
-  | "faq";
+  | "faq"
+  | "coachNotes";
 
 /* ── Override shapes (each = the full editable subset of a card) ── */
 export interface WelcomeOverride {
@@ -87,6 +99,43 @@ export interface RoadmapOverride {
   phases?: { weeks: string; name: string; note: string }[];
 }
 
+/* ── Phase 99g Item 1: editable core cards ────────────────────── */
+
+export interface AssessmentOverride {
+  weightKg?: number;
+  heightCm?: number;
+  /** null = deliberate clear ("not measured"). */
+  bodyFatPct?: number | null;
+  goalStatement?: string;
+}
+
+export interface CaloriesOverride {
+  target?: number;
+  /** fraction 0–0.5 (validated at save). */
+  deficitPct?: number;
+}
+
+export interface MacrosOverride {
+  /** key of one of the report's macro styles. */
+  recommendedKey?: string;
+  /** per-style atTarget grams (full values, validated ≥ 0). */
+  styles?: Record<string, { proteinG: number; carbsG: number; fatsG: number }>;
+}
+
+export interface TrainingOverride {
+  restRules?: string[];
+  stepTarget?: number;
+  /** full sessions matched by index; name/kind/finisher/rounds are
+   *  carried from the base so the stored override is complete. */
+  sessions?: GbcSession[];
+}
+
+export interface HeaderOverride {
+  trainerName?: string;
+  /** null = deliberately hide the business name. */
+  businessName?: string | null;
+}
+
 export interface PlanOverrides {
   welcome?: WelcomeOverride;
   weeklyTargets?: WeeklyTargetsOverride;
@@ -96,6 +145,10 @@ export interface PlanOverrides {
   tracking?: TrackingOverride;
   faq?: FaqOverride;
   roadmap?: RoadmapOverride;
+  assessment?: AssessmentOverride;
+  calories?: CaloriesOverride;
+  macros?: MacrosOverride;
+  training?: TrainingOverride;
 }
 
 /* ── Merge primitives ────────────────────────────────────────── */
@@ -182,6 +235,136 @@ export function effectiveRoadmap(r: BlueprintResult) {
   return phases ?? r.roadmap;
 }
 
+/* ── Phase 99g Item 1: effective core cards ───────────────────── */
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/** Assessment: weight/height/body-fat/goal-statement edits merge over
+ *  the base card; BMI + fat/lean mass are RECOMPUTED from the
+ *  effective inputs (pure card-local math) so an edited card never
+ *  shows a stale derived number. BMR + maintenance stay base — they
+ *  belong to the calorie engine (age/gender live outside this card). */
+export function effectiveAssessment(r: BlueprintResult) {
+  const ov = r.overrides?.assessment;
+  const a = r.assessment;
+  const weightKg = ov?.weightKg ?? a.weightKg;
+  const heightCm = ov?.heightCm ?? a.heightCm;
+  const bodyFatPct = ov?.bodyFatPct === undefined ? a.bodyFatPct : ov.bodyFatPct;
+  const leanMassKg = bodyFatPct != null ? round1(weightKg * (1 - bodyFatPct / 100)) : null;
+  return {
+    weightKg,
+    heightCm,
+    bmi: round1(weightKg / (heightCm / 100) ** 2),
+    bodyFatPct,
+    fatMassKg: leanMassKg != null ? round1(weightKg - leanMassKg) : null,
+    leanMassKg,
+    bmr: a.bmr,
+    bmrMethod: a.bmrMethod,
+    maintenance: a.maintenance,
+    goalStatement: ov?.goalStatement ?? r.goal.statement,
+  };
+}
+
+/** Calories: target/deficitPct edits merge over the base. When the
+ *  target is edited, the displayed deficit is recomputed from
+ *  maintenance (never a stale pair), and the "raised to the safety
+ *  floor" note no longer applies (the manual target is deliberate —
+ *  save-time validation enforces ≥ the 1,200 kcal floor). */
+export function effectiveCalories(r: BlueprintResult) {
+  const ov = r.overrides?.calories;
+  const base = r.calories;
+  const overridden = !!(ov && (ov.target !== undefined || ov.deficitPct !== undefined));
+  const target = ov?.target ?? base.target;
+  const deficitPct =
+    ov?.deficitPct ?? (ov?.target != null && base.maintenance > 0
+      ? Math.max(0, (base.maintenance - target) / base.maintenance)
+      : base.deficitPct);
+  return {
+    ...base,
+    target,
+    deficitPct,
+    deficitPerDay: base.maintenance - target,
+    clampedByFloor: overridden ? false : base.clampedByFloor,
+    overridden,
+  };
+}
+
+/** Macros: the recommended-style pick and per-style atTarget grams
+ *  merge over the base table; below-floor flags + notes are
+ *  RECOMPUTED from the effective protein vs the protein floor so a
+ *  boosted style never carries a stale ⚠ (or a stale all-clear). */
+export function effectiveMacros(r: BlueprintResult) {
+  const ov = r.overrides?.macros;
+  const styles = r.macroStyles.map((s) => {
+    const g = ov?.styles?.[s.key];
+    if (!g) return s;
+    const proteinG = g.proteinG;
+    const belowFloor = proteinG < r.proteinFloor.grams;
+    return {
+      ...s,
+      atTarget: {
+        proteinG,
+        carbsG: g.carbsG,
+        fatsG: g.fatsG,
+        belowFloor,
+        note: belowFloor ? "Below your protein floor — boost protein by trimming carbs" : null,
+      },
+    };
+  });
+  let recommended = r.recommended;
+  if (ov?.recommendedKey) {
+    const style = styles.find((s) => s.key === ov.recommendedKey);
+    if (style) {
+      recommended = { key: style.key, name: style.name, reason: "your coach's pick for this plan" };
+    }
+  }
+  const anyBelowFloor = styles.some((s) => s.atTarget.belowFloor);
+  return { target: r.calories.target, maintenance: r.calories.maintenance, styles, recommended, proteinFloor: r.proteinFloor, anyBelowFloor };
+}
+
+/** Training: restRules / stepTarget / session blocks merge over the
+ *  base card. (The Phase 81 structured TrainingPlanEditor writes the
+ *  program itself via onSaveTraining — this override path only
+ *  changes what the SUMMARY displays.) */
+export function effectiveTraining(r: BlueprintResult) {
+  const ov = r.overrides?.training;
+  return {
+    sessions: ov?.sessions ?? r.training.sessions,
+    restRules: ov?.restRules ?? r.training.restRules,
+    stepTarget: ov?.stepTarget ?? r.training.stepTarget,
+    metaNotes: r.trainingMeta?.notes ?? [],
+  };
+}
+
+/* ── Phase 99g Item 2: Coach's Notes ──────────────────────────── */
+/** Coach's Notes = a trainer free-text card stored at the TOP level
+ *  of result (result.coachNotes), not in overrides — absent or blank
+ *  = no card anywhere. */
+export function effectiveCoachNotes(r: BlueprintResult): string | null {
+  return typeof r.coachNotes === "string" && r.coachNotes.trim().length > 0 ? r.coachNotes : null;
+}
+
+/** Markdown-lite paragraphs: split on blank lines, trim, drop
+ *  empties. Line breaks inside a paragraph are preserved by the
+ *  renderers (whitespace-pre-wrap / <br>) — never interpreted as
+ *  HTML. */
+export function coachNotesParagraphs(text: string): string[] {
+  return text
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+
+/* ── Phase 99g Item 3: header override ────────────────────────── */
+/** The report header the renderers show: headerOverride replaces the
+ *  generated trainer/business names (an empty trainer name falls
+ *  back to the generated one; businessName null hides it). */
+export function effectiveHeader(r: BlueprintResult): { trainerName: string; businessName?: string | null } {
+  const ov = r.headerOverride;
+  const trainerName = ov?.trainerName?.trim() ? ov.trainerName.trim() : r.header.trainerName;
+  const businessName = ov?.businessName === undefined ? r.header.businessName : ov.businessName;
+  return { trainerName, businessName };
+}
+
 /* ── Include ticks ───────────────────────────────────────────── */
 export function isIncluded(included: BlueprintResult["included"], key: SectionKey): boolean {
   return included?.[key] !== false;
@@ -203,10 +386,11 @@ export const ALL_SECTION_KEYS: SectionKey[] = [
   "tracking",
   "roadmap",
   "faq",
+  "coachNotes",
 ];
 
 /** Sections actually present in this report (old summaries lack the
- *  99c cards) — counting only present sections for the last-tick rule. */
+ *  99c/99g cards) — counting only present sections for the last-tick rule. */
 export function presentSectionKeys(r: BlueprintResult): SectionKey[] {
   const present: SectionKey[] = ["assessment", "calories", "macros", "training", "sampleDay", "tracking", "roadmap", "faq"];
   if (r.welcome) present.push("welcome");
@@ -216,6 +400,7 @@ export function presentSectionKeys(r: BlueprintResult): SectionKey[] {
   if (r.nutritionGuide) present.push("nutritionGuide");
   if (r.extras?.sampleDiet) present.push("sampleDiet");
   if (r.extras?.supplements) present.push("supplements");
+  if (effectiveCoachNotes(r)) present.push("coachNotes");
   return present;
 }
 
@@ -237,6 +422,7 @@ export function sectionPresent(r: BlueprintResult, key: SectionKey): boolean {
     case "nutritionGuide": return !!r.nutritionGuide;
     case "sampleDiet": return !!r.extras?.sampleDiet;
     case "supplements": return !!r.extras?.supplements;
+    case "coachNotes": return effectiveCoachNotes(r) != null;
   }
 }
 
@@ -265,6 +451,7 @@ const NUMBERED_ORDER: (SectionKey | "femaleNote")[] = [
   "tracking",
   "roadmap",
   "faq",
+  "coachNotes",
 ];
 
 /** Section number under presence + include rules. Returns 0 when the
