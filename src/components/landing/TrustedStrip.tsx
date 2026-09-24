@@ -1,7 +1,7 @@
 /**
  * LANDING-A1 — single-row trusted-claims marquee directly under the hero.
- * Shares the LandingMarquee engine with TestimonialMarquee but stays
- * minimal on purpose: no cards, no hover pause, one continuous row.
+ * Shares the LandingMarquee engine with the rest of the landing page but
+ * stays minimal on purpose: no cards, no hover pause, one continuous row.
  *
  * HONEST DATA: the claims below are the verified live numbers (StatsSection
  * shows the same 270+ / 3 / 116+ / 1/5 values, plus the product's home

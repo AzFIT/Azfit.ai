@@ -1,9 +1,9 @@
 /**
  * LANDING-A1 — shared infinite-marquee engine for the landing page.
- * Consumed by TestimonialMarquee (cards, pause-on-hover) and
- * TrustedStrip (bare row, no pause). Hand-ported from the Aceternity UI
- * "Infinite Moving Cards" pattern, Vite-compatible: no @aceternity/registry,
- * no next/* imports; the keyframes live in tailwind.config.js (`marquee`).
+ * Consumed by TrustedStrip (bare row, no pause). Hand-ported from the
+ * Aceternity UI "Infinite Moving Cards" pattern, Vite-compatible: no
+ * @aceternity/registry, no next/* imports; the keyframes live in
+ * tailwind.config.js (`marquee`).
  *
  * Mechanics: an overflow-hidden mask wraps a `w-max` flex track whose
  * content is duplicated 2× — one `translateX(-50%)` sweep is therefore a

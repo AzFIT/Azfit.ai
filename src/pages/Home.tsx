@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import Footer from "@/components/Footer";
 import TrustedStrip from "@/components/landing/TrustedStrip";
-import TestimonialMarquee from "@/components/landing/TestimonialMarquee";
+import TransformationCompare from "@/components/landing/TransformationCompare";
 import { useTheme } from "@/hooks/useTheme";
 import { supabase } from "@/lib/supabase";
 import AIShowcase from "@/components/AIShowcase";
@@ -674,7 +674,7 @@ function PricingSection({ onNavigate }: { onNavigate: (path: string) => void }) 
         <ScrollReveal className="mb-12 lg:mb-16">
           <div className="flex items-center gap-4">
             <p className="section-label text-xs font-semibold">
-              04 — Pricing
+              03 — Pricing
             </p>
             <div className="section-divider flex-1" />
           </div>
@@ -831,7 +831,7 @@ function DownloadCTA({ onNavigate }: { onNavigate: (path: string) => void }) {
       <div className="relative z-10 mx-auto max-w-2xl text-center">
         <ScrollReveal>
           <p className="section-label text-xs font-semibold">
-            05 — Waitlist
+            04 — Waitlist
           </p>
           <h2
             className="font-display text-chrome mt-4 text-4xl font-bold leading-tight lg:text-[56px]"
@@ -1021,7 +1021,7 @@ export default function Home() {
       <StatsSection />
       <FeaturesSection />
       <HowItWorksSection />
-      <TestimonialMarquee />
+      <TransformationCompare />
       <PricingSection onNavigate={handleNavigate} />
       <DownloadCTA onNavigate={handleNavigate} />
 
