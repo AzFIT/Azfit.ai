@@ -2216,3 +2216,10 @@ Extends the 99d per-card override system to the remaining core content cards and
 **Screenshots:** `.temp/audit/shots/99g/` (edit-coachnotes / edit-macros / edit-training 1280 dark, ticked-off, print-1280, report 1280 light + 390 dark/light).
 
 **VERIFIER NOTE:** the live plan-export function needs a re-deploy (MCP flat-bundle: index.ts + planSummaryRender.ts + planSummaryOverrides.ts + planExportHtml.ts + planSummaryExtras.ts) for coachNotes + headerOverride to appear in exported docs — repo imports unchanged (`../../src/lib/…`), the bundle just carries the new module content.
+
+## 99g MERGE + DEPLOY — 2026-09-24
+- Merge: fast-forward only `723f882 → a726e16` (feat/plan-summary-99g), no merge commit. Clean ff confirmed.
+- Gates on merged main: tsc · lint · 1199/1199 · build + 404 fallback copy · e2e 4/4 — all green.
+- Push: `723f882..a726e16` at epoch 1790269765.
+- Deploy verified: https://azfit.fit/ Last-Modified `Thu, 24 Sep 2026 17:10:44 GMT` (epoch 1790269844) ≥ push epoch, probe 5 of 6.
+- Edge function NOT re-deployed by KC — POV redeploys plan-export via MCP flat-bundle (see verifier note above).
