@@ -2233,3 +2233,13 @@ Branch `feat/landing-a1` off main (`af29985`). Hand-ported Aceternity "Infinite 
 - Gates: tsc · lint · 1199/1199 · build + 404 copy · e2e 4/4. scrollWidth == viewport at 1280 AND 390, zero console errors.
 - Screenshots: `.temp/audit/shots/uix/` (trusted-strip 1280/390, panel-gate-off 1280/390, marquee-gate-on 1280/390 — gate-on used a local-only temp seed, reverted before commit; nothing fabricated shipped).
 - Decision-log entry C appended in 07-UIUX-STUDIO. Flag to UX: section number "05" sits between "02" and "03" (design-locked value; renumber if undesired).
+
+## OAUTH-1 — Google OAuth refresh-token flow for edge functions — 2026-09-25
+Branch `feat/oauth-edge-auth` off main (`54bde98`). Built in an isolated git worktree (`AZFIT-AI-OAUTH`) because UX was actively editing the main working tree (A2 compare pick) — see report flags.
+- Root cause being fixed: service accounts have ZERO Drive storage quota (Google's own verdict) — plan-export's per-export Doc creation hard-502s at the Drive boundary. Fix: OAuth 2.0 refresh-token flow acting as the owner's account (azwarhktrl@gmail.com).
+- `src/lib/googleOAuth.ts` (PURE, unit-tested, flat-bundle deployable like planSummaryRender): `resolveGoogleAuthMode(env)` → oauth / legacy_sa / incomplete; `refreshGoogleAccessToken(cfg, fetchImpl?)` → sanitized errors, tokens never echoed.
+- Runtime fallback, NOT a flag day: OAuth secrets absent → legacy SA JWT flow unchanged (sheets-export keeps working pre-provisioning). Refresh token present but client id/secret missing → loud 503 not_configured (owner intended OAuth — silent SA fallback would fail on quota anyway).
+- Wired into plan-export + sheets-export (identical pattern: cheap 503 gate before any work, token source swap, all Drive/Sheets calls unchanged). READMEs updated: OAuth secrets table, owner prerequisite (POV provisions GOOGLE_OAUTH_REFRESH_TOKEN / _CLIENT_ID / _CLIENT_SECRET), SA documented as legacy fallback, flat-bundle file lists now include googleOAuth.ts.
+- Unit tests: 8 new (mode resolution ×5 incl. whitespace/empty, grant form shape, Google 400 sanitized + no token echo, 200-without-token honest error). 1207/1207 total.
+- Gates: tsc · lint · 1207/1207 · build + 404 copy · e2e 4/4 (e2e needed .env/.env.local copied into the worktree — gitignored files don't travel with `git worktree add`).
+- KC did NOT touch Supabase secrets/dashboards and did NOT deploy — POV deploys both functions via MCP flat bundle (+ provisions the three secrets + live-verifies).

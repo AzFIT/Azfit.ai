@@ -2,9 +2,12 @@
 // sheets-export — Phase 98a trainer-authorized Google Sheets export.
 //
 // Why this exists: the owner exports business data to Google Sheets.
-// The service-account credential NEVER lives in the repo or the
-// client — it is the Supabase secret SHEETS_SA_JSON, read only here.
-// The app invokes this function with the trainer's JWT; the export
+// The Google credential NEVER lives in the repo or the client. OAUTH-1
+// auth model: prefer the OAuth 2.0 refresh-token flow acting as the
+// owner's account (GOOGLE_OAUTH_* secrets, provisioned by POV); fall
+// back to the legacy service-account JWT flow (SHEETS_SA_JSON) when the
+// OAuth secrets are absent — runtime fallback, not a flag day. The app
+// invokes this function with the trainer's JWT; the export
 // scope is the caller's OWN data, filtered by explicit trainer_id
 // via the service-role client (the payload is never trusted for
 // scoping — there is no payload at all).
@@ -16,10 +19,10 @@
 //           payments, packages} }   — real counts only
 //   → 401 { error: "Unauthorized" }           bad/missing JWT
 //   → 403 { error }                           caller is not a trainer
-//   → 503 { error, code: "not_configured" }   SHEETS_SA_JSON missing
-//                                             or malformed (owner:
-//                                             add the secret via the
-//                                             Dashboard)
+//   → 503 { error, code: "not_configured" }   Google credential missing
+//                                             or malformed (OAuth secrets
+//                                             incomplete, or SA path active
+//                                             without SHEETS_SA_JSON)
 //   → 5xx { error }                           Google/provider failure,
 //                                             sanitized — the service
 //                                             account is NEVER logged
@@ -33,6 +36,8 @@
 // OWNER PREREQUISITES (README.md in this folder):
 //   1. Sheets API + Drive API enabled on the GCP project.
 //   2. SHEETS_SA_JSON secret = the service account's full JSON.
+//   3. (OAUTH-1, preferred) GOOGLE_OAUTH_REFRESH_TOKEN +
+//      GOOGLE_OAUTH_CLIENT_ID + GOOGLE_OAUTH_CLIENT_SECRET — POV provisions.
 // ============================================================
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
@@ -50,6 +55,10 @@ import {
   type ExportPaymentRow,
   type ExportSessionRow,
 } from "../../src/lib/sheetsExportRows.ts";
+import {
+  refreshGoogleAccessToken,
+  resolveGoogleAuthMode,
+} from "../../src/lib/googleOAuth.ts";
 
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_SCOPES = [
@@ -148,7 +157,11 @@ serve(async (req) => {
       return json({ error: "Function is not configured (missing env secrets)" }, 500);
     }
 
-    // ── Service account (before anything else — cheap honest 503) ──
+    // ── Google auth config (before anything else — cheap honest 503) ──
+    // OAUTH-1: prefer the OAuth refresh-token flow (owner's account);
+    // fall back to the legacy SA JWT flow when the OAuth secrets are
+    // absent. "incomplete" fails loudly — the owner intended OAuth.
+    const authMode = resolveGoogleAuthMode(Deno.env.toObject());
     const saRaw = Deno.env.get("SHEETS_SA_JSON");
     let sa: ServiceAccount | null = null;
     if (saRaw) {
@@ -166,7 +179,16 @@ serve(async (req) => {
         sa = null; // malformed secret → same honest 503 as missing
       }
     }
-    if (!sa) {
+    if (authMode.mode === "incomplete") {
+      return json(
+        {
+          error: "Export is not configured — OAuth client secrets are incomplete (refresh token present, client id/secret missing)",
+          code: "not_configured",
+        },
+        503,
+      );
+    }
+    if (authMode.mode === "legacy_sa" && !sa) {
       return json(
         {
           error: "Export is not configured — the service account secret needs to be added",
@@ -255,7 +277,13 @@ serve(async (req) => {
     };
 
     // ── Google auth ────────────────────────────────────────────
-    const accessToken = await googleAccessToken(sa);
+    // OAuth refresh grant when provisioned (owner's account), else the
+    // legacy SA JWT flow — unchanged behavior while the SA path is active.
+    // Tokens never logged or returned.
+    const accessToken =
+      authMode.mode === "oauth"
+        ? await refreshGoogleAccessToken(authMode)
+        : await googleAccessToken(sa as ServiceAccount);
 
     // ── Spreadsheet: reuse the stored one, else create ─────────
     const prevConfig = profile?.sheets_config ?? null;

@@ -6,12 +6,16 @@
 // deps): this function renders the summary to a clean standalone
 // HTML document SERVER-SIDE and uploads it to Google Drive with
 // Google's native HTML→Google-Doc conversion (Drive files.create,
-// mimeType application/vnd.google-apps.document). The trainer gets
-// an editable Google Doc in the SA's Drive.
+// mimeType application/vnd.google-apps.document). The trainer gets an
+// editable Google Doc in the OWNER's Drive (OAuth path) or the SA's
+// Drive (legacy fallback — quota-limited, see README).
 //
-// The service-account credential is the EXISTING Supabase secret
-// SHEETS_SA_JSON (same SA as sheets-export) — NEVER in the repo,
-// NEVER client-side.
+// The Google credential is NEVER in the repo or client-side. OAUTH-1
+// auth model: prefer the OAuth 2.0 refresh-token flow acting as the
+// owner's account (azwarhktrl@gmail.com — service accounts have ZERO
+// Drive storage quota, so SA-owned file creation is impossible); fall
+// back to the legacy service-account JWT flow (SHEETS_SA_JSON) when the
+// OAuth secrets are absent. See README.md for the secrets table.
 //
 // Section resolution comes from the SAME pure resolver the app and
 // print views consume (src/lib/planSummaryRender.ts) — bundled via
@@ -27,8 +31,9 @@
 //   → 404 { error }       unknown summary OR not this trainer's
 //                         client's summary (404 for both — no
 //                         existence leak)
-//   → 503 { error, code: "not_configured" } SHEETS_SA_JSON missing
-//                         or malformed
+//   → 503 { error, code: "not_configured" } Google credential missing
+//                         or malformed (OAuth secrets incomplete, or SA
+//                         path active without SHEETS_SA_JSON)
 //   → 5xx { error }       Google/provider failure, sanitized — the
 //                         service account is NEVER logged/returned.
 // ============================================================
@@ -40,6 +45,10 @@ import { resolvePlanSummary } from "../../src/lib/planSummaryRender.ts";
 import { effectiveHeader } from "../../src/lib/planSummaryOverrides.ts";
 import { buildPlanExportHtml } from "../../src/lib/planExportHtml.ts";
 import { MEDICAL_DISCLAIMER } from "../../src/lib/planSummaryExtras.ts";
+import {
+  refreshGoogleAccessToken,
+  resolveGoogleAuthMode,
+} from "../../src/lib/googleOAuth.ts";
 
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 // Drive-only scope: this function creates Google Docs, no Sheets.
@@ -169,7 +178,12 @@ serve(async (req) => {
       return json({ error: "summary_id is required" }, 400);
     }
 
-    // ── Service account (cheap honest 503 before any work) ─────
+    // ── Google auth config (cheap honest 503 before any work) ──
+    // OAUTH-1: prefer the OAuth refresh-token flow (owner's account — SAs
+    // have zero Drive quota); fall back to the legacy SA JWT flow when the
+    // OAuth secrets are absent. "incomplete" (refresh token set without
+    // client id/secret) fails loudly — the owner intended OAuth.
+    const authMode = resolveGoogleAuthMode(Deno.env.toObject());
     const saRaw = Deno.env.get("SHEETS_SA_JSON");
     let sa: ServiceAccount | null = null;
     if (saRaw) {
@@ -187,7 +201,16 @@ serve(async (req) => {
         sa = null; // malformed secret → same honest 503 as missing
       }
     }
-    if (!sa) {
+    if (authMode.mode === "incomplete") {
+      return json(
+        {
+          error: "Export is not configured — OAuth client secrets are incomplete (refresh token present, client id/secret missing)",
+          code: "not_configured",
+        },
+        503,
+      );
+    }
+    if (authMode.mode === "legacy_sa" && !sa) {
       return json(
         {
           error: "Export is not configured — the service account secret needs to be added",
@@ -280,7 +303,12 @@ serve(async (req) => {
     });
 
     // ── Google auth ────────────────────────────────────────────
-    const accessToken = await googleAccessToken(sa);
+    // OAuth refresh grant when provisioned (owner's account), else the
+    // legacy SA JWT flow. Tokens never logged or returned.
+    const accessToken =
+      authMode.mode === "oauth"
+        ? await refreshGoogleAccessToken(authMode)
+        : await googleAccessToken(sa as ServiceAccount);
 
     // ── Upload with native HTML→Google-Doc conversion ──────────
     const metadata = {
