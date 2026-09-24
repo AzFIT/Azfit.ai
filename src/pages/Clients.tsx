@@ -358,7 +358,7 @@ export default function ClientsPage() {
               type="button"
               onClick={async () => {
                 if (!user) return;
-                const link = `https://azfit.github.io/Azfit.ai/#/invite/${user.id}`;
+                const link = `https://azfit.fit/#/invite/${user.id}`;
                 try {
                   await navigator.clipboard.writeText(link);
                   toast.success("Invite link copied — send it to your client");

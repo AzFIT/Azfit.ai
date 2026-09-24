@@ -49,7 +49,7 @@ const DOCS_MIME = "application/vnd.google-apps.document";
 // The deployed site's public logo — fetched and inlined base64 so the
 // export has zero external assets (a fetch failure omits the logo
 // honestly; the HTML builder has a text fallback).
-const SITE_BASE = "https://azfit.github.io/Azfit.ai";
+const SITE_BASE = "https://azfit.fit";
 const LOGO_URL = `${SITE_BASE}/azfit-logo-header.png`;
 
 const corsHeaders = {

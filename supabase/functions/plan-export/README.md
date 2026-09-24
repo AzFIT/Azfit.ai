@@ -62,7 +62,7 @@ transpile and need no bundling.
    sheets-export). The SA needs the `drive.file` scope only — this
    function creates Google Docs, it does not touch Sheets.
 3. The AzFIT logo is fetched from the live site
-   (`https://azfit.github.io/Azfit.ai/azfit-logo-header.png`) and inlined
+   (`https://azfit.fit/azfit-logo-header.png`) and inlined
    base64; if the fetch fails the doc renders a text fallback — no
    external asset references in the export.
 
