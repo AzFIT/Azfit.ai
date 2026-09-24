@@ -2133,3 +2133,22 @@ Goal-adaptive: fat-loss gets the low-calorie toolkit (protein anchor with the re
 **Screenshots:** `.temp/audit/shots/99e/` (report-1280-dark, report-1280-light, report-390-dark, report-390-light — Export button visible in all four).
 
 - **Phase 99e merge + deploy:** fast-forward d54da86 → 65c7184, no merge commit; gates re-run on merged main all green (1152/1152 tests, e2e 4/4); main pushed at epoch 1790206666; deploy verified `Last-Modified: Wed, 23 Sep 2026 23:39:01 GMT` (epoch 1790206741) on probe 3 of 6. plan-export edge function live: 401 without JWT, 503 not_configured with a valid trainer JWT — exactly per spec (verifier-deployed).
+
+
+## Phase FIX-2 — Plan Summary persist path: audit claim investigated, hardening + regression tests (branch feat/fix2-summary-persist)
+
+**The AUDIT-2 claim ("edits + include ticks silently dead — zero requests, overrides/included stay NULL") did NOT reproduce on current main.** Root-cause investigation showed the wiring intact and both paths working end-to-end: include tick → `PATCH /rest/v1/plan_summaries?id=eq.…` → 204 → SQL-verified `result.included` landed; card edit → Save → second PATCH 204 → SQL-verified `result.overrides` landed. The audit's "zero requests" was a **measurement artifact**: supabase-js binds `fetch` at client creation, so the audit's `window.fetch` monkey-patch was blind to the real REST calls (and its clicks likely never landed on the real buttons). Reproduced live on the dev server with instrumentation on both paths before touching any code.
+
+**Fixes shipped (defensive hardening — the only genuinely silent paths found):**
+- `saveCard` in `PlanSummaryTab.tsx` had two silent-return guards (`if (!draft) return;` / `if (override === undefined) return;`) — no toast, no persist, dead click. Both now toast an honest error ("This card isn't open for editing — reopen it and try again" / "This card can't be edited — nothing was saved").
+- `BlueprintReportView` is now a named export so the persist path is unit-testable.
+
+**Regression tests (permanent — `src/components/client/PlanSummaryTab.persist.test.tsx`, 5 tests):** include tick persists the toggled `included` map; un-ticking the last included section is blocked with a toast and NO persist; card edit persists the per-card override (generated base untouched); Reset removes the override key; a rejected persist toasts AND reloads (never silent). Fixture lesson baked into the test: jsdom's `querySelector` mis-parses `&` inside attribute-value selectors (nwsapi) — aria lookups go through `getAttribute` comparison; `IS_REACT_ACT_ENVIRONMENT` must be set for `act()` outside the app setup.
+
+**Silent-death sweep (all other Plan Summary write paths — no changes needed):** `toggleIncluded`, `resetCard`, `remove`, `generate`, `exportToDoc`, `saveTargetsToIntake` (caller toasts), `saveTraining` (caller sets error state) — every failure path already surfaces honestly. Only `saveCard` was silent.
+
+**Gates (branch):** tsc · lint · **1157/1157 tests** (+5) · build + 404 fallback copy · e2e 4/4.
+
+**Smoke (WebBridge, trainer session, James Park summary `0a7395b8-…`):** Tracking card edit via real UI → Save → rendered + "Edited" marker → untick FAQ → section gone → hard reload → edit + marker + exclusion ALL survive → SQL probe: `result.overrides.tracking` + `result.included.faq=false` landed → row restored to original (keys verified absent, UI re-verified clean after reload). Screenshots: `.temp/audit/shots/fix2/`.
+
+**Audit tooling lesson (permanent):** never assert "no network requests" via `window.fetch` monkey-patching when supabase-js is in play — instrument at the REST layer or verify via SQL probes; a fetch patch that sees nothing proves nothing.

@@ -917,7 +917,7 @@ const rowCls = "flex items-center justify-between border-b py-1.5 text-xs last:b
 const rowLabel = "text-[var(--light-text-muted)]";
 const rowValue = "font-semibold text-[var(--page-text)]";
 
-function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTraining, onSaveTargets, onPersistResult, onReload }: { report: BlueprintResult; createdAt: string; canEdit: boolean; onDelete: () => void; onSaveTraining: (sessions: GbcSession[]) => Promise<void>; onSaveTargets: () => Promise<void>; onPersistResult: (next: BlueprintResult, message: string) => Promise<void>; onReload: () => Promise<void> }) {
+export function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTraining, onSaveTargets, onPersistResult, onReload }: { report: BlueprintResult; createdAt: string; canEdit: boolean; onDelete: () => void; onSaveTraining: (sessions: GbcSession[]) => Promise<void>; onSaveTargets: () => Promise<void>; onPersistResult: (next: BlueprintResult, message: string) => Promise<void>; onReload: () => Promise<void> }) {
   const [expanded, setExpanded] = useState(true);
   // Phase 81 Item 2: trainer-only training-module edit mode
   const [editMode, setEditMode] = useState(false);
@@ -1000,9 +1000,18 @@ function BlueprintReportView({ report, createdAt, canEdit, onDelete, onSaveTrain
   };
 
   const saveCard = async (key: SectionKey) => {
-    if (!draft) return;
+    // FIX-2: these guards were silent no-ops — a click on Save changes with
+    // no effect and no explanation reads as a broken app. They should never
+    // fire in practice, but if they ever do the trainer gets told.
+    if (!draft) {
+      toast.error("This card isn't open for editing — reopen it and try again");
+      return;
+    }
     const override = overrideFromDraft(key, draft);
-    if (override === undefined) return;
+    if (override === undefined) {
+      toast.error("This card can't be edited — nothing was saved");
+      return;
+    }
     setEditingSaving(true);
     try {
       await onPersistResult({ ...report, overrides: { ...report.overrides, [key]: override } }, "Card saved");
